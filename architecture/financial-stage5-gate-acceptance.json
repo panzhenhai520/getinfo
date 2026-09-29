@@ -1,0 +1,88 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "correctness_not_profitability": true,
+    "execution_mode": "paper",
+    "existing_sqlite_reused": true,
+    "existing_worker_reused": true,
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "point_in_time": true,
+    "real_order_execution": false
+  },
+  "runtime": {
+    "broker_calls": 0,
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "golden": {
+      "disabled_gate": {
+        "account_blocked": true,
+        "backtest_blocked": true,
+        "row_counts_unchanged": true
+      },
+      "network_attempts": [],
+      "projection_sha256": "31beb458dd13ef1ab72c9b77c5eccc5435631c80ca5065426ed944376a8d5ab1",
+      "repetition_hashes": [
+        "31beb458dd13ef1ab72c9b77c5eccc5435631c80ca5065426ed944376a8d5ab1",
+        "31beb458dd13ef1ab72c9b77c5eccc5435631c80ca5065426ed944376a8d5ab1",
+        "31beb458dd13ef1ab72c9b77c5eccc5435631c80ca5065426ed944376a8d5ab1"
+      ],
+      "repetitions": 3,
+      "restart": {
+        "analytics_retry_idempotent": true,
+        "backtest_retry_idempotent": true,
+        "creation_disabled_after_restart": true,
+        "executed": true,
+        "paper_account_retry_idempotent": true,
+        "paper_fills_retry_idempotent": true,
+        "paper_history_visible_with_switch_off": true,
+        "paper_orders_retry_idempotent": true,
+        "projection_preserved": true
+      },
+      "status": "passed"
+    },
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 70
+  },
+  "static": {
+    "forbidden_broker_domains": [
+      "api.alpaca.markets",
+      "paper-api.alpaca.markets",
+      "interactivebrokers.com",
+      "tws-api",
+      "api.binance.com",
+      "api.coinbase.com",
+      "api.kraken.com"
+    ],
+    "forbidden_broker_ports": [4001, 4002, 7496, 7497],
+    "forbidden_domain_hits": [],
+    "forbidden_port_hits": [],
+    "prohibited_imports": [],
+    "published_ports": [8003]
+  },
+  "verification": {
+    "architecture_gate": "passed",
+    "browser_regression": "passed",
+    "container_restart": {
+      "container_invocations": 2,
+      "network": "none",
+      "persistent_store": "mounted_file_sqlite",
+      "projection_sha256": "31beb458dd13ef1ab72c9b77c5eccc5435631c80ca5065426ed944376a8d5ab1",
+      "resume_checks_passed": 9,
+      "resume_phase": "passed",
+      "seed_phase": "passed"
+    },
+    "full_regression_tests": 505,
+    "offline_build": {
+      "base_image": "collectinfo:financial-simulation-view-acceptance",
+      "base_image_digest": "sha256:6f33723ef5c495f8e274b705f77aa276fbe20fdd3dac30c0dff71fe6bd37b232",
+      "image_digest": "sha256:27f0c1dca46fcd5bbc9ea0d7feb3c775ab9dd52e446b5218938d78f059a36d28",
+      "network": "none"
+    },
+    "related_regression_tests": 70
+  },
+  "task": "5.6"
+}

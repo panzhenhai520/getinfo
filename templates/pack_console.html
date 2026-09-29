@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>用户中心 - 情报系统</title>
+<link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css">
+<style>
+body.skin-darkblue{background:linear-gradient(160deg,#0e1d3a 0%,#08101f 55%,#060b1c 100%)}
+.pack-wrap{max-width:920px;margin:16px auto 40px;padding:0 18px}
+.pack-card{background:rgba(13,28,56,.82);border:1px solid rgba(96,165,250,.22);border-radius:12px;padding:20px 22px;margin-bottom:16px;color:#dbeafe}
+.pack-card h2{font-size:18px;font-weight:800;color:#e6f0ff;margin:0 0 12px}
+.pack-card label{display:block;font-size:12px;color:#8ea6c8;margin:10px 0 4px}
+.pack-card input,.pack-card select{width:100%;padding:10px 11px;border:1px solid rgba(96,165,250,.28);border-radius:8px;background:#0e1d3a;color:#e6f0ff;font-size:14px}
+.pack-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:12px}
+.pack-btn:hover{background:#1d4ed8}
+.pack-btn.sec{background:#12233f;color:#dbeafe;border:1px solid rgba(96,165,250,.28)}
+.pack-msg{font-size:12px;margin-top:8px}
+.pack-msg.ok{color:#4ade80}.pack-msg.err{color:#f87171}
+.avatar-row{display:flex;gap:16px;align-items:flex-start;margin:8px 0}
+.avatar-preview{width:96px;height:96px;border-radius:12px;object-fit:cover;background:#12233f;border:2px solid rgba(96,165,250,.3)}
+.avatar-defaults{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.avatar-def{width:46px;height:46px;border-radius:50%;cursor:pointer;border:2px solid rgba(96,165,250,.3);transition:.15s}
+.avatar-def:hover{border-color:#38bdf8;transform:scale(1.08)}
+.qr-img{width:220px;height:220px;object-fit:contain;background:#fff;border-radius:8px;display:block}
+.meta{font-size:12px;color:#8ea6c8;display:block;margin:4px 0}
+/* 浅色皮肤覆盖：卡片/输入框默认浅色，深蓝皮肤保持原深色 */
+body:not(.skin-darkblue) .pack-card{background:#fff;border-color:#e2e8f0;color:#1f2937}
+body:not(.skin-darkblue) .pack-card h2{color:#111827}
+body:not(.skin-darkblue) .pack-card label,body:not(.skin-darkblue) .meta{color:#64748b}
+body:not(.skin-darkblue) .pack-card input,body:not(.skin-darkblue) .pack-card select{background:#fff;color:#17201d;border-color:#cbd5e1}
+body:not(.skin-darkblue) .pack-btn.sec{background:#f1f5f9;color:#334155;border-color:#cbd5e1}
+body:not(.skin-darkblue) .avatar-preview{background:#f1f5f9;border-color:#cbd5e1}
+</style>
+</head>
+<body>
+<script>try{var _s=localStorage.getItem('dashSkin');document.body.classList.add((_s===null||_s==='darkblue')?'skin-darkblue':'skin-light');}catch(e){document.body.classList.add('skin-darkblue');}</script>
+{% include '_dashboard_nav.html' %}
+<main class="pack-wrap">
+  <div id="loginCard" class="pack-card">
+    <h2><i class="fa fa-sign-in-alt"></i> 包用户登录</h2>
+    <div id="loginStep1">
+      <label>用户名</label><input id="u1" type="text" autocomplete="username">
+      <label>口令</label><input id="p1" type="password" autocomplete="current-password">
+      <button class="pack-btn" onclick="step1()">下一步（获取邮箱验证码）</button>
+      <div id="msg1" class="pack-msg"></div>
+    </div>
+    <div id="loginStep2" style="display:none">
+      <label>邮箱验证码（已发送至邮箱）</label><input id="c2" type="text">
+      <button class="pack-btn" onclick="step2()">验证邮箱</button>
+      <div id="msg2" class="pack-msg"></div>
+    </div>
+    <div id="loginStep3" style="display:none">
+      <label>原口令</label><input id="o3" type="password">
+      <label>新口令（需字母+数字，至少6位）</label><input id="n3" type="password">
+      <button class="pack-btn" onclick="step3()">设置新口令并登录</button>
+      <div id="msg3" class="pack-msg"></div>
+    </div>
+    <div class="meta" style="margin-top:14px">尚未有账号？请联系行业包管理员开通。</div>
+  </div>
+
+  <div id="profileCard" class="pack-card" style="display:none">
+    <h2><i class="fa fa-user"></i> 用户中心</h2>
+    <div><span class="meta">用户名：<b id="mUser"></b></span><span class="meta">邮箱（不可改）：<b id="mEmail"></b></span><span class="meta">首次登录激活时间：<b id="mInit"></b></span><span class="meta">授权到期：<b id="mExpire"></b></span></div>
+    <div class="avatar-row">
+      <img id="mAvatar" class="avatar-preview" alt="头像">
+      <div><label>更换头像（上传图片自动裁剪为 64×64），或从默认头像中选择：</label>
+        <div id="avatarDefaults" class="avatar-defaults"></div>
+        <input id="avatarInput" type="file" accept="image/*"><button class="pack-btn sec" onclick="uploadAvatar()">上传头像</button><div id="msgA" class="pack-msg"></div></div>
+    </div>
+    <label>公司名称：</label><input id="nick" type="text"><button class="pack-btn" onclick="saveNick()">保存公司名称</button>
+    <div class="avatar-row" style="margin-top:14px">
+      <img id="mLogo" class="avatar-preview" alt="首页Logo" style="border-radius:8px">
+      <div><label>首页 Logo（登录后首页左上角显示的品牌图标；上传后需管理员在用户管理开启「首页显示用户品牌」开关）</label>
+        <input id="logoInput" type="file" accept="image/*"><button class="pack-btn sec" onclick="uploadLogo()">上传 Logo</button><div id="msgL" class="pack-msg"></div>
+        <div id="brandHint" class="meta" style="margin-top:4px"></div></div>
+    </div>
+    <label>修改口令（字母+数字 至少6位）</label><input id="newpw" type="password"><button class="pack-btn sec" onclick="savePw()">修改口令</button>
+    <div id="msgP" class="pack-msg"></div>
+    <button class="pack-btn sec" style="margin-top:16px" onclick="logout()">退出登录</button>
+  </div>
+
+  <div id="payCard" class="pack-card" style="display:none">
+    <h2><i class="fa fa-credit-card"></i> 授权续费</h2>
+    <div><span class="meta">到期时间：<b id="payExpire"></b></span><span class="meta">联系人电话：<b id="payPhone"></b></span><span class="meta">续费金额：<b id="payAmount"></b></span></div>
+    <label>支付方式</label>
+    <select id="payMethod"><option value="wechat">微信</option><option value="alipay">支付宝</option></select>
+    <button class="pack-btn" onclick="startPay()">生成付款二维码</button>
+    <div id="payBox" style="margin-top:12px"><img id="payQr" class="qr-img" alt=""><div id="payInfo" class="meta"></div></div>
+    <button class="pack-btn sec" onclick="confirmPay()" style="display:none" id="payConfirmBtn">我已支付，确认到账</button>
+    <div id="msgPay" class="pack-msg"></div>
+  </div>
+</main>
+<script>
+const PACK = '{{ active_industry_pack.id }}' || '';
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function msg(id,t,ok){var e=document.getElementById(id);if(e){e.className='pack-msg '+(ok?'ok':'err');e.textContent=t;}}
+async function post(path,body,files){var o={method:'POST'};if(body){o.headers={'Content-Type':'application/json'};o.body=JSON.stringify(body);}if(files)o.body=files;var r=await fetch(path,o);var d;try{d=await r.json();}catch(e){d={};}return {status:r.status,d};}
+async function getU(path){var r=await fetch(path,{cache:'no-store'});var d;try{d=await r.json();}catch(e){d={};}return {status:r.status,d};}
+var PACK_USER=null, PENDING_PAY=null;
+function showLogin(step){for(var i=1;i<=3;i++){document.getElementById('loginStep'+i).style.display=(i===step)?'':'none';}}
+async function step1(){msg('msg1','');var x=await post('/api/pack-users/login',{username:document.getElementById('u1').value.trim(),password:document.getElementById('p1').value});if(!x.d.success){msg('msg1',x.d.message||'登录失败',false);return;}showLogin(2);if(x.d.email_sent===false&&x.d.dev_code){msg('msg2','未配置SMTP，已切换到测试模式：验证码为 '+x.d.dev_code+'（配置SMTP后自动改为邮件发送）',true);}else{msg('msg2','验证码已发送到邮箱，请查收。',true);}}
+async function step2(){msg('msg2','');var x=await post('/api/pack-users/login/verify',{username:document.getElementById('u1').value.trim(),code:document.getElementById('c2').value.trim()});if(!x.d.success){msg('msg2',x.d.message||'验证失败',false);return;}if(x.d.step==='change_password'){showLogin(3);}else{await refresh();}}
+async function step3(){msg('msg3','');var x=await post('/api/pack-users/login/change-password',{username:document.getElementById('u1').value.trim(),old_password:document.getElementById('o3').value,new_password:document.getElementById('n3').value});if(!x.d.success){msg('msg3',x.d.message||'改密失败',false);return;}await refresh();}
+async function refresh(){var x=await getU('/api/pack-users/me');PACK_USER=x.d.user||null;if(!PACK_USER){document.getElementById('loginCard').style.display='block';document.getElementById('loginCard').style.display='block';['profileCard','payCard'].forEach(function(i){document.getElementById(i).style.display='none';});showLogin(1);window.__setNavUser&&window.__setNavUser(null);return;}document.getElementById('loginCard').style.display='none';document.getElementById('profileCard').style.display='block';document.getElementById('payCard').style.display='block';
+  document.getElementById('mUser').textContent=PACK_USER.username;document.getElementById('mEmail').textContent=PACK_USER.email;document.getElementById('mInit').textContent=PACK_USER.init_login_at||'—';document.getElementById('mExpire').textContent=PACK_USER.expire_at||'—';document.getElementById('nick').value=PACK_USER.company_name||'';if(PACK_USER.avatar)document.getElementById('mAvatar').src='/'+PACK_USER.avatar;const _lg=document.getElementById('mLogo'),_bh=document.getElementById('brandHint');if(_lg){if(PACK_USER.logo_url){_lg.src=PACK_USER.logo_url;_lg.style.display='';}else{_lg.style.display='none';}}if(_bh){_bh.textContent=PACK_USER.show_user_brand?'✅ 管理员已开启「首页显示用户品牌」，登录后首页将显示你的公司名与 Logo。':'⚠️ 管理员尚未开启「首页显示用户品牌」，Logo 上传后仍需要在行业包用户管理里开启开关才会生效。';}window.__setNavUser&&window.__setNavUser(PACK_USER);loadExpiry();}
+async function uploadAvatar(){var f=document.getElementById('avatarInput').files[0];if(!f){msg('msgA','请选择图片',false);return;}var fd=new FormData();fd.append('file',f);var x=await post('/api/pack-users/avatar',null,fd);if(!x.d.success){msg('msgA',x.d.message||'上传失败',false);return;}msg('msgA','头像已更新（64×64）',true);document.getElementById('mAvatar').src=x.d.url;window.__setNavUser&&window.__setNavUser(true);}
+async function uploadLogo(){var f=document.getElementById('logoInput').files[0];if(!f){msg('msgL','请选择图片',false);return;}var fd=new FormData();fd.append('file',f);var x=await post('/api/pack-users/logo',null,fd);if(!x.d.success){msg('msgL',x.d.message||'上传失败',false);return;}msg('msgL','Logo 已更新',true);var lg=document.getElementById('mLogo');lg.src=x.d.url;lg.style.display='';window.__setNavUser&&window.__setNavUser(true);}
+// 10 个默认抽象头像
+var DEFAULT_AV_COLORS=[['#2563eb','#7dd3fc'],['#0f766e','#5eead4'],['#7c3aed','#c4b5fd'],['#d97706','#fcd34d'],['#e11d48','#fda4af'],['#0ea5e9','#bae6fd'],['#16a34a','#86efac'],['#64748b','#cbd5e1'],['#db2777','#f9a8d4'],['#4f46e5','#a5b4fc']];
+function renderDefAvatars(){var box=document.getElementById('avatarDefaults');if(!box)return;box.innerHTML='';DEFAULT_AV_COLORS.forEach(function(c){
+  var cv=document.createElement('canvas');cv.width=92;cv.height=92;cv.className='avatar-def';var ctx=cv.getContext('2d');var g=ctx.createLinearGradient(0,0,92,92);g.addColorStop(0,c[0]);g.addColorStop(1,c[1]);ctx.fillStyle=g;ctx.fillRect(0,0,92,92);
+  ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(46,46,30,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(46,46,16,0,Math.PI*2);ctx.stroke();
+  cv.title='选择此头像';cv.onclick=function(){cv.toBlob(function(blob){var fd=new FormData();fd.append('file',blob,'avatar.png');uploadDefault(fd);},'image/png');};box.appendChild(cv);});}
+async function uploadDefault(fd){var x=await post('/api/pack-users/avatar',null,fd);if(!x.d.success){msg('msgA',x.d.message||'上传失败',false);return;}msg('msgA','默认头像已更新',true);document.getElementById('mAvatar').src=x.d.url;window.__setNavUser&&window.__setNavUser(true);}
+renderDefAvatars();
+async function saveNick(){var x=await fetch('/api/pack-users/profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({company_name:document.getElementById('nick').value.trim()})});var d=await x.json();msg('msgP',d.success?'公司名称已保存':(d.message||'失败'),d.success);}
+async function savePw(){var pw=document.getElementById('newpw').value;var x=await fetch('/api/pack-users/profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_password:pw})});var d=await x.json();msg('msgP',d.success?'口令已修改':(d.message||'失败'),d.success);}
+async function logout(){await post('/api/pack-users/logout',{});await refresh();}
+async function loadExpiry(){var x=await getU('/api/pack-users/my-expiry?industry_pack_id='+encodeURIComponent(PACK));var i=x.d.info;if(i){document.getElementById('payExpire').textContent=i.expire_at||'—';document.getElementById('payPhone').textContent=i.contact_phone||'—';document.getElementById('payAmount').textContent=i.renewal_amount||'—';}}
+async function startPay(){msg('msgPay','');var x=await post('/api/pack-users/payments',{industry_pack_id:PACK,method:document.getElementById('payMethod').value});if(!x.d.success){msg('msgPay',x.d.message||'发起失败',false);return;}PENDING_PAY=x.d.payment_id;document.getElementById('payQr').src=x.d.qr;document.getElementById('payInfo').textContent='账户:'+x.d.account+' · '+x.d.method+' · 金额:'+x.d.amount+'元';document.getElementById('payConfirmBtn').style.display='inline-flex';msg('msgPay','请用'+x.d.method+'扫码支付。',true);}
+async function confirmPay(){if(!PENDING_PAY)return;var x=await post('/api/pack-users/payments/'+PENDING_PAY+'/confirm',{});if(!x.d.success){msg('msgPay',x.d.message||'确认失败',false);return;}document.getElementById('payConfirmBtn').style.display='none';msg('msgPay','已支付，授权延期至 '+x.d.new_expire_at,true);loadExpiry();}
+refresh();
+</script>
+</body>
+</html>

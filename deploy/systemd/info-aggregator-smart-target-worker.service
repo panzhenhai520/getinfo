@@ -1,0 +1,22 @@
+[Unit]
+Description=Info Aggregator Smart Target URL Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=timebot
+Group=timebot
+WorkingDirectory=/home/timebot/app
+Environment=PYTHONUNBUFFERED=1
+Environment=DATABASE_PATH=/home/timebot/app/data/crawler_articles.db
+Environment=CRAWL4_AI_BASE_DIRECTORY=/home/timebot/app/data/crawl4ai
+Environment=PLAYWRIGHT_BROWSERS_PATH=/home/timebot/app/data/ms-playwright
+EnvironmentFile=-/home/timebot/app/.env
+ExecStart=/usr/bin/python3 /home/timebot/app/smart_target_worker.py --daemon --mode incremental --interval-seconds 3600 --ttl-hours 48 --max-keywords 8 --max-candidates 10 --max-results 6 --article-sample-size 2 --max-articles-per-keyword 3
+Restart=always
+RestartSec=15
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,78 @@
+{
+  "acceptance_version": "shared-llm-broker-v1",
+  "stage": "2.14",
+  "status": "passed",
+  "runtime_identity": {
+    "provider_id": "local",
+    "runtime_source": "chat_api.get_chat_model_runtime_config(local)",
+    "same_base_url_as_ai_assistant": true,
+    "same_model_id_as_ai_assistant": true,
+    "api_key_exposed": false
+  },
+  "implementation": {
+    "type": "embedded_library",
+    "transport": "intel_llm_client.IntelLLMClient",
+    "profiles": [
+      "fast",
+      "deep"
+    ],
+    "priority_order": [
+      "chat_clarification",
+      "chat_fact",
+      "interactive_research",
+      "scheduled_research",
+      "batch_reflection"
+    ],
+    "fair_fifo_with_priority_aging": true,
+    "cooperative_cancellation": true,
+    "bounded_retry_and_overall_deadline": true,
+    "json_schema_validation": "Draft 2020-12",
+    "tool_calls_returned_not_executed": true,
+    "context_silently_truncated": false,
+    "unauthorized_cloud_fallback": false
+  },
+  "audit": {
+    "table": "llm_call_audit",
+    "required_for_every_call": true,
+    "plaintext_prompt_stored": false,
+    "plaintext_response_stored": false,
+    "api_key_stored": false,
+    "prompt_sha256_stored": true,
+    "response_sha256_stored": true
+  },
+  "live_probe": {
+    "command": "python3 tools/check_shared_llm_broker.py --live --timeout-seconds 20",
+    "passed": true,
+    "audit_database": "temporary",
+    "secret_exposed": false
+  },
+  "focused_acceptance": {
+    "command": "python3 -m unittest tests.test_shared_llm_broker tests.test_intel_stage4 tests.test_tradingagents_architecture -v",
+    "tests_run": 20,
+    "passed": true
+  },
+  "full_regression": {
+    "command": "python3 -m unittest discover -s tests",
+    "tests_run": 209,
+    "passed": true
+  },
+  "baseline_recovery": {
+    "database_integrity_passed": true,
+    "host_application_smoke_passed": true,
+    "passed": true
+  },
+  "architecture": {
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "published_ports": [
+      8003
+    ],
+    "new_llm_service": false,
+    "new_port": false,
+    "static_guard_passed": true
+  }
+}

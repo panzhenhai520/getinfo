@@ -1,0 +1,16 @@
+[Unit]
+Description=FRP Client Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=timebot
+WorkingDirectory=/opt/frp_0.64.0_linux_amd64
+ExecStart=/opt/frp_0.64.0_linux_amd64/frpc -c /opt/frp_0.64.0_linux_amd64/frpc.toml
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

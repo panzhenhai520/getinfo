@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "seed_version": "default-market-scopes-v1",
+  "source_provider_key": "project_controlled_seed",
+  "effective_from": "2026-01-01",
+  "universes": [
+    {
+      "universe_key": "CN_XSHG_MARKET",
+      "display_name": "上交所市场概览",
+      "universe_type": "market",
+      "market": "CN",
+      "definition_version": "xshg-market-v1",
+      "definition": {
+        "constituent_basis": "上证综指基准行情与上交所全市场宽度",
+        "scope_basis": "benchmark_plus_market_breadth",
+        "required_market_metrics": ["breadth:XSHG"],
+        "sampling_policy": "benchmark_priority",
+        "currency_policy": "group_without_implicit_conversion",
+        "must_not_represent_market_with_single_equity": true
+      },
+      "members": [
+        {"canonical_symbol": "000001.SH", "role": "benchmark", "priority": 10}
+      ]
+    },
+    {
+      "universe_key": "CN_XSHE_MARKET",
+      "display_name": "深交所市场概览",
+      "universe_type": "market",
+      "market": "CN",
+      "definition_version": "xshe-market-v1",
+      "definition": {
+        "constituent_basis": "深证成指、创业板指基准行情与深交所全市场宽度",
+        "scope_basis": "benchmarks_plus_market_breadth",
+        "required_market_metrics": ["breadth:XSHE"],
+        "sampling_policy": "benchmark_priority",
+        "currency_policy": "group_without_implicit_conversion",
+        "must_not_represent_market_with_single_equity": true
+      },
+      "members": [
+        {"canonical_symbol": "399001.SZ", "role": "benchmark", "priority": 10},
+        {"canonical_symbol": "399006.SZ", "role": "benchmark", "priority": 20}
+      ]
+    },
+    {
+      "universe_key": "CN_A_MARKET",
+      "display_name": "A股市场概览",
+      "universe_type": "market",
+      "market": "CN",
+      "definition_version": "cn-a-market-v1",
+      "definition": {
+        "constituent_basis": "上证综指、深证成指、创业板指、沪深300与沪深两市宽度",
+        "scope_basis": "benchmarks_plus_market_breadth",
+        "required_market_metrics": ["breadth:XSHG", "breadth:XSHE"],
+        "sampling_policy": "benchmark_priority",
+        "currency_policy": "group_without_implicit_conversion",
+        "must_not_represent_market_with_single_equity": true
+      },
+      "members": [
+        {"canonical_symbol": "000001.SH", "role": "benchmark", "priority": 10},
+        {"canonical_symbol": "399001.SZ", "role": "benchmark", "priority": 20},
+        {"canonical_symbol": "399006.SZ", "role": "benchmark", "priority": 30},
+        {"canonical_symbol": "000300.SH", "role": "benchmark", "priority": 40}
+      ]
+    },
+    {
+      "universe_key": "HK_MARKET",
+      "display_name": "香港股票市场概览",
+      "universe_type": "market",
+      "market": "HK",
+      "definition_version": "hk-market-v1",
+      "definition": {
+        "constituent_basis": "恒生指数、恒生科技指数与港股全市场宽度",
+        "scope_basis": "benchmarks_plus_market_breadth",
+        "required_market_metrics": ["breadth:XHKG"],
+        "sampling_policy": "benchmark_priority",
+        "currency_policy": "group_without_implicit_conversion",
+        "must_not_represent_market_with_single_equity": true
+      },
+      "members": [
+        {"canonical_symbol": "HSI.HK", "role": "benchmark", "priority": 10},
+        {"canonical_symbol": "HSTECH.HK", "role": "benchmark", "priority": 20}
+      ]
+    },
+    {
+      "universe_key": "DEFAULT_MARKET_PULSE",
+      "display_name": "默认市场脉搏",
+      "universe_type": "composite_market",
+      "market": "CN+HK",
+      "definition_version": "default-market-pulse-v1",
+      "definition": {
+        "constituent_basis": "A股总览、上证、深证及香港市场的六项基准与三地市场宽度",
+        "scope_basis": "cross_market_benchmarks_plus_market_breadth",
+        "required_market_metrics": ["breadth:XSHG", "breadth:XSHE", "breadth:XHKG"],
+        "sampling_policy": "market_then_benchmark_priority",
+        "currency_policy": "group_without_implicit_conversion",
+        "must_not_represent_market_with_single_equity": true,
+        "default_scope_notice": "用户未指定市场，采用A股与香港市场默认范围"
+      },
+      "members": [
+        {"canonical_symbol": "000001.SH", "role": "benchmark", "priority": 10},
+        {"canonical_symbol": "399001.SZ", "role": "benchmark", "priority": 20},
+        {"canonical_symbol": "399006.SZ", "role": "benchmark", "priority": 30},
+        {"canonical_symbol": "000300.SH", "role": "benchmark", "priority": 40},
+        {"canonical_symbol": "HSI.HK", "role": "benchmark", "priority": 50},
+        {"canonical_symbol": "HSTECH.HK", "role": "benchmark", "priority": 60}
+      ]
+    }
+  ]
+}

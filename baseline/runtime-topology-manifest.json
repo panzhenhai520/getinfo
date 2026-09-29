@@ -1,0 +1,574 @@
+{
+  "acceptance": {
+    "all_configured_images_have_immutable_ids": true,
+    "all_services_running": true,
+    "compose_service_set_matches_runtime": true,
+    "configured_healthchecks_passed": true,
+    "environment_values_absent": true,
+    "host_python_dependencies_recorded": true,
+    "passed": true,
+    "runtime_packages_match_lock": true,
+    "smoke_image_has_immutable_id": true,
+    "system_health_endpoint_passed": true,
+    "systemd_web_service_active": true,
+    "web_port_listener_present": true
+  },
+  "captured_at_utc": "2026-08-01T03:11:33Z",
+  "compose": {
+    "networks": [
+      "default"
+    ],
+    "services": {
+      "crawler": {
+        "build": true,
+        "command": [
+          "gunicorn",
+          "-w",
+          "2",
+          "--threads",
+          "4",
+          "--bind",
+          "0.0.0.0:8003",
+          "--timeout",
+          "300",
+          "firecrawl_app:app"
+        ],
+        "container_name": "firecrawl-crawler",
+        "depends_on": [
+          "redis"
+        ],
+        "env_files": [
+          ".env"
+        ],
+        "environment_keys": [
+          "AUTH_STORAGE_DIR",
+          "CRAWL_LINK_DISCOVERY_MAX_PAGES",
+          "CRAWL_MAX_ARTICLES_PER_TASK",
+          "CRAWL_RESULTS_DIR",
+          "CRAWL_SCHEDULER_ADMIN_MAX_CONCURRENT",
+          "CRAWL_SCHEDULER_MAX_CONCURRENT",
+          "CRAWL_SCHEDULER_MAX_PER_DOMAIN",
+          "CRAWL_SCHEDULER_TASK_TIMEOUT",
+          "DATABASE_PATH",
+          "ENABLE_SCHEDULER",
+          "FLASK_HOST",
+          "FLASK_PORT",
+          "LOG_FILE",
+          "PLAYWRIGHT_MAX_CONCURRENT",
+          "REDIS_HOST",
+          "REDIS_PORT",
+          "TZ"
+        ],
+        "environment_values_recorded": false,
+        "healthcheck_configured": true,
+        "image": "firecrawlapp-crawler:latest",
+        "ports": [
+          "${CRAWLER_HOST_PORT:-8003}:8003"
+        ],
+        "restart": "unless-stopped",
+        "volumes": [
+          {
+            "read_only": false,
+            "source": ".",
+            "target": "/app",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./data",
+            "target": "/app/data",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./crawl_results",
+            "target": "/app/crawl_results",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./auth_storage",
+            "target": "/app/auth_storage",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./crawl_logs",
+            "target": "/app/crawl_logs",
+            "type": "bind"
+          }
+        ]
+      },
+      "intel-worker": {
+        "build": true,
+        "command": [
+          "python",
+          "intel_worker.py"
+        ],
+        "container_name": "firecrawl-intel-worker",
+        "depends_on": [
+          "redis"
+        ],
+        "env_files": [
+          ".env"
+        ],
+        "environment_keys": [
+          "DATABASE_PATH",
+          "INTEL_CANDIDATE_DISPATCH_ENABLED",
+          "INTEL_CLASSIFICATION_ENABLED",
+          "INTEL_LIGHT_SCANNER_ENABLED",
+          "INTEL_LIGHT_SCAN_DAILY_TIME",
+          "INTEL_SCAN_MAX_SOURCES_PER_RUN",
+          "INTEL_SOURCE_SYNC_ENABLED",
+          "INTEL_TOPIC_CLUSTER_ENABLED",
+          "RAGFLOW_LLM_ENABLED",
+          "TZ"
+        ],
+        "environment_values_recorded": false,
+        "healthcheck_configured": true,
+        "image": "firecrawlapp-crawler:latest",
+        "ports": [],
+        "restart": "unless-stopped",
+        "volumes": [
+          {
+            "read_only": false,
+            "source": ".",
+            "target": "/app",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./data",
+            "target": "/app/data",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./crawl_results",
+            "target": "/app/crawl_results",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./crawl_logs",
+            "target": "/app/crawl_logs",
+            "type": "bind"
+          }
+        ]
+      },
+      "redis": {
+        "build": false,
+        "command": [
+          "redis-server",
+          "--appendonly",
+          "yes"
+        ],
+        "container_name": "firecrawl-redis",
+        "depends_on": [],
+        "env_files": [],
+        "environment_keys": [],
+        "environment_values_recorded": false,
+        "healthcheck_configured": true,
+        "image": "redis:7-alpine",
+        "ports": [],
+        "restart": "unless-stopped",
+        "volumes": [
+          {
+            "read_only": false,
+            "source": "redis_data",
+            "target": "/data",
+            "type": "volume"
+          }
+        ]
+      },
+      "worker": {
+        "build": true,
+        "command": [
+          "python",
+          "start_scheduler_worker.py"
+        ],
+        "container_name": "firecrawl-worker",
+        "depends_on": [
+          "redis"
+        ],
+        "env_files": [
+          ".env"
+        ],
+        "environment_keys": [
+          "AUTH_STORAGE_DIR",
+          "CRAWL_LINK_DISCOVERY_MAX_PAGES",
+          "CRAWL_MAX_ARTICLES_PER_TASK",
+          "CRAWL_RESULTS_DIR",
+          "CRAWL_SCHEDULER_ADMIN_MAX_CONCURRENT",
+          "CRAWL_SCHEDULER_MAX_CONCURRENT",
+          "CRAWL_SCHEDULER_MAX_PER_DOMAIN",
+          "CRAWL_SCHEDULER_STALE_RUN_GRACE_SECONDS",
+          "CRAWL_SCHEDULER_TASK_TIMEOUT",
+          "DATABASE_PATH",
+          "ENABLE_SCHEDULER",
+          "LOG_FILE",
+          "PLAYWRIGHT_MAX_CONCURRENT",
+          "REDIS_HOST",
+          "REDIS_PORT",
+          "TZ"
+        ],
+        "environment_values_recorded": false,
+        "healthcheck_configured": false,
+        "image": "firecrawlapp-crawler:latest",
+        "ports": [],
+        "restart": "unless-stopped",
+        "volumes": [
+          {
+            "read_only": false,
+            "source": ".",
+            "target": "/app",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./data",
+            "target": "/app/data",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./crawl_results",
+            "target": "/app/crawl_results",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./auth_storage",
+            "target": "/app/auth_storage",
+            "type": "bind"
+          },
+          {
+            "read_only": false,
+            "source": "./crawl_logs",
+            "target": "/app/crawl_logs",
+            "type": "bind"
+          }
+        ]
+      }
+    },
+    "volumes": [
+      "redis_data"
+    ]
+  },
+  "configured_images": {
+    "firecrawlapp-crawler:latest": {
+      "architecture": "amd64",
+      "created": "2026-07-28T12:23:59.793541425+08:00",
+      "image_id": "sha256:5d373112a765764daad67dfe431a87a3a2ef3886900d1c13aec4cf9b2cb06e23",
+      "os": "linux",
+      "repo_digests": [
+        "firecrawlapp-crawler@sha256:5d373112a765764daad67dfe431a87a3a2ef3886900d1c13aec4cf9b2cb06e23"
+      ],
+      "size": 1297723405
+    },
+    "redis:7-alpine": {
+      "architecture": "amd64",
+      "created": "2026-05-07T17:34:49.043581139Z",
+      "image_id": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+      "os": "linux",
+      "repo_digests": [
+        "redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99"
+      ],
+      "size": 16275739
+    }
+  },
+  "host_python": "3.10.12",
+  "host_python_executable": "/usr/bin/python3",
+  "host_python_packages": [
+    "aiofiles==25.1.0",
+    "aiohappyeyeballs==2.6.2",
+    "aiohttp==3.14.1",
+    "aiosignal==1.4.0",
+    "aiosqlite==0.22.1",
+    "alphashape==1.3.1",
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.14.1",
+    "apturl==0.5.2",
+    "async-timeout==5.0.1",
+    "attrs==26.1.0",
+    "babel==2.18.0",
+    "bcrypt==3.2.0",
+    "beautifulsoup4==4.12.2",
+    "blinker==1.4",
+    "blinker==1.9.0",
+    "Brlapi==0.8.3",
+    "brotli==1.2.0",
+    "certifi==2020.6.20",
+    "certifi==2026.6.17",
+    "cffi==2.0.0",
+    "chardet==4.0.0",
+    "chardet==7.4.3",
+    "charset-normalizer==3.4.7",
+    "click-log==0.4.0",
+    "click==8.0.3",
+    "click==8.4.2",
+    "colorama==0.4.4",
+    "command-not-found==0.3",
+    "courlan==1.4.0",
+    "Crawl4AI==0.9.0",
+    "cryptography==3.4.8",
+    "cryptography==49.0.0",
+    "cssselect==1.4.0",
+    "cupshelpers==1.0",
+    "dateparser==1.4.1",
+    "dbus-python==1.2.18",
+    "defer==1.0.6",
+    "distro-info==1.1+ubuntu0.2",
+    "distro==1.7.0",
+    "duplicity==0.8.21",
+    "exceptiongroup==1.3.1",
+    "fake-useragent==2.2.0",
+    "fasteners==0.14.1",
+    "fastuuid==0.14.0",
+    "feedfinder2==0.0.4",
+    "feedparser==6.0.12",
+    "filelock==3.29.4",
+    "Flask-Cors==4.0.0",
+    "Flask==2.3.3",
+    "frozenlist==1.8.0",
+    "fsspec==2026.6.0",
+    "future==0.18.2",
+    "greenlet==3.5.3",
+    "h11==0.16.0",
+    "h2==4.3.0",
+    "hf-xet==1.5.1",
+    "hpack==4.2.0",
+    "htmldate==1.10.0",
+    "httpcore==1.0.9",
+    "httplib2==0.20.2",
+    "httpx==0.28.1",
+    "huggingface_hub==1.21.0",
+    "humanize==4.15.0",
+    "hyperframe==6.1.0",
+    "idna==3.3",
+    "importlib-metadata==4.6.4",
+    "importlib_metadata==9.0.0",
+    "itsdangerous==2.2.0",
+    "jeepney==0.7.1",
+    "jieba3k==0.35.1",
+    "Jinja2==3.1.6",
+    "jiter==0.15.0",
+    "joblib==1.5.3",
+    "jsonschema-specifications==2025.9.1",
+    "jsonschema==4.26.0",
+    "jusText==3.0.2",
+    "keyring==23.5.0",
+    "language-selector==0.1",
+    "lark==1.3.1",
+    "launchpadlib==1.10.16",
+    "lazr.restfulclient==0.14.4",
+    "lazr.uri==1.0.6",
+    "lockfile==0.12.2",
+    "louis==3.20.0",
+    "lxml==5.4.0",
+    "lxml_html_clean==0.4.5",
+    "macaroonbakery==1.3.1",
+    "Mako==1.1.3",
+    "markdown-it-py==4.2.0",
+    "MarkupSafe==2.0.1",
+    "MarkupSafe==3.0.3",
+    "mdurl==0.1.2",
+    "monotonic==1.6",
+    "more-itertools==8.10.0",
+    "multidict==6.7.1",
+    "netifaces==0.11.0",
+    "networkx==3.4.2",
+    "newspaper3k==0.2.8",
+    "nltk==3.9.4",
+    "numpy==2.2.6",
+    "oauthlib==3.2.0",
+    "olefile==0.46",
+    "openai==2.44.0",
+    "opencc-python-reimplemented==0.1.7",
+    "packaging==26.2",
+    "paramiko==2.9.3",
+    "patchright==1.61.1",
+    "pexpect==4.8.0",
+    "pillow==12.2.0",
+    "Pillow==9.0.1",
+    "pip==26.1.2",
+    "playwright-stealth==2.0.3",
+    "playwright==1.61.0",
+    "propcache==0.5.2",
+    "protobuf==3.12.4",
+    "psutil==7.2.2",
+    "ptyprocess==0.7.0",
+    "pycairo==1.20.1",
+    "pycparser==3.0",
+    "pycups==2.0.1",
+    "pydantic==2.13.4",
+    "pydantic_core==2.46.4",
+    "pyee==13.0.1",
+    "Pygments==2.20.0",
+    "PyGObject==3.42.1",
+    "PyJWT==2.3.0",
+    "pymacaroons==0.13.0",
+    "PyNaCl==1.5.0",
+    "pyOpenSSL==26.3.0",
+    "pyparsing==2.4.7",
+    "pyRFC3339==1.1",
+    "PySocks==1.7.1",
+    "python-apt==2.4.0+ubuntu4.1",
+    "python-dateutil==2.8.1",
+    "python-dateutil==2.9.0.post0",
+    "python-debian==0.1.43+ubuntu1.1",
+    "python-dotenv==1.2.2",
+    "pytz==2022.1",
+    "pytz==2026.2",
+    "pyxdg==0.27",
+    "PyYAML==5.4.1",
+    "PyYAML==6.0.3",
+    "rank-bm25==0.2.2",
+    "readability-lxml==0.8.4.1",
+    "redis==8.0.1",
+    "referencing==0.37.0",
+    "regex==2026.6.28",
+    "reportlab==3.6.8",
+    "requests-file==3.0.1",
+    "requests==2.25.1",
+    "requests==2.34.2",
+    "rich==15.0.0",
+    "rpds-py==0.30.0",
+    "rtree==1.4.1",
+    "scipy==1.15.3",
+    "SecretStorage==3.3.1",
+    "setuptools==82.0.1",
+    "sgmllib3k==1.0.0",
+    "shapely==2.1.2",
+    "shellingham==1.5.4",
+    "six==1.16.0",
+    "sniffio==1.3.1",
+    "snowballstemmer==2.2.0",
+    "soupsieve==2.8.4",
+    "ssh-import-id==5.11",
+    "systemd-python==234",
+    "tiktoken==0.13.0",
+    "tinysegmenter==0.3",
+    "tld==0.13.2",
+    "tldextract==5.3.1",
+    "tokenizers==0.23.1",
+    "tqdm==4.68.3",
+    "trafilatura==2.1.0",
+    "trimesh==4.12.2",
+    "typer==0.25.1",
+    "typing-inspection==0.4.2",
+    "typing_extensions==4.15.0",
+    "tzlocal==5.4.4",
+    "ubuntu-drivers-common==0.0.0",
+    "ubuntu-pro-client==8001",
+    "ufw==0.36.1",
+    "unattended-upgrades==0.1",
+    "unclecode-litellm==1.81.13",
+    "urllib3==1.26.5",
+    "usb-creator==0.3.7",
+    "wadllib==1.3.6",
+    "Werkzeug==2.3.7",
+    "wheel==0.47.0",
+    "xdg==5",
+    "xkit==0.0.0",
+    "xxhash==3.8.0",
+    "yarl==1.24.2",
+    "zipp==1.0.0",
+    "zipp==4.1.0"
+  ],
+  "host_python_packages_sha256": "13dd16bd040016d3a6dbcf93052cb857c509ed71eb6c8d6685762d0917bc3ae2",
+  "listeners": [
+    {
+      "address": "0.0.0.0",
+      "pid": 1327588,
+      "port": 8003,
+      "process": "python3"
+    }
+  ],
+  "manifest_version": "runtime-topology-baseline-v1",
+  "package_lock_count": 106,
+  "package_lock_values_recorded": true,
+  "repository_root": "/home/timebot/app",
+  "runtime_containers": {
+    "crawler": {
+      "configured_image": "firecrawlapp-crawler:latest",
+      "container_name": "firecrawl-crawler",
+      "environment_values_recorded": false,
+      "health": "healthy",
+      "runtime_image_id": "sha256:5d373112a765764daad67dfe431a87a3a2ef3886900d1c13aec4cf9b2cb06e23",
+      "state": "running"
+    },
+    "intel-worker": {
+      "configured_image": "firecrawlapp-crawler:latest",
+      "container_name": "firecrawl-intel-worker",
+      "environment_values_recorded": false,
+      "health": "healthy",
+      "runtime_image_id": "sha256:5d373112a765764daad67dfe431a87a3a2ef3886900d1c13aec4cf9b2cb06e23",
+      "state": "running"
+    },
+    "redis": {
+      "configured_image": "redis:7-alpine",
+      "container_name": "firecrawl-redis",
+      "environment_values_recorded": false,
+      "health": "healthy",
+      "runtime_image_id": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+      "state": "running"
+    },
+    "worker": {
+      "configured_image": "firecrawlapp-crawler:latest",
+      "container_name": "firecrawl-worker",
+      "environment_values_recorded": false,
+      "health": "none",
+      "runtime_image_id": "sha256:f8fe4a473bea773c0a61593b130d6e55717017e6229990df6733e5b264f01980",
+      "state": "running"
+    }
+  },
+  "smoke_image": {
+    "architecture": "amd64",
+    "created": "2026-08-01T10:52:45.792788149+08:00",
+    "image_id": "sha256:3693540822200b4c8b5fd3a0f3b58f13acc1b88cd8a642216c57f30a5d2c156f",
+    "name": "firecrawlapp-crawler:baseline-smoke",
+    "os": "linux",
+    "repo_digests": [
+      "firecrawlapp-crawler@sha256:3693540822200b4c8b5fd3a0f3b58f13acc1b88cd8a642216c57f30a5d2c156f"
+    ],
+    "size": 1299069485
+  },
+  "system_health": {
+    "chrome_process_count": 24,
+    "http_status": 200,
+    "running_tasks": 2,
+    "status": "ok",
+    "success": true,
+    "zombie_count": 0
+  },
+  "systemd_web_service": {
+    "active_state": "active",
+    "environment_values_recorded": false,
+    "exec_argv": [
+      "/usr/bin/python3",
+      "/home/timebot/app/start_with_schedule.py"
+    ],
+    "exec_path": "/usr/bin/python3",
+    "fragment_path": "/etc/systemd/system/firecrawl.service",
+    "fragment_sha256": "67ab989c415433e42d9fe8f54abef5be3c5002d5accd2d4e6ee299c70ec73fd7",
+    "group": "timebot",
+    "main_pid": 1327588,
+    "restart": "always",
+    "sub_state": "running",
+    "unit": "firecrawl.service",
+    "unit_file_state": "enabled",
+    "user": "timebot",
+    "working_directory": "/home/timebot/app"
+  },
+  "tracked_file_sha256": {
+    ".dockerignore": "8e3e01fca318976bccf2411c9fce086a7992379db7d06dda1da12ebe365d9cd7",
+    "Dockerfile": "6054977b128576a65252bbc6b8ae8195b8ee12a7a6143bde596ac804e9a83e27",
+    "Dockerfile.baseline-smoke": "99679b1d418ea52b8648c9c989db4ae9e1adadf869e6c244e955208e6ee82fa6",
+    "baseline/docker-compose.image-lock.yml": "6df61491e3e60e7a5ca4fc268d7496a2e79521acb18eaf531483eeece9375aa8",
+    "baseline/runtime-pip-freeze.txt": "ea5bd99592bf105ab9bb034473ecef3e260e207ebe904d8cdb13d4905d310e57",
+    "docker-compose.crawler.yml": "ccec912f027f00e3bd2f267fce36b66eda09cd95867b440954c0a4bf4555864e",
+    "requirements.txt": "642669c81afe50e840420566ea826a025bebdd74366470cbd9e3aef4976737f1"
+  }
+}

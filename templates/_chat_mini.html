@@ -1,0 +1,405 @@
+{# ============================================================
+   轻量 AI 助手抽屉（_chat_mini.html）
+   给没有完整聊天实现、但能查看文章详情的页面复用：
+   唤醒按钮 + 抽屉（发送/流式回复）+「引用到AI助手」入口。
+   数据隔离由服务端按会话完成，前端只传行业包 ID。
+   ============================================================ #}
+<button type="button" class="mini-chat-fab" id="miniChatFab" title="唤醒AI助手" aria-label="唤醒AI助手"><i class="fa fa-robot"></i></button>
+<aside class="mini-chat-drawer" id="miniChatDrawer" aria-label="AI助手">
+    <header class="mini-chat-head">
+        <div class="mini-chat-title"><i class="fa fa-robot"></i> AI助手</div>
+        <button type="button" class="mini-chat-close" id="miniChatClose" aria-label="关闭"><i class="fa fa-chevron-right"></i></button>
+    </header>
+    <div class="mini-chat-body" id="miniChatMessages">
+        <div class="mini-chat-welcome">你好，我是 AI 助手。可以在文章详情中选中文字后点击「引用到AI助手」，或直接输入问题。</div>
+    </div>
+    <form class="mini-chat-compose" id="miniChatForm">
+        <div class="mini-chat-input-row">
+            <textarea id="miniChatInput" placeholder="输入问题，与 AI 助手对话"></textarea>
+            <button class="mini-chat-send" type="submit" title="发送"><i class="fa fa-paper-plane"></i></button>
+        </div>
+        <div class="mini-chat-status" id="miniChatStatus" role="status"></div>
+    </form>
+</aside>
+<aside class="mini-retrieval-drawer" id="miniRetrievalDrawer" aria-label="本次回答参考的库内文章">
+    <header class="mini-retrieval-head">
+        <strong><i class="fa fa-book" aria-hidden="true"></i> 本次回答参考的库内文章</strong>
+        <button type="button" class="mini-retrieval-close" id="miniRetrievalClose" aria-label="关闭">×</button>
+    </header>
+    <div class="mini-retrieval-body" id="miniRetrievalBody"></div>
+</aside>
+<div class="mini-chat-toast" id="miniChatToast" role="status" aria-live="polite"></div>
+<style>
+    .mini-chat-fab {
+        position: fixed; right: 18px; bottom: 92px; z-index: 1500;
+        width: 52px; height: 52px; border: 0; border-radius: 50%;
+        background: var(--accent, #1d7f68); color: #fff; font-size: 22px;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 8px 22px rgba(15, 118, 110, .35); cursor: pointer;
+    }
+    .mini-chat-fab.hidden { display: none; }
+    .mini-chat-drawer {
+        position: fixed; top: 0; right: 0; z-index: 2000;
+        width: min(560px, 100vw); height: 100vh; height: 100dvh;
+        display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, auto);
+        background: rgba(250, 252, 249, .98); color: #17201d;
+        border-left: 1px solid #dbe5df; box-shadow: -18px 0 50px rgba(33, 43, 38, .16);
+        transform: translateX(105%); transition: transform 220ms ease;
+    }
+    .mini-chat-drawer.open { transform: translateX(0); }
+    .mini-chat-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 14px; border-bottom: 1px solid #dbe5df;
+    }
+    .mini-chat-title { font-weight: 700; font-size: 15px; }
+    .mini-chat-title i { color: var(--accent, #1d7f68); margin-right: 6px; }
+    .mini-chat-close { width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; font-size: 16px; }
+    .mini-chat-close:hover { background: rgba(29, 127, 104, .1); }
+    .mini-chat-body { min-height: 0; overflow-y: auto; padding: 14px; font-size: 14px; line-height: 1.7; }
+    .mini-chat-welcome { color: #6b7280; font-size: 13px; }
+    .mini-chat-msg { max-width: 86%; margin: 0 0 12px; padding: 9px 12px; border-radius: 9px; white-space: pre-wrap; word-break: break-word; }
+    .mini-chat-msg.is-user { margin-left: auto; background: var(--accent, #1d7f68); color: #fff; }
+    .mini-chat-msg.is-answer { margin-right: auto; background: #eef3f0; color: #17201d; }
+    .mini-chat-compose { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom)); border-top: 1px solid #dbe5df; }
+    .mini-chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+    #miniChatInput {
+        flex: 1 1 0%; min-width: 0; min-height: 44px; max-height: 140px;
+        padding: 10px 12px; border: 1px solid #cbd5d1; border-radius: 8px;
+        font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; background: #fff; color: #17201d;
+    }
+    #miniChatInput:focus { outline: 2px solid rgba(29, 127, 104, .35); border-color: var(--accent, #1d7f68); }
+    .mini-chat-send {
+        flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 8px;
+        background: var(--accent, #1d7f68); color: #fff; font-size: 15px; cursor: pointer;
+    }
+    .mini-chat-send:disabled { opacity: .55; cursor: not-allowed; }
+    .mini-chat-status { min-height: 16px; font-size: 12px; color: #b45309; margin-top: 6px; }
+    /* 召回触发条：点击从右侧滑出抽屉，不常驻占用消息区空间 */
+    .mini-chat-recall-trigger {
+        margin-top: 8px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border: 1px solid rgba(29, 127, 104, .28);
+        border-radius: 8px;
+        background: rgba(29, 127, 104, .07);
+        color: #1d7f68;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .mini-chat-recall-trigger .arrow { margin-left: auto; }
+    .mini-retrieval-drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 2100;
+        width: min(420px, 94vw);
+        height: 100vh;
+        height: 100dvh;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        background: rgba(250, 252, 249, .99);
+        color: #17201d;
+        border-left: 1px solid #dbe5df;
+        box-shadow: -18px 0 50px rgba(33, 43, 38, .16);
+        transform: translateX(105%);
+        transition: transform 220ms ease;
+    }
+    .mini-retrieval-drawer.open { transform: translateX(0); }
+    .mini-retrieval-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid #dbe5df;
+        font-size: 14px;
+    }
+    .mini-retrieval-head i { color: #1d7f68; margin-right: 6px; }
+    .mini-retrieval-close {
+        border: 0;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 18px;
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+    }
+    .mini-retrieval-close:hover { background: rgba(29, 127, 104, .1); }
+    .mini-retrieval-body { overflow-y: auto; padding: 12px 14px; }
+    .mini-retrieval-body a {
+        display: block;
+        padding: 9px 10px;
+        margin-bottom: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fff;
+        color: #17201d;
+        text-decoration: none;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    .mini-retrieval-body a:hover { border-color: rgba(29, 127, 104, .55); }
+    @media (max-width: 767px) {
+        .mini-retrieval-drawer { width: 100vw; }
+    }
+    .mini-chat-toast {
+        position: fixed; left: 50%; bottom: 30px; z-index: 3000; transform: translateX(-50%) translateY(20px);
+        max-width: 86vw; padding: 9px 16px; border-radius: 8px; background: rgba(23, 32, 29, .92); color: #fff;
+        font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+    }
+    .mini-chat-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (max-width: 767px) {
+        .mini-chat-fab { right: 12px; bottom: 78px; width: 48px; height: 48px; }
+        .mini-chat-drawer { width: 100vw; }
+    }
+</style>
+<script>
+(function () {
+    var drawer = document.getElementById('miniChatDrawer');
+    if (!drawer) return;
+    var fab = document.getElementById('miniChatFab');
+    var closeBtn = document.getElementById('miniChatClose');
+    var form = document.getElementById('miniChatForm');
+    var input = document.getElementById('miniChatInput');
+    var box = document.getElementById('miniChatMessages');
+    var statusLine = document.getElementById('miniChatStatus');
+    var toast = document.getElementById('miniChatToast');
+    var sessionId = '';
+    var history = [];      // 本页会话上下文（最近消息，供模型参考）
+    var streaming = false;
+    var activeModel = 'deepseek';
+    // 与首页一致：使用服务端配置的 active_model（该模型一定配好了 Key），避免硬编码模型无 Key 时整段失败
+    var configReady = fetch('/api/chat/config')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.success && d.config && d.config.active_model) {
+                activeModel = d.config.active_model;
+            }
+        })
+        .catch(function () { /* 保持默认 deepseek */ });
+    var packId = (document.body && (document.body.getAttribute('data-industry-pack-id') || document.body.dataset.industryPackId)) || window.__intelIndustryPackId || '';
+    var packName = (document.body && document.body.getAttribute('data-industry-name')) || '';
+
+    function setStatus(text) { statusLine.textContent = text || ''; }
+    function toastMsg(text) {
+        toast.textContent = text;
+        toast.classList.add('show');
+        clearTimeout(window.__miniChatToastTimer);
+        window.__miniChatToastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2400);
+    }
+
+    window.openMiniChat = function () {
+        drawer.classList.add('open');
+        fab.classList.add('hidden');
+        setTimeout(function () { try { input.focus(); } catch (e) { /* 忽略 */ } }, 250);
+    };
+    function closeMiniChat() {
+        drawer.classList.remove('open');
+        fab.classList.remove('hidden');
+    }
+
+    function appendMsg(role, content) {
+        var item = document.createElement('div');
+        item.className = 'mini-chat-msg ' + (role === 'user' ? 'is-user' : 'is-answer');
+        item.textContent = content || '';
+        box.appendChild(item);
+        box.scrollTop = box.scrollHeight;
+        return item;
+    }
+
+    function ensureSession() {
+        if (sessionId) return Promise.resolve(sessionId);
+        return fetch('/mapindex/api/chat/sessions', { method: 'POST' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { sessionId = (d && d.session_id) || null; return sessionId; })
+            .catch(function () { sessionId = null; return null; })
+            .then(function (sid) {
+                if (!sid) sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+                return sessionId;
+            });
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (streaming) return;
+        var question = input.value.trim();
+        if (!question) return;
+        input.value = '';
+        streaming = true;
+        var sendBtn = form.querySelector('.mini-chat-send');
+        if (sendBtn) sendBtn.disabled = true;
+        history.push({ role: 'user', content: question });
+        if (history.length > 24) history.splice(0, history.length - 24);
+        appendMsg('user', question);
+        var answerNode = appendMsg('answer', '');
+        setStatus('正在等待响应…');
+        var finish = function () {
+            streaming = false;
+            if (sendBtn) sendBtn.disabled = false;
+        };
+        Promise.resolve(configReady).then(function () {
+            return ensureSession();
+        }).then(function () {
+            var payload = {
+                session_id: sessionId,
+                model: activeModel,
+                topic: packName ? (packName + '资讯') : '资讯',
+                industry_pack_id: packId,
+                messages: history.slice(-20),
+                web_search: false,
+                sse_features: ['financial-sse-v1'],
+            };
+            return fetch('/api/chat/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        }).then(function (response) {
+            if (!response.ok || !response.body) {
+                return response.json().catch(function () { return {}; }).then(function (errData) {
+                    throw new Error((errData && (errData.message || errData.error)) || ('聊天接口异常：' + response.status));
+                });
+            }
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = '';
+            var answer = '';
+            var finished = false;
+            var categoryLabels = { today: '行业动态', event: '行业动态', trend: '趋势观察', policy: '政策法规', recent: '最近关注', other: '其他资讯' };
+            var recallDrawer = document.getElementById('miniRetrievalDrawer');
+            var recallBody = document.getElementById('miniRetrievalBody');
+            function openMiniRecallDrawer() { if (recallDrawer) recallDrawer.classList.add('open'); }
+            function closeMiniRecallDrawer() { if (recallDrawer) recallDrawer.classList.remove('open'); }
+            var recallCloseBtn = document.getElementById('miniRetrievalClose');
+            if (recallCloseBtn) recallCloseBtn.addEventListener('click', closeMiniRecallDrawer);
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') closeMiniRecallDrawer();
+            });
+            // 召回展示：消息内只放一个触发条，点开从右侧滑出抽屉（不常驻占用空间）
+            function appendRecall(node, articles) {
+                if (!articles || !articles.length || !node || node.querySelector('.mini-chat-recall-trigger')) return;
+                var trigger = document.createElement('button');
+                trigger.type = 'button';
+                trigger.className = 'mini-chat-recall-trigger';
+                trigger.innerHTML = '<i class="fa fa-book" aria-hidden="true"></i> 本次回答参考的库内文章（' + articles.length + '）<span class="arrow"><i class="fa fa-chevron-right" aria-hidden="true"></i></span>';
+                trigger.addEventListener('click', function () {
+                    if (!recallBody) return;
+                    recallBody.innerHTML = '';
+                    articles.forEach(function (item, index) {
+                        var a = document.createElement('a');
+                        a.href = item.url || ('/share/article/' + item.id);
+                        a.target = '_blank';
+                        a.rel = 'noopener';
+                        var packs = (item.packs && item.packs.length) ? ('[' + item.packs.join('、') + '] ') : '';
+                        var cat = categoryLabels[item.category] ? ('【' + categoryLabels[item.category] + '】') : '';
+                        a.textContent = (index + 1) + '. ' + cat + packs + item.title;
+                        a.title = item.title + (item.date ? ('（' + item.date + '）') : '');
+                        recallBody.appendChild(a);
+                    });
+                    openMiniRecallDrawer();
+                });
+                node.appendChild(trigger);
+            }
+            function finishStream() {
+                if (!answer) answerNode.textContent = '（本次对话没有返回内容）';
+                history.push({ role: 'assistant', content: answer });
+                setStatus('');
+                finish();
+            }
+            function pump() {
+                return reader.read().then(function (chunk) {
+                    if (chunk.done) { return finishStream(); }
+                    buffer += decoder.decode(chunk.value, { stream: true });
+                    var parts = buffer.split('\n\n');
+                    buffer = parts.pop();
+                    parts.forEach(function (part) {
+                        if (part.indexOf('data:') !== 0) return;
+                        var payloadText = part.slice(5).trim();
+                        if (!payloadText) return;
+                        var evt;
+                        try { evt = JSON.parse(payloadText); } catch (e) { return; }
+                        if (finished) return;
+                        if (evt.type === 'chunk') {
+                            answer += evt.content || '';
+                            answerNode.textContent = answer;
+                            box.scrollTop = box.scrollHeight;
+                        } else if (evt.type === 'retrieval') {
+                            // 收到召回文章立即渲染，即使后续生成失败用户也能看到参考来源
+                            appendRecall(answerNode, evt.articles || []);
+                        } else if (evt.type === 'status') {
+                            setStatus(evt.message || '');
+                        } else if (evt.type === 'error') {
+                            throw new Error(evt.message || '生成失败');
+                        } else if (evt.type === 'done') {
+                            finished = true;
+                        }
+                    });
+                    if (finished) return finishStream();
+                    return pump();
+                });
+            }
+            return pump();
+        }).catch(function (error) {
+            // 出错时保留已渲染的召回触发条（textContent 会清空整节点）
+            var triggerNode = answerNode.querySelector('.mini-chat-recall-trigger');
+            answerNode.textContent = error.message || '发送失败，请重试';
+            if (triggerNode) answerNode.appendChild(triggerNode);
+            history.pop();
+            setStatus(error.message || '');
+            finish();
+        });
+    });
+
+    fab.addEventListener('click', function () { window.openMiniChat(); });
+    closeBtn.addEventListener('click', closeMiniChat);
+
+    // 引用到AI助手：与首页实现一致——移动端点击按钮的瞬间手机浏览器会清空选区
+    // （并弹出复制工具条），因此用 selectionchange 缓存弹窗内的有效选区，
+    // 点击时优先取实时选区，丢失则回退到缓存；弹窗关闭时清空缓存。
+    var cachedQuoteSelection = '';
+    function quoteModalOpen(modal) {
+        return modal && (modal.classList.contains('active') || modal.classList.contains('show'));
+    }
+    function currentModalSelectionText() {
+        var modal = document.getElementById('articleModal');
+        if (!quoteModalOpen(modal)) return '';
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (!sel || sel.rangeCount < 1) return '';
+        var range = sel.getRangeAt(0);
+        var container = range.commonAncestorContainer;
+        if (container.nodeType !== 1) container = container.parentElement;
+        if (!modal.contains(container)) return '';
+        return sel.toString().trim();
+    }
+    document.addEventListener('selectionchange', function () {
+        var text = currentModalSelectionText();
+        if (text) cachedQuoteSelection = text;
+    });
+    var quoteModal = document.getElementById('articleModal');
+    if (quoteModal && window.MutationObserver) {
+        var quoteModalObserver = new MutationObserver(function () {
+            if (!quoteModalOpen(quoteModal)) cachedQuoteSelection = '';
+        });
+        quoteModalObserver.observe(quoteModal, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    window.quoteSelectionToMiniChat = function (event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        var selected = currentModalSelectionText() || cachedQuoteSelection;
+        if (!selected) {
+            toastMsg('请先在文章正文中选择一段文字，再引用');
+            return;
+        }
+        cachedQuoteSelection = '';   // 引用已消费，清空缓存；再次引用需重新选择
+        window.openMiniChat();
+        var draft = input.value.replace(/\s+$/, '');
+        input.value = draft ? draft + '\n\n' + selected : selected;
+        input.focus();
+    };
+})();
+</script>

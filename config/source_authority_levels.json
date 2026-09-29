@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "roles": {
+    "government_regulator": {
+      "label": "政府与监管机构",
+      "weight": 5,
+      "evidence_class": "official",
+      "can_resolve_conflicts": true,
+      "authority_scopes": ["regulatory_decision", "official_rule", "official_statistics"],
+      "examples": ["MIIT", "Federal Register", "NHTSA", "HKMA", "MAS"]
+    },
+    "official_investigation": {
+      "label": "官方调查机构",
+      "weight": 5,
+      "evidence_class": "official",
+      "can_resolve_conflicts": true,
+      "authority_scopes": ["investigation_finding", "official_safety_finding"],
+      "examples": ["NTSB"]
+    },
+    "exchange_official": {
+      "label": "交易所官方披露",
+      "weight": 5,
+      "evidence_class": "official",
+      "can_resolve_conflicts": true,
+      "authority_scopes": ["exchange_filing", "listing_rule", "issuer_filing"],
+      "examples": ["HKEXnews", "SEC EDGAR"]
+    },
+    "academic_research": {
+      "label": "学术研究机构",
+      "weight": 4,
+      "evidence_class": "research",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["research_finding"],
+      "examples": ["大学研究中心", "同行评审期刊"]
+    },
+    "independent_research": {
+      "label": "独立研究机构",
+      "weight": 4,
+      "evidence_class": "research",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["research_finding"],
+      "examples": ["ICCT", "IIHS"]
+    },
+    "industry_association": {
+      "label": "行业协会与标准组织",
+      "weight": 4,
+      "evidence_class": "association",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["association_position", "industry_standard"],
+      "examples": ["ACEA", "SAE International", "ASAM"]
+    },
+    "issuer_official": {
+      "label": "机构或企业官方发布",
+      "weight": 3,
+      "evidence_class": "first_party",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["publisher_self_statement"],
+      "examples": ["企业公告", "机构官网新闻"]
+    },
+    "engineering_media": {
+      "label": "工程与技术媒体",
+      "weight": 3,
+      "evidence_class": "media",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["media_reporting"],
+      "examples": ["IEEE Spectrum"]
+    },
+    "professional_trade_media": {
+      "label": "专业行业媒体",
+      "weight": 2,
+      "evidence_class": "media",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["media_reporting"],
+      "examples": ["electrive", "Green Car Reports", "WealthBriefing"]
+    },
+    "professional_advisor": {
+      "label": "专业服务与顾问机构",
+      "weight": 2,
+      "evidence_class": "advisory",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["professional_interpretation", "publisher_self_statement"],
+      "examples": ["律师事务所", "会计师事务所", "财富顾问"]
+    },
+    "consumer_media": {
+      "label": "大众与消费媒体",
+      "weight": 1,
+      "evidence_class": "media",
+      "can_resolve_conflicts": false,
+      "authority_scopes": ["media_reporting"],
+      "examples": ["Edmunds", "Motor Authority"]
+    },
+    "unclassified": {
+      "label": "未分类来源",
+      "weight": 1,
+      "evidence_class": "unknown",
+      "can_resolve_conflicts": false,
+      "authority_scopes": [],
+      "examples": []
+    }
+  },
+  "aliases": {
+    "consumer_automotive_media": "consumer_media",
+    "official_publisher": "issuer_official"
+  },
+  "policies": {
+    "industry_admission_independent": true,
+    "same_publisher_counts_once": true,
+    "association_is_not_regulator": true,
+    "media_is_not_automatic_fact": true
+  }
+}

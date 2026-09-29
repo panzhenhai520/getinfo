@@ -1,0 +1,228 @@
+services:
+  crawler:
+    image: firecrawlapp-crawler:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firecrawl-crawler
+    restart: unless-stopped
+    init: true
+    # Task state still has a compatibility in-process view. Keep one web
+    # process until all manual tasks are consumed by the durable worker queue.
+    command: ["gunicorn", "-w", "1", "--threads", "4", "--bind", "0.0.0.0:8003", "--timeout", "300", "firecrawl_app:app"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      ENABLE_SCHEDULER: "false"
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 8003
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: collectinfo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      AUTH_STORAGE_DIR: /app/auth_storage
+      LOG_FILE: /app/crawl_logs/app.log
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CRAWL_SCHEDULER_MAX_CONCURRENT: 1
+      CRAWL_SCHEDULER_ADMIN_MAX_CONCURRENT: 2
+      CRAWL_SCHEDULER_MAX_PER_DOMAIN: 1
+      CRAWL_SCHEDULER_TASK_TIMEOUT: 3600
+      PLAYWRIGHT_MAX_CONCURRENT: 1
+      MANUAL_CRAWL_MAX_WORKERS: 1
+      MANUAL_CRAWL_MAX_QUEUED: 10
+      CRAWL_TLS_VERIFY: "true"
+      CRAWL_ALLOW_PRIVATE_NETWORKS: "false"
+      CRAWL_MAX_ARTICLES_PER_TASK: 100
+      CRAWL_LINK_DISCOVERY_MAX_PAGES: 20
+    ports:
+      # The production systemd service owns 8003; keep the optional Docker
+      # web process on a separate host port so both deployment modes can coexist.
+      - "${CRAWLER_HOST_PORT:-8004}:8003"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./auth_storage:/app/auth_storage
+      - ./crawl_logs:/app/crawl_logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/api/system/health', timeout=5).close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    image: firecrawlapp-crawler:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firecrawl-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "start_scheduler_worker.py"]
+    pids_limit: 4096
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      ENABLE_SCHEDULER: "true"
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: collectinfo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      AUTH_STORAGE_DIR: /app/auth_storage
+      LOG_FILE: /app/crawl_logs/app.log
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CRAWL_SCHEDULER_MAX_CONCURRENT: 1
+      CRAWL_SCHEDULER_ADMIN_MAX_CONCURRENT: 2
+      CRAWL_SCHEDULER_MAX_PER_DOMAIN: 1
+      CRAWL_SCHEDULER_TASK_TIMEOUT: 3600
+      CRAWL_SCHEDULER_STALE_RUN_GRACE_SECONDS: 21600
+      PLAYWRIGHT_MAX_CONCURRENT: 1
+      CRAWL_MAX_ARTICLES_PER_TASK: 100
+      CRAWL_LINK_DISCOVERY_MAX_PAGES: 20
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./auth_storage:/app/auth_storage
+      - ./crawl_logs:/app/crawl_logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  intel-worker:
+    image: firecrawlapp-crawler:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firecrawl-intel-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "intel_worker_supervisor.py"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Hong_Kong
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: collectinfo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      INTEL_CLASSIFICATION_ENABLED: "true"
+      INTEL_SOURCE_SYNC_ENABLED: "true"
+      INTEL_LIGHT_SCANNER_ENABLED: "true"
+      INTEL_CANDIDATE_DISPATCH_ENABLED: "true"
+      INTEL_LIGHT_SCAN_DAILY_TIME: "08:30"
+      INTEL_SCAN_MAX_SOURCES_PER_RUN: "150"
+      INTEL_TOPIC_CLUSTER_ENABLED: "true"
+      RAGFLOW_LLM_ENABLED: "false"
+      INTEL_WORKER_POLL_SECONDS: "5"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "tools/check_intel_worker_health.py", "--database", "/app/data/crawler_articles.db"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: firecrawl-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: collectinfo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: collectinfo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      TZ: Asia/Shanghai
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d collectinfo"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+
+volumes:
+  redis_data:
+  pg_data:

@@ -1,0 +1,1392 @@
+{
+  "id": "bolean_security_compute",
+  "name": "工控安全与算力",
+  "schema_version": 3,
+  "pack_version": "1.0.0",
+  "enabled": true,
+  "default_market": "CN",
+  "timezone": "Asia/Shanghai",
+  "pack_kind": "primary",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "ics_security_intelligence",
+      "name": "工控安全情报聚合",
+      "enabled": true,
+      "implementation_status": "existing"
+    },
+    {
+      "key": "compute_trading_intelligence",
+      "name": "算力交易情报聚合",
+      "enabled": true,
+      "implementation_status": "existing"
+    },
+    {
+      "key": "bolean_entity_radar",
+      "name": "木链科技实体雷达",
+      "enabled": false,
+      "implementation_status": "planned"
+    }
+  ],
+  "dashboard_categories": [],
+  "dashboard_capabilities": {
+    "show_financial_news": false,
+    "show_market_index_cards": false,
+    "show_watched_stock_cards": false,
+    "show_spatiotemporal_map": false
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": false,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "木链科技",
+    "Bolean",
+    "工控安全",
+    "工业互联网安全",
+    "算力交易",
+    "智算服务",
+    "算力买卖"
+  ],
+  "expanded_keywords": [
+    "工业控制系统",
+    "工业信息安全",
+    "网络安全",
+    "算力",
+    "GPU 算力",
+    "智算中心",
+    "算力网络",
+    "算力平台",
+    "算力超市",
+    "关键基础设施",
+    "关键信息基础设施",
+    "电力",
+    "能源",
+    "电网",
+    "发电",
+    "SCADA",
+    "基础设施",
+    "油气管道",
+    "轨道交通",
+    "供水",
+    "电力监控系统",
+    "变电站",
+    "光伏",
+    "风电",
+    "核电",
+    "水电",
+    "储能",
+    "输变电",
+    "配电",
+    "供电",
+    "燃气",
+    "热力",
+    "工控",
+    "工业控制",
+    "自动化",
+    "控制系统",
+    "PLC",
+    "DCS",
+    "工业互联网",
+    "智能制造",
+    "信息安全",
+    "数据安全",
+    "工控安全",
+    "态势感知",
+    "通信",
+    "通信信号",
+    "光通信",
+    "数据中心",
+    "智算",
+    "服务器",
+    "芯片",
+    "云计算",
+    "超算",
+    "冶金",
+    "钢铁",
+    "装备",
+    "新能源"
+  ],
+  "trend_keywords": [
+    "中标",
+    "合作",
+    "签约",
+    "发布",
+    "融资",
+    "产品",
+    "解决方案",
+    "算力服务",
+    "GPU 池化",
+    "行业标准",
+    "监管",
+    "政策",
+    "工业控制系统安全",
+    "工控网络攻防演练",
+    "工业信息安全防护",
+    "算力交易定价机制",
+    "智算中心建设规划",
+    "GPU 算力调度优化",
+    "算力平台互联互通",
+    "算力超市运营模式",
+    "算力网络架构设计",
+    "工业互联网安全标准",
+    "AI大模型安全治理",
+    "国产GPU发展路径",
+    "数据要素市场化",
+    "算力租赁价格分析",
+    "网络安全等级保护",
+    "工业控制系统漏洞",
+    "工控安全合规审查",
+    "算力资源池化技术",
+    "智算服务商业化",
+    "算力交易监管政策",
+    "工业信息安全法规",
+    "算力网络互联互通",
+    "GPU 算力共享平台",
+    "工业控制系统升级",
+    "算力交易平台建设",
+    "工业安全事件响应",
+    "算力服务SLA标准",
+    "智算中心能耗管理",
+    "工控安全防护体系",
+    "算力资源调度算法",
+    "工业互联网安全监测",
+    "国产化算力替代",
+    "算力交易市场分析",
+    "工业控制系统加固",
+    "网络安全威胁情报"
+  ],
+  "event_keywords": [
+    "发布",
+    "融资",
+    "收购",
+    "合作",
+    "中标",
+    "上线",
+    "任命",
+    "签约"
+  ],
+  "negative_keywords": [
+    "招聘",
+    "培训",
+    "广告"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 2,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ],
+    "recent_today_window_days": 5,
+    "recent_trend_window_days": 21
+  },
+  "serpapi_queries": [
+    "木链科技 最新动态",
+    "Bolean 工控安全",
+    "工控安全 中标 客户",
+    "算力交易 平台 中标",
+    "智算中心 GPU 算力 新闻"
+  ],
+  "default_sources": [
+    {
+      "name": "中国核工业集团（中核集团）",
+      "url": "https://www.cnnc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cnnc.com.cn"
+    },
+    {
+      "name": "中国广核集团（中广核）",
+      "url": "https://www.cgnpc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cgnpc.com.cn"
+    },
+    {
+      "name": "国家电网",
+      "url": "https://www.sgcc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "sgcc.com.cn"
+    },
+    {
+      "name": "国网电力科学研究院（国网电科院）",
+      "url": "https://www.epri.sgcc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "epri.sgcc.com.cn"
+    },
+    {
+      "name": "中国船舶集团（中船重工）",
+      "url": "https://www.cssc.net.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cssc.net.cn"
+    },
+    {
+      "name": "红塔集团（烟草）",
+      "url": "https://www.hongta.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "hongta.com"
+    },
+    {
+      "name": "大连地铁",
+      "url": "https://www.dlmetro.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "dlmetro.com"
+    },
+    {
+      "name": "浙江大学",
+      "url": "https://www.zju.edu.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "academic_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "zju.edu.cn"
+    },
+    {
+      "name": "中国信息通信研究院（信通院）",
+      "url": "https://www.caict.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "caict.ac.cn"
+    },
+    {
+      "name": "中国汽车技术研究中心（中汽研/中汽数据）",
+      "url": "https://www.catarc.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "catarc.ac.cn"
+    },
+    {
+      "name": "中国电子",
+      "url": "https://www.cec.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "cec.com.cn"
+    },
+    {
+      "name": "中国南方电网",
+      "url": "https://www.csg.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "csg.cn"
+    },
+    {
+      "name": "国家能源集团",
+      "url": "https://www.chnenergy.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "chnenergy.com.cn"
+    },
+    {
+      "name": "中国华能",
+      "url": "https://www.chng.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "chng.com.cn"
+    },
+    {
+      "name": "中国大唐",
+      "url": "https://www.china-cdt.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "china-cdt.com"
+    },
+    {
+      "name": "中国华电",
+      "url": "https://www.chd.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "chd.com.cn"
+    },
+    {
+      "name": "中国三峡集团",
+      "url": "https://www.ctg.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ctg.com.cn"
+    },
+    {
+      "name": "中国石油",
+      "url": "https://www.cnpc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cnpc.com.cn"
+    },
+    {
+      "name": "中国石化",
+      "url": "https://www.sinopec.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "sinopec.com"
+    },
+    {
+      "name": "中国海油",
+      "url": "https://www.cnooc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cnooc.com.cn"
+    },
+    {
+      "name": "中国宝武钢铁",
+      "url": "https://www.baowugroup.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "baowugroup.com"
+    },
+    {
+      "name": "鞍钢集团",
+      "url": "https://www.ansteel.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ansteel.com.cn"
+    },
+    {
+      "name": "河钢集团",
+      "url": "https://www.hbisco.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "hbisco.com"
+    },
+    {
+      "name": "沙钢集团",
+      "url": "https://www.shasteel.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "shasteel.cn"
+    },
+    {
+      "name": "中国中化",
+      "url": "https://www.sinochem.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "sinochem.com"
+    },
+    {
+      "name": "万华化学",
+      "url": "https://www.whchem.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "whchem.com"
+    },
+    {
+      "name": "国家铁路集团",
+      "url": "https://www.china-railway.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "china-railway.com.cn"
+    },
+    {
+      "name": "云南中烟工业公司",
+      "url": "https://www.ynzy-tobacco.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ynzy-tobacco.com"
+    },
+    {
+      "name": "阿里云",
+      "url": "https://www.aliyun.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "aliyun.com"
+    },
+    {
+      "name": "腾讯云",
+      "url": "https://cloud.tencent.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "cloud.tencent.com"
+    },
+    {
+      "name": "华为云",
+      "url": "https://www.huaweicloud.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "huaweicloud.com"
+    },
+    {
+      "name": "百度智能云",
+      "url": "https://cloud.baidu.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "cloud.baidu.com"
+    },
+    {
+      "name": "天翼云",
+      "url": "https://www.ctyun.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "ctyun.cn"
+    },
+    {
+      "name": "移动云",
+      "url": "https://ecloud.10086.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "ecloud.10086.cn"
+    },
+    {
+      "name": "联通云",
+      "url": "https://www.cucloud.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "cucloud.cn"
+    },
+    {
+      "name": "商汤科技",
+      "url": "https://www.sensetime.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "sensetime.com"
+    },
+    {
+      "name": "科大讯飞",
+      "url": "https://www.iflytek.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "iflytek.com"
+    },
+    {
+      "name": "智谱 AI",
+      "url": "https://www.zhipuai.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "zhipuai.cn"
+    },
+    {
+      "name": "鹏城实验室",
+      "url": "https://www.pcl.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "pcl.ac.cn"
+    },
+    {
+      "name": "之江实验室",
+      "url": "https://www.zhejianglab.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "zhejianglab.com"
+    },
+    {
+      "name": "北京超级云计算中心",
+      "url": "https://www.paratera.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "paratera.com"
+    },
+    {
+      "name": "威努特",
+      "url": "https://www.winicssec.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "winicssec.com"
+    },
+    {
+      "name": "六方云",
+      "url": "https://www.6cloudtech.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "6cloudtech.com"
+    },
+    {
+      "name": "天地和兴",
+      "url": "https://www.tdhxkj.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "tdhxkj.com"
+    },
+    {
+      "name": "中电安科",
+      "url": "https://www.zd-sec.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "zd-sec.com"
+    },
+    {
+      "name": "安帝科技",
+      "url": "https://www.andisec.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "andisec.com"
+    },
+    {
+      "name": "烽台科技",
+      "url": "https://www.fengtaisec.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "fengtaisec.com"
+    },
+    {
+      "name": "天融信",
+      "url": "https://www.topsec.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "topsec.com.cn"
+    },
+    {
+      "name": "奇安信",
+      "url": "https://www.qianxin.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "qianxin.com"
+    },
+    {
+      "name": "启明星辰",
+      "url": "https://www.venustech.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "venustech.com.cn"
+    },
+    {
+      "name": "绿盟科技",
+      "url": "https://www.nsfocus.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "nsfocus.com"
+    },
+    {
+      "name": "安恒信息",
+      "url": "https://www.dbappsecurity.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "dbappsecurity.com.cn"
+    },
+    {
+      "name": "青云科技（算力云）",
+      "url": "https://www.qingcloud.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "qingcloud.com"
+    },
+    {
+      "name": "算力互联（算力交易/算力网）",
+      "url": "https://www.casdao.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "casdao.com"
+    },
+    {
+      "name": "趋动科技（GPU 池化）",
+      "url": "https://www.virtaitech.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "virtaitech.com"
+    },
+    {
+      "name": "摩尔线程（GPU）",
+      "url": "https://www.mthreads.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "mthreads.com"
+    },
+    {
+      "name": "燧原科技（AI 芯片/算力）",
+      "url": "https://www.enflame-tech.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "enflame-tech.com"
+    },
+    {
+      "name": "中国算力平台（官方算力交易枢纽）",
+      "url": "https://hcp.caict.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "hcp.caict.ac.cn"
+    },
+    {
+      "name": "安全牛（网络安全智库）",
+      "url": "https://www.aqniu.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "aqniu.com"
+    },
+    {
+      "name": "安全内参（国家工业信息安全发展研究中心）",
+      "url": "https://www.secrss.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "secrss.com"
+    },
+    {
+      "name": "嘶吼安全产业研究院",
+      "url": "https://www.4hou.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "4hou.com"
+    },
+    {
+      "name": "国家工业信息安全发展研究中心（CICS）",
+      "url": "https://www.cics-cert.org.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "cics-cert.org.cn"
+    },
+    {
+      "name": "FreeBuf",
+      "url": "https://www.freebuf.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "freebuf.com"
+    },
+    {
+      "name": "工业互联网产业联盟（AII）",
+      "url": "https://www.aii-alliance.org",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "aii-alliance.org"
+    },
+    {
+      "name": "工业和信息化部",
+      "url": "https://www.miit.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "miit.gov.cn"
+    },
+    {
+      "name": "中国工信新闻网（中国算力大会报道）",
+      "url": "https://www.cnii.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "cnii.com.cn"
+    },
+    {
+      "name": "智东西（AI/算力媒体）",
+      "url": "https://www.zhidx.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "zhidx.com"
+    },
+    {
+      "name": "量子位（AI/算力媒体）",
+      "url": "https://www.qbitai.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "qbitai.com"
+    },
+    {
+      "name": "Data Center Dynamics（DCD，数据中心/算力）",
+      "url": "https://www.datacenterdynamics.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "unclassified",
+      "authority_level": 1,
+      "authority_scope": [],
+      "publisher_key": "datacenterdynamics.com"
+    },
+    {
+      "name": "国家电力投资集团（国家电投）",
+      "url": "https://www.spic.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "spic.com.cn"
+    },
+    {
+      "name": "华润电力",
+      "url": "https://www.crpower.com.hk",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "crpower.com.hk"
+    },
+    {
+      "name": "中国电力建设集团（中国电建）",
+      "url": "https://www.powerchina.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "powerchina.cn"
+    },
+    {
+      "name": "中国能源建设集团（中国能建）",
+      "url": "https://www.ceec.net.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ceec.net.cn"
+    },
+    {
+      "name": "国家石油天然气管网集团（国家管网）",
+      "url": "https://www.pipechina.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "pipechina.com.cn"
+    },
+    {
+      "name": "新奥能源",
+      "url": "https://www.ennenergy.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ennenergy.com"
+    },
+    {
+      "name": "中国铁建",
+      "url": "https://www.crcc.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "crcc.cn"
+    },
+    {
+      "name": "中国交通建设集团（中国交建）",
+      "url": "https://www.ccccltd.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ccccltd.cn"
+    },
+    {
+      "name": "中远海运集团",
+      "url": "https://www.cosco.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cosco.com"
+    },
+    {
+      "name": "招商局集团",
+      "url": "https://www.cmhk.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "cmhk.com"
+    },
+    {
+      "name": "中国中车",
+      "url": "https://www.crrcgc.cc",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "crrcgc.cc"
+    },
+    {
+      "name": "北京市地铁运营有限公司（北京地铁）",
+      "url": "https://www.bjsubway.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "bjsubway.com"
+    },
+    {
+      "name": "上海申通地铁（上海地铁）",
+      "url": "https://www.shmetro.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "shmetro.com"
+    },
+    {
+      "name": "浙江省能源集团（浙能）",
+      "url": "https://www.zjenergy.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "zjenergy.com.cn"
+    },
+    {
+      "name": "广东能源集团（粤电）",
+      "url": "https://www.gdyd.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "gdyd.com.cn"
+    },
+    {
+      "name": "中国华润集团",
+      "url": "https://www.crc.com.hk",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "crc.com.hk"
+    },
+    {
+      "name": "中国招标投标公共服务平台",
+      "url": "https://www.cebpubservice.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [],
+      "publisher_key": "cebpubservice.com"
+    },
+    {
+      "name": "中国政府采购网",
+      "url": "https://www.ccgp.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [],
+      "publisher_key": "ccgp.gov.cn"
+    },
+    {
+      "name": "中国采购与招标网",
+      "url": "https://www.chinabidding.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [],
+      "publisher_key": "chinabidding.com.cn"
+    },
+    {
+      "name": "中国移动采购与招标网",
+      "url": "https://b2b.10086.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [],
+      "publisher_key": "b2b.10086.cn"
+    },
+    {
+      "name": "中国电信阳光采购网",
+      "url": "https://caigou.chinatelecom.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [],
+      "publisher_key": "caigou.chinatelecom.com.cn"
+    },
+    {
+      "name": "中国石油招标投标网",
+      "url": "https://www.cnpcbidding.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [],
+      "publisher_key": "cnpcbidding.com"
+    },
+    {
+      "name": "国家电网电子商务平台",
+      "url": "https://ecp.sgcc.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [],
+      "publisher_key": "ecp.sgcc.com.cn"
+    },
+    {
+      "name": "千里马招标网",
+      "url": "https://www.qianlima.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [],
+      "publisher_key": "qianlima.com"
+    },
+    {
+      "name": "采招网",
+      "url": "https://www.bidcenter.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [],
+      "publisher_key": "bidcenter.com.cn"
+    },
+    {
+      "name": "全国公共资源交易平台",
+      "url": "https://www.ggzy.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": ["official_rule", "official_statistics"],
+      "publisher_key": "ggzy.gov.cn",
+      "link_include_pattern": "information/deal/html/"
+    },
+    {
+      "name": "全国公共资源交易平台（招标中标接口）",
+      "url": "https://www.ggzy.gov.cn/information/pubTradingInfo/getTradList",
+      "source_type": "ggzy_api",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": ["official_rule", "official_statistics"],
+      "publisher_key": "ggzy.gov.cn",
+      "deal_classify": ["01", "02"],
+      "api_source_types": ["2", "1"],
+      "api_deal_time": "02",
+      "api_window_days": 10,
+      "title_include_keywords": [
+        "电力", "电网", "能源", "变电站", "发电", "光伏", "风电", "核电", "水电", "储能",
+        "输变电", "配电", "供电", "工控", "工业控制", "自动化", "控制系统", "SCADA", "PLC",
+        "DCS", "工业互联网", "智能制造", "网络安全", "信息安全", "数据安全", "工控安全",
+        "态势感知", "通信", "通信信号", "光通信", "数据中心", "智算", "算力", "服务器",
+        "芯片", "云计算", "超算"
+      ]
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "bolean_company",
+      "name": "木链科技公司动态",
+      "keywords": [
+        "木链科技",
+        "Bolean"
+      ]
+    },
+    {
+      "key": "ics_security",
+      "name": "工控安全",
+      "keywords": [
+        "工控安全",
+        "工业互联网安全",
+        "工业信息安全"
+      ]
+    },
+    {
+      "key": "compute_trading",
+      "name": "算力交易",
+      "keywords": [
+        "算力交易",
+        "智算服务",
+        "算力买卖",
+        "算力网络",
+        "算力互联",
+        "算力调度",
+        "算力平台",
+        "算力服务",
+        "算力超市",
+        "算力租赁",
+        "算力",
+        "算力基础设施"
+      ],
+      "exclude_keywords": [
+        "解决方案",
+        "产品介绍",
+        "产品咨询",
+        "产品动态",
+        "产品简介",
+        "产品中心",
+        "产品资料",
+        "产品白皮书",
+        "产品选购",
+        "社区版",
+        "体验馆",
+        "在线体验",
+        "现场体验",
+        "技术文章",
+        "智算卡",
+        "特惠",
+        "官网公告",
+        "公告列表",
+        "快速上手",
+        "使用指南",
+        "开发者文档",
+        "用户协议",
+        "服务协议",
+        "企业云",
+        "云服务器",
+        "裸金属",
+        "池化软件",
+        "全栈云平台",
+        "为什么选择我们",
+        "智能诊断",
+        "服务解析"
+      ]
+    },
+    {
+      "key": "customers",
+      "name": "客户与中标",
+      "keywords": [
+        "中标",
+        "招标",
+        "客户",
+        "签约",
+        "订单",
+        "合同",
+        "采购",
+        "招投标",
+        "供应商",
+        "项目合作"
+      ]
+    },
+    {
+      "key": "competitors",
+      "name": "竞争情报",
+      "keywords": [
+        "威努特",
+        "六方云",
+        "奇安信",
+        "并行科技",
+        "青云科技"
+      ]
+    },
+    {
+      "key": "critical_infrastructure",
+      "name": "关键基础设施",
+      "keywords": [
+        "关键基础设施",
+        "关键信息基础设施",
+        "电力",
+        "能源",
+        "电网",
+        "发电",
+        "SCADA",
+        "基础设施",
+        "油气管道",
+        "轨道交通",
+        "供水",
+        "电力监控系统",
+        "工控系统",
+        "工业控制系统"
+      ]
+    }
+  ],
+  "serpapi_query_gates": {}
+}

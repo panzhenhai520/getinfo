@@ -1,0 +1,54 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "generic_llm_opinion_fallback": false,
+    "legacy_sse_event_types": [
+      "status",
+      "chunk",
+      "done"
+    ],
+    "real_order_created": false,
+    "run_and_job_atomic": true,
+    "secrets_persisted": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "generic_model_fallback_calls": 0,
+    "offline_image_manifest_digest": "sha256:f0c973e0d64878af1063cd31032596fa51d47ed7835fef32050aed5928d05b32",
+    "network_calls": 0,
+    "tests_run": 8
+  },
+  "scenarios": {
+    "cancelled_job_is_not_replaced_with_opinion": true,
+    "comparison_targets_preserved": true,
+    "compatible_fresh_report_reused": true,
+    "concurrent_identical_requests_share_one_run": true,
+    "deep_universe_research_separated_from_light_overview": true,
+    "expired_report_not_reused": true,
+    "failure_has_explainable_evidence_closed_status": true,
+    "graph_config_change_invalidates_cache": true,
+    "provider_profile_change_invalidates_cache": true,
+    "target_change_isolated": true
+  },
+  "static": {
+    "cache_identity": [
+      "instrument_or_universe",
+      "as_of",
+      "graph_version",
+      "provider_profile_hash",
+      "config_hash"
+    ],
+    "direct_network_or_model_imports": [],
+    "existing_database": "crawler_articles.db",
+    "existing_llm_runtime": "AI assistant local OpenAI-compatible runtime",
+    "existing_queue": "intel_jobs",
+    "existing_worker": "intel-worker",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema": "financial-full-research-route-v1"
+  },
+  "task": "3.7"
+}

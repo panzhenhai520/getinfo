@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="{% if report %}{{ report.title }} — {{ platform_name }} AI 行业周报{% else %}周报不存在{% endif %}">
+<meta property="og:title" content="{% if report %}{{ report.title }}{% else %}周报不存在{% endif %}">
+<meta property="og:description" content="{% if report %}{{ report.title }}｜统计时间窗 {{ report.time_start }} ~ {{ report.time_end }}｜{{ platform_name }} AI 行业周报{% else %}资讯情报分享{% endif %}">
+<meta property="og:image" content="{% if platform_logo %}{{ request.url_root.rstrip('/') }}{{ platform_logo if platform_logo.startswith('/') else '/' + platform_logo }}{% else %}{{ request.url_root.rstrip('/') }}/static/img/logo-share.png{% endif %}">
+<title>{% if report %}{{ report.title }} - AI 周报分享{% else %}周报不存在{% endif %}</title>
+<script src="/static/js/marked.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+       background: #f7faf7; color: #17201d; min-height: 100vh; display: flex; flex-direction: column; }
+.wrap { max-width: 720px; width: 100%; margin: 0 auto; padding: 22px 16px 0; flex: 1; }
+.brand { font-size: 13px; color: #0f766e; font-weight: 800; margin-bottom: 14px; letter-spacing: .5px; }
+h1 { font-size: 21px; line-height: 1.45; margin-bottom: 12px; }
+.meta { font-size: 12px; color: #6b7280; margin-bottom: 18px; display: flex; flex-wrap: wrap; gap: 12px; }
+.content { font-size: 15px; line-height: 1.9; color: #1f2937; background: #fff; border: 1px solid #e5e7eb;
+          border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; word-break: break-word; }
+.content h1,.content h2,.content h3,.content h4 { color:#111827; border-bottom:1px solid #eef2f5; padding-bottom:6px; margin:14px 0 10px; }
+.content h1{font-size:19px} .content h2{font-size:16px} .content h3{font-size:14px}
+.content p { margin: 8px 0; }
+.content ul,.content ol { margin:6px 0; padding-left:22px; }
+.content li { margin:3px 0; }
+.content blockquote { border-left:3px solid rgba(15,118,110,.35); margin:10px 0; padding:5px 12px; color:#475569; background:#f6faf8; }
+.content table { border-collapse:collapse; margin:10px 0; }
+.content th,.content td { border:1px solid #e5e7eb; padding:5px 10px; }
+.content th { background:#f0fdfa; }
+.content pre { background:#f6f8fa; padding:12px; border-radius:8px; overflow:auto; }
+.content code { background:rgba(15,118,110,.10); color:#0f766e; padding:1px 4px; border-radius:4px; }
+.content a { color:#0f766e; }
+.notfound { text-align: center; color: #6b7280; padding: 60px 0; }
+.wx-tip { display: none; position: sticky; top: 0; z-index: 10; padding: 10px 14px;
+         background: #07c160; color: #fff; font-size: 13px; text-align: center; }
+.wx-tip.show { display: block; }
+.share-box { margin: 18px 0; padding: 14px; border: 1px dashed #cbd5d1; border-radius: 10px;
+            background: #fff; text-align: center; }
+.share-box .qr { width: 168px; height: 168px; display: block; margin: 8px auto; }
+.share-box p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
+.cta { display: block; margin: 14px auto 26px; text-align: center; color: #0f766e; font-weight: 700;
+       text-decoration: none; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wx-tip" id="wxTip">点击右上角「…」→ 转发给朋友或分享到朋友圈</div>
+<div class="wrap">
+  <div class="brand">{{ platform_name }}</div>
+  {% if report %}
+  <h1>{{ report.title }}</h1>
+  <div class="meta">
+    <span>统计时间窗：{{ report.time_start }} ~ {{ report.time_end }}</span>
+    <span>生成：{{ report.generated_at }}</span>
+    <span>覆盖 {{ report.article_count }} 篇文章</span>
+  </div>
+  <div class="content" id="reportContent"></div>
+  <script type="text/plain" id="excerptSrc">{{ excerpt }}</script>
+  <div class="share-box">
+    <p>长按识别二维码，查看完整 AI 周报</p>
+    <img class="qr" src="/share/report/{{ report.id }}/qr.png" alt="周报二维码">
+    <p>也可复制链接转发到微信</p>
+  </div>
+  <a class="cta" href="/login">登录查看全部行业周报 →</a>
+  {% else %}
+  <div class="notfound">周报不存在或已删除</div>
+  {% endif %}
+</div>
+<script>
+if (navigator.userAgent.indexOf('MicroMessenger') > -1) {
+  document.getElementById('wxTip').classList.add('show');
+}
+// Markdown 美化渲染：把摘要从隐藏源块解析为排版后的 HTML
+try {
+  var src = document.getElementById('excerptSrc');
+  var box = document.getElementById('reportContent');
+  if (src && box && typeof marked !== 'undefined') {
+    marked.setOptions({ breaks: true, gfm: true });
+    box.innerHTML = marked.parse(src.textContent);
+  } else if (box) {
+    box.textContent = src ? src.textContent : '';
+    box.style.whiteSpace = 'pre-wrap';
+  }
+} catch (e) {}
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider_id": "official_evidence",
+  "display_name": "现有官方 RSS / 网页证据",
+  "access_tier": "public_documents_source_terms_apply",
+  "default_enabled": false,
+  "license_profile": "official_document_evidence_source_terms",
+  "provider_type": "existing_sqlite_articles",
+  "priority": 5,
+  "daily_call_budget": 1000,
+  "fallback_rank": 5,
+  "documentation_url": "architecture/financial-rss-acceptance.json",
+  "terms_url": "",
+  "attribution_text": "Original regulator, exchange, central-bank or issuer URL retained as evidence.",
+  "terms_note": "复用当前 RSS/网页入库，不新增抓取服务。仅允许白名单官方域名；文章中的数值不能替代结构化行情快照。",
+  "sla": "source_dependent",
+  "capabilities": ["news"],
+  "logical_endpoints": {"official_article": ["existing articles table"]},
+  "official_domain_suffixes": ["news.gov.hk", "hkma.gov.hk", "sfc.hk", "hkex.com.hk", "szse.cn", "sse.com.cn", "csrc.gov.cn", "pbc.gov.cn", "sec.gov", "federalreserve.gov"]
+}

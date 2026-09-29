@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行业趋势演化 - {{ platform_name }}</title>
+<link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css"><link rel="stylesheet" href="/static/css/intel-trend-chart.css">
+<script src="/static/js/echarts.min.js"></script><script src="/static/js/intel-trend-chart.js?v=2"></script>
+<style>
+.intel-trend-evolution{padding:18px 20px}
+.intel-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.intel-section-title{font-size:18px;font-weight:800;color:#1f2937}
+.intel-section-description{font-size:12px;color:#6b7280;margin-top:2px}
+.intel-trend-tabs{display:flex;gap:8px;margin:10px 0 6px}
+.intel-trend-tab{border:0;padding:6px 12px;border-radius:999px;background:#f3f4f6;color:#4b5563;font-weight:700;cursor:pointer}
+.intel-trend-tab.active{background:#1d7f68;color:#fff}
+.intel-trend-legend-bar{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#374151;margin:6px 0}
+.intel-trend-state-key{display:inline-flex;align-items:center;gap:4px}
+.intel-trend-state-key.is-rising{color:#2b6cb0}.intel-trend-state-key.is-bursting{color:#9b2c2c}.intel-trend-state-key.is-mature{color:#6b46c1}.intel-trend-state-key.is-declining{color:#718096}.intel-trend-state-key.is-emerging{color:#38a169}.intel-trend-state-key.is-insufficient{color:#6b7280;background:#f3f4f6;border:1px solid #e5e7eb;padding:2px 9px;border-radius:999px;line-height:1.4}
+.intel-trend-chart-wrap{position:relative;margin:6px 0}
+.intel-trend-chart{min-height:260px}
+.intel-trend-empty{color:#9ca3af;text-align:center;padding:30px 0;font-size:13px}
+.intel-trend-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;margin:4px 4px 0 0;cursor:pointer}
+.intel-trend-chip.is-rising{background:#e6f0fb;color:#2b6cb0}.intel-trend-chip.is-bursting{background:#fde8e8;color:#9b2c2c}.intel-trend-chip.is-mature{background:#ede9fc;color:#6b46c1}.intel-trend-chip.is-declining{background:#f3f4f6;color:#718096}.intel-trend-chip.is-emerging{background:#e6f9ef;color:#38a169}.intel-trend-chip.is-insufficient{background:#f3f4f6;color:#9ca3af}
+.intel-trend-reading{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px dashed #e5e7eb;cursor:pointer;font-size:13px}
+.intel-trend-reading-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.intel-trend-reading-kw{font-weight:800;min-width:90px;font-size:24px;line-height:1.3;letter-spacing:.2px}
+.intel-trend-reading-text{color:#6b7280;flex:1}
+.intel-trend-chart-modal,.intel-trend-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);z-index:2000}.intel-trend-modal[hidden]{display:none}
+.intel-trend-modal-card{width:min(820px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:10px;padding:18px}
+.intel-trend-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.intel-trend-modal-head h3{font-size:17px;font-weight:800}
+.intel-trend-modal-loading{color:#6b7280;padding:20px;text-align:center}
+.intel-trend-article{padding:10px 8px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.intel-trend-article:nth-child(odd){background:#f7f7f7}
+.intel-trend-article:nth-child(even){background:#e8e9eb}
+.intel-trend-article:hover{background:#d4e6df}
+.intel-trend-article-title{font-weight:500;color:#1f2937;display:flex;align-items:center;gap:7px}
+.intel-trend-article .rt-dot{width:7px;height:7px;border-radius:50%;background:#0f766e;flex-shrink:0;box-shadow:0 0 0 2px rgba(15,118,110,.12)}
+.intel-trend-article-meta{font-size:12px;color:#6b7280;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.intel-trend-article-meta .src{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.intel-trend-article-meta .time{flex-shrink:0;color:#64748b}
+#intelTrendModalBody{flex:1;min-height:0;overflow-y:auto}
+#intelTrendModalFoot{flex-shrink:0;padding:8px 10px;border-top:1px solid #eef2f0;background:#fbfdfc;display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.intel-trend-page-btn{border:0;padding:5px 12px;border-radius:6px;background:#e5e7eb;color:#374151;cursor:pointer;font-weight:700;margin-right:8px}
+.intel-trend-page-btn:disabled{opacity:.5;cursor:not-allowed}
+.intel-trend-page-info{font-size:12px;color:#6b7280}
+.intel-trend-content-toggle{border:0;margin-left:6px;padding:3px 10px;border-radius:999px;background:rgba(29,127,104,.08);color:#1d7f68;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.intel-trend-content-toggle:hover{background:rgba(29,127,104,.18)}
+.intel-trend-content-arrow{border:0;background:transparent;color:#1d7f68;font-size:16px;font-weight:800;cursor:pointer;padding:4px 9px;border-radius:4px;line-height:1;flex-shrink:0}
+.intel-trend-content-arrow:hover{background:rgba(29,127,104,.12);color:#0f5f52}
+.intel-trend-chip-active{box-shadow:0 0 0 2px currentColor;transform:translateY(-1px)}
+.intel-trend-reading-articles{flex:0 0 100%;width:100%;padding:8px 4px 10px;background:rgba(29,127,104,.03);border-radius:6px;display:flex;flex-direction:column;gap:8px}
+.intel-trend-reading-articles[hidden]{display:none}
+.intel-trend-inline-article{padding:6px 8px;border-bottom:1px solid rgba(102,115,109,.12)}
+.intel-trend-inline-article:last-child{border-bottom:0}
+.intel-trend-inline-title{color:#1f2937;font-weight:400;font-size:13px;text-decoration:none;display:block;line-height:1.4}
+.intel-trend-inline-title:hover{color:#1d7f68}
+/* 弹窗放大 + 左右分屏（左=文章列表，右=提取内容） */
+.intel-trend-modal-card.intel-trend-modal-wide{width:min(1120px,96vw);height:min(80vh,760px);max-height:80vh;overflow:hidden;padding:0;display:flex;flex-direction:column}
+.intel-trend-modal-wide .intel-trend-modal-head{padding:14px 16px;margin-bottom:0;border-bottom:1px solid rgba(102,115,109,.16);flex-shrink:0}
+.intel-trend-modal-wide .intel-trend-modal-head h3{font-size:17px;font-weight:800}
+.intel-trend-modal-split{display:grid;grid-template-columns:minmax(340px,42%) 1fr;flex:1;min-height:0}
+.intel-trend-modal-left{display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(102,115,109,.16)}
+#intelTrendModalBody{flex:1;overflow-y:auto;min-height:0;padding:4px 8px}
+#intelTrendModalFoot{flex-shrink:0;border-top:1px solid rgba(102,115,109,.12);padding:10px 12px;display:flex;align-items:center;gap:6px}
+.intel-trend-modal-right{overflow-y:auto;padding:16px 18px;min-width:0;background:rgba(244,247,243,.35)}
+.intel-trend-content-title{font-size:16px;font-weight:700;color:#1f2937;margin-bottom:8px;line-height:1.4}
+.intel-trend-content-meta{font-size:12px;color:#6b7280;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.intel-trend-content-meta a{color:#1d7f68;text-decoration:none;font-weight:600}
+.intel-trend-content-text{font-size:14px;line-height:1.8;color:#374151;word-break:break-word}
+/* 阶段1：正文统一 Markdown 渲染样式 */
+.intel-trend-content-text h1,.intel-trend-content-text h2,.intel-trend-content-text h3,.intel-trend-content-text h4{color:#1f2937;line-height:1.4;margin:16px 0 8px}
+.intel-trend-content-text h1{font-size:20px}.intel-trend-content-text h2{font-size:17px}.intel-trend-content-text h3{font-size:15px}
+.intel-trend-content-text p{margin:0 0 10px}
+.intel-trend-content-text ul,.intel-trend-content-text ol{padding-left:22px;margin:0 0 10px}
+.intel-trend-content-text blockquote{margin:10px 0;padding:6px 12px;border-left:3px solid #cbd5d1;background:#f6faf8;color:#475569}
+.intel-trend-content-text table{border-collapse:collapse;margin:10px 0;max-width:100%}
+.intel-trend-content-text th,.intel-trend-content-text td{border:1px solid #e5e7eb;padding:5px 9px;font-size:12px}
+.intel-trend-content-text img{max-width:100%;height:auto}
+.intel-trend-content-text a{color:#1d7f68;word-break:break-all}
+mark.kw-hl{background:#fde68a;color:#78350f;padding:0 2px;border-radius:3px}
+@media(max-width:760px){.intel-trend-modal-split{grid-template-columns:1fr}.intel-trend-modal-left{border-right:0;border-bottom:1px solid rgba(102,115,109,.16);max-height:48vh}}
+</style>
+<script src="/static/js/marked.min.js"></script>
+</head>
+<body data-industry-pack-id="{{ active_industry_pack_id|default('') }}">
+{% include '_dashboard_nav.html' %}
+<main class="max-w-7xl mx-auto px-4 py-6">
+  <section class="intel-section intel-trend-evolution" aria-labelledby="intelTrendEvolutionTitle">
+    <div class="intel-section-head">
+      <div>
+        <h2 class="intel-section-title" id="intelTrendEvolutionTitle">行业趋势演化</h2>
+        <div class="intel-section-description">基于文章命中热度的关键词趋势（爆发检测 + 状态机）</div>
+      </div>
+      <div class="intel-section-count" id="intelTrendEvolutionMeta">--</div>
+    </div>
+    <div class="intel-trend-tabs">
+      <button type="button" class="intel-trend-tab active" data-pane="trend_keyword" onclick="switchIntelTrendTab('trend_keyword')">关键词趋势</button>
+      <button type="button" class="intel-trend-tab" data-pane="brand" onclick="switchIntelTrendTab('brand')">品牌动态</button>
+      <button type="button" class="intel-trend-tab" data-pane="topic" onclick="switchIntelTrendTab('topic')">主题趋势</button>
+    </div>
+    <div class="intel-trend-pane" id="intelTrendPaneKeyword">
+      <div class="intel-trend-legend-bar"><span class="intel-trend-state-key is-rising">上升</span><span class="intel-trend-state-key is-bursting">★ 爆发</span><span class="intel-trend-state-key is-mature">成熟</span><span class="intel-trend-state-key is-declining">衰退</span><span class="intel-trend-state-key is-emerging">新生</span><span class="intel-trend-state-key is-insufficient">数据不足</span></div>
+      <div class="intel-trend-chart-wrap"><div id="intelTrendChart" class="intel-trend-chart"></div><div class="intel-trend-empty" id="intelTrendEmpty">正在加载趋势…</div></div>
+      <div class="intel-trend-legend" id="intelTrendLegend"></div>
+      <div class="intel-trend-readings" id="intelTrendReadings"></div>
+    </div>
+  </section>
+</main>
+<div id="intelTrendArticlesModal" class="intel-trend-modal" hidden onclick="if(event.target===this) closeIntelTrendModal()"><div class="intel-trend-modal-card intel-trend-modal-wide"><div class="intel-trend-modal-head"><h3 id="intelTrendModalTitle">相关文章</h3><button type="button" class="intel-trend-event-close" onclick="closeIntelTrendModal()"><i class="fa fa-times"></i></button></div><div class="intel-trend-modal-split"><div class="intel-trend-modal-left"><div id="intelTrendModalBody"></div><div id="intelTrendModalFoot"></div></div><div class="intel-trend-modal-right" id="intelTrendModalContent"><div class="intel-trend-modal-loading">点击左侧文章标题查看内容</div></div></div></div></div>
+<script>
+const state = { intelIndustryPackId: '', intelTrendModalKeyword: '', intelTrendModalPage: 1 };
+const escapeHtml = value => String(value || '').replace(/[&<>"']/g, chr => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[chr]));
+async function loadTrendEvolution(dimension) {
+  dimension = dimension || 'trend_keyword';
+  const chartEl = document.getElementById('intelTrendChart'), emptyEl = document.getElementById('intelTrendEmpty'), metaEl = document.getElementById('intelTrendEvolutionMeta'), legendEl = document.getElementById('intelTrendLegend'), readingsEl = document.getElementById('intelTrendReadings');
+  try {
+    const params = new URLSearchParams({ industry_pack_id: state.intelIndustryPackId || '', days: '180', top: '30', min_total: '1', dimension });
+    const resp = await fetch('/api/intel/trends?' + params.toString(), { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || '趋势加载失败');
+    const series = data.series || [];
+    if (!series.length) { emptyEl.style.display='flex'; emptyEl.textContent='暂无趋势数据（需先运行趋势聚合任务）'; metaEl.textContent='--'; legendEl.innerHTML=''; if(readingsEl)readingsEl.innerHTML=''; return; }
+    emptyEl.style.display='none'; metaEl.textContent=`${series.length} 个${dimension==='bertopic'?'主题':'关键词'} · 近 ${data.days||30} 天`;
+    if (typeof window.renderIntelTrendChart === 'function') window.renderIntelTrendChart(chartEl, series, data.window||7);
+    else chartEl.innerHTML = '<div class="intel-trend-empty">图表库未加载</div>';
+    const kwAttr = kw => `openTrendKeywordArticles(decodeURIComponent('${encodeURIComponent(kw)}'), 1, '${dimension}')`;
+    // 数据不足与新生是两种状态：数据点数 < 窗口 → 数据不足（灰）；点数充足但暂不成势 → 新生（绿）
+    const stateNames={BURSTING:'爆发',RISING:'上升',MATURE:'成熟',DECLINING:'衰退',EMERGING:'新生'};
+    const stateLabelFor = s => (s && s.insufficient_data) ? '数据不足' : (stateNames[(s&&s.state)] || (s&&s.state) || '新生');
+    const stateClassFor = s => (s && s.insufficient_data) ? 'is-insufficient' : ('is-' + ((s && s.state) || 'EMERGING').toLowerCase());
+    legendEl.innerHTML = series.map((s, si) => `<span class="intel-trend-chip ${stateClassFor(s)} intel-trend-clickable${si===0?' intel-trend-chip-active':''}" title="点击切换曲线显示" onclick="toggleTrendChip(this,'${escapeHtml(s.keyword)}')">${escapeHtml(s.keyword)}${s.is_burst?' ★':''}</span>`).join('');
+    if (readingsEl) {
+      const lineColors=['#1d7f68','#2b6cb0','#c05621','#6b46c1','#b7791f','#2c7a7b','#9b2c2c','#38a169','#d53f8c','#2d3748'];
+      readingsEl.innerHTML = series.map((s,i)=>{
+        const sn=stateLabelFor(s); const dot=lineColors[i%lineColors.length];
+        const contentOn=`toggleTrendContent(decodeURIComponent('${encodeURIComponent(s.keyword)}'), '${dimension}')`;
+        return `<div class="intel-trend-reading" data-kw="${escapeHtml(s.keyword)}">
+          <span class="intel-trend-reading-dot" style="background:${dot}"></span>
+          <span class="intel-trend-reading-kw intel-trend-clickable" title="点击查看相关文章" onclick="${kwAttr(s.keyword)}">${escapeHtml(s.keyword)}</span>
+          <button type="button" class="intel-trend-content-arrow" onclick="${contentOn}" title="展开/收起内容"><i class="fa fa-chevron-down"></i></button>
+          <span class="intel-trend-chip ${stateClassFor(s)}">${sn}</span>
+          <span class="intel-trend-reading-text">${escapeHtml(s.interpretation||'')}</span>
+          <button type="button" class="intel-trend-content-toggle" onclick="${contentOn}"><i class="fa fa-list"></i> 内容</button>
+          <div class="intel-trend-reading-articles" hidden></div>
+        </div>`;
+      }).join('');
+      // 所有关键词默认全部展开（点击箭头可收起）
+      const rows = Array.prototype.slice.call(readingsEl.querySelectorAll('.intel-trend-reading'));
+      rows.forEach(row => { const btn = row.querySelector('.intel-trend-content-toggle'); if (btn) btn.click(); });
+    }
+  } catch (err) { emptyEl.style.display='flex'; emptyEl.textContent='趋势暂不可用：'+(err.message||'未知错误'); }
+}
+/* 点击趋势词标签：切换对应曲线显示/隐藏（桌面/手机一致，默认只亮第一个） */
+function toggleTrendChip(el, kw){
+  if (typeof window.toggleIntelTrendSeries === 'function') {
+    const showing = window.toggleIntelTrendSeries(kw);
+    if (el) el.classList.toggle('intel-trend-chip-active', showing);
+  }
+}
+async function toggleTrendContent(kw, dimension) {
+  const rows = document.querySelectorAll('#intelTrendReadings .intel-trend-reading');
+  let row = null;
+  for (let i = 0; i < rows.length; i++) { if (rows[i].getAttribute('data-kw') === kw) { row = rows[i]; break; } }
+  if (!row) return;
+  const container = row.querySelector('.intel-trend-reading-articles');
+  if (!container) return;
+  const setArrow = open => { const a = row.querySelector('.intel-trend-content-arrow i'); if (a) a.className = open ? 'fa fa-chevron-up' : 'fa fa-chevron-down'; };
+  if (!container.hidden) { container.hidden = true; setArrow(false); return; }
+  container.hidden = false; setArrow(true);
+  if (container.dataset.loaded === '1') return;
+  container.dataset.loaded = '1';
+  container.innerHTML = '<div class="intel-trend-modal-loading">加载内容…</div>';
+  try {
+    const params = new URLSearchParams({industry_pack_id: state.intelIndustryPackId||'', keyword: kw, days:'180', page:'1', per_page:'5', dimension: dimension||'trend_keyword'});
+    const resp = await fetch('/api/intel/trends/articles?'+params.toString(),{cache:'no-store'});
+    const data = await resp.json();
+    if(!resp.ok||!data.success) throw new Error(data.error||'加载失败');
+    const arts = data.articles||[];
+    if(!arts.length){ container.innerHTML='<div class="intel-trend-modal-loading">近 30 天暂无命中文章</div>'; return; }
+    // 只在“本次返回结果”内部去重（避免同一篇文章在该词下重复出现）；
+    // 不做跨关键词去重——否则先展开的词会把文章全部“吃掉”，后点的词展开后是空的。
+    const seen = new Set();
+    const uniq = arts.filter(a => { const id = Number(a.article_id || a.id || 0); if (!id) return true; if (seen.has(id)) return false; seen.add(id); return true; });
+    if(!uniq.length){ container.innerHTML='<div class="intel-trend-modal-loading">近 30 天暂无命中文章</div>'; return; }
+    container.innerHTML = uniq.map(a => { const aid=Number(a.article_id||a.id||0); return `<div class="intel-trend-inline-article"><a class="intel-trend-inline-title" href="${aid?'/article-management?article_id='+aid:escapeHtml(a.url||'#')}" ${aid?'':'target="_blank" rel="noopener"'} title="${aid?'打开文章详情':'打开原文'}">${escapeHtml(a.title||'无标题')}</a><div class="intel-trend-article-meta"><span class="src"><i class="fa fa-link"></i> ${escapeHtml(a.domain||'-')}</span><span class="time"><i class="fa fa-clock"></i> ${escapeHtml(a.publish_date||a.effective_time||'未知')}</span></div></div>`; }).join('');
+  } catch(err) { container.innerHTML='<div class="intel-trend-modal-loading">内容暂不可用：'+(err.message||'未知错误')+'</div>'; }
+}
+function switchIntelTrendTab(pane) { document.querySelectorAll('.intel-trend-tab').forEach(b=>b.classList.toggle('active', b.dataset.pane===pane)); loadTrendEvolution(pane==='topic'?'fixed_topic':(pane==='brand'?'brand':'trend_keyword')); }
+async function openTrendKeywordArticles(keyword, page, dimension) { page=page||1; const modal=document.getElementById('intelTrendArticlesModal'),title=document.getElementById('intelTrendModalTitle'),body=document.getElementById('intelTrendModalBody'),foot=document.getElementById('intelTrendModalFoot'); if(!modal||!keyword)return; title.textContent='「'+keyword+'」相关文章'; body.innerHTML='<div class="intel-trend-modal-loading">加载中…</div>'; foot.innerHTML=''; const contentPane=document.getElementById('intelTrendModalContent'); if(contentPane) contentPane.innerHTML='<div class="intel-trend-modal-loading">点击左侧文章标题查看内容</div>'; modal.hidden=false; try{ const params=new URLSearchParams({industry_pack_id:state.intelIndustryPackId||'',keyword,days:'30',page:String(page),per_page:'10',dimension:dimension||'trend_keyword'}); const resp=await fetch('/api/intel/trends/articles?'+params.toString(),{cache:'no-store'}); const data=await resp.json(); if(!resp.ok||!data.success)throw new Error(data.error||'加载失败'); const arts=data.articles||[],total=Number(data.total||0),totalPages=Number(data.total_pages||1); if(!arts.length){body.innerHTML='<div class="intel-trend-modal-loading">近 30 天暂无命中文章</div>';return;} body.innerHTML=arts.map(a=>`<div class="intel-trend-article" onclick="loadTrendArticleContent(${Number(a.article_id||0)})"><div class="intel-trend-article-title"><span class="rt-dot"></span>${escapeHtml(a.title||'无标题')}</div><div class="intel-trend-article-meta"><span class="src"><i class="fa fa-link"></i> ${escapeHtml(a.domain||'-')}</span><span class="time"><i class="fa fa-clock"></i> ${escapeHtml(a.publish_date||a.effective_time||'未知')}</span></div></div>`).join(''); if(arts.length) loadTrendArticleContent(Number(arts[0].article_id||0)); const prev=page>1?`<button type="button" class="intel-trend-page-btn" onclick="openTrendKeywordArticles(decodeURIComponent('${encodeURIComponent(keyword)}'),${page-1},'${dimension||''}')">上一页</button>`:`<button type="button" class="intel-trend-page-btn" disabled>上一页</button>`; const next=page<totalPages?`<button type="button" class="intel-trend-page-btn" onclick="openTrendKeywordArticles(decodeURIComponent('${encodeURIComponent(keyword)}'),${page+1},'${dimension||''}')">下一页</button>`:`<button type="button" class="intel-trend-page-btn" disabled>下一页</button>`; foot.innerHTML=`${prev}<span class="intel-trend-page-info">第 ${page} / ${totalPages} 页 · 共 ${total} 篇</span>${next}`; }catch(err){body.innerHTML='<div class="intel-trend-modal-loading">加载失败：'+(err.message||'未知错误')+'</div>';} }
+async function loadTrendArticleContent(article_id) {
+  const pane = document.getElementById('intelTrendModalContent');
+  if (!pane || !article_id) return;
+  pane.innerHTML = '<div class="intel-trend-modal-loading">加载内容…</div>';
+  try {
+    const resp = await fetch('/article-management/api/article/' + article_id, { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || '文章不存在');
+    const a = data.article || {};
+    let title = a.title || '无标题';
+    let content = a.content || '暂无内容';
+    // 🔥 阶段1：优先展示统一 Markdown（content_markdown 仅展示用）
+    let displayContent = (a.content_markdown && String(a.content_markdown).trim())
+      ? String(a.content_markdown) : String(content);
+    const _t = String(title).trim();
+    const _cl = String(displayContent).split('\n');
+    const _fi = _cl.findIndex(l => String(l).trim() !== '');
+    if (_fi >= 0 && _t) {
+      const _nf0 = String(_cl[_fi]).trim().replace(/^#+\s*/, '').replace(/^[-*\s]+/, '').trim();
+      const _nt0 = _t.replace(/\s+/g, '').toLowerCase();
+      const _nf = _nf0.replace(/\s+/g, '').toLowerCase();
+      if (_nf && _nf.length >= 6 && (_nf === _nt0 || _nt0 === _nf || _nt0.startsWith(_nf) || _nf.startsWith(_nt0) || _nt0.indexOf(_nf) === 0)) { _cl.splice(_fi, 1); displayContent = _cl.join('\n').replace(/\n{3,}/g, '\n\n'); }
+    }
+    const kws = a.matched_keywords || a.classification_keywords || [];
+    pane.innerHTML = '<div class="intel-trend-content-title">' + escapeHtml(title) + '</div>' +
+      '<div class="intel-trend-content-meta"><span><i class="fa fa-link"></i> ' + escapeHtml(a.domain || '-') + '</span><span><i class="fa fa-calendar"></i> ' + escapeHtml(a.publish_date || '未知') + '</span>' +
+      (a.url ? '<span><i class="fa fa-external-link"></i> <a href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">打开原文</a></span>' : '') + '</div>' +
+      '<div class="intel-trend-content-text">' + renderTrendMarkdown(displayContent, kws) + '</div>';
+  } catch (err) { pane.innerHTML = '<div class="intel-trend-modal-loading">内容暂不可用：' + (err.message || '未知错误') + '</div>'; }
+}
+function renderTrendMarkdown(text, keywords) {
+  text = String(text || '').replace(/\r/g, '');
+  const terms = [];
+  try {
+    if (Array.isArray(keywords)) { keywords.forEach(k => { if (k) terms.push(String(k)); }); }
+    else if (keywords) { String(keywords).split(/[,，;；]+/).forEach(k => { k = String(k || '').trim(); if (k) terms.push(k); }); }
+  } catch (e) {}
+  const list = [...new Set(terms)].filter(Boolean).sort((x, y) => y.length - x.length);
+  let html = null;
+  if (typeof marked !== 'undefined') {
+    try { marked.setOptions({ breaks: true, gfm: true, sanitize: false }); html = marked.parse(text); } catch (e) { html = null; }
+  }
+  if (!html) return escapeHtml(text);
+  html = html.replace(/\shref=["'](?:javascript|vbscript|data):[^"']*["']/gi, ' href="#"').replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
+  if (!list.length) return html;
+  const pattern = list.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return String(html).split(/(<[^>]+>)/).map((seg, i) => i % 2 ? seg : seg.replace(new RegExp('(' + pattern + ')', 'gi'), '<mark class="kw-hl">$1</mark>')).join('');
+}
+function closeIntelTrendModal(){ const m=document.getElementById('intelTrendArticlesModal'); if(m) m.hidden=true; }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeIntelTrendModal(); });
+(async function init(){ try{ const resp=await fetch('/api/intel/industry-packs'); const data=await resp.json(); state.intelIndustryPackId = document.body.getAttribute('data-industry-pack-id')||window.__intelIndustryPackId||data.default_industry_pack_id || ''; }catch(_){ state.intelIndustryPackId = document.body.getAttribute('data-industry-pack-id')||window.__intelIndustryPackId||''; } loadTrendEvolution('trend_keyword'); })();
+</script>
+</body>
+</html>

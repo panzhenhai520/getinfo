@@ -1,0 +1,83 @@
+{
+  "acceptance": {
+    "archive_matches_revision": true,
+    "backup_checksum_matches": true,
+    "config_summary_is_sanitized": true,
+    "config_summary_matches_revision": true,
+    "container_build_passed": true,
+    "container_network_disabled": true,
+    "container_smoke_requested": true,
+    "container_startup_smoke_passed": true,
+    "database_integrity_passed": true,
+    "database_restore_matches_manifest": true,
+    "host_application_smoke_passed": true,
+    "passed": true,
+    "readonly_queries_passed": true,
+    "required_code_files_present": true,
+    "revision_resolved": true,
+    "runtime_files_excluded": true
+  },
+  "configuration": {
+    "boolean_setting_count": 28,
+    "configuration_key_count": 138,
+    "endpoint_host_count": 11,
+    "raw_secret_values_recorded": false,
+    "summary_sha256": "ea5f6ed295c59e083c71e69773c8e3809a73757b4051fc343985d50a76d324da"
+  },
+  "container_smoke": {
+    "build_passed": true,
+    "error_type": "",
+    "image_id": "sha256:9c6ea139c435d205e17835168a587edc0c01178185434e766ca27bba49240d8e",
+    "image_tag": "firecrawlapp-crawler:financial-baseline-recovery",
+    "network_mode": "none",
+    "read_only_root": true,
+    "requested": true,
+    "startup_smoke_passed": true,
+    "subprocess_output_retained": false,
+    "temporary_database_mount": true
+  },
+  "database": {
+    "backup_filename": "crawler_articles-20260731T164045Z.sqlite3",
+    "backup_sha256": "3cfe86d5c1aecb70fdb31c0a75479e046c2f3d36759a15e0fe7a771b135acdc2",
+    "differences": {},
+    "index_count": 101,
+    "integrity_check": [
+      "ok"
+    ],
+    "live_database_modified": false,
+    "readonly_queries": {
+      "articles": "passed",
+      "chat_history": "passed",
+      "users": "passed"
+    },
+    "restore_method": "sqlite3.Connection.backup",
+    "row_counts_match": true,
+    "schema_sha256": "43154e1066327ceb79eafaff024195ae4ba94d57908a8ed515ba87bfa5e909af",
+    "table_count": 44
+  },
+  "host_application_smoke": {
+    "chat_history_read": "passed",
+    "dashboard_read": "passed",
+    "health_endpoint": "passed",
+    "passed": true,
+    "subprocess_output_retained": false
+  },
+  "isolation": {
+    "git_worktree_modified": false,
+    "live_containers_restarted": false,
+    "live_database_modified": false,
+    "subprocess_output_retained": false,
+    "temporary_directory_removed_after_run": true
+  },
+  "manifest_version": "financial-baseline-recovery-v1",
+  "revision": {
+    "archive_file_count": 351,
+    "commit": "2cdc49fe6f70ee12838b41422da94cd6d88df298",
+    "forbidden_runtime_paths_found": [],
+    "missing_required_files": [],
+    "requested": "financial-tradingagents-baseline-v1",
+    "tracked_file_count": 351,
+    "tree": "733b08b5a147dce071b01efe773246b304d1e626"
+  },
+  "verified_at_utc": "2026-08-01T04:12:58Z"
+}

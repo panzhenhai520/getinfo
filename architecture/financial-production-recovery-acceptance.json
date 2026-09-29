@@ -1,0 +1,145 @@
+{
+  "acceptance": "passed",
+  "baseline_recovery": {
+    "backup_captured_at_utc": "2026-07-31T16:40:54Z",
+    "baseline_code_current_schema_elapsed_seconds": 5.414,
+    "baseline_code_current_schema_rto_target_seconds": 180,
+    "checks": {
+      "baseline_acceptance_passed": true,
+      "baseline_revision_exact": true,
+      "current_schema_compatibility_passed": true,
+      "isolated_database_restore_rto_passed": true,
+      "live_state_was_not_modified": true,
+      "offline_readonly_container_smoke_passed": true,
+      "post_baseline_legal_row_preserved": true
+    },
+    "database_backup_sha256": "3cfe86d5c1aecb70fdb31c0a75479e046c2f3d36759a15e0fe7a771b135acdc2",
+    "database_restore_elapsed_seconds": 0.072,
+    "database_restore_rto_target_seconds": 300,
+    "executed": true,
+    "revision_commit": "2cdc49fe6f70ee12838b41422da94cd6d88df298",
+    "status": "passed"
+  },
+  "boundaries": {
+    "human_production_approval_fabricated": false,
+    "live_database_modified": false,
+    "live_network_required": false,
+    "live_service_restarted": false,
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "new_table": false,
+    "real_trade_capability": false,
+    "worktree_reset_or_checkout": false
+  },
+  "checked_at": "2026-08-02T20:10:20Z",
+  "fault_scenarios": [
+    "database_corruption",
+    "llm_failure",
+    "provider_failure",
+    "report_corruption",
+    "schema_interruption",
+    "worker_failure"
+  ],
+  "final_acceptance": "passed",
+  "full_suite": {
+    "elapsed_seconds": 23.537,
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "tests_run": 548
+  },
+  "image_acceptance": {
+    "executed": true,
+    "full_suite_passed": true,
+    "image_id": "sha256:9b12bcd03bfd9c57567b74320dc3a327ec98f58dffea88f222a96042510d4003",
+    "network_mode": "none"
+  },
+  "recovery_version": "financial-recovery-v1",
+  "role_acceptance": {
+    "development": {
+      "evidence": "policy, schema, artifact, worker and architecture gates",
+      "status": "passed"
+    },
+    "operations": {
+      "evidence": "isolated baseline/current-schema/container recovery gate",
+      "status": "passed"
+    },
+    "product": {
+      "evidence": "rollback boundaries and no-real-trade architecture",
+      "status": "passed"
+    },
+    "test": {
+      "evidence": "fault injection and related regression suites",
+      "status": "passed"
+    }
+  },
+  "rpo": {
+    "approved_database_restore": "baseline manifest captured_at_utc",
+    "non_database_recovery": "zero protected rows lost",
+    "worker_restart": "zero completed jobs lost"
+  },
+  "rto_targets_seconds": {
+    "baseline_code_smoke": 180,
+    "feature_flag_rollback": 5,
+    "isolated_database_restore": 300,
+    "provider_or_llm_degrade": 5,
+    "report_fallback": 5,
+    "schema_resume": 120,
+    "worker_restart": 60
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "rto_assertions": {
+      "feature_flag_rollback": "tests.test_financial_recovery",
+      "provider_or_llm_degrade": "tests.test_financial_recovery",
+      "report_fallback": "tests.test_financial_artifacts",
+      "schema_resume": "tests.test_financial_recovery",
+      "worker_restart": "tests.test_financial_recovery"
+    },
+    "suites": [
+      "tests.test_financial_recovery",
+      "tests.test_financial_artifacts",
+      "tests.test_financial_schema",
+      "tests.test_financial_worker_jobs",
+      "tests.test_financial_rollout",
+      "tests.test_financial_health",
+      "tests.test_baseline_recovery"
+    ],
+    "tests_run": 45
+  },
+  "static": {
+    "architecture": {
+      "new_databases": [],
+      "new_ports": [],
+      "new_services": [],
+      "new_tables": [],
+      "passed": true,
+      "published_ports": [
+        8003
+      ],
+      "services": [
+        "crawler",
+        "intel-worker",
+        "redis",
+        "worker"
+      ]
+    },
+    "checks": {
+      "all_required_faults_have_fail_closed_policy": true,
+      "approved_rto_targets_are_positive": true,
+      "baseline_restore_is_isolated_checksum_verified_and_compatible": true,
+      "feature_flag_rollback_is_immediate_and_preserves_database": true,
+      "recovery_policy_has_no_write_network_process_or_service_side_effect": true,
+      "recovery_tool_has_no_destructive_git_or_recursive_delete": true,
+      "report_corruption_uses_hash_valid_prior_version": true,
+      "runbook_has_rto_rpo_faults_and_four_role_acceptance": true,
+      "schema_migration_is_additive_transactional_and_versioned": true,
+      "worker_stop_and_restart_use_persistent_retry_and_lease": true
+    }
+  },
+  "task": "6.6"
+}

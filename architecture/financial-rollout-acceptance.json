@@ -1,0 +1,96 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "database_rollback_required": false,
+    "live_network_required": false,
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "new_table": false
+  },
+  "checked_at": "2026-08-03T03:53:15+08:00",
+  "image_acceptance": {
+    "base_digest": "sha256:d52f80f9cb7fa711ebefef4549ef55f2564ff742a92a6ca0e2eaec00da470d7d",
+    "full_suite": {
+      "errors": 0,
+      "failures": 0,
+      "seconds": 22.268,
+      "tests_run": 541
+    },
+    "image": "collectinfo:financial-rollout-acceptance",
+    "image_digest": "sha256:69a65231b0bd67d46366ec600c195df8afd9d6cf217dacf237bd29b1e36883f0",
+    "network_mode": "none",
+    "passed": true
+  },
+  "rollout_version": "financial-rollout-v1",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "suites": [
+      "tests.test_financial_rollout",
+      "tests.test_financial_config",
+      "tests.test_financial_feature_gate",
+      "tests.test_financial_health",
+      "tests.test_financial_phase0_rss_scans",
+      "tests.test_financial_worker_jobs",
+      "tests.test_financial_full_research",
+      "tests.test_financial_gcd_review",
+      "tests.test_financial_synthesis_review"
+    ],
+    "tests_run": 58
+  },
+  "scenarios": {
+    "administrator_projection_is_read_only": true,
+    "all_stages_support_immediate_rollback": true,
+    "healthy_observation_required": true,
+    "invalid_stage_fails_closed": true,
+    "one_new_capability_per_advance": true,
+    "rollback_preserves_database": true,
+    "rss_to_simulation_entry_points_gated": true,
+    "stage_skip_rejected": true,
+    "stage_specific_smoke_required": true
+  },
+  "static": {
+    "architecture": {
+      "new_databases": [],
+      "new_ports": [],
+      "new_services": [],
+      "new_tables": [],
+      "passed": true,
+      "published_ports": [
+        8003
+      ],
+      "services": [
+        "crawler",
+        "intel-worker",
+        "redis",
+        "worker"
+      ]
+    },
+    "checks": {
+      "administrator_status_endpoint_is_protected": true,
+      "all_product_entry_points_are_stage_gated": true,
+      "configuration_ui_exposes_stage_and_observation": true,
+      "configuration_write_path_enforces_transition": true,
+      "forward_is_single_stage_after_observation_and_smoke": true,
+      "rollback_is_immediate_without_database_rollback": true,
+      "rollout_policy_has_no_storage_network_or_service": true,
+      "stage_order_is_complete_and_exact": true
+    },
+    "stage_order": [
+      "off",
+      "rss",
+      "snapshot_readonly",
+      "dashboard",
+      "ai_fact",
+      "stock_research",
+      "index_research",
+      "history_review",
+      "auto_research",
+      "simulation_backtest"
+    ]
+  },
+  "task": "6.5"
+}

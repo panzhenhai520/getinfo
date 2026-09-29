@@ -1,0 +1,45 @@
+# 敏感配置
+.env
+setup_github.sh
+
+# Python缓存
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# 运行时数据
+crawler_articles.db
+data/
+crawl_results/
+crawl_logs/
+auth_storage/
+backups/
+*.log
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 会话临时文件（_tmp_* 脚本、askpass、截图、诊断输出、部署数据）
+_*
+deploy-data/
+
+# 行业包数据库备份（数据快照，不进代码仓库）
+industry_pack_backups/
+
+# 含 API 密钥的个人工作笔记（保留在本地，不进仓库）
+部署说明.txt

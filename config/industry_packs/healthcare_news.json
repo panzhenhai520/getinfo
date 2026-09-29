@@ -1,0 +1,1391 @@
+{
+  "id": "healthcare_news",
+  "name": "医疗行业资讯",
+  "schema_version": 3,
+  "pack_version": "2.0.15",
+  "enabled": true,
+  "default_market": "GLOBAL",
+  "timezone": "Asia/Hong_Kong",
+  "freshness_window_days": 90,
+  "pack_kind": "primary",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "healthcare_content_intelligence",
+      "name": "医疗资讯聚合与分类",
+      "enabled": true,
+      "implementation_status": "existing"
+    },
+    {
+      "key": "clinical_trial_monitor",
+      "name": "临床试验进展监测",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    },
+    {
+      "key": "drug_approval_monitor",
+      "name": "药械审批与召回监测",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    },
+    {
+      "key": "medical_evidence_grading",
+      "name": "医学证据等级与冲突核验",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    }
+  ],
+  "dashboard_categories": [
+    {
+      "key": "healthcare_regulatory_radar",
+      "name": "医疗审批与临床证据雷达",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    }
+  ],
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": false,
+    "show_watched_stock_cards": false,
+    "show_spatiotemporal_map": false
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": false,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "医疗信息化",
+    "医院信息系统",
+    "HIS",
+    "电子病历",
+    "EMR",
+    "智慧医院",
+    "互联网医院",
+    "PACS",
+    "LIS",
+    "集成平台",
+    "互联互通",
+    "医疗大数据",
+    "医疗云",
+    "HIT",
+    "DRG",
+    "DIP",
+    "医保信息化",
+    "医疗AI",
+    "AI医疗",
+    "医疗大模型",
+    "AI医疗大模型",
+    "医疗人工智能",
+    "人工智能医疗",
+    "CDSS",
+    "远程医疗",
+    "互联网诊疗",
+    "医疗软件",
+    "医院信息平台"
+  ],
+  "expanded_keywords": [
+    "云HIS",
+    "集成引擎",
+    "数据中心",
+    "等保",
+    "灾备",
+    "信创",
+    "国产化",
+    "电子病历评级",
+    "智慧服务",
+    "智慧管理",
+    "医疗物联网",
+    "5G医疗",
+    "移动医疗",
+    "区域卫生信息平台",
+    "全民健康信息平台",
+    "检查检验结果互认",
+    "医疗数据安全",
+    "隐私计算",
+    "手术麻醉管理",
+    "手麻管理",
+    "移动医护",
+    "医疗器械",
+    "医用软件",
+    "医疗保险",
+    "社会保险",
+    "医保基金监管"
+  ],
+  "trend_keywords": [
+    "智慧医院评级",
+    "电子病历评级",
+    "互联互通测评",
+    "DRG/DIP改革",
+    "医保信息化",
+    "医疗大模型",
+    "AI辅助诊断",
+    "医疗信创",
+    "医疗信息化招标",
+    "医院信息化预算",
+    "集成平台建设",
+    "区域医疗平台",
+    "医疗数据要素",
+    "医疗AI产品注册",
+    "数字疗法",
+    "互联网医院",
+    "云HIS",
+    "CDSS应用",
+    "医疗多模态大模型",
+    "电子健康档案",
+    "医院数据中心建设",
+    "信息安全等级保护",
+    "医学影像AI",
+    "影像云平台",
+    "检验结果互认",
+    "实验室自动化",
+    "手术麻醉信息化",
+    "围术期管理",
+    "手麻系统",
+    "体检中心信息化",
+    "健康管理平台",
+    "HRP医院运营",
+    "医院绩效管理",
+    "紧密型县域医共体",
+    "医联体建设",
+    "医疗器械注册",
+    "医疗设备管理",
+    "医院招投标",
+    "政府采购医疗",
+    "人工智能医用软件审评",
+    "医疗器械审评审批",
+    "医疗项目投资",
+    "医疗信息化融资",
+    "医院建设投资",
+    "商业机会"
+  ],
+  "event_keywords": [
+    "中标",
+    "招标",
+    "签约",
+    "上线",
+    "验收",
+    "发布",
+    "融资",
+    "合作",
+    "入选",
+    "获批",
+    "任命",
+    "收购"
+  ],
+  "negative_keywords": [
+    "招聘",
+    "培训",
+    "兼职",
+    "求职",
+    "广告",
+    "促销",
+    "保险推销",
+    "代写"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 2,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ]
+  },
+  "serpapi_queries": [
+    "site:nhsa.gov.cn 医保 政策",
+    "site:nmpa.gov.cn 医疗器械",
+    "site:hit180.com 医疗信息化",
+    "site:hc3i.cn 医疗IT",
+    "site:vcbeat.top 医疗AI 融资",
+    "site:cn-healthcare.com 医疗 政策",
+    "site:winning.com.cn OR site:neusoft.com OR site:imedway.com 医疗 发布",
+    "site:qixieke.com 医疗器械"
+  ],
+  "default_sources": [
+    {
+      "name": "国家医保局 DRG/DIP 支付方式改革专栏",
+      "url": "https://www.nhsa.gov.cn/col/col104/index.html",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nhsa.gov.cn",
+      "polling_interval_minutes": 360,
+      "link_include_pattern": "/art/\\d+/\\d+/\\d+/art_\\d+(_\\d+)?\\.html"
+    },
+    {
+      "name": "国家医保局 政策法规",
+      "url": "https://www.nhsa.gov.cn/col/col14/index.html",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nhsa.gov.cn",
+      "polling_interval_minutes": 360,
+      "link_include_pattern": "/art/\\d+/\\d+/\\d+/art_\\d+(_\\d+)?\\.html"
+    },
+    {
+      "name": "北京市医保局",
+      "url": "https://ybj.beijing.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.beijing.gov.cn"
+    },
+    {
+      "name": "上海市医保局",
+      "url": "https://ybj.sh.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.sh.gov.cn"
+    },
+    {
+      "name": "广东省医保局",
+      "url": "https://hsa.gd.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "hsa.gd.gov.cn"
+    },
+    {
+      "name": "江苏省医保局",
+      "url": "https://ybj.jiangsu.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.jiangsu.gov.cn"
+    },
+    {
+      "name": "浙江省医保局",
+      "url": "https://ybj.zj.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.zj.gov.cn"
+    },
+    {
+      "name": "山东省医保局",
+      "url": "https://ybj.shandong.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.shandong.gov.cn"
+    },
+    {
+      "name": "四川省医保局",
+      "url": "https://ylbzj.sc.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ylbzj.sc.gov.cn"
+    },
+    {
+      "name": "河南省医保局",
+      "url": "https://ylbz.henan.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ylbz.henan.gov.cn"
+    },
+    {
+      "name": "湖北省医保局",
+      "url": "https://ybj.hubei.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.hubei.gov.cn"
+    },
+    {
+      "name": "湖南省医保局",
+      "url": "https://ybj.hunan.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.hunan.gov.cn"
+    },
+    {
+      "name": "安徽省医保局",
+      "url": "https://ybj.ah.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.ah.gov.cn"
+    },
+    {
+      "name": "福建省医保局",
+      "url": "https://ybj.fujian.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.fujian.gov.cn"
+    },
+    {
+      "name": "河北省医保局",
+      "url": "https://ylbzj.hebei.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ylbzj.hebei.gov.cn"
+    },
+    {
+      "name": "陕西省医保局",
+      "url": "https://ybj.shaanxi.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ybj.shaanxi.gov.cn"
+    },
+    {
+      "name": "重庆市医保局",
+      "url": "https://ylbzj.cq.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ylbzj.cq.gov.cn"
+    },
+    {
+      "name": "天津市医保局",
+      "url": "https://ylbz.tj.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "ylbz.tj.gov.cn"
+    },
+    {
+      "name": "中国医疗保险（杂志社）",
+      "url": "https://www.zgylbx.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.zgylbx.com"
+    },
+    {
+      "name": "CMS 美国医保中心",
+      "url": "https://www.cms.gov",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.cms.gov"
+    },
+    {
+      "name": "国家卫生健康委员会",
+      "url": "http://www.nhc.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nhc.gov.cn"
+    },
+    {
+      "name": "国家医疗保障局（DRG/DIP）",
+      "url": "https://www.nhsa.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nhsa.gov.cn"
+    },
+    {
+      "name": "国家药品监督管理局（医疗软件注册）",
+      "url": "https://www.nmpa.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nmpa.gov.cn"
+    },
+    {
+      "name": "CHIMA 中国医院协会信息专业委员会",
+      "url": "https://www.chima.org.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "industry_association",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "www.chima.org.cn"
+    },
+    {
+      "name": "国家卫生健康委统计信息中心",
+      "url": "http://www.nhc.gov.cn/mohwsbwstjxxzx/index.shtml",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_statistics"
+      ],
+      "publisher_key": "www.nhc.gov.cn"
+    },
+    {
+      "name": "HIMSS（医疗信息化国际协会）",
+      "url": "https://www.himss.org",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "industry_association",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "www.himss.org"
+    },
+    {
+      "name": "HIT专家网",
+      "url": "https://www.hit180.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.hit180.com"
+    },
+    {
+      "name": "HC3i 数字医疗网",
+      "url": "https://www.hc3i.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.hc3i.cn"
+    },
+    {
+      "name": "动脉网（医疗科技创投）",
+      "url": "https://www.vcbeat.top",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.vcbeat.top"
+    },
+    {
+      "name": "健康界",
+      "url": "https://www.cn-healthcare.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.cn-healthcare.com"
+    },
+    {
+      "name": "健康报",
+      "url": "https://www.jkb.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.jkb.com.cn"
+    },
+    {
+      "name": "雷峰网 医健AI 频道",
+      "url": "https://www.leiphone.com/category/medAI",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.leiphone.com"
+    },
+    {
+      "name": "Healthcare IT News",
+      "url": "https://www.healthcareitnews.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.healthcareitnews.com"
+    },
+    {
+      "name": "Becker's Health IT",
+      "url": "https://www.beckershospitalreview.com/health-information-technology/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.beckershospitalreview.com"
+    },
+    {
+      "name": "HIT Consultant",
+      "url": "https://hitconsultant.net",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hitconsultant.net"
+    },
+    {
+      "name": "MobiHealthNews",
+      "url": "https://www.mobihealthnews.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.mobihealthnews.com"
+    },
+    {
+      "name": "Fierce Healthcare",
+      "url": "https://www.fiercehealthcare.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.fiercehealthcare.com"
+    },
+    {
+      "name": "MedCity News",
+      "url": "https://medcitynews.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "medcitynews.com"
+    },
+    {
+      "name": "Digital Health（英国）",
+      "url": "https://www.digitalhealth.net",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.digitalhealth.net"
+    },
+    {
+      "name": "HealthITAnalytics",
+      "url": "https://healthitanalytics.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "healthitanalytics.com"
+    },
+    {
+      "name": "EHR Intelligence",
+      "url": "https://ehrintelligence.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "ehrintelligence.com"
+    },
+    {
+      "name": "FDA Newsroom（数字医疗监管）",
+      "url": "https://www.fda.gov/news-events/fda-newsroom",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.fda.gov"
+    },
+    {
+      "name": "东软集团 媒体中心（医疗信息化）",
+      "url": "https://www.neusoft.com/cn/media-center/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.neusoft.com"
+    },
+    {
+      "name": "东华医为（imedway）",
+      "url": "http://www.imedway.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.imedway.com"
+    },
+    {
+      "name": "卫宁健康",
+      "url": "https://www.winning.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.winning.com.cn"
+    },
+    {
+      "name": "久远银海 公司动态",
+      "url": "https://www.yinhai.com/pc/gsdt_1703471434871/index.html",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.yinhai.com"
+    },
+    {
+      "name": "坐标软件集团",
+      "url": "https://www.cnhis.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.cnhis.com"
+    },
+    {
+      "name": "丁香园",
+      "url": "https://www.dxy.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.dxy.cn"
+    },
+    {
+      "name": "医学界",
+      "url": "https://www.yxj.org.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.yxj.org.cn"
+    },
+    {
+      "name": "中国政府采购网（医疗招投标）",
+      "url": "https://www.ccgp.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.ccgp.gov.cn"
+    },
+    {
+      "name": "中国招标投标公共服务平台",
+      "url": "https://www.cebpubservice.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.cebpubservice.com"
+    },
+    {
+      "name": "中国医疗器械行业协会",
+      "url": "http://www.camdi.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "industry_association",
+      "authority_level": 4,
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
+      "publisher_key": "www.camdi.cn"
+    },
+    {
+      "name": "创业慧康",
+      "url": "https://www.bsoft.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.bsoft.com.cn"
+    },
+    {
+      "name": "嘉和美康",
+      "url": "https://www.goodwillcis.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.goodwillcis.com"
+    },
+    {
+      "name": "和仁科技",
+      "url": "https://www.herenit.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "issuer_official",
+      "authority_level": 3,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "publisher_key": "www.herenit.com"
+    },
+    {
+      "name": "新青年麻醉论坛",
+      "url": "https://www.xqnmz.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.xqnmz.com"
+    },
+    {
+      "name": "器械之家（医疗器械媒体）",
+      "url": "http://qixieke.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "qixieke.com"
+    },
+    {
+      "name": "中国医院院长网",
+      "url": "https://www.h-ceo.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.h-ceo.com"
+    },
+    {
+      "name": "国家药监局医疗器械技术审评中心",
+      "url": "https://www.cmde.org.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.cmde.org.cn"
+    },
+    {
+      "name": "中国健康管理协会",
+      "url": "https://www.cha-china.org",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "industry_association",
+      "authority_level": 4,
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
+      "publisher_key": "www.cha-china.org"
+    },
+    {
+      "name": "HIT专家网 RSS",
+      "url": "https://www.hit180.com/feed/rss2",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.hit180.com",
+      "polling_interval_minutes": 360
+    },
+    {
+      "name": "梅斯医学 RSS（RSSHub）",
+      "url": "http://10.88.0.1:1200/medsci",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.medsci.cn",
+      "polling_interval_minutes": 360
+    },
+    {
+      "name": "36氪快讯 RSS（RSSHub）",
+      "url": "http://10.88.0.1:1200/36kr/newsflashes",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "36kr.com",
+      "polling_interval_minutes": 360
+    },
+    {
+      "name": "检验医学网",
+      "url": "https://www.labmed.net",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.labmed.net"
+    },
+    {
+      "name": "人力资源和社会保障部 政策文件",
+      "url": "https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/index.html",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.mohrss.gov.cn",
+      "polling_interval_minutes": 360
+    },
+    {
+      "name": "国家卫生健康委 法规司",
+      "url": "http://www.nhc.gov.cn/wjw/flfz/wsjkfz.shtml",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nhc.gov.cn",
+      "polling_interval_minutes": 360
+    },
+    {
+      "name": "国家药监局 医疗器械通告栏目",
+      "url": "https://www.nmpa.gov.cn/xxgk/ggtg/ylqxggtg/index.html",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.nmpa.gov.cn",
+      "polling_interval_minutes": 360,
+      "link_include_pattern": "/\\d{10,}\\.html"
+    },
+    {
+      "name": "中国政府采购网 地方采购公告（省市县）",
+      "url": "http://www.ccgp.gov.cn/cggg/dfgg/index.htm",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.ccgp.gov.cn",
+      "polling_interval_minutes": 360,
+      "link_include_pattern": "/news/\\d{6}/t\\d{8}_\\d+\\.htm"
+    },
+    {
+      "name": "筑医台（医院建设与投资项目）",
+      "url": "https://www.zhuyitai.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.zhuyitai.com",
+      "polling_interval_minutes": 720
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "smart_hospital",
+      "name": "智慧医院",
+      "keywords": [
+        "智慧医院",
+        "智慧医疗",
+        "智慧服务",
+        "智慧管理",
+        "电子病历评级",
+        "互联互通测评"
+      ]
+    },
+    {
+      "key": "his_emr",
+      "name": "医院信息系统与集成平台",
+      "keywords": [
+        "HIS",
+        "电子病历",
+        "EMR",
+        "集成平台",
+        "PACS",
+        "LIS",
+        "医院信息平台",
+        "云HIS"
+      ]
+    },
+    {
+      "key": "health_data_ai",
+      "name": "医疗大数据与AI",
+      "keywords": [
+        "医疗大数据",
+        "医疗大模型",
+        "AI辅助诊断",
+        "CDSS",
+        "医疗AI",
+        "数据要素"
+      ]
+    },
+    {
+      "key": "insurance_drg",
+      "name": "DRG/DIP 医保支付",
+      "keywords": [
+        "DRG",
+        "DIP",
+        "医保信息化",
+        "支付方式改革",
+        "医保局",
+        "结算清单"
+      ]
+    },
+    {
+      "key": "health_it_market",
+      "name": "医疗信创与市场",
+      "keywords": [
+        "医疗信创",
+        "国产化",
+        "中标",
+        "招标",
+        "医疗软件",
+        "医院信息化预算",
+        "信创",
+        "政府采购",
+        "投标",
+        "中标公告",
+        "招标公告",
+        "医疗IT"
+      ]
+    },
+    {
+      "key": "hospital_management",
+      "name": "医院管理信息系统",
+      "keywords": [
+        "医院管理",
+        "医院运营",
+        "HRP",
+        "绩效管理",
+        "成本核算",
+        "医院财务",
+        "运营数据中心",
+        "院长决策",
+        "医院运营管理",
+        "全面预算管理",
+        "HRP系统",
+        "院长驾驶舱"
+      ]
+    },
+    {
+      "key": "surgery_anesthesia",
+      "name": "手术麻醉管理",
+      "keywords": [
+        "手术麻醉",
+        "麻醉管理",
+        "手麻系统",
+        "麻醉信息系统",
+        "手术室管理",
+        "围术期",
+        "手麻管理",
+        "麻醉科",
+        "手术麻醉系统",
+        "麻醉监护",
+        "手术排班"
+      ]
+    },
+    {
+      "key": "medical_imaging",
+      "name": "医学影像",
+      "keywords": [
+        "医学影像",
+        "影像云",
+        "放射科",
+        "影像AI",
+        "医学影像设备",
+        "超声信息化",
+        "影像诊断",
+        "影像中心",
+        "区域影像",
+        "云胶片",
+        "超声科"
+      ]
+    },
+    {
+      "key": "medical_lab",
+      "name": "医学检验",
+      "keywords": [
+        "医学检验",
+        "检验科",
+        "实验室信息系统",
+        "检验结果互认",
+        "检验信息化",
+        "检验管理",
+        "检验科信息化",
+        "生化免疫",
+        "POCT",
+        "实验室管理"
+      ]
+    },
+    {
+      "key": "physical_exam",
+      "name": "体检信息系统",
+      "keywords": [
+        "体检系统",
+        "健康体检",
+        "体检管理",
+        "检后管理",
+        "体检信息化",
+        "健康管理平台",
+        "体检报告",
+        "职业体检",
+        "健康小屋",
+        "慢病管理"
+      ]
+    },
+    {
+      "key": "competitor_news",
+      "name": "竞品信息",
+      "keywords": [
+        "东软",
+        "卫宁健康",
+        "东华医为",
+        "东华软件",
+        "久远银海",
+        "坐标软件",
+        "创业慧康",
+        "嘉和美康",
+        "和仁科技",
+        "思创医惠",
+        "麦迪科技",
+        "联众智慧",
+        "京颐科技",
+        "望海康信",
+        "讯飞医疗",
+        "医渡科技",
+        "鹰瞳科技",
+        "数坤科技",
+        "厂商动态",
+        "新品发布",
+        "产品发布",
+        "战略合作"
+      ]
+    },
+    {
+      "key": "medical_devices",
+      "name": "医疗器械",
+      "keywords": [
+        "医疗器械",
+        "医疗设备",
+        "设备管理",
+        "医疗器械注册",
+        "医疗装备",
+        "影像设备",
+        "检验设备",
+        "医疗设备信息化",
+        "设备全生命周期",
+        "医用耗材"
+      ]
+    },
+    {
+      "key": "hospital_bidding",
+      "name": "医院招投标信息",
+      "keywords": [
+        "招标公告",
+        "中标公告",
+        "招投标",
+        "医院采购",
+        "集采",
+        "公开招标",
+        "竞争性磋商",
+        "采购意向",
+        "中标候选人",
+        "采购公告",
+        "评标结果",
+        "医院信息化项目"
+      ]
+    },
+    {
+      "key": "medical_alliance",
+      "name": "医共体&医联体",
+      "keywords": [
+        "医共体",
+        "医联体",
+        "紧密型县域医共体",
+        "医疗集团",
+        "区域医疗中心",
+        "分级诊疗",
+        "对口帮扶",
+        "县域医共体",
+        "医疗联合体",
+        "总医院",
+        "远程会诊"
+      ]
+    },
+    {
+      "key": "policy_regulation",
+      "name": "政策法规",
+      "keywords": [
+        "审评",
+        "审批",
+        "注册审查",
+        "指导原则",
+        "管理办法",
+        "通告",
+        "征求意见稿",
+        "监管要求",
+        "审评要求",
+        "分类界定",
+        "技术审评",
+        "医疗器械注册",
+        "政策解读",
+        "社会保险",
+        "医疗保障",
+        "医保基金",
+        "待遇保障",
+        "药品目录",
+        "医保目录",
+        "诊疗项目",
+        "卫生法规",
+        "规范性文件"
+      ]
+    },
+    {
+      "key": "business_opportunity",
+      "name": "商业机会",
+      "keywords": [
+        "采购意向",
+        "预算金额",
+        "中标金额",
+        "项目投资",
+        "融资",
+        "A轮",
+        "B轮",
+        "C轮",
+        "估值",
+        "IPO",
+        "上市",
+        "投资",
+        "收购",
+        "并购",
+        "新建医院",
+        "医院扩建",
+        "信息化立项",
+        "智慧医院项目",
+        "千万",
+        "亿元"
+      ]
+    }
+  ],
+  "brands": [
+    "卫宁健康",
+    "东华软件",
+    "东华医为",
+    "东软集团",
+    "坐标软件",
+    "创业慧康",
+    "思创医惠",
+    "嘉和美康",
+    "和仁科技",
+    "麦迪科技",
+    "联众智慧",
+    "京颐科技",
+    "望海康信",
+    "久远银海",
+    "国新健康",
+    "山大地纬",
+    "易联众",
+    "平安医保科技",
+    "万达信息",
+    "联仁健康",
+    "讯飞医疗",
+    "医渡科技",
+    "鹰瞳科技",
+    "数坤科技",
+    "推想医疗",
+    "深睿医疗",
+    "Epic",
+    "Oracle Health",
+    "Cerner",
+    "Meditech",
+    "InterSystems",
+    "athenahealth",
+    "Philips",
+    "GE HealthCare",
+    "Siemens Healthineers"
+  ],
+  "trend_topics": [
+    "智慧医院建设",
+    "医院信息系统与集成平台",
+    "医疗大数据与AI",
+    "DRG/DIP 医保支付改革",
+    "医疗信创与国产化"
+  ]
+}

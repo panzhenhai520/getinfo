@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资讯流 - {{ platform_name }}</title>
+<link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css">
+<style>
+.feed-wrap{max-width:1440px;margin:0 auto;padding:58px 22px 22px}
+.feed-top{font-size:22px;font-weight:800;color:#111827;margin-bottom:2px}
+.feed-meta{font-size:13px;color:#6b7280;margin-bottom:14px}
+.feed-section{margin-bottom:20px}
+.feed-sec-head{display:flex;align-items:center;gap:14px;padding:10px 0;cursor:pointer;user-select:none;border-bottom:2px solid #eef1f4;margin-bottom:12px}
+.feed-sec-head:hover .feed-sec-title{color:#0f766e}
+.feed-sec-titlewrap{flex:1;min-width:0}
+.feed-sec-title{font-size:20px;font-weight:800;color:#1f2937}
+.feed-sec-desc{font-size:12px;color:#8a94a0;margin-top:2px}
+.feed-sec-count{font-size:12px;color:#6b7280;white-space:nowrap}
+.feed-more{font-size:12px;color:#0f766e;font-weight:700;border:0;background:transparent;cursor:pointer;text-decoration:underline;white-space:nowrap}
+.feed-search{display:flex;gap:8px;align-items:center;margin-left:auto;flex-shrink:0}
+.feed-search-input{width:200px;border:1px solid #d4dce6;border-radius:6px;padding:6px 10px;font-size:13px;outline:0}
+.feed-search-input:focus{border-color:#0f766e}
+.feed-search-btn{display:inline-flex;align-items:center;gap:4px;border:0;border-radius:6px;padding:7px 13px;background:#1d7f68;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.feed-search-btn:hover{background:#166a55}
+.feed-hero{text-align:center;margin-bottom:2px}
+.feed-hero-title{font-size:24px;font-weight:800;color:#111827}
+.feed-hero-meta{font-size:13px;color:#6b7280;margin-top:1px}
+.feed-caret{font-size:12px;color:#0f766e;transition:transform .2s}
+.feed-section.is-collapsed .feed-caret{transform:rotate(-90deg)}
+.feed-section.is-collapsed .feed-grid{display:none}
+.feed-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;align-items:stretch}
+@media(max-width:1100px){.feed-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.feed-grid{grid-template-columns:1fr}}
+.feed-empty{color:#9ca3af;font-size:13px}
+.article-card{height:230px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;padding:10px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:border-color 0.15s ease,box-shadow 0.15s ease,transform 0.15s ease}
+.article-card:hover{border-color:rgba(29,127,104,.62);background:#e7f2eb;box-shadow:0 10px 24px rgba(29,93,72,.15);transform:translateY(-2px)}
+.article-card-title{width:100%;min-height:40px;border:0;padding:0;background:transparent;color:#1e293b;font-size:13px;font-weight:700;line-height:1.45;text-align:left;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.article-card-meta{display:flex;flex-wrap:wrap;gap:6px;color:#64748b;font-size:11px}
+.article-card-meta span{display:flex;align-items:center;gap:4px;min-width:0}
+.article-card-preview{flex:1;overflow:hidden;color:#475569;font-size:12px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+.keyword-badges{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:22px;overflow:hidden}
+.keyword-badge{display:inline-flex;align-items:center;gap:3px;max-width:100%;padding:2px 7px;border-radius:0;border:1px solid transparent;font-size:11px;line-height:1.35;font-weight:600}
+.keyword-badge-content{background:rgba(29,127,104,.10);border-color:rgba(29,127,104,.28);color:#12674f}
+.keyword-empty{color:#9ca3af;font-size:11px}
+.article-card-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:6px;border-top:1px solid #f1f5f9}
+.task-origin-empty{max-width:100%;color:#9ca3af;font-size:12px;overflow:hidden;display:flex;align-items:center;gap:4px;min-width:0}
+.task-origin-empty span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.article-card-actions{display:flex;flex-shrink:0;gap:3px;max-width:100%}
+.article-card-action{display:inline-flex;width:23px;height:22px;align-items:center;justify-content:center;border:0;border-radius:4px;color:#fff;font-size:10px;cursor:pointer;transition:filter .15s ease,transform .15s ease}
+.article-card-action.view{background:#1d7f68}
+.article-card-action.translate{width:auto;padding:0 5px;background:#365b47;font-size:9px;font-weight:800}
+.article-card-action.delete{background:#ef4444}
+.article-card-action.follow{color:#854d0e;background:#fef3c7;border:1px solid #d97706}
+.article-card-action.follow:hover{color:#fff;background:#b45309;border-color:#92400e}
+.translation-mark{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;line-height:1}.translation-mark i{font-style:normal;color:currentColor;opacity:.86;font-size:12px}
+</style>
+</head>
+<body data-industry-pack-id="{{ active_industry_pack_id|default('') }}">
+{% include '_dashboard_nav.html' %}
+<main>
+  <div class="feed-wrap">
+    <div class="feed-hero"><div class="feed-hero-title" id="feedHeroTitle">资讯流</div><div class="feed-hero-meta" id="feedHeroMeta"></div></div>
+    <div id="feedSections"><div class="feed-empty">加载中…</div></div>
+  </div>
+</main>
+<script>
+// 详情页功能开关（朗读/翻译）——默认关闭。卡片由 JS 动态渲染，这里按开关在渲染后移除卡片上的
+// 翻译按钮（关闭时移除而非隐藏），并用定时器兜住"渲染晚于配置返回"的情况；取不到包=关闭。
+(function(){
+  function apply(f){
+    window.__intelFeatures = f || {};
+    var strip = function(){
+      if (f && f.translate) return;
+      var nodes = document.querySelectorAll('.article-card-action.translate');
+      for (var i=0;i<nodes.length;i+=1) { if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]); }
+    };
+    strip();
+    if (!window.__intelFeatTimer) window.__intelFeatTimer = setInterval(strip, 1500);
+  }
+  var pid = (document.body && document.body.dataset.industryPackId) || window.__intelIndustryPackId || '';
+  if (!pid) { apply({}); return; }
+  fetch('/api/intel/industry-packs/'+encodeURIComponent(pid)+'/configuration',{cache:'no-store'})
+    .then(function(r){return r.json()})
+    .then(function(d){ apply((d && d.pack && d.pack.features) || {}); })
+    .catch(function(){ apply({}); });
+})();
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function kwList(kw){ if(!kw) return []; if(typeof kw==='string') return kw.split(/[,，、]/).filter(Boolean); return kw.map(function(x){return typeof x==='object'?(x.keyword||x.name||''):x;}).filter(Boolean); }
+function highlightKeywords(text, keywords){ if(!keywords||!text) return text; var list=kwList(keywords); if(!list.length) return text; var result=text; list.forEach(function(k){ try{ var re=new RegExp('('+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); result=result.replace(re,'<mark class="bg-yellow-300 text-yellow-900 px-0.5 rounded">$1</mark>'); }catch(e){} }); return result; }
+function transMark(){ return '<span class="translation-mark"><b>EN</b><i class="fa fa-language"></i></span>'; }
+function viewArticle(id){ location.href='/article-management?article_id='+id; }
+async function deleteArticle(id,event){ event.stopPropagation(); if(!confirm('确定删除这篇文章吗？'))return; try{ var r=await fetch('/article-management/api/article/'+id,{method:'DELETE'}); var d=await r.json(); if(!d.success) throw new Error(d.error||d.message||'删除失败'); var c=event.currentTarget.closest('.article-card'); if(c) c.remove(); }catch(e){ alert('删除失败：'+e.message); } }
+async function followArticle(id,event){ event.stopPropagation(); try{ var r=await fetch('/api/intel/articles/'+id+'/follow',{method:'POST'}); var d=await r.json(); if(!r.ok||!d.success) throw new Error(d.error||'关注失败'); var b=event.currentTarget; b.classList.toggle('is-following',!!d.following); b.title=d.following?'已关注（点击取消）':'加入当前关注'; }catch(e){ alert('关注失败：'+e.message); } }
+async function translateCard(id,event){ event.stopPropagation(); var card=event.currentTarget.closest('.article-card'); var b=event.currentTarget; if(!card||!b)return;
+  if(card.dataset.translated==='1'){ card.querySelector('[data-card-title]').textContent=card.dataset.originalTitle||''; card.querySelector('[data-card-preview]').textContent=card.dataset.originalPreview||''; card.dataset.translated='0'; b.innerHTML=transMark(); b.title='Translate / 翻译'; return; }
+  try{ card.dataset.originalTitle=card.querySelector('[data-card-title]').textContent; card.dataset.originalPreview=card.querySelector('[data-card-preview]').textContent;
+    var r=await fetch('/api/intel/articles/'+id+'/translate',{method:'POST'}); var d=await r.json(); if(!r.ok||!d.success) throw new Error(d.error||'翻译失败');
+    var parts=String(d.translation||'').split(/\n\s*\n/);
+    card.querySelector('[data-card-title]').textContent=(parts[0]||d.translation).replace(/^标题[：:]/,'').trim(); card.querySelector('[data-card-preview]').textContent=(parts.slice(1).join(' ')||d.translation).replace(/^内容[：:]/,'').trim();
+    card.dataset.translated='1'; b.textContent='Original'; b.title='已翻译；点击恢复';
+  }catch(e){ alert('翻译失败：'+e.message); } }
+function card(a){
+  var id=Number(a.article_id||a.id||0); var kw=a.matched_keywords||a.classification_keywords||[];
+  var sum=String(a.trend_summary||a.why_important||a.content_preview||a.final_reason||a.why_important||'暂无资讯摘要').replace(/\s+/g,' ').trim();
+  var dom=String(a.domain||'-').replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
+  var src=a.source_display_name||a.source_name||a.domain||'无任务';
+  var searchText=(String(a.title||'')+' '+(a.trend_summary||a.why_important||a.content_preview||a.final_reason||a.why_important||'')+' '+a.domain).toLowerCase();
+  return '<article class="article-card" data-article-id="'+id+'" data-search="'+esc(searchText)+'">'+
+    '<button type="button" class="article-card-title" data-card-title onclick="viewArticle('+id+')" title="'+esc(a.title||'')+'">'+highlightKeywords(esc(a.title||'无标题'),kw)+'</button>'+
+    '<div class="article-card-meta"><span title="'+esc(a.domain||'-')+'"><i class="fa fa-link text-gray-400"></i> '+esc(dom)+'</span><span><i class="fa fa-calendar text-gray-400"></i> '+esc(a.publish_date||'未知')+'</span><span><i class="fa fa-font text-gray-400"></i> '+Number(a.content_length||0)+'字</span></div>'+
+    '<div class="article-card-preview" data-card-preview>'+highlightKeywords(esc(sum),kw)+'</div>'+
+    '<div class="article-card-footer"><div class="task-origin-empty" title="'+esc(src)+'"><i class="fa fa-globe"></i><span>'+esc(src)+'</span></div><div class="article-card-actions">'+
+      '<button type="button" class="article-card-action view" onclick="viewArticle('+id+')" title="查看"><i class="fa fa-eye"></i></button>'+
+      '<button type="button" class="article-card-action translate" onclick="translateCard('+id+',event)" title="翻译">'+transMark()+'</button>'+
+      ((window.__canDeleteArticles===false)?'':'<button type="button" class="article-card-action delete" data-del-perm="1" onclick="deleteArticle('+id+',event)" title="删除"><i class="fa fa-trash"></i></button>')+
+      '<button type="button" class="article-card-action follow" onclick="followArticle('+id+',event)" title="加入关注"><i class="fa fa-star"></i></button>'+
+    '</div></div></article>';
+}
+function filterFeed(input, cat){
+  var q=(input.value||'').toLowerCase().trim();
+  var sec=[].slice.call(document.querySelectorAll('#feedSections .feed-section[data-cat="'+cat+'"]'))[0];
+  if(!sec) return;
+  sec.querySelectorAll('.article-card').forEach(function(c){ c.style.display=(!q||(c.dataset.search||'').indexOf(q)!==-1)?'':'none'; });
+}
+function toggleFeed(sec){ sec.classList.toggle('is-collapsed'); }
+var CATS=[
+  ['today','行业动态','近期新发布、宣布、签约、投资、合作、峰会与任命等事件信号'],
+  ['trend','趋势观察','近期持续出现的政策、监管、市场与长期结构性变化'],
+  ['policy','政策法规','仅展示命中行业关键词的监管政策、法规、行业办法与权威解读'],
+  ['other','其他资讯','补充资讯；无内容时自动隐藏']
+];
+fetch('/api/intel/dashboard?industry_pack_id='+encodeURIComponent(document.body.getAttribute('data-industry-pack-id')||window.__intelIndustryPackId||''),{cache:'no-store'}).then(r=>r.json()).then(d=>{
+  var sec=d.sections||{}; var box=document.getElementById('feedSections'); var html='';
+  var pk=d.industry_pack||{};
+  if(pk.name) document.getElementById('feedHeroTitle').textContent=pk.name;
+  document.getElementById('feedHeroMeta').textContent=((d.total_active_articles!=null?d.total_active_articles:d.total)||'0')+' 篇已筛选资讯';
+  CATS.forEach(function(cat){
+    var s=sec[cat[0]]||{}; var arts=(s.articles||[]).slice(0,10); var total=s.total||arts.length;
+    if(!total) return;
+    html+='<section class="feed-section" data-cat="'+cat[0]+'">'+
+      '<div class="feed-sec-head" onclick="toggleFeed(this.closest(\'.feed-section\'))"><div class="feed-sec-titlewrap"><div class="feed-sec-title"><i class="fa fa-folder-open"></i> '+cat[1]+'</div><div class="feed-sec-desc">'+cat[2]+'</div></div>'+
+      '<span class="feed-sec-count">'+total+' 篇</span>'+
+      '<a class="feed-more" href="/intel-category/'+cat[0]+'" onclick="event.stopPropagation()">查看更多 &gt;</a>'+
+      '<div class="feed-search"><input class="feed-search-input" placeholder="搜索标题或摘要" oninput="filterFeed(this,\''+cat[0]+'\')" onkeydown="if(event.key===\'Enter\')filterFeed(this,\''+cat[0]+'\')"><button type="button" class="feed-search-btn" onclick="filterFeed(this.previousElementSibling,\''+cat[0]+'\')"><i class="fa fa-search"></i> 搜索</button></div>'+
+      '<span class="feed-caret">▾</span></div>'+
+      '<div class="feed-grid">'+arts.map(card).join('')+'</div></section>';
+  });
+  box.innerHTML= html || '<div class="feed-empty">暂无资讯流内容</div>';
+  // 卡片级点击：点击卡片任意处(除按钮/链接外)打开文章详情
+  box.querySelectorAll('.article-card').forEach(function(card){
+    card.onclick=function(e){ if(e.target.closest('button,a'))return; var id=Number(card.dataset.articleId); if(id) viewArticle(id); };
+    card.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); var id=Number(card.dataset.articleId); if(id) viewArticle(id); } };
+  });
+}).catch(function(){document.getElementById('feedSections').innerHTML='<div class="feed-empty">加载失败</div>';});
+</script>
+</body>
+</html>

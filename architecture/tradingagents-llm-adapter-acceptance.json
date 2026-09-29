@@ -1,0 +1,77 @@
+{
+  "check_version": "tradingagents-llm-adapter-v1",
+  "checked_at_utc": "2026-08-01T10:18:27Z",
+  "static": {
+    "adapter_path": "tradingagents_llm_adapter.py",
+    "role_count": 13,
+    "roles": [
+      "aggressive_risk_analyst",
+      "bear_researcher",
+      "bull_researcher",
+      "conservative_risk_analyst",
+      "fundamentals_analyst",
+      "market_analyst",
+      "neutral_risk_analyst",
+      "news_analyst",
+      "portfolio_manager",
+      "reflection",
+      "research_manager",
+      "sentiment_analyst",
+      "trader"
+    ],
+    "tool_role_sets": 4,
+    "structured_schema_roles": {
+      "PortfolioDecision": "portfolio_manager",
+      "ResearchPlan": "research_manager",
+      "SentimentReport": "sentiment_analyst",
+      "TraderProposal": "trader"
+    },
+    "direct_network_or_model_imports": [],
+    "environment_key_reads": 0,
+    "broker_completion_paths": 1,
+    "finite_json_repair_max": 1
+  },
+  "runtime": {
+    "executed": true,
+    "tradingagents_version": "0.3.1",
+    "langchain_runnable": true,
+    "complete_graph_compiled": true,
+    "complete_graph_node_count": 22,
+    "original_role_nodes_present": [
+      "Aggressive Analyst",
+      "Bear Researcher",
+      "Bull Researcher",
+      "Conservative Analyst",
+      "Fundamentals Analyst",
+      "Market Analyst",
+      "Neutral Analyst",
+      "News Analyst",
+      "Portfolio Manager",
+      "Research Manager",
+      "Sentiment Analyst",
+      "Trader"
+    ],
+    "upstream_plain_node_invoked": true,
+    "upstream_pydantic_structured_output_invoked": true,
+    "upstream_reflection_invoked": true,
+    "broker_only_runtime_calls": 3,
+    "runtime_roles_observed": [
+      "bull_researcher",
+      "trader",
+      "reflection"
+    ],
+    "research_run_and_audit_fields_threaded": true,
+    "network_calls": 0
+  },
+  "acceptance": {
+    "all_upstream_roles_have_explicit_policy": true,
+    "fast_and_deep_profiles_are_bounded": true,
+    "structured_repairs_are_finite": true,
+    "adapter_has_no_direct_model_or_network_client": true,
+    "adapter_does_not_read_environment_keys": true,
+    "all_llm_calls_use_shared_broker": true,
+    "research_run_role_model_latency_hash_contract": true,
+    "complete_upstream_graph_runtime_passed": true,
+    "passed": true
+  }
+}

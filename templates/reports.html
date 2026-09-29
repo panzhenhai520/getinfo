@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>报告 - {{ platform_name }}</title>
+<link href="/static/css/tailwind.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/fontawesome.css">
+<link rel="stylesheet" href="/static/css/dashboard-theme.css">
+<script src="/static/js/marked.min.js"></script>
+<style>
+  body{background:#f8fafc;min-height:100vh}
+  .reports-wrap{max-width:1440px;margin:84px auto 40px;padding:0 22px}
+  .report-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+  .layer{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .layer .chip{font-size:12px;color:#334155;background:#eef2f5;border:1px solid #dbe5e7;border-radius:999px;padding:4px 11px}
+  .reports-grid{display:grid;grid-template-columns:minmax(360px,42%) 1fr;gap:16px;align-items:start}
+  .reports-list{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;max-height:calc(100vh - 160px);overflow:auto}
+  .group-title{font-weight:700;color:#0f766e;padding:10px 6px 6px;font-size:14px;border-bottom:1px solid #eef2f5;margin-top:6px}
+  .report-item{display:flex;gap:10px;align-items:flex-start;padding:10px 8px;border-radius:9px;cursor:pointer;border-bottom:1px solid #f6f8fa}
+  .report-item:hover{background:#f0fdfa}
+  .report-item.active{background:#e6f6f2}
+  .report-item .title{font-size:13px;font-weight:600;color:#1f2937;line-height:1.4}
+  .report-item .meta{font-size:11px;color:#6b7280;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+  .report-item .badge{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;font-size:10px;font-weight:600}
+  .badge.scheduled{background:#eef2ff;color:#4338ca}
+  .badge.test{background:#fef3c7;color:#92400e}
+  .preview-panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;min-height:calc(100vh - 160px);display:flex;flex-direction:column}
+  .preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #eef2f5}
+  .preview-title{font-size:17px;font-weight:700;color:#111827}
+  .preview-sub{font-size:12px;color:#6b7280;margin-top:3px}
+  .preview-body{flex:1;overflow:auto;padding:16px 4px}
+  .empty{color:#94a3b8;text-align:center;padding:70px 20px}
+  .empty .fa{font-size:38px;color:#cbd5e1;display:block;margin-bottom:12px}
+  .empty a{color:#0f766e;text-decoration:none;font-weight:600}
+  /* ── 深蓝皮肤适配：报告列表高亮、文本、徽标、预览区 ── */
+  body.skin-darkblue .report-item{border-bottom-color:rgba(96,165,250,.14)}
+  body.skin-darkblue .report-item:hover{background:rgba(56,189,248,.12)}
+  body.skin-darkblue .report-item.active{background:rgba(56,189,248,.22)}
+  body.skin-darkblue .report-item .title{color:#e6f0ff}
+  body.skin-darkblue .report-item .meta{color:#8ea6c8}
+  body.skin-darkblue .group-title{color:#7dd3fc;border-bottom-color:rgba(96,165,250,.16)}
+  body.skin-darkblue .layer .chip{background:#12233f;color:#c9d8ee;border-color:rgba(96,165,250,.24)}
+  body.skin-darkblue .badge.scheduled{background:rgba(99,102,241,.22);color:#c7d2fe}
+  body.skin-darkblue .badge.test{background:rgba(245,158,11,.20);color:#fcd34d}
+  body.skin-darkblue .preview-title{color:#e6f0ff}
+  body.skin-darkblue .preview-sub{color:#8ea6c8}
+  body.skin-darkblue .preview-head{border-bottom-color:rgba(96,165,250,.16)}
+  body.skin-darkblue .preview-panel,.skin-darkblue .reports-list{background:#0e1d3a;border-color:rgba(96,165,250,.24)}
+  /* Markdown 报告预览：默认浅色皮肤（白底深字，与页面皮肤一致）；深蓝皮肤用 body.skin-darkblue 覆盖 */
+  .md-preview{padding:18px 22px;font-size:14px;line-height:1.85;color:#1f2937;background:#ffffff;border:1px solid #e5e7eb;border-radius:10px;word-break:break-word}
+  .md-preview h1,.md-preview h2,.md-preview h3,.md-preview h4{color:#111827;border-bottom:1px solid #eef2f5;padding-bottom:6px;margin:14px 0 10px}
+  .md-preview h1{font-size:20px}.md-preview h2{font-size:17px}.md-preview h3{font-size:15px}
+  .md-preview p{margin:8px 0}
+  .md-preview a{color:#0f766e;text-decoration:none}
+  .md-preview a:hover{text-decoration:underline}
+  .md-preview ul,.md-preview ol{margin:6px 0;padding-left:22px}
+  .md-preview li{margin:3px 0}
+  .md-preview pre{background:#f6f8fa;color:#334155;padding:12px;border-radius:8px;overflow:auto;font-size:13px;line-height:1.6}
+  .md-preview code{background:rgba(15,118,110,.10);color:#0f766e;padding:1px 4px;border-radius:4px}
+  .md-preview pre code{background:transparent;padding:0}
+  .md-preview table{border-collapse:collapse;margin:10px 0}
+  .md-preview th,.md-preview td{border:1px solid #e5e7eb;padding:5px 10px}
+  .md-preview th{background:#f0fdfa}
+  .md-preview blockquote{border-left:3px solid rgba(15,118,110,.35);margin:10px 0;padding:5px 12px;color:#475569;background:#f6faf8}
+  .md-preview img{max-width:100%;border-radius:8px}
+  .md-preview hr{border:0;border-top:1px solid #e5e7eb;margin:16px 0}
+  /* 深蓝皮肤：保持深色预览，颜色与原深色风格一致 */
+  body.skin-darkblue .md-preview{color:#dbeafe;background:#0e1d3a;border-color:rgba(96,165,250,.22)}
+  body.skin-darkblue .md-preview h1,body.skin-darkblue .md-preview h2,
+  body.skin-darkblue .md-preview h3,body.skin-darkblue .md-preview h4{color:#e6f0ff;border-bottom-color:rgba(96,165,250,.18)}
+  body.skin-darkblue .md-preview a{color:#7dd3fc}
+  body.skin-darkblue .md-preview pre{background:#12233f;color:#e6f0ff}
+  body.skin-darkblue .md-preview code{background:rgba(56,189,248,.14);color:#93c5fd}
+  body.skin-darkblue .md-preview th,body.skin-darkblue .md-preview td{border-color:rgba(96,165,250,.3)}
+  body.skin-darkblue .md-preview th{background:rgba(56,189,248,.12)}
+  body.skin-darkblue .md-preview blockquote{border-left-color:rgba(56,189,248,.4);color:#b8c9e6;background:rgba(56,189,248,.08)}
+  body.skin-darkblue .md-preview hr{border-top-color:rgba(96,165,250,.2)}
+  /* 预览头部左区（返回按钮 + 标题） */
+  .preview-head-left{display:flex;align-items:flex-start;gap:10px;min-width:0}
+  .back-btn{display:none;align-items:center;gap:5px;border:1px solid #cbd5e1;border-radius:8px;
+    padding:7px 12px;font-size:13px;background:#fff;cursor:pointer;color:#334155;flex-shrink:0}
+  body.skin-darkblue .back-btn{background:#12233f;color:#dbeafe;border-color:rgba(96,165,250,.28)}
+  .preview-foot{margin-top:12px;padding-top:12px;border-top:1px solid #eef2f5;display:flex;justify-content:flex-end}
+  body.skin-darkblue .preview-foot{border-top-color:rgba(96,165,250,.16)}
+  .preview-foot .btn.primary{background:#0f766e;color:#fff;border-color:#0f766e}
+  /* ── 手机布局：单列主从切换，同一屏只出现一次标题 ── */
+  @media (max-width: 860px){
+    .reports-wrap{margin:56px auto 22px;padding:0 12px}
+    .report-head{flex-direction:column;align-items:flex-start;gap:8px}
+    .report-tabs{flex-wrap:wrap}
+    .reports-grid{grid-template-columns:1fr;gap:0}
+    .reports-list{max-height:none;border-radius:12px}
+    .report-item{padding:13px 10px}
+    .back-btn{display:inline-flex}
+    /* 默认：只显示列表 */
+    .preview-panel{display:none}
+    /* 选中报告：只显示预览（隐藏列表与 tab 栏） */
+    body.report-detail-mobile .reports-list,
+    body.report-detail-mobile .report-tabs,
+    body.report-detail-mobile .report-head{display:none}
+    body.report-detail-mobile .preview-panel{display:flex;min-height:calc(100vh - 96px);border-radius:12px}
+    .md-preview{padding:14px 14px}
+  }
+</style>
+</head>
+<body>
+{% include "_dashboard_nav.html" %}
+<main class="reports-wrap">
+  <div class="report-head">
+    <div>
+      <h2 class="text-2xl font-bold text-gray-800">报告</h2>
+      <p class="text-gray-500 text-sm mt-1">AI 行业周报：每周五自动总结最近 7 天文章库生成；也可到「信源管理 → AI 周报」配置提示词并测试。</p>
+    </div>
+    <div class="layer"><span class="chip" id="reportCount">加载中…</span></div>
+  </div>
+  <div class="report-tabs" style="display:flex;gap:8px;margin:0 0 14px">
+    <button type="button" class="rtab active" data-view="reports" onclick="switchReportView('reports')">AI 周报</button>
+    <button type="button" class="rtab" data-view="sim" onclick="switchReportView('sim')">文章相似性检测</button>
+  </div>
+  <div id="simSection" style="display:none">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <button class="btn" id="simDetect" onclick="loadSimilarity()">检测相似文章</button>
+      <button class="btn danger" id="simMerge" onclick="executeMerge()" disabled>执行去重（删除选中重复）</button>
+      <span id="simStatus" style="font-size:13px;color:#6b7280"></span>
+    </div>
+    <div id="simGroups"></div>
+  </div>
+  <div class="reports-grid" id="reportsGrid" style="display:grid;grid-template-columns:minmax(360px,42%) 1fr;gap:16px;align-items:start;">
+    <div class="reports-list" id="reportsList"><div class="empty"><i class="fa fa-file-alt"></i>正在加载报告…</div></div>
+    <div class="preview-panel">
+      <div class="preview-head">
+        <div class="preview-head-left">
+          <button type="button" class="back-btn" id="pvBack" onclick="backToReportList()" aria-label="返回报告列表"><i class="fa fa-arrow-left"></i> 返回列表</button>
+          <div><div class="preview-title" id="pvTitle">请选择左侧报告</div><div class="preview-sub" id="pvSub">—</div></div>
+        </div>
+        <div class="preview-actions">
+          <button type="button" class="btn" id="pvShare" onclick="shareCurrentReport(this)" title="分享周报到微信"><i class="fa fa-share-alt"></i> 分享</button>
+        </div>
+      </div>
+      <div class="preview-body" id="pvBody"><div class="empty"><i class="fa fa-file-lines"></i>点击左侧报告名查看内容</div></div>
+      <div class="preview-foot">
+        <button type="button" class="btn primary" id="quoteReportBtn" onclick="quoteReportToAssistant()" title="把这份周报引用到AI助手继续提问"><i class="fa fa-quote-left"></i> 选择引用到AI助手</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const PACK = '{{ active_industry_pack.id }}' || '';
+let currentReportId = null, currentReportTitle = '', currentReportMarkdown = '';
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+// 分享当前周报：优先系统分享面板，其次剪贴板，最后弹出手动复制（与文章分享一致）
+async function shareCurrentReport(btn){
+  const id = currentReportId;
+  if(!id) return;
+  const url = location.origin + '/share/report/' + id;
+  const shareTitle = currentReportTitle || document.title;
+  const markDone = (text) => {
+    if(!btn) return;
+    const old = btn.innerHTML;
+    btn.innerHTML = `<i class="fa fa-check"></i> ${text || '已复制'}`;
+    setTimeout(() => { btn.innerHTML = old; }, 2000);
+  };
+  if(navigator.share){
+    try { await navigator.share({ title: shareTitle, text: shareTitle, url }); markDone('已唤起分享'); return; }
+    catch(error){ if(error && error.name === 'AbortError') return; }
+  }
+  try {
+    if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(url); markDone('已复制'); return; }
+  } catch(error) {}
+  prompt('复制以下链接分享到微信：', url);
+}
+// 选择引用到AI助手：把周报正文带回首页并拉起AI助手对话窗
+function quoteReportToAssistant(){
+  if(!currentReportMarkdown) return;
+  const quote = `【报告引用：${currentReportTitle || 'AI 周报'}】\n${currentReportMarkdown.slice(0, 3000)}`;
+  try { localStorage.setItem('chatPendingQuote', quote); } catch(e) {}
+  location.href = '/?openChat=1';
+}
+// LaTeX 行内公式可读化：常见记号 → Unicode，其余 $...$ 剥壳保留内文（前端不渲染数学）
+function cleanLatex(txt){
+  if(!txt) return txt;
+  const map = {'\\rightarrow':'→','\\longrightarrow':'→','\\leftarrow':'←','\\uparrow':'↑',
+    '\\downarrow':'↓','\\updownarrow':'↕','\\times':'×','\\cdot':'·','\\approx':'≈','\\sim':'~',
+    '\\geq':'≥','\\ge':'≥','\\leq':'≤','\\le':'≤','\\neq':'≠','\\pm':'±','\\propto':'∝',
+    '\\in':'∈','\\to':'→','\\leftrightarrow':'↔','\\cdots':'…','\\ldots':'…'};
+  let out = txt;
+  for(const k in map){ out = out.split(k).join(map[k]); }
+  out = out.replace(/\$([^$\n]{1,80})\$/g, (m, inner) => inner.replace(/\\/g, ''));
+  return out;
+}
+async function api(path){const r=await fetch(path,{cache:'no-store'});const d=await r.json();if(!d.success)throw Error(d.error||d.message||'加载失败');return d;}
+function pvMeta(r){
+  const parts=[];
+  if(r.time_start&&r.time_end)parts.push(r.time_start+' ~ '+r.time_end);
+  if(r.generated_at)parts.push('生成 '+r.generated_at);
+  parts.push(r.article_count?('覆盖 '+r.article_count+' 篇文章'):'');
+  return parts.filter(Boolean).join(' · ');
+}
+async function selectReport(r){
+  const prev=document.querySelector('.report-item.active'); if(prev)prev.classList.remove('active');
+  const el=document.getElementById('ri-'+r.id); if(el)el.classList.add('active');
+  currentReportId = r.id;
+  currentReportTitle = r.title||'报告';
+  document.getElementById('pvTitle').textContent=currentReportTitle;
+  document.getElementById('pvSub').textContent=pvMeta(r);
+  // 手机：进入详情视图（隐藏列表，避免同一屏标题出现两次）
+  if(window.matchMedia && window.matchMedia('(max-width: 860px)').matches){
+    document.body.classList.add('report-detail-mobile');
+    window.scrollTo(0,0);
+  }
+  const body=document.getElementById('pvBody');  body.innerHTML='<div class="empty"><i class="fa fa-spinner fa-spin"></i>加载中…</div>';
+  try{
+    const resp=await fetch('/api/pack-reports/'+encodeURIComponent(r.id)+'/markdown?industry_pack_id='+encodeURIComponent(PACK),{cache:'no-store'});
+    if(!resp.ok){ body.innerHTML='<div class="empty"><i class="fa fa-file-lines"></i>报告内容加载失败</div>'; return; }
+    const txt=await resp.text();
+    // 面板头部与左侧列表已各展示一次报告标题；正文首个 H1 与标题重复，剔除后再渲染
+    let clean=txt;
+    clean=clean.replace(/^\s*#\s+[^\n]*\n?/, '');
+    // LaTeX 可读化：$\rightarrow$ 等记号转 Unicode 箭头/符号
+    clean=cleanLatex(clean);
+    currentReportMarkdown = clean;
+    let html;
+    if(typeof marked!=='undefined'){ marked.setOptions({breaks:true,gfm:true}); html=marked.parse(clean); }
+    else html='<pre style="white-space:pre-wrap">'+esc(clean)+'</pre>';
+    body.innerHTML='<div class="md-preview">'+html+'</div>';
+  }catch(e){ body.innerHTML='<div class="empty"><i class="fa fa-file-lines"></i>预览加载失败</div>'; }
+}
+(async function load(){
+  try{
+    const d=await api('/api/pack-reports?industry_pack_id='+encodeURIComponent(PACK));
+    const reps=d.reports||[];
+    document.getElementById('reportCount').textContent='共 '+reps.length+' 份报告';
+    if(!reps.length){
+      document.getElementById('reportsList').innerHTML='<div class="empty"><i class="fa fa-file-alt"></i>暂无 AI 周报<p style="font-size:13px;margin-top:8px">每周五自动生成；也可到 <a href="/source-management">信源管理 → AI 周报</a> 点「测试提示词效果」立即生成一份</p></div>';
+      return;
+    }
+    document.getElementById('reportsList').innerHTML=reps.map(r=>{
+      const srcBadge = r.source==='test' ? '<span class="badge test">测试</span>' : '<span class="badge scheduled">定期</span>';
+      return '<div class="report-item" id="ri-'+r.id+'" onclick="selectReport('+JSON.stringify(r).replace(/"/g,'&quot;')+')">'
+        +'<div style="flex:1"><div class="title">'+esc(r.title)+'</div><div class="meta"><span>'+esc(r.time_start||'')+' ~ '+esc(r.time_end||'')+'</span>'
+        +'<span>生成 '+esc(r.generated_at||'')+'</span>'
+        +'<span>'+(r.article_count||0)+' 篇</span>'
+        +srcBadge
+        +'</div></div><i class="fa fa-chevron-right" style="color:#cbd5e1;margin-top:4px;"></i></div>';
+    }).join('');
+    const first=document.querySelector('.report-item');
+    // 桌面端自动打开第一份；手机端停留在列表，等用户点选
+    if(first && !(window.matchMedia && window.matchMedia('(max-width: 860px)').matches)) first.click();
+  }catch(e){document.getElementById('reportsList').innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>';}
+})();
+function backToReportList(){
+  document.body.classList.remove('report-detail-mobile');
+  window.scrollTo(0,0);
+}
+function switchReportView(v){
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  document.getElementById('reportsGrid').style.display = v==='reports' ? 'grid' : 'none';
+  document.getElementById('simSection').style.display = v==='sim' ? 'block' : 'none';
+  if(v==='sim') loadSimilarity();
+}
+var simSelected = [];
+async function loadSimilarity(){
+  var st=document.getElementById('simStatus'); st.textContent='检测中…';
+  var box=document.getElementById('simGroups'); box.innerHTML='';
+  simSelected=[];
+  document.getElementById('simMerge').disabled=true;
+  try{
+    var d=await api('/api/intel/report-similarity?industry_pack_id='+encodeURIComponent(PACK));
+    st.textContent='发现 '+(d.groups||[]).length+' 组疑似重复，共 '+d.total_dup+' 篇';
+    if(!d.groups.length){ box.innerHTML='<div class="empty">未发现明显重复文章</div>'; return; }
+    box.innerHTML=d.groups.map(function(g,i){
+      var dups=g.dups.map(function(x){
+        var cid='simd_'+i+'_'+x.id;
+        simSelected.push(x.id);
+        return '<label class="sim-dup" style="display:flex;align-items:center;gap:8px;padding:4px 0"><input type="checkbox" checked data-id="'+x.id+'" onchange="syncSimSel()"> <span>'+esc(x.title||'')+'</span> <span style="color:#9ca3af;font-size:12px">'+esc(x.domain||'')+'</span></label>';
+      }).join('');
+      return '<div class="sim-group" style="padding:10px 0;border-top:1px solid var(--dashboard-line)">'+
+        '<div style="font-weight:700">保留：'+esc(g.rep.title||'')+' <span style="color:#9ca3af;font-weight:400">('+esc(g.rep.domain||'')+')</span></div>'+
+        '<div style="margin:6px 0 0 12px;font-size:13px">'+dups+'</div></div>';
+    }).join('');
+    syncSimSel();
+  }catch(e){ st.textContent='检测失败：'+esc(e.message); }
+}
+function syncSimSel(){
+  var ids=[];
+  document.querySelectorAll('#simGroups input[type=checkbox]:checked').forEach(function(c){ids.push(Number(c.dataset.id));});
+  simSelected=ids;
+  document.getElementById('simMerge').disabled = !ids.length;
+}
+async function executeMerge(){
+  if(!simSelected.length) return;
+  if(!confirm('确认删除选中的 '+simSelected.length+' 篇疑似重复文章？（保留各组代表，删除不可恢复）')) return;
+  try{
+    var d=await fetch('/api/intel/report-similarity/merge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({duplicate_ids:simSelected})}).then(r=>r.json());
+    if(!d.success){ alert(d.message||'执行失败'); return; }
+    alert('已删除 '+d.removed+' 篇重复文章');
+    loadSimilarity();
+  }catch(e){ alert('执行失败：'+e.message); }
+}
+</script>
+<style>
+.rtab{padding:6px 14px;border:1px solid var(--dashboard-line);border-radius:999px;background:transparent;cursor:pointer;font-size:13px;font-weight:700}
+.rtab.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.btn{border:1px solid #cbd5e1;border-radius:8px;padding:7px 13px;font-size:12px;background:#fff;cursor:pointer;color:#334155}
+.btn.danger{background:#dc2626;color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer}
+.btn.danger:disabled{opacity:.45;cursor:not-allowed}
+.sim-dup span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
+</body>
+</html>

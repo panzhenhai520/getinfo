@@ -1,0 +1,75 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "existing_ragflow_reused": true,
+    "existing_sqlite_reused": true,
+    "history_not_deleted": true,
+    "new_database": false,
+    "new_model_client": false,
+    "ragflow_candidate_discovery_only": true,
+    "real_order_execution": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "external_network_calls": 0,
+    "failures": 0,
+    "model_calls": 0,
+    "tests_run": 9
+  },
+  "scenarios": {
+    "current_fact_only_while_effective": true,
+    "explicit_human_adjudication_only": true,
+    "historical_fact_recallable_by_historical_time": true,
+    "instrument_scope_enforced": true,
+    "new_report_expires_old_current_projection": true,
+    "ragflow_unavailable_degrades_with_report_available": true,
+    "remote_chunk_text_never_becomes_fact": true,
+    "revoked_report_rejected_dynamically": true,
+    "unregistered_remote_chunk_rejected": true,
+    "unresolved_conflict_rejected_dynamically": true
+  },
+  "static": {
+    "checks": {
+      "absolute_time_and_effective_to_required": true,
+      "claim_and_report_state_rechecked": true,
+      "closed_retrieval_schema": true,
+      "existing_ragflow_search_api_reused": true,
+      "explicit_human_publication_metadata": true,
+      "local_projection_not_remote_chunk": true,
+      "no_direct_model_or_network_client": true,
+      "publication_registry_saved_before_upload": true,
+      "report_fact_history_separated": true,
+      "report_survives_ragflow_failure": true,
+      "sqlite_registry_required": true,
+      "verified_conflict_verdict_only": true
+    },
+    "direct_model_or_network_imports": [],
+    "existing_services": [
+      "RAGFlow",
+      "SQLite"
+    ],
+    "existing_tables": [
+      "financial_artifacts",
+      "financial_claims",
+      "financial_claim_evidence",
+      "financial_verdicts",
+      "financial_final_reports",
+      "articles",
+      "article_ragflow_documents"
+    ],
+    "gate_version": "financial-rag-gate-v1",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": []
+  },
+  "task": "4.5",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 436,
+    "offline_build_base": "collectinfo:financial-answer-composer-acceptance",
+    "offline_build_network": "none",
+    "offline_image": "sha256:ae4cffe95d3f9e17766f47dbb97a9cac16fa9f499efbcc9cf33be56281a5345d",
+    "related_regression_tests": 25
+  }
+}

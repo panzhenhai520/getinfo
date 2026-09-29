@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "dataset_id": "financial-information-needs-v1",
+  "examples": [
+    {
+      "text": "SpaceX 股票最新信息",
+      "channels": ["quote", "news"],
+      "freshness_mode": "latest_available"
+    },
+    {
+      "text": "SpaceX 最新股价",
+      "channels": ["quote"],
+      "freshness_mode": "latest_available"
+    },
+    {
+      "text": "SpaceX 股票最新新闻",
+      "channels": ["news"],
+      "freshness_mode": "latest_available"
+    },
+    {
+      "text": "Apple 股票最新信息",
+      "channels": ["quote", "news"],
+      "freshness_mode": "latest_available"
+    },
+    {
+      "text": "分析 Apple 的基本面和风险",
+      "channels": ["research"],
+      "freshness_mode": "unspecified"
+    }
+  ]
+}

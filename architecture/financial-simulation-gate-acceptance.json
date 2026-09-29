@@ -1,0 +1,60 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "execution_mode": "paper",
+    "existing_queue_reused": true,
+    "new_database": false,
+    "new_model_client": false,
+    "real_order_execution": false,
+    "server_authoritative": true
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 11
+  },
+  "scenarios": {
+    "all_parent_switch_combinations": true,
+    "client_spoof_cannot_enable": true,
+    "history_preserved_owner_scoped": true,
+    "idempotent_creation": true,
+    "menu_and_api_share_projection": true,
+    "non_financial_pack_denied": true,
+    "paper_and_backtest_share_one_switch": true,
+    "queued_and_new_job_skips_after_close": true,
+    "running_job_finishes": true
+  },
+  "static": {
+    "authoritative_flag": "TRADING_SIMULATION_ENABLED",
+    "checks": {
+      "authenticated_creation_api": true,
+      "client_flag_not_consumed": true,
+      "config_label_is_enable_simulated_data": true,
+      "creation_api_calls_server_gate": true,
+      "disabled_menu_removed": true,
+      "existing_worker_queue_reused": true,
+      "menu_entries_hidden_by_default": true,
+      "paper_only_no_real_order": true,
+      "simulation_and_backtesting_share_flag": true,
+      "single_authoritative_flag": true,
+      "worker_rechecks_at_execution": true
+    },
+    "creation_endpoint": "POST /api/intel/financial/simulation/jobs",
+    "existing_job_type": "paper_backtest",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": []
+  },
+  "task": "5.1",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 450,
+    "offline_build_base": "collectinfo:financial-stage4-gate-acceptance",
+    "offline_build_network": "none",
+    "offline_image": "sha256:fd3bb1d7fcb1baee417acd31a8e95b70b90a42d964bc8740f460f4f01d4d60de",
+    "related_regression_tests": 11
+  }
+}

@@ -1,0 +1,545 @@
+{
+  "id": "ai_news",
+  "name": "AI 资讯",
+  "schema_version": 3,
+  "pack_version": "2.0.3",
+  "enabled": true,
+  "default_market": "GLOBAL",
+  "timezone": "Asia/Hong_Kong",
+  "pack_kind": "primary",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "ai_content_intelligence",
+      "name": "AI 资讯聚合与分类",
+      "enabled": true,
+      "implementation_status": "existing"
+    },
+    {
+      "key": "ai_model_release_radar",
+      "name": "模型发布与版本能力追踪",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    },
+    {
+      "key": "ai_benchmark_comparison",
+      "name": "模型基准与成本对比",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    },
+    {
+      "key": "ai_compute_supply_chain",
+      "name": "算力与芯片供给监测",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    }
+  ],
+  "dashboard_categories": [
+    {
+      "key": "ai_model_radar",
+      "name": "AI 模型与算力雷达",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    }
+  ],
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": false,
+    "show_watched_stock_cards": false,
+    "show_spatiotemporal_map": false
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": false,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "人工智能",
+    "生成式 AI",
+    "大模型",
+    "AI Agent",
+    "智能体",
+    "多模态",
+    "推理模型",
+    "AI 芯片",
+    "OpenAI",
+    "Anthropic",
+    "Google DeepMind",
+    "Meta AI",
+    "NVIDIA",
+    "DeepSeek",
+    "通义千问",
+    "文心一言",
+    "豆包",
+    "GLM",
+    "国产大模型",
+    "开源模型",
+    "AI 编程",
+    "大语言模型",
+    "基础模型"
+  ],
+  "expanded_keywords": [
+    "算力",
+    "模型训练",
+    "机器学习",
+    "神经网络",
+    "GPU",
+    "推理芯片",
+    "模型蒸馏",
+    "强化学习",
+    "世界模型",
+    "AI 手机",
+    "AI PC",
+    "端侧 AI",
+    "合成数据",
+    "长上下文"
+  ],
+  "trend_keywords": [
+    "模型发布",
+    "技术路线",
+    "开源模型",
+    "监管",
+    "AI 安全",
+    "算力基础设施",
+    "企业采用",
+    "行业应用",
+    "基准测试",
+    "推理成本",
+    "人形机器人",
+    "AI智能体生态",
+    "大模型推理成本",
+    "端侧大模型",
+    "AI芯片性能",
+    "多模态训练",
+    "具身智能",
+    "AI安全对齐",
+    "智能编程",
+    "AI视频生成",
+    "模型蒸馏",
+    "AI应用商店",
+    "智能体编排",
+    "AI合规治理",
+    "数据标注",
+    "AI搜索",
+    "AI编程助手",
+    "AI产品定价",
+    "开源模型生态",
+    "AI算力供给",
+    "强化学习",
+    "世界模型",
+    "多智能体",
+    "Scaling Law",
+    "合成数据",
+    "AI 手机",
+    "AI PC"
+  ],
+  "event_keywords": [
+    "发布",
+    "融资",
+    "收购",
+    "合作",
+    "上线",
+    "开源",
+    "禁令",
+    "诉讼",
+    "任命",
+    "裁员"
+  ],
+  "negative_keywords": [
+    "爱好",
+    "人工智能玩具广告",
+    "招聘",
+    "培训",
+    "兼职",
+    "求职",
+    "游戏",
+    "彩票"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 2,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ]
+  },
+  "serpapi_queries": [
+    "generative AI latest news",
+    "AI agent startup funding",
+    "large language model release",
+    "site:openai.com/news AI",
+    "site:deepmind.google/discover/blog AI",
+    "AI 大模型 发布 融资 新闻",
+    "DeepSeek 开源 模型 进展",
+    "AI 芯片 算力 供货",
+    "人形机器人 具身智能 融资",
+    "AI 安全 监管 政策"
+  ],
+  "default_sources": [
+    {
+      "name": "国家互联网信息办公室",
+      "url": "https://www.cac.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.cac.gov.cn"
+    },
+    {
+      "name": "中国信息通信研究院",
+      "url": "https://www.caict.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "www.caict.ac.cn"
+    },
+    {
+      "name": "中国人工智能学会",
+      "url": "https://www.caai.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "www.caai.cn"
+    },
+    {
+      "name": "北京智源人工智能研究院",
+      "url": "https://www.baai.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "www.baai.ac.cn"
+    },
+    {
+      "name": "Stanford HAI（AI Index）",
+      "url": "https://hai.stanford.edu",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "hai.stanford.edu"
+    },
+    {
+      "name": "OpenAI News",
+      "url": "https://openai.com/news/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "openai.com"
+    },
+    {
+      "name": "Google DeepMind Blog",
+      "url": "https://deepmind.google/discover/blog/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "deepmind.google"
+    },
+    {
+      "name": "Google Research Blog",
+      "url": "https://research.google/blog/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "research.google"
+    },
+    {
+      "name": "Anthropic News",
+      "url": "https://www.anthropic.com/news",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "www.anthropic.com"
+    },
+    {
+      "name": "Meta AI Blog",
+      "url": "https://ai.meta.com/blog/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "ai.meta.com"
+    },
+    {
+      "name": "Microsoft AI Blog",
+      "url": "https://blogs.microsoft.com/ai/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "blogs.microsoft.com"
+    },
+    {
+      "name": "NVIDIA Blog",
+      "url": "https://blogs.nvidia.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "blogs.nvidia.com"
+    },
+    {
+      "name": "Hugging Face Blog",
+      "url": "https://huggingface.co/blog",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "huggingface.co"
+    },
+    {
+      "name": "arXiv cs.AI",
+      "url": "https://arxiv.org/list/cs.AI/recent",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "academic_research",
+      "authority_level": 3,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "arxiv.org"
+    },
+    {
+      "name": "机器之心",
+      "url": "https://www.jiqizhixin.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.jiqizhixin.com"
+    },
+    {
+      "name": "量子位",
+      "url": "https://www.qbitai.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.qbitai.com"
+    },
+    {
+      "name": "雷峰网 AI 频道",
+      "url": "https://www.leiphone.com/category/ai",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.leiphone.com"
+    },
+    {
+      "name": "InfoQ 中文 AI",
+      "url": "https://www.infoq.cn/topic/AI",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.infoq.cn"
+    },
+    {
+      "name": "智源社区",
+      "url": "https://hub.baai.ac.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hub.baai.ac.cn"
+    },
+    {
+      "name": "TechCrunch AI",
+      "url": "https://techcrunch.com/category/artificial-intelligence/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "techcrunch.com"
+    },
+    {
+      "name": "VentureBeat AI",
+      "url": "https://venturebeat.com/category/ai/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "venturebeat.com"
+    },
+    {
+      "name": "MIT Technology Review",
+      "url": "https://www.technologyreview.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.technologyreview.com"
+    },
+    {
+      "name": "The Verge AI",
+      "url": "https://www.theverge.com/ai-artificial-intelligence",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.theverge.com"
+    },
+    {
+      "name": "The Decoder",
+      "url": "https://the-decoder.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "the-decoder.com"
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "model_releases",
+      "name": "模型发布",
+      "keywords": [
+        "模型发布",
+        "上线",
+        "开源"
+      ]
+    },
+    {
+      "key": "ai_safety_policy",
+      "name": "安全与监管",
+      "keywords": [
+        "AI 安全",
+        "监管",
+        "禁令"
+      ]
+    },
+    {
+      "key": "compute_chips",
+      "name": "算力与芯片",
+      "keywords": [
+        "算力",
+        "AI 芯片",
+        "NVIDIA"
+      ]
+    },
+    {
+      "key": "funding_mna",
+      "name": "融资与并购",
+      "keywords": [
+        "融资",
+        "收购"
+      ]
+    }
+  ],
+  "brands": [
+    "OpenAI",
+    "Anthropic",
+    "Google DeepMind",
+    "Google",
+    "Meta",
+    "Microsoft",
+    "NVIDIA",
+    "xAI",
+    "DeepSeek",
+    "智谱",
+    "月之暗面",
+    "MiniMax",
+    "零一万物",
+    "百川智能",
+    "阶跃星辰",
+    "百度",
+    "阿里巴巴",
+    "腾讯",
+    "字节跳动",
+    "科大讯飞",
+    "商汤科技"
+  ],
+  "trend_topics": [
+    "大模型发布",
+    "AI算力与芯片",
+    "AI应用落地",
+    "AI安全与治理",
+    "具身智能"
+  ]
+}

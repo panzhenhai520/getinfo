@@ -1,0 +1,73 @@
+{
+  "check_version": "tradingagents-supply-chain-v1",
+  "checked_at_utc": "2026-08-01T09:58:48Z",
+  "component": {
+    "name": "TradingAgents",
+    "version": "0.3.1",
+    "commit": "01477f9afb7a47b849ed4c9259d3a9a4738d9fda",
+    "tag_object": "5a3d1b51d339202d03c4b57c1a1012f69376495f",
+    "tag_signature_verified": true
+  },
+  "archive": {
+    "path": "vendor/tradingagents/TradingAgents-0.3.1-01477f9.tar.gz",
+    "sha256": "e5b1886d4d61ed7bd79da8294b3d7802408dc262c51fe1544ac317cc43f6566e",
+    "file_count": 158
+  },
+  "dependency_lock": {
+    "path": "requirements-tradingagents.lock",
+    "sha256": "e550ce18c19d83dce7cbf3ec777d0899bd566f785a111914432a424e06cfb6e4",
+    "input_sha256": "deb87b2c3814db011d21b698c9f9b970f610ee5aca49db61f153ea45dc0f7876",
+    "package_count": 109,
+    "all_packages_exact": true,
+    "all_packages_hashed": true
+  },
+  "docker": {
+    "build_time_install": true,
+    "hash_enforcement": true,
+    "runtime_download": false,
+    "upstream_entrypoint": false,
+    "offline_application_rebuild": true,
+    "offline_rebuild_requires_preloaded_runtime_image": true
+  },
+  "sbom": {
+    "present": true,
+    "path": "architecture/tradingagents-sbom.json",
+    "package_count": 109,
+    "noassertion_count": 0,
+    "copyleft_boundary_declared": true
+  },
+  "generated_sbom_package_count": null,
+  "runtime": {
+    "imported_version": "0.3.1",
+    "minimal_graph_compiled": true,
+    "minimal_graph_node_count": 13,
+    "original_role_nodes_present": [
+      "Aggressive Analyst",
+      "Bear Researcher",
+      "Bull Researcher",
+      "Conservative Analyst",
+      "Market Analyst",
+      "Neutral Analyst",
+      "Portfolio Manager",
+      "Research Manager",
+      "Trader"
+    ],
+    "fixed_fixture_ran": true,
+    "fixture_rating": "Buy",
+    "pip_check": "passed",
+    "network_calls": 0,
+    "executed": true
+  },
+  "acceptance": {
+    "source_version_and_commit_locked": true,
+    "signed_tag_evidence_recorded": true,
+    "archive_hash_verified": true,
+    "archive_members_safe": true,
+    "dependency_hashes_complete": true,
+    "license_boundary_declared": true,
+    "runtime_install_disabled": true,
+    "upstream_services_disabled": true,
+    "runtime_checks_passed": true,
+    "passed": true
+  }
+}

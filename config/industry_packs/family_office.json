@@ -1,0 +1,2006 @@
+{
+  "id": "family_office",
+  "name": "家族办公室",
+  "schema_version": 3,
+  "pack_version": "2.2.0",
+  "enabled": true,
+  "default_market": "HK",
+  "timezone": "Asia/Hong_Kong",
+  "pack_kind": "primary",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "family_office_content_intelligence",
+      "name": "家族办公室资讯聚合与分类",
+      "enabled": true,
+      "implementation_status": "existing"
+    }
+  ],
+  "dashboard_categories": [
+    {
+      "key": "family_office_intelligence",
+      "name": "家族办公室行业信息",
+      "enabled": true,
+      "implementation_status": "existing"
+    }
+  ],
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": true,
+    "show_watched_stock_cards": true,
+    "show_spatiotemporal_map": true
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": true,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "家族办公室",
+    "家办",
+    "单一家族办公室",
+    "联合家族办公室",
+    "Family Office",
+    "Single Family Office",
+    "Multi Family Office",
+    "FIHV",
+    "family-owned investment holding vehicle"
+  ],
+  "expanded_keywords": [
+    "跨境财富",
+    "财富传承",
+    "信托架构",
+    "家族信托",
+    "落户香港"
+  ],
+  "candidate_gate": {
+    "anchor_keywords": [
+      "家族办公室",
+      "家办",
+      "单一家族办公室",
+      "联合家族办公室",
+      "Family Office",
+      "Single Family Office",
+      "Multi Family Office",
+      "FIHV",
+      "family-owned investment holding vehicle",
+      "家族信托",
+      "信托架构",
+      "财富传承",
+      "传承规划",
+      "家族治理",
+      "跨境财富",
+      "落户香港"
+    ],
+    "entity_keywords": [
+      "时和资产",
+      "时和资产管理",
+      "Time Asset"
+    ],
+    "description": "文章必须命中行业锚点或已备案行业机构实体；报告、政策、获奖、合作等仅用于分类。机构实体仅限已备案的行业参与者及其官方网站。"
+  },
+  "trend_keywords": [
+    "政策",
+    "税改",
+    "税务宽免",
+    "监管",
+    "新政",
+    "落户",
+    "增长",
+    "统计",
+    "报告",
+    "行业趋势",
+    "财富管理中心",
+    "跨境理财",
+    "资产配置",
+    "传承规划",
+    "治理",
+    "家族信托架构",
+    "跨境资产配置",
+    "税务筹划优化",
+    "财富传承规划",
+    "家族治理结构",
+    "离岸财富管理",
+    "信托法律风险",
+    "家族企业传承",
+    "高净值人群画像",
+    "资产隔离机制",
+    "家族办公室合规",
+    "境外投资准入",
+    "家族财富保护",
+    "信托财产登记",
+    "家族成员权利",
+    "财富分配机制",
+    "跨境资金流动",
+    "家族治理机制",
+    "税务筹划策略",
+    "家族办公室选址",
+    "资产配置模型",
+    "家族财富评估",
+    "信托受益权转让",
+    "家族企业上市",
+    "境外投资监管",
+    "家族财富安全",
+    "跨境理财通",
+    "家族办公室运营",
+    "家族信托设立",
+    "财富传承工具",
+    "家族治理框架",
+    "资产保护策略",
+    "家族办公室规模",
+    "家族财富数字化",
+    "信托财产分割"
+  ],
+  "event_keywords": [
+    "获奖",
+    "荣获",
+    "宣布",
+    "签约",
+    "任命",
+    "投资",
+    "推出",
+    "发布",
+    "峰会",
+    "论坛",
+    "合作",
+    "收购",
+    "开设",
+    "成立"
+  ],
+  "negative_keywords": [
+    "家用办公室",
+    "家庭办公",
+    "home office furniture"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 2,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ]
+  },
+  "serpapi_queries": [
+    "家族办公室",
+    "家族信托",
+    "家办",
+    "财富传承",
+    "家族财富管理"
+  ],
+  "default_sources": [
+    {
+      "name": "海问律师事务所",
+      "url": "http://www.haiwen-law.com/en",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "10:55",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "haiwen-law.com"
+    },
+    {
+      "name": "时和资产管理",
+      "url": "http://www.rtamc.com.hk/index.php?a=Home&f=news&cid=2",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "rtamc.com.hk"
+    },
+    {
+      "name": "STEP",
+      "url": "http://www.step.org",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "00:52",
+      "schedule_rule": "daily",
+      "browser_fetch_enabled": true,
+      "source_role": "industry_association",
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
+      "publisher_key": "step.org"
+    },
+    {
+      "name": "中国信托业协会",
+      "url": "http://www.xtxh.net/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "industry_association",
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
+      "publisher_key": "xtxh.net"
+    },
+    {
+      "name": "36氪",
+      "url": "https://36kr.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "36kr.com"
+    },
+    {
+      "name": "ACTEC Foundation",
+      "url": "https://actecfoundation.org/podcasts/family-office-landscape-models-services-options/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "industry_association",
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
+      "publisher_key": "actecfoundation.org"
+    },
+    {
+      "name": "香港科技大学家办研究",
+      "url": "https://afbfo.hkust.edu.hk/",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "academic_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "afbfo.hkust.edu.hk"
+    },
+    {
+      "name": "中伦律师事务所",
+      "url": "https://en.zhonglun.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "12:39",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "en.zhonglun.com"
+    },
+    {
+      "name": "Family Office Insider",
+      "url": "https://familyofficeinsider.substack.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "familyofficeinsider.substack.com"
+    },
+    {
+      "name": "FOInsight（家办新智点）",
+      "url": "https://foinsight.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "foinsight.com"
+    },
+    {
+      "name": "Acclime",
+      "url": "https://hongkong.acclime.com/zh-hant/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "17:53",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "hongkong.acclime.com"
+    },
+    {
+      "name": "Dentons律师事务所",
+      "url": "https://hongkong.dentons.com/zh/office-details/hong-kong",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "14:24",
+      "schedule_rule": "daily",
+      "browser_fetch_enabled": true,
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "hongkong.dentons.com"
+    },
+    {
+      "name": "IQEQ",
+      "url": "https://iqeq.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "17:01",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "iqeq.com"
+    },
+    {
+      "name": "KPMG",
+      "url": "https://kpmg.com/xx/en.html",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "19:12",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "kpmg.com"
+    },
+    {
+      "name": "新京报瑞银家办报告",
+      "url": "https://m.bjnews.com.cn/detail/1781010421129664.html",
+      "source_type": "website",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "m.bjnews.com.cn"
+    },
+    {
+      "name": "Maples律师事务所",
+      "url": "https://maples.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "04:48",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "maples.com"
+    },
+    {
+      "name": "PitchBook",
+      "url": "https://pitchbook.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "browser_fetch_enabled": true,
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "pitchbook.com"
+    },
+    {
+      "name": "PKWA Law律师事务所",
+      "url": "https://pkwalaw.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "08:17",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "pkwalaw.com"
+    },
+    {
+      "name": "摩根大通私人银行家族办公室服务",
+      "url": "https://privatebank.jpmorgan.com/apac/en/who-we-serve/family-office",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "privatebank.jpmorgan.com"
+    },
+    {
+      "name": "大成律师事务所",
+      "url": "https://w.dacheng.com/en/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "13:58",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "w.dacheng.com"
+    },
+    {
+      "name": "知网",
+      "url": "https://wap.cnki.net/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": false,
+      "market": "HK",
+      "source_role": "academic_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "wap.cnki.net"
+    },
+    {
+      "name": "财策智库（WealthPlus）",
+      "url": "https://wealthplus.org.cn/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "wealthplus.org.cn"
+    },
+    {
+      "name": "Amati Law律师事务所",
+      "url": "https://www.amatilaw.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "07:25",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "amatilaw.com"
+    },
+    {
+      "name": "Apex Group",
+      "url": "https://www.apexgroup.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "16:09",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "apexgroup.com"
+    },
+    {
+      "name": "Appleby律师事务所",
+      "url": "https://www.applebyglobal.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "05:40",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "applebyglobal.com"
+    },
+    {
+      "name": "汇丰环球私人银行家族办公室",
+      "url": "https://www.asia.privatebanking.hsbc.com.hk/family-office-uhnw/",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "asia.privatebanking.hsbc.com.hk"
+    },
+    {
+      "name": "新加坡银行香港家族办公室咨询",
+      "url": "https://www.bankofsingapore.com/hk/private-banking-hong-kong.html",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "bankofsingapore.com"
+    },
+    {
+      "name": "Bedell Cristin律师事务所",
+      "url": "https://www.bedellcristin.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "09:10",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "bedellcristin.com"
+    },
+    {
+      "name": "Bloomberg Wealth",
+      "url": "https://www.bloomberg.com/wealth",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "browser_fetch_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "bloomberg.com"
+    },
+    {
+      "name": "中银香港家族办公室政策研究",
+      "url": "https://www.bochk.com/dam/investment/bocecon/SY2024011%28en%29.pdf",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "bochk.com"
+    },
+    {
+      "name": "财新",
+      "url": "https://www.caixin.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "20:31",
+      "schedule_rule": "daily",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "caixin.com"
+    },
+    {
+      "name": "Campden Wealth",
+      "url": "https://www.campdenwealth.com/research-reports-portfolio",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "campdenwealth.com"
+    },
+    {
+      "name": "Carey Olsen律师事务所",
+      "url": "https://www.careyolsen.com/locations/carey-olsen-asia",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "02:37",
+      "schedule_rule": "daily",
+      "browser_fetch_enabled": true,
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "careyolsen.com"
+    },
+    {
+      "name": "Charltons律师事务所",
+      "url": "https://www.charltonslaw.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "06:59",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "charltonslaw.com"
+    },
+    {
+      "name": "Collas Crill律师事务所",
+      "url": "https://www.collascrill.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "03:56",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "collascrill.com"
+    },
+    {
+      "name": "Conyers律师事务所",
+      "url": "https://www.conyers.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "06:07",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "conyers.com"
+    },
+    {
+      "name": "Dakota",
+      "url": "https://www.dakota.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "dakota.com"
+    },
+    {
+      "name": "星展香港私人银行财富规划",
+      "url": "https://www.dbs.com.hk/private-banking/wealth-planning?source=external",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "dbs.com.hk"
+    },
+    {
+      "name": "德恒律师事务所",
+      "url": "https://www.dehenglaw.com/EN/index/0001.aspx",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "13:32",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "dehenglaw.com"
+    },
+    {
+      "name": "Deloitte",
+      "url": "https://www.deloitte.com/cn/en.html",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "01:19",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "deloitte.com"
+    },
+    {
+      "name": "Deloitte Private",
+      "url": "https://www.deloitte.com/global/en/services/deloitte-private/research/family-office-insights-series-collections.html",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "deloitte.com"
+    },
+    {
+      "name": "EY",
+      "url": "https://www.ey.com/en_gl",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "00:00",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ey.com"
+    },
+    {
+      "name": "FamilyOfficeHK",
+      "url": "https://www.familyofficehk.gov.hk/en/news-and-events/",
+      "source_type": "list_page",
+      "content_type": "official",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "familyofficehk.gov.hk"
+    },
+    {
+      "name": "Family Office Magazine",
+      "url": "https://www.familyofficemag.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "familyofficemag.com"
+    },
+    {
+      "name": "Family Wealth Report",
+      "url": "https://www.familywealthreport.com/",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "familywealthreport.com"
+    },
+    {
+      "name": "方达律师事务所",
+      "url": "https://www.fangdalaw.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "10:28",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "fangdalaw.com"
+    },
+    {
+      "name": "方达律师事务所",
+      "url": "https://www.fangdalaw.com/news",
+      "source_type": "list_page",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "18:20",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "fangdalaw.com"
+    },
+    {
+      "name": "FINTRX",
+      "url": "https://www.fintrx.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "fintrx.com"
+    },
+    {
+      "name": "GJC Law律师事务所",
+      "url": "https://www.gjclaw.com.sg/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "07:51",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "gjclaw.com.sg"
+    },
+    {
+      "name": "环球律师事务所",
+      "url": "https://www.glo.com.cn/en/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "11:47",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "glo.com.cn"
+    },
+    {
+      "name": "Harneys律师事务所",
+      "url": "https://www.harneys.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "05:14",
+      "schedule_rule": "daily",
+      "browser_fetch_enabled": true,
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "harneys.com"
+    },
+    {
+      "name": "香港中国金融协会发表文章",
+      "url": "https://www.hcfa.org.hk/a-list/30836-cht",
+      "source_type": "list_page",
+      "content_type": "event",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "industry_association",
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
+      "publisher_key": "hcfa.org.hk"
+    },
+    {
+      "name": "信报",
+      "url": "https://www.hkej.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "02:11",
+      "schedule_rule": "daily",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hkej.com"
+    },
+    {
+      "name": "信报dailynews",
+      "url": "https://www.hkej.com/dailynews/headline",
+      "source_type": "website",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "21:23",
+      "schedule_rule": "daily",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hkej.com"
+    },
+    {
+      "name": "信报instantnews",
+      "url": "https://www.hkej.com/instantnews",
+      "source_type": "website",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "21:49",
+      "schedule_rule": "daily",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hkej.com"
+    },
+    {
+      "name": "地产投资",
+      "url": "https://www.hkej.com/property",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "22:15",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "hkej.com"
+    },
+    {
+      "name": "信报-财富",
+      "url": "https://www.hkej.com/wm/currency1",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "22:41",
+      "schedule_rule": "daily",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hkej.com"
+    },
+    {
+      "name": "fund",
+      "url": "https://www.hkej.com/wm/fund",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "20:57",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "hkej.com"
+    },
+    {
+      "name": "HKMA",
+      "url": "https://www.hkma.gov.hk/eng/",
+      "source_type": "website",
+      "content_type": "official",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "19:38",
+      "schedule_rule": "daily",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "hkma.gov.hk"
+    },
+    {
+      "name": "香港新闻社",
+      "url": "https://www.hkong.cn/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hkong.cn"
+    },
+    {
+      "name": "香港新闻社｜卓越跨境金融服务大奖",
+      "url": "https://www.hkong.cn/2024/0926/26246.shtml",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": false,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "hkong.cn"
+    },
+    {
+      "name": "InvestHK",
+      "url": "https://www.investhk.gov.hk/en/how-change-text-size/",
+      "source_type": "website",
+      "content_type": "official",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "20:04",
+      "schedule_rule": "daily",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "investhk.gov.hk"
+    },
+    {
+      "name": "界面新闻",
+      "url": "https://www.jiemian.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "jiemian.com"
+    },
+    {
+      "name": "竞天公诚律师事务所",
+      "url": "https://www.jingtian.com/en/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "11:21",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "jingtian.com"
+    },
+    {
+      "name": "经济参考报财富频道",
+      "url": "https://www.jjckb.cn/caifuindex.html",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "jjckb.cn"
+    },
+    {
+      "name": "JTC Group",
+      "url": "https://www.jtcgroup.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "15:43",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "jtcgroup.com"
+    },
+    {
+      "name": "君和律师事务所",
+      "url": "https://www.junhe.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "10:02",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "junhe.com"
+    },
+    {
+      "name": "君合律师事务所",
+      "url": "https://www.junhe.com/news",
+      "source_type": "list_page",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "18:46",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "junhe.com"
+    },
+    {
+      "name": "Kaizen",
+      "url": "https://www.kaizencpa.com/Services/index.html",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "17:27",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "kaizencpa.com"
+    },
+    {
+      "name": "金杜律师事务所",
+      "url": "https://www.kwm.com/cn/zh/insights/latest-thinking.html",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "kwm.com"
+    },
+    {
+      "name": "金杜律师事务所",
+      "url": "https://www.kwm.com/hk/en/home.html",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "09:36",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "kwm.com"
+    },
+    {
+      "name": "Singapore MAS",
+      "url": "https://www.mas.gov.sg/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "mas.gov.sg"
+    },
+    {
+      "name": "Singapore MAS_3",
+      "url": "https://www.mas.gov.sg/news",
+      "source_type": "list_page",
+      "content_type": "other",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "00:26",
+      "schedule_rule": "daily",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "mas.gov.sg"
+    },
+    {
+      "name": "Singapore MAS_2",
+      "url": "https://www.mas.gov.sg/publications",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "00:26",
+      "schedule_rule": "daily",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "mas.gov.sg"
+    },
+    {
+      "name": "Singapore MAS_1",
+      "url": "https://www.mas.gov.sg/regulation",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "00:26",
+      "schedule_rule": "daily",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "mas.gov.sg"
+    },
+    {
+      "name": "McKinsey & Company",
+      "url": "https://www.mckinsey.com/industries/financial-services/our-insights",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "mckinsey.com"
+    },
+    {
+      "name": "植德律师事务所",
+      "url": "https://www.meritsandtree.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "14:50",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "meritsandtree.com"
+    },
+    {
+      "name": "Mourant律师事务所",
+      "url": "https://www.mourant.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "03:29",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "mourant.com"
+    },
+    {
+      "name": "国家金融监督管理总局",
+      "url": "https://www.nfra.gov.cn/",
+      "source_type": "list_page",
+      "content_type": "official",
+      "authority_level": 5,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "government_regulator",
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "publisher_key": "nfra.gov.cn"
+    },
+    {
+      "name": "Northern Trust",
+      "url": "https://www.northerntrust.com/united-states/institute/segment/family-offices",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "northerntrust.com"
+    },
+    {
+      "name": "Ogier律师事务所",
+      "url": "https://www.ogier.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "03:03",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "ogier.com"
+    },
+    {
+      "name": "清华五道口金融学院",
+      "url": "https://www.pbcsf.tsinghua.edu.cn/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "academic_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "pbcsf.tsinghua.edu.cn"
+    },
+    {
+      "name": "Preqin",
+      "url": "https://www.preqin.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "preqin.com"
+    },
+    {
+      "name": "花旗私人银行香港家族办公室",
+      "url": "https://www.privatebank.citibank.com/office-locations/hong-kong",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "privatebank.citibank.com"
+    },
+    {
+      "name": "Citibank Private Bank",
+      "url": "https://www.privatebank.citibank.com/sc/insights/the-family-office-survey",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "privatebank.citibank.com"
+    },
+    {
+      "name": "PwC",
+      "url": "https://www.pwchk.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "01:45",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "pwchk.com"
+    },
+    {
+      "name": "RBC 财富管理家族办公室",
+      "url": "https://www.rbcwealthmanagement.com/en-je/how-we-help/family-offices",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "rbcwealthmanagement.com"
+    },
+    {
+      "name": "SCMP Family Offices",
+      "url": "https://www.scmp.com/topics/family-office",
+      "source_type": "list_page",
+      "content_type": "other",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "scmp.com"
+    },
+    {
+      "name": "证券时报瑞银家办报告",
+      "url": "https://www.stcn.com/article/detail/3954440.html",
+      "source_type": "website",
+      "content_type": "report",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "stcn.com"
+    },
+    {
+      "name": "Tembusu Law律师事务所",
+      "url": "https://www.tembusulaw.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "08:44",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "tembusulaw.com"
+    },
+    {
+      "name": "Timothy Loh律师事务所",
+      "url": "https://www.timothyloh.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "06:33",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "timothyloh.com"
+    },
+    {
+      "name": "通商律师事务所",
+      "url": "https://www.tongshang.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "12:13",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "tongshang.com"
+    },
+    {
+      "name": "Trident Trust",
+      "url": "https://www.tridenttrust.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "15:16",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "tridenttrust.com"
+    },
+    {
+      "name": "天元律师事务所",
+      "url": "https://www.tylaw.com.cn/en/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "13:05",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "tylaw.com.cn"
+    },
+    {
+      "name": "瑞银2026全球家族办公室报告",
+      "url": "https://www.ubs.com/global/en/media/display-page-ndp/en-20260528-global-family-office-report-2026.html",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "browser_fetch_enabled": true,
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "ubs.com"
+    },
+    {
+      "name": "UBS",
+      "url": "https://www.ubs.com/global/en/wealthmanagement/family-office-uhnw/series/family-office-insights.html",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "browser_fetch_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "ubs.com"
+    },
+    {
+      "name": "瑞银香港家族咨询",
+      "url": "https://www.ubs.com/hk/en/wealthmanagement/what-we-offer/planning/family-advisory.html",
+      "source_type": "list_page",
+      "content_type": "report",
+      "authority_level": 4,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "browser_fetch_enabled": true,
+      "source_role": "independent_research",
+      "authority_scope": [
+        "research_finding"
+      ],
+      "publisher_key": "ubs.com"
+    },
+    {
+      "name": "Vistra",
+      "url": "https://www.vistra.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "16:35",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "vistra.com"
+    },
+    {
+      "name": "Walkers律师事务所",
+      "url": "https://www.walkersglobal.com/",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "04:22",
+      "schedule_rule": "daily",
+      "source_role": "professional_advisor",
+      "authority_scope": [
+        "professional_interpretation",
+        "publisher_self_statement"
+      ],
+      "publisher_key": "walkersglobal.com"
+    },
+    {
+      "name": "WealthBriefing",
+      "url": "https://www.wealthbriefing.com/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "wealthbriefing.com"
+    },
+    {
+      "name": "新加坡联合早报",
+      "url": "https://www.zaobao.com.sg/home/",
+      "source_type": "list_page",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "market": "HK",
+      "preferred_scan_time": "06:30",
+      "schedule_rule": "daily",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "zaobao.com.sg"
+    },
+    {
+      "name": "信报财经新闻",
+      "url": "https://www1.hkej.com/",
+      "source_type": "website",
+      "content_type": "media",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www1.hkej.com"
+    },
+    {
+      "name": "新加坡联合早报",
+      "url": "https://zaobao.com",
+      "source_type": "website",
+      "content_type": "other",
+      "authority_level": 2,
+      "polling_interval_minutes": 1440,
+      "is_enabled": false,
+      "market": "HK",
+      "source_role": "professional_trade_media",
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "zaobao.com"
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "policy_tax",
+      "name": "政策与税务",
+      "keywords": [
+        "政策",
+        "税务",
+        "税改",
+        "税务宽免",
+        "监管",
+        "个税",
+        "所得税",
+        "征税",
+        "税收",
+        "个人所得税",
+        "免税",
+        "避税",
+        "契税",
+        "遗产税"
+      ]
+    },
+    {
+      "key": "hong_kong_landing",
+      "name": "落户香港",
+      "keywords": [
+        "落户香港",
+        "香港",
+        "财富管理中心"
+      ]
+    },
+    {
+      "key": "cross_border_wealth",
+      "name": "跨境财富管理",
+      "keywords": [
+        "跨境财富",
+        "跨境理财",
+        "财富管理"
+      ]
+    },
+    {
+      "key": "trust_succession",
+      "name": "信托与传承",
+      "keywords": [
+        "家族信托",
+        "信托架构",
+        "财富传承",
+        "传承规划"
+      ]
+    },
+    {
+      "key": "investment_preferences",
+      "name": "投资偏好",
+      "keywords": [
+        "投资",
+        "资产配置",
+        "股价下跌",
+        "金融机构",
+        "市场波动",
+        "股票下跌",
+        "金融股",
+        "保诚",
+        "汇控",
+        "渣打"
+      ]
+    },
+    {
+      "key": "events_awards",
+      "name": "行业活动与奖项",
+      "keywords": [
+        "峰会",
+        "论坛",
+        "获奖"
+      ]
+    },
+    {
+      "key": "institution_updates",
+      "name": "机构动态",
+      "keywords": [
+        "成立",
+        "任命",
+        "收购",
+        "合作"
+      ]
+    },
+    {
+      "key": "research_reports",
+      "name": "研究报告",
+      "keywords": [
+        "研究",
+        "报告",
+        "统计"
+      ]
+    }
+  ]
+}

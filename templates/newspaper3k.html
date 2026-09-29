@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newspaper3k 文章提取器</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+    <style>
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+        .progress-bar {
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: progress 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->{% include "_dashboard_nav.html" %}
+
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        
+        <!-- 功能介绍 -->
+        <section class="mb-6">
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                <div class="flex items-center mb-3">
+                    <i class="fa fa-info-circle text-blue-500 text-xl mr-3"></i>
+                    <h2 class="text-lg font-bold text-blue-800">关于 Newspaper3k</h2>
+                </div>
+                <p class="text-blue-700 text-sm leading-relaxed">
+                    Newspaper3k 是一个强大的 Python 库，专门用于新闻文章的提取和处理。它能够自动识别文章标题、作者、发布日期、正文内容等关键信息，支持多种语言，并提供文章摘要功能。相比传统的网页聚合工具，Newspaper3k 更专注于新闻和文章内容的精准提取。
+                </p>
+            </div>
+        </section>
+
+        <!-- 智能列表提取（新功能） -->
+        <section class="mb-6">
+            <div class="bg-white rounded-xl p-5 card-shadow border-2 border-blue-200">
+                <div class="mb-5">
+                    <h3 class="text-xl font-bold flex items-center text-dark">
+                        <i class="fa fa-magic text-blue-600 mr-2"></i> 智能列表提取 <span class="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">推荐</span>
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-2">输入新闻列表页面URL，自动识别并提取所有文章链接，然后批量处理</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">新闻列表页面URL</label>
+                        <input type="url" id="listUrl" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="https://www.junhe.com/news">
+                        <p class="text-xs text-gray-500 mt-1">例如：新闻列表页、博客首页等包含多篇文章链接的页面</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">最多处理文章数</label>
+                        <select id="maxArticles" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="3">3篇（快速测试）</option>
+                            <option value="5" selected>5篇（推荐）</option>
+                            <option value="10">10篇（完整提取）</option>
+                            <option value="15">15篇（深度提取）</option>
+                            <option value="20">20篇（最大）</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <button id="extractLinksBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                            <i class="fa fa-search mr-2"></i> 1. 提取文章链接
+                        </button>
+                        <button id="autoExtractBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                            <i class="fa fa-bolt mr-2"></i> 2. 一键提取所有文章
+                        </button>
+                        <div id="listStatus" class="text-sm text-gray-600 hidden"></div>
+                    </div>
+                    
+                    <!-- 链接提取进度 -->
+                    <div id="listProgress" class="hidden">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="listProgressBar" class="bg-blue-600 h-2.5 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>处理进度</span>
+                            <span id="listProgressText">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 提取的链接列表 -->
+                <div id="extractedLinks" class="mt-6 hidden">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fa fa-list text-blue-600 mr-2"></i> 发现的文章链接
+                    </h4>
+                    <div id="extractedLinksContent" class="space-y-2 max-h-80 overflow-y-auto">
+                        <!-- 链接列表将在这里动态加载 -->
+                    </div>
+                </div>
+                
+                <!-- 自动提取结果 -->
+                <div id="autoExtractResult" class="mt-6 hidden">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-3">自动提取结果</h4>
+                    <div id="autoExtractSummary" class="mb-4 p-4 bg-gray-50 rounded-lg">
+                        <!-- 汇总信息将在这里显示 -->
+                    </div>
+                    <div id="autoExtractContent" class="space-y-4">
+                        <!-- 详细结果将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 单个URL提取 -->
+        <section class="mb-6">
+            <div class="bg-white rounded-xl p-5 card-shadow">
+                <div class="mb-5">
+                    <h3 class="text-xl font-bold flex items-center text-dark">
+                        <i class="fa fa-link text-primary mr-2"></i> 单个文章提取
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-2">输入单个文章URL，使用Newspaper3k提取文章内容</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">文章URL</label>
+                        <input type="url" id="singleUrl" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="https://example.com/article/...">
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <button id="extractSingleBtn" class="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                            <i class="fa fa-extract mr-2"></i> 提取文章
+                        </button>
+                        <div id="singleStatus" class="text-sm text-gray-600 hidden"></div>
+                    </div>
+                </div>
+                
+                <!-- 单个提取结果 -->
+                <div id="singleResult" class="mt-6 hidden">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-3">提取结果</h4>
+                    <div id="singleResultContent" class="space-y-4">
+                        <!-- 结果内容将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 批量URL提取 -->
+        <section class="mb-6">
+            <div class="bg-white rounded-xl p-5 card-shadow">
+                <div class="mb-5">
+                    <h3 class="text-xl font-bold flex items-center text-dark">
+                        <i class="fa fa-list text-primary mr-2"></i> 批量文章提取
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-2">输入多个文章URL（每行一个），批量提取文章内容</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">文章URL列表（每行一个，最多10个）</label>
+                        <textarea id="batchUrls" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" rows="8" placeholder="https://example.com/article1/...&#10;https://example.com/article2/...&#10;https://example.com/article3/..."></textarea>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <button id="extractBatchBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                            <i class="fa fa-download mr-2"></i> 批量提取
+                        </button>
+                        <div id="batchStatus" class="text-sm text-gray-600 hidden"></div>
+                    </div>
+                    
+                    <!-- 批量处理进度 -->
+                    <div id="batchProgress" class="hidden">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="batchProgressBar" class="bg-green-600 h-2.5 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>批量处理进度</span>
+                            <span id="batchProgressText">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 批量提取结果 -->
+                <div id="batchResult" class="mt-6 hidden">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-3">批量提取结果</h4>
+                    <div id="batchResultSummary" class="mb-4 p-4 bg-gray-50 rounded-lg">
+                        <!-- 汇总信息将在这里显示 -->
+                    </div>
+                    <div id="batchResultContent" class="space-y-4">
+                        <!-- 详细结果将在这里动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 最近提取的文章 -->
+        <section class="mb-6">
+            <div class="bg-white rounded-xl p-5 card-shadow">
+                <div class="mb-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                    <h3 class="text-xl font-bold flex items-center text-dark">
+                        <i class="fa fa-history text-primary mr-2"></i> 最近提取的文章
+                    </h3>
+                    <button id="refreshHistoryBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center shadow-sm">
+                        <i class="fa fa-refresh mr-1.5 text-xs"></i> 刷新
+                    </button>
+                </div>
+                
+                <div id="recentArticles" class="space-y-4">
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fa fa-spinner fa-spin text-2xl text-gray-300 mb-2"></i>
+                        <p class="text-sm">正在加载最近提取的文章...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- JavaScript -->
+    <script>
+        // 移动端菜单切换
+        document.getElementById('menuBtn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobileMenu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // DOM元素
+        const listUrl = document.getElementById('listUrl');
+        const maxArticles = document.getElementById('maxArticles');
+        const extractLinksBtn = document.getElementById('extractLinksBtn');
+        const autoExtractBtn = document.getElementById('autoExtractBtn');
+        const listStatus = document.getElementById('listStatus');
+        const listProgress = document.getElementById('listProgress');
+        const listProgressBar = document.getElementById('listProgressBar');
+        const listProgressText = document.getElementById('listProgressText');
+        const extractedLinks = document.getElementById('extractedLinks');
+        const extractedLinksContent = document.getElementById('extractedLinksContent');
+        const autoExtractResult = document.getElementById('autoExtractResult');
+        const autoExtractSummary = document.getElementById('autoExtractSummary');
+        const autoExtractContent = document.getElementById('autoExtractContent');
+
+        const singleUrl = document.getElementById('singleUrl');
+        const extractSingleBtn = document.getElementById('extractSingleBtn');
+        const singleStatus = document.getElementById('singleStatus');
+        const singleResult = document.getElementById('singleResult');
+        const singleResultContent = document.getElementById('singleResultContent');
+
+        const batchUrls = document.getElementById('batchUrls');
+        const extractBatchBtn = document.getElementById('extractBatchBtn');
+        const batchStatus = document.getElementById('batchStatus');
+        const batchProgress = document.getElementById('batchProgress');
+        const batchProgressBar = document.getElementById('batchProgressBar');
+        const batchProgressText = document.getElementById('batchProgressText');
+        const batchResult = document.getElementById('batchResult');
+        const batchResultSummary = document.getElementById('batchResultSummary');
+        const batchResultContent = document.getElementById('batchResultContent');
+
+        const refreshHistoryBtn = document.getElementById('refreshHistoryBtn');
+        const recentArticles = document.getElementById('recentArticles');
+
+        // 存储提取的链接
+        let currentExtractedLinks = [];
+
+        // 提取文章链接
+        extractLinksBtn.addEventListener('click', async function() {
+            const url = listUrl.value.trim();
+            if (!url) {
+                showMessage('请输入列表页面URL', 'error');
+                return;
+            }
+
+            // URL验证
+            try {
+                new URL(url);
+            } catch (e) {
+                showMessage('请输入有效的URL格式', 'error');
+                return;
+            }
+
+            // 更新UI状态
+            extractLinksBtn.disabled = true;
+            extractLinksBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 正在提取链接...';
+            showStatus(listStatus, '正在分析页面，识别文章链接...', 'info');
+            extractedLinks.classList.add('hidden');
+            autoExtractResult.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/newspaper3k-extract-links', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentExtractedLinks = data.article_links;
+                    showStatus(listStatus, `成功提取到 ${data.total_links} 个文章链接！`, 'success');
+                    displayExtractedLinks(data.article_links);
+                } else {
+                    showStatus(listStatus, '提取链接失败: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('提取链接失败:', error);
+                showStatus(listStatus, '提取链接失败: ' + error.message, 'error');
+            } finally {
+                extractLinksBtn.disabled = false;
+                extractLinksBtn.innerHTML = '<i class="fa fa-search mr-2"></i> 1. 提取文章链接';
+            }
+        });
+
+        // 一键自动提取所有文章
+        autoExtractBtn.addEventListener('click', async function() {
+            const url = listUrl.value.trim();
+            const max = parseInt(maxArticles.value);
+
+            if (!url) {
+                showMessage('请输入列表页面URL', 'error');
+                return;
+            }
+
+            // URL验证
+            try {
+                new URL(url);
+            } catch (e) {
+                showMessage('请输入有效的URL格式', 'error');
+                return;
+            }
+
+            // 更新UI状态
+            autoExtractBtn.disabled = true;
+            extractLinksBtn.disabled = true;
+            autoExtractBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 自动处理中...';
+            showStatus(listStatus, `正在自动提取和处理文章（最多${max}篇）...`, 'info');
+            listProgress.classList.remove('hidden');
+            autoExtractResult.classList.add('hidden');
+
+            // 模拟进度更新
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 5;
+                if (progress <= 90) {
+                    listProgressBar.style.width = progress + '%';
+                    listProgressText.textContent = progress + '%';
+                }
+            }, 1000);
+
+            try {
+                const response = await fetch('/api/newspaper3k-auto-extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        url: url,
+                        max_articles: max
+                    })
+                });
+
+                const data = await response.json();
+
+                clearInterval(progressInterval);
+                listProgressBar.style.width = '100%';
+                listProgressText.textContent = '100%';
+
+                if (data.success) {
+                    showStatus(listStatus, `自动提取完成！共发现 ${data.total_links_found} 个链接，处理了 ${data.processed_count} 篇文章`, 'success');
+                    displayAutoExtractResult(data);
+                    loadRecentArticles(); // 刷新最近文章列表
+                } else {
+                    showStatus(listStatus, '自动提取失败: ' + data.error, 'error');
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                console.error('自动提取失败:', error);
+                showStatus(listStatus, '自动提取失败: ' + error.message, 'error');
+            } finally {
+                autoExtractBtn.disabled = false;
+                extractLinksBtn.disabled = false;
+                autoExtractBtn.innerHTML = '<i class="fa fa-bolt mr-2"></i> 2. 一键提取所有文章';
+                setTimeout(() => {
+                    listProgress.classList.add('hidden');
+                    listProgressBar.style.width = '0%';
+                    listProgressText.textContent = '0%';
+                }, 2000);
+            }
+        });
+
+        // 显示提取的链接
+        function displayExtractedLinks(links) {
+            if (links.length === 0) {
+                extractedLinksContent.innerHTML = `
+                    <div class="text-center text-gray-500 py-4">
+                        <i class="fa fa-inbox text-2xl text-gray-300 mb-2"></i>
+                        <p class="text-sm">未找到文章链接</p>
+                    </div>
+                `;
+                extractedLinks.classList.remove('hidden');
+                return;
+            }
+
+            const html = links.map((link, index) => `
+                <div class="flex items-start p-3 border border-gray-200 rounded-lg hover:bg-blue-50 transition-colors">
+                    <div class="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm mr-3">
+                        ${index + 1}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h6 class="font-medium text-gray-900 truncate">${link.text}</h6>
+                        <p class="text-xs text-gray-500 mt-1 break-all">
+                            <a href="${link.url}" target="_blank" class="hover:text-blue-600">${link.url}</a>
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 ml-3">
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${link.confidence === 'high' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                            ${link.confidence === 'high' ? '高' : '中'}
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+
+            extractedLinksContent.innerHTML = html;
+            extractedLinks.classList.remove('hidden');
+        }
+
+        // 显示自动提取结果
+        function displayAutoExtractResult(data) {
+            // 显示汇总信息
+            autoExtractSummary.innerHTML = `
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">${data.total_links_found}</div>
+                        <div class="text-sm text-gray-600">发现链接</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-purple-600">${data.processed_count}</div>
+                        <div class="text-sm text-gray-600">处理数量</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">${data.success_count}</div>
+                        <div class="text-sm text-gray-600">提取成功</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600">${data.failed_count}</div>
+                        <div class="text-sm text-gray-600">提取失败</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <p><span class="font-medium">批次ID:</span> ${data.batch_id}</p>
+                    <p><span class="font-medium">列表URL:</span> <a href="${data.list_url}" target="_blank" class="text-blue-600 hover:underline">${data.list_url}</a></p>
+                </div>
+            `;
+
+            // 显示详细结果
+            const resultsHtml = data.results.map((result, index) => {
+                if (result.success) {
+                    return `
+                        <div class="border border-green-200 bg-green-50 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
+                                    ${result.index}
+                                </div>
+                                <h6 class="font-semibold text-green-800 flex-1">${result.title || result.link_text || '未识别标题'}</h6>
+                                <i class="fa fa-check-circle text-green-600 text-xl"></i>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm ml-11">
+                                <div>
+                                    <p><span class="font-medium">作者:</span> ${result.author || '未识别'}</p>
+                                    <p><span class="font-medium">文本长度:</span> ${result.text_length} 字符</p>
+                                </div>
+                                <div>
+                                    <p><span class="font-medium">发布日期:</span> ${result.date || '未识别'}</p>
+                                    <p><span class="font-medium">发现链接:</span> ${result.links_found} 个</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-600 ml-11">
+                                <p class="truncate"><a href="${result.url}" target="_blank" class="text-blue-600 hover:underline">${result.url}</a></p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="border border-red-200 bg-red-50 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
+                                    ${result.index}
+                                </div>
+                                <h6 class="font-semibold text-red-800 flex-1">${result.link_text || '提取失败'}</h6>
+                                <i class="fa fa-times-circle text-red-600 text-xl"></i>
+                            </div>
+                            <div class="text-sm ml-11">
+                                <p class="text-xs text-gray-600 mb-2 truncate"><a href="${result.url}" target="_blank" class="text-blue-600 hover:underline">${result.url}</a></p>
+                                <p class="text-red-700"><span class="font-medium">错误:</span> ${result.error}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            autoExtractContent.innerHTML = resultsHtml;
+            autoExtractResult.classList.remove('hidden');
+        }
+
+        // 单个URL提取
+        extractSingleBtn.addEventListener('click', async function() {
+            const url = singleUrl.value.trim();
+            if (!url) {
+                showMessage('请输入文章URL', 'error');
+                return;
+            }
+
+            // 简单的URL验证
+            try {
+                new URL(url);
+            } catch (e) {
+                showMessage('请输入有效的URL格式', 'error');
+                return;
+            }
+
+            // 更新UI状态
+            extractSingleBtn.disabled = true;
+            extractSingleBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 提取中...';
+            showStatus(singleStatus, '正在使用Newspaper3k提取文章内容...', 'info');
+            singleResult.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/newspaper3k-extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus(singleStatus, '提取成功！', 'success');
+                    displaySingleResult(data.data);
+                    loadRecentArticles(); // 刷新最近文章列表
+                } else {
+                    showStatus(singleStatus, '提取失败: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('提取失败:', error);
+                showStatus(singleStatus, '提取失败: ' + error.message, 'error');
+            } finally {
+                // 恢复按钮状态
+                extractSingleBtn.disabled = false;
+                extractSingleBtn.innerHTML = '<i class="fa fa-extract mr-2"></i> 提取文章';
+            }
+        });
+
+        // 批量URL提取
+        extractBatchBtn.addEventListener('click', async function() {
+            const urlsText = batchUrls.value.trim();
+            if (!urlsText) {
+                showMessage('请输入文章URL列表', 'error');
+                return;
+            }
+
+            // 解析URL列表
+            const urls = urlsText.split('\n').map(u => u.trim()).filter(u => u);
+            if (urls.length === 0) {
+                showMessage('请输入有效的URL列表', 'error');
+                return;
+            }
+
+            if (urls.length > 10) {
+                showMessage('最多支持10个URL的批量提取', 'error');
+                return;
+            }
+
+            // 验证URL格式
+            const invalidUrls = [];
+            urls.forEach((url, index) => {
+                try {
+                    new URL(url);
+                } catch (e) {
+                    invalidUrls.push(`第${index + 1}行: ${url}`);
+                }
+            });
+
+            if (invalidUrls.length > 0) {
+                showMessage('以下URL格式无效:\n' + invalidUrls.join('\n'), 'error');
+                return;
+            }
+
+            // 更新UI状态
+            extractBatchBtn.disabled = true;
+            extractBatchBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 批量处理中...';
+            showStatus(batchStatus, `正在批量处理 ${urls.length} 个URL...`, 'info');
+            batchProgress.classList.remove('hidden');
+            batchResult.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/newspaper3k-batch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ urls: urls })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 更新进度条
+                    batchProgressBar.style.width = '100%';
+                    batchProgressText.textContent = '100%';
+                    
+                    showStatus(batchStatus, `批量处理完成！成功: ${data.success_count}, 失败: ${data.failed_count}`, 'success');
+                    displayBatchResult(data);
+                    loadRecentArticles(); // 刷新最近文章列表
+                } else {
+                    showStatus(batchStatus, '批量处理失败: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('批量处理失败:', error);
+                showStatus(batchStatus, '批量处理失败: ' + error.message, 'error');
+            } finally {
+                // 恢复按钮状态
+                extractBatchBtn.disabled = false;
+                extractBatchBtn.innerHTML = '<i class="fa fa-download mr-2"></i> 批量提取';
+                // 隐藏进度条
+                setTimeout(() => {
+                    batchProgress.classList.add('hidden');
+                    batchProgressBar.style.width = '0%';
+                    batchProgressText.textContent = '0%';
+                }, 2000);
+            }
+        });
+
+        // 显示单个提取结果
+        function displaySingleResult(result) {
+            const html = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h5 class="font-semibold text-gray-800 mb-2">基本信息</h5>
+                        <div class="space-y-2 text-sm">
+                            <p><span class="font-medium">标题:</span> ${result.title || '未识别'}</p>
+                            <p><span class="font-medium">作者:</span> ${result.author || '未识别'}</p>
+                            <p><span class="font-medium">发布日期:</span> ${result.date || '未识别'}</p>
+                            <p><span class="font-medium">文本长度:</span> ${result.text_length} 字符</p>
+                            <p><span class="font-medium">发现链接:</span> ${result.links_found} 个</p>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h5 class="font-semibold text-gray-800 mb-2">提取方法</h5>
+                        <div class="space-y-2 text-sm">
+                            <p><span class="font-medium">使用工具:</span> ${result.method}</p>
+                            <p><span class="font-medium">目标URL:</span> <a href="${result.url}" target="_blank" class="text-blue-600 hover:underline break-all">${result.url}</a></p>
+                        </div>
+                    </div>
+                </div>
+                
+                ${result.text_content ? `
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h5 class="font-semibold text-gray-800 mb-2">文章内容预览</h5>
+                    <div class="text-sm text-gray-700 max-h-64 overflow-y-auto">
+                        <p class="whitespace-pre-wrap">${result.text_content.substring(0, 500)}${result.text_content.length > 500 ? '...' : ''}</p>
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${result.summary ? `
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <h5 class="font-semibold text-blue-800 mb-2">文章摘要</h5>
+                    <p class="text-sm text-blue-700">${result.summary}</p>
+                </div>
+                ` : ''}
+                
+                ${result.sample_links && result.sample_links.length > 0 ? `
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h5 class="font-semibold text-gray-800 mb-2">发现的链接 (前5个)</h5>
+                    <div class="space-y-1 text-sm">
+                        ${result.sample_links.map(link => 
+                            `<p><a href="${link.url}" target="_blank" class="text-blue-600 hover:underline">${link.text}</a></p>`
+                        ).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            singleResultContent.innerHTML = html;
+            singleResult.classList.remove('hidden');
+        }
+
+        // 显示批量提取结果
+        function displayBatchResult(data) {
+            // 显示汇总信息
+            batchResultSummary.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h5 class="font-semibold text-gray-800">批量处理汇总</h5>
+                        <p class="text-sm text-gray-600 mt-1">批次ID: ${data.batch_id}</p>
+                    </div>
+                    <div class="flex space-x-6">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600">${data.success_count}</div>
+                            <div class="text-sm text-gray-600">成功</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-red-600">${data.failed_count}</div>
+                            <div class="text-sm text-gray-600">失败</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-600">${data.total_count}</div>
+                            <div class="text-sm text-gray-600">总计</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 显示详细结果
+            const resultsHtml = data.results.map((result, index) => {
+                if (result.success) {
+                    return `
+                        <div class="border border-green-200 bg-green-50 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <i class="fa fa-check-circle text-green-600 mr-2"></i>
+                                <h6 class="font-semibold text-green-800">URL ${index + 1}: 提取成功</h6>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p><span class="font-medium">标题:</span> ${result.title || '未识别'}</p>
+                                    <p><span class="font-medium">作者:</span> ${result.author || '未识别'}</p>
+                                    <p><span class="font-medium">文本长度:</span> ${result.text_length} 字符</p>
+                                </div>
+                                <div>
+                                    <p><span class="font-medium">URL:</span> <a href="${result.url}" target="_blank" class="text-blue-600 hover:underline break-all">${result.url}</a></p>
+                                    <p><span class="font-medium">发布日期:</span> ${result.date || '未识别'}</p>
+                                    <p><span class="font-medium">发现链接:</span> ${result.links_found} 个</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="border border-red-200 bg-red-50 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <i class="fa fa-times-circle text-red-600 mr-2"></i>
+                                <h6 class="font-semibold text-red-800">URL ${index + 1}: 提取失败</h6>
+                            </div>
+                            <div class="text-sm">
+                                <p><span class="font-medium">URL:</span> <a href="${result.url}" target="_blank" class="text-blue-600 hover:underline break-all">${result.url}</a></p>
+                                <p class="text-red-700 mt-2"><span class="font-medium">错误:</span> ${result.error}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            batchResultContent.innerHTML = resultsHtml;
+            batchResult.classList.remove('hidden');
+        }
+
+        // 加载最近文章
+        async function loadRecentArticles() {
+            try {
+                const response = await fetch('/api/recent-articles?limit=10');
+                const data = await response.json();
+
+                if (data.success && data.articles) {
+                    displayRecentArticles(data.articles);
+                } else {
+                    recentArticles.innerHTML = `
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fa fa-inbox text-2xl text-gray-300 mb-2"></i>
+                            <p class="text-sm">暂无最近提取的文章</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载最近文章失败:', error);
+                recentArticles.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fa fa-exclamation-triangle text-2xl text-red-300 mb-2"></i>
+                        <p class="text-sm">加载失败，请稍后重试</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 显示最近文章
+        function displayRecentArticles(articles) {
+            if (articles.length === 0) {
+                recentArticles.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fa fa-inbox text-2xl text-gray-300 mb-2"></i>
+                        <p class="text-sm">暂无最近提取的文章</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = articles.map(article => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                    <div class="flex items-start space-x-4">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fa fa-newspaper text-blue-600"></i>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h5 class="font-semibold text-gray-900 truncate">${article.title || '未识别标题'}</h5>
+                            <p class="text-sm text-gray-600 mt-1">
+                                <span class="font-medium">作者:</span> ${article.author || '未知'}
+                                ${article.publish_date ? ` • <span class="font-medium">发布:</span> ${new Date(article.publish_date).toLocaleDateString()}` : ''}
+                            </p>
+                            <p class="text-sm text-gray-500 mt-1">
+                                <span class="font-medium">提取时间:</span> ${new Date(article.extracted_at).toLocaleString()}
+                                • <span class="font-medium">方法:</span> ${article.extraction_method || 'newspaper3k'}
+                            </p>
+                            <p class="text-xs text-gray-400 mt-2 truncate">
+                                <a href="${article.url}" target="_blank" class="hover:text-blue-600">${article.url}</a>
+                            </p>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                已提取
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            recentArticles.innerHTML = html;
+        }
+
+        // 刷新最近文章
+        refreshHistoryBtn.addEventListener('click', loadRecentArticles);
+
+        // 显示状态信息
+        function showStatus(element, message, type) {
+            element.textContent = message;
+            element.className = 'text-sm ';
+            
+            switch (type) {
+                case 'info':
+                    element.className += 'text-blue-600';
+                    break;
+                case 'success':
+                    element.className += 'text-green-600';
+                    break;
+                case 'error':
+                    element.className += 'text-red-600';
+                    break;
+                default:
+                    element.className += 'text-gray-600';
+            }
+            
+            element.classList.remove('hidden');
+        }
+
+        // 显示消息提示
+        function showMessage(message, type) {
+            // 创建消息元素
+            const messageElement = document.createElement('div');
+            messageElement.className = 'fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50';
+            
+            // 根据类型设置样式
+            if (type === 'success') {
+                messageElement.className += ' bg-green-100 text-green-800 border border-green-200';
+                messageElement.innerHTML = '<div class="flex items-center"><i class="fa fa-check-circle mr-2"></i> ' + message + '</div>';
+            } else if (type === 'error') {
+                messageElement.className += ' bg-red-100 text-red-800 border border-red-200';
+                messageElement.innerHTML = '<div class="flex items-center"><i class="fa fa-exclamation-circle mr-2"></i> ' + message + '</div>';
+            } else {
+                messageElement.className += ' bg-blue-100 text-blue-800 border border-blue-200';
+                messageElement.innerHTML = '<div class="flex items-center"><i class="fa fa-info-circle mr-2"></i> ' + message + '</div>';
+            }
+            
+            // 添加到页面
+            document.body.appendChild(messageElement);
+            
+            // 3秒后移除消息
+            setTimeout(() => {
+                messageElement.remove();
+            }, 3000);
+        }
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRecentArticles();
+        });
+    </script>
+</body>
+</html>

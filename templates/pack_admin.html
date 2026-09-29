@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>行业包用户管理</title>
+<link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css">
+<style>
+body{background:#08101f;color:#e6f0ff;margin:0;font-family:-apple-system,'Microsoft YaHei',sans-serif}
+.pa-shell{display:flex;height:calc(100vh - 52px);overflow:hidden;padding-top:52px}
+.pa-left{width:270px;flex-shrink:0;background:rgba(9,20,42,.9);border-right:1px solid rgba(96,165,250,.18);padding:14px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.pa-left h3{margin:0 0 6px;font-size:13px;color:#8ea6c8;font-weight:700;padding:0 6px}
+.pa-pack{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid transparent;border-radius:10px;cursor:pointer;transition:.15s}
+.pa-pack:hover{background:rgba(56,189,248,.08)}
+.pa-pack.active{border-color:#38bdf8;background:rgba(16,34,66,.9)}
+.pa-pack .nm{font-size:14px;font-weight:700;color:#e6f0ff}
+.pa-pack .id{font-size:11px;color:#8ea6c8}
+.pa-right{flex:1;overflow-y:auto;padding:18px 22px}
+.pa-title{font-size:20px;font-weight:800;margin:0 0 12px;color:#e6f0ff}
+.pa-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.pa-btn,.pa-btn2{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700}
+.pa-btn{background:#2563eb;color:#fff}.pa-btn:hover{background:#1d4ed8}
+.pa-btn2{background:#12233f;color:#dbeafe;border:1px solid rgba(96,165,250,.28)}
+.pa-btn2:hover{background:rgba(56,189,248,.16)}
+.pa-del{color:#f87171;border-color:rgba(248,113,113,.35)}.pa-del:hover{background:rgba(248,113,113,.16)}
+.pa-table{width:100%;border-collapse:collapse;font-size:13px}
+.pa-table th,.pa-table td{padding:9px 8px;border-bottom:1px solid rgba(96,165,250,.14);text-align:left;vertical-align:top}
+.pa-table th{background:#12233f;color:#94a7c6;font-weight:700;white-space:nowrap}
+.pa-table td{color:#dbeafe}
+.pa-tag{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.pa-tag.active{background:rgba(34,197,94,.18);color:#4ade80}
+.pa-tag.disabled{background:rgba(248,113,113,.18);color:#fca5a5}
+.pa-tag.expired{background:rgba(251,191,36,.18);color:#fcd34d}
+.pa-field label{display:block;font-size:12px;color:#8ea6c8;margin:8px 0 3px}
+.pa-field input{width:100%;padding:8px 10px;border:1px solid rgba(96,165,250,.28);border-radius:7px;background:#0e1d3a;color:#e6f0ff;font-size:13px}
+.pa-modal{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 14px;overflow:auto}
+.pa-modal.active{display:flex}
+.pa-modal-card{background:#0e1d3a;border:1px solid rgba(96,165,250,.28);border-radius:12px;padding:22px 24px;width:560px;max-width:96vw}
+.pa-modal-card h3{margin:0 0 12px;color:#e6f0ff}
+.pa-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+@media(max-width:720px){
+  .pa-grid{grid-template-columns:1fr}
+  /* 手机：行业包列表改为顶部横向滚动 chips 条，用户区在下方全宽展示 */
+  .pa-shell{display:block;height:auto;overflow:visible;padding-top:0}
+  .pa-left{width:100%;flex-direction:column;overflow:visible;border-right:0;border-bottom:1px solid rgba(96,165,250,.18);padding:10px 12px;flex-shrink:0}
+  .pa-left h3{display:none}
+  #packList{display:flex;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:4px}
+  .pa-pack{flex-shrink:0;min-width:max-content;padding:7px 12px;border-radius:999px;border:1px solid rgba(96,165,250,.25)}
+  .pa-right{padding:12px;width:100%}
+  .pa-title{font-size:17px}
+  .pa-toolbar{flex-wrap:wrap;gap:8px}
+  .pa-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .pa-table{min-width:780px}
+}
+.pa-msg{font-size:12px;margin-top:8px}.pa-msg.ok{color:#4ade80}.pa-msg.err{color:#f87171}
+/* 浅色皮肤：跟随全站 dashSkin（本页深色为默认，浅色用 skin-light 覆盖） */
+body.skin-light{background:#f4f7f8;color:#17201d}
+body.skin-light .pa-left{background:#fff;border-right-color:#e2e8f0}
+body.skin-light .pa-left h3,body.skin-light .pa-pack .id,body.skin-light .pa-field label,body.skin-light #toolbarInfo{color:#64748b}
+body.skin-light .pa-pack:hover{background:rgba(29,127,104,.06)}
+body.skin-light .pa-pack.active{border-color:#0f766e;background:rgba(29,127,104,.10)}
+body.skin-light .pa-pack .nm,body.skin-light .pa-title,body.skin-light .pa-modal-card h3{color:#111827}
+body.skin-light .pa-table th{background:#f1f5f9;color:#475569;border-bottom-color:#e2e8f0}
+body.skin-light .pa-table td{color:#1f2937;border-bottom-color:#e2e8f0}
+body.skin-light .pa-field input,body.skin-light .pa-field select{background:#fff;color:#17201d;border-color:#cbd5e1}
+body.skin-light .pa-btn2{background:#fff;color:#334155;border-color:#cbd5e1}
+body.skin-light .pa-btn2:hover{background:rgba(29,127,104,.10)}
+body.skin-light .pa-modal-card{background:#fff;border-color:#e2e8f0}
+body.skin-light #authPanel{background:#f8fafc;border-color:#e2e8f0}
+body.skin-light select{background:#fff;color:#17201d;border-color:#cbd5e1}
+</style>
+</head>
+<body>
+<script>try{var _s=localStorage.getItem('dashSkin');document.body.classList.add((_s===null||_s==='darkblue')?'skin-darkblue':'skin-light');}catch(e){document.body.classList.add('skin-darkblue');}</script>
+{% include '_dashboard_nav.html' %}
+<div class="pa-shell">
+  <div class="pa-left">
+    <h3>行业包列表</h3>
+    <div id="packList">加载中…</div>
+  </div>
+  <div class="pa-right">
+    <h2 class="pa-title" id="rightTitle">选择左侧行业包查看用户</h2>
+    <div class="pa-toolbar">
+      <button class="pa-btn" onclick="openAdd()"><i class="fa fa-user-plus"></i> 新增用户</button>
+      <button class="pa-btn2" onclick="loadAuth()"><i class="fa fa-cog"></i> 授权配置（金额/二维码/电话）</button>
+      <span id="toolbarInfo" style="font-size:12px;color:#8ea6c8"></span>
+    </div>
+    <div id="authPanel" style="display:none;background:rgba(13,28,56,.82);border:1px solid rgba(96,165,250,.22);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+      <div class="pa-grid">
+        <div class="pa-field"><label>默认授权天数</label><input id="defaultAuthDays" type="number" value="30"></div>
+        <div class="pa-field"><label>续费天数</label><input id="renewalDays" type="number" value="30"></div>
+        <div class="pa-field"><label>续费金额(元)</label><input id="renewalAmount" type="text"></div>
+        <div class="pa-field"><label>联系人电话</label><input id="contactPhone" type="text"></div>
+        <div class="pa-field"><label>微信收款二维码(路径)</label><input id="qrWechat" type="text"></div>
+        <div class="pa-field"><label>支付宝收款二维码(路径)</label><input id="qrAlipay" type="text"></div>
+      </div>
+      <button class="pa-btn" style="margin-top:12px" onclick="saveAuth()">保存授权配置</button><span id="authMsg" class="pa-msg"></span>
+    </div>
+    <div class="pa-table-wrap"><table class="pa-table"><thead><tr><th>用户名</th><th>公司</th><th>电话</th><th>邮箱</th><th>注册日期</th><th>授权</th><th>到期时间</th><th>客服联系电话</th><th>状态</th><th>首页品牌</th><th>操作</th></tr></thead><tbody id="userRows"><tr><td colspan="11" style="color:#8ea6c8">请选择一个行业包</td></tr></tbody></table></div>
+  </div>
+</div>
+
+<div id="addModal" class="pa-modal"><div class="pa-modal-card">
+  <h3><i class="fa fa-user-plus"></i> 新增用户</h3>
+  <div class="pa-grid">
+    <div class="pa-field"><label>用户名</label><input id="nu" type="text"></div>
+    <div class="pa-field"><label>初始口令（字母+数字≥6）</label><input id="np" type="text" value="init1234"></div>
+    <div class="pa-field"><label>公司名称</label><input id="nco" type="text"></div>
+    <div class="pa-field"><label>联系电话</label><input id="ncp" type="text"></div>
+    <div class="pa-field"><label>邮箱（必填）</label><input id="ne" type="text"></div>
+    <div class="pa-field"><label>授权天数</label><input id="nd" type="number" value="30"></div>
+    <div class="pa-field"><label>客服联系电话</label><input id="nr" type="text"></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:18px"><button class="pa-btn" onclick="addUser()">保存</button><button class="pa-btn2" onclick="closeAdd()">取消</button><span id="addMsg" class="pa-msg"></span></div>
+</div></div>
+
+<div id="editModal" class="pa-modal"><div class="pa-modal-card">
+  <h3><i class="fa fa-edit"></i> 编辑用户</h3>
+  <div class="pa-grid">
+    <input type="hidden" id="euId">
+    <div class="pa-field"><label>公司名称</label><input id="euCompany" type="text"></div>
+    <div class="pa-field"><label>联系电话</label><input id="euPhone" type="text"></div>
+    <div class="pa-field"><label>邮箱</label><input id="euEmail" type="text"></div>
+    <div class="pa-field"><label>授权天数</label><input id="euAuthDays" type="number"></div>
+    <div class="pa-field"><label>到期时间 (YYYY-MM-DD HH:MM:SS)</label><input id="euExpire" type="text" placeholder="如 2026-12-31 23:59:59"></div>
+    <div class="pa-field"><label>客服联系电话</label><input id="euRemind" type="text"></div>
+    <div class="pa-field"><label>状态</label>
+      <select id="euStatus" style="width:100%;padding:8px 10px;border:1px solid rgba(96,165,250,.28);border-radius:7px;background:#0e1d3a;color:#e6f0ff;font-size:13px">
+        <option value="active">启用</option><option value="disabled">停用</option><option value="expired">到期</option>
+      </select></div>
+    <div class="pa-field"><label style="display:flex;align-items:center;gap:6px;margin-top:22px"><input id="euCanDel" type="checkbox" style="width:auto"> 允许删除文章</label></div>
+    <div class="pa-field"><label style="display:flex;align-items:center;gap:6px;margin-top:6px"><input id="euShowBrand" type="checkbox" style="width:auto"> 首页显示该用户的公司名称与 Logo（白标品牌）</label></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:18px"><button class="pa-btn" onclick="saveEdit()">保存</button><button class="pa-btn2" onclick="closeEdit()">取消</button><span id="editMsg" class="pa-msg"></span></div>
+</div></div>
+
+<script>
+let selectedPack = null;
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+async function post(p,b){let r=await fetch(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});let d;try{d=await r.json();}catch(e){d={};}return {status:r.status,d};}
+async function put(p,b){let r=await fetch(p,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});let d;try{d=await r.json();}catch(e){d={};}return {status:r.status,d};}
+async function get(p){let r=await fetch(p,{cache:'no-store'});let d;try{d=await r.json();}catch(e){d={};}return {status:r.status,d};}
+function msg(id,t,ok){let e=document.getElementById(id);if(e){e.className='pa-msg '+(ok?'ok':'err');e.textContent=t;}}
+async function loadPacks(){let x=await get('/api/intel/industry-packs');let pk=(x.d.industry_packs||[]);let el=document.getElementById('packList');
+  if(!pk.length){el.innerHTML='<div style="color:#8ea6c8;font-size:12px">无行业包</div>';return;}
+  el.innerHTML=pk.map(p=>`<div class="pa-pack" data-id="${esc(p.id)}" onclick="selectPack('${esc(p.id)}')"><div class="nm">${esc(p.name)}</div><div class="id">${esc(p.id)}</div></div>`).join('');
+  if(x.d.default_industry_pack_id) selectPack(x.d.default_industry_pack_id);
+}
+function selectPack(id){selectedPack=id;document.querySelectorAll('.pa-pack').forEach(e=>e.classList.toggle('active',e.dataset.id===id));
+  let meta=document.querySelector(`.pa-pack[data-id="${id}"] .nm`);document.getElementById('rightTitle').textContent=(meta?meta.textContent:'')+' · 用户管理';loadUsers();}
+async function loadUsers(){document.getElementById('toolbarInfo').textContent='';let x=await get('/api/pack-users?industry_pack_id='+encodeURIComponent(selectedPack));let us=x.d.users||[];window.__paUsers=us;let tb=document.getElementById('userRows');
+  if(!us.length){tb.innerHTML='<tr><td colspan="10" style="color:#8ea6c8">该行业包暂无用户，点击“新增用户”创建</td></tr>';return;}
+  tb.innerHTML=us.map(u=>{let st=u.status==='active'?'active':(u.status==='disabled'?'disabled':'expired');let stl={active:'启用',disabled:'停用',expired:'到期'}[st];
+    const brandOn=!!u.show_user_brand;const brandBtn=`<button class="pa-btn2" onclick="toggleBrand(${u.id},${brandOn?0:1})" title="首页是否显示该用户公司名与Logo">${brandOn?'已开启':'关闭'}</button>`;
+    const logoBtn=`<button class="pa-btn2" onclick="pickLogo(${u.id})" title="上传用户Logo">${u.logo_url?'换Logo':'传Logo'}</button>`;
+    return `<tr><td><b>${esc(u.username)}</b></td><td>${esc(u.company_name||'')}</td><td>${esc(u.contact_phone||'—')}</td><td>${esc(u.email||'—')}</td><td>${esc((u.created_at||'').slice(0,10)||'—')}</td><td>${u.auth_days||'—'}天</td><td>${esc(u.expire_at||'—')}</td><td>${esc(u.remind_phone||'—')}</td><td><span class="pa-tag ${st}">${stl}</span></td><td style="white-space:nowrap">${brandBtn} ${logoBtn}</td>
+      <td style="white-space:nowrap">
+        <button class="pa-btn" onclick="openEdit(${u.id})" title="编辑">编辑</button>
+        <button class="pa-btn2" onclick="resetPw(${u.id})" title="重置口令">重置口令</button>
+        <button class="pa-btn2" onclick="extendUser(${u.id})" title="延期">延期</button>
+        <button class="pa-btn2" onclick="toggleUser(${u.id},'${u.status==='active'?'disabled':'active'}')">${u.status==='active'?'停用':'启用'}</button>
+        <button class="pa-btn2" onclick="setRemind(${u.id})">客服电话</button>
+        <button class="pa-btn2 pa-del" onclick="deleteUser(${u.id})">删除</button>
+      </td></tr>`;}).join('');
+}
+async function toggleBrand(uid,show){let x=await put('/api/pack-users/'+uid,{show_user_brand:!!show});if(x.d.success){loadUsers();}else alert(x.d.message||'切换失败');}
+function pickLogo(uid){let input=document.createElement('input');input.type='file';input.accept='image/*';
+  input.onchange=async()=>{let f=input.files[0];if(!f)return;let fd=new FormData();fd.append('file',f);let r=await fetch('/api/pack-users/'+uid+'/logo',{method:'POST',body:fd});let d;try{d=await r.json();}catch(e){d={};}
+    if(d.success){alert('Logo 已更新');loadUsers();}else alert(d.message||'上传失败');};input.click();}
+async function loadAuth(){let p=document.getElementById('authPanel');p.style.display=p.style.display==='none'?'block':'none';if(p.style.display==='block'){let x=await get('/api/pack-users/auth-config?industry_pack_id='+encodeURIComponent(selectedPack||''));let c=x.d.config||{};let key={defaultAuthDays:c.default_auth_days,renewalDays:c.renewal_days,renewalAmount:c.renewal_amount,contactPhone:c.contact_phone,qrWechat:c.qr_wechat,qrAlipay:c.qr_alipay};['defaultAuthDays','renewalDays','renewalAmount','contactPhone','qrWechat','qrAlipay'].forEach(k=>{let el=document.getElementById(k);if(el)el.value=key[k]||'';});}}
+async function saveAuth(){let x=await put('/api/pack-users/auth-config',{industry_pack_id:selectedPack,default_auth_days:document.getElementById('defaultAuthDays').value,renewal_days:document.getElementById('renewalDays').value,renewal_amount:document.getElementById('renewalAmount').value,contact_phone:document.getElementById('contactPhone').value,qr_wechat:document.getElementById('qrWechat').value,qr_alipay:document.getElementById('qrAlipay').value});msg('authMsg',x.d.success?'已保存':(x.d.message||'失败'),x.d.success);}
+function openAdd(){document.getElementById('addModal').classList.add('active');msg('addMsg','',true);}
+function closeAdd(){document.getElementById('addModal').classList.remove('active');}
+async function addUser(){let x=await post('/api/pack-users',{industry_pack_id:selectedPack,username:document.getElementById('nu').value.trim(),password:document.getElementById('np').value,email:document.getElementById('ne').value.trim(),company_name:document.getElementById('nco').value.trim(),contact_phone:document.getElementById('ncp').value.trim(),auth_days:document.getElementById('nd').value,remind_phone:document.getElementById('nr').value.trim()});
+  msg('addMsg',x.d.success?('已创建 id='+x.d.user_id):(x.d.message||'失败'),x.d.success);if(x.d.success){closeAdd();loadUsers();}}
+async function resetPw(uid){let x=await post('/api/pack-users/'+uid+'/reset-password',{send_email:false});if(x.d.success){alert('已重置。新口令：'+x.d.new_password+'（请告知用户，首次登录可修改）');loadUsers();}else alert(x.d.message||'失败');}
+async function extendUser(uid){let days=prompt('延期天数：');if(!days)return;let inv=prompt('发票号：');if(!inv)return;let amt=prompt('付费金额：');if(!amt)return;let x=await post('/api/pack-users/'+uid+'/extend',{extra_days:days,invoice_no:inv,amount:amt});if(x.d.success){alert('已延期至 '+x.d.new_expire_at);loadUsers();}else alert(x.d.message||'失败');}
+async function toggleUser(uid,st){await put('/api/pack-users/'+uid,{status:st});loadUsers();}
+async function setRemind(uid){let p=prompt('客服联系电话（用户到期后联系）：');if(p==null)return;await put('/api/pack-users/'+uid,{remind_phone:p.trim()});loadUsers();}
+async function deleteUser(uid){if(!confirm('确定删除该用户？删除后不可恢复。'))return;let r=await fetch('/api/pack-users/'+uid,{method:'DELETE'});let d=await r.json();if(d.success){alert('已删除');loadUsers();}else alert(d.message||'删除失败');}
+function openEdit(id){var u=(window.__paUsers||[]).find(x=>x.id===id);if(!u){alert('请刷新后重试');return;}
+  document.getElementById('euId').value=u.id;document.getElementById('euCompany').value=u.company_name||'';document.getElementById('euPhone').value=u.contact_phone||'';
+  document.getElementById('euEmail').value=u.email||'';document.getElementById('euAuthDays').value=u.auth_days||'';document.getElementById('euExpire').value=u.expire_at||'';
+  // ── 授权天数 ↔ 到期时间 双向联动（天数从"激活当天"起算）──
+  // 基准日优先取该用户的首次登录激活时间(init_login_at)，其次注册时间，最后今天。
+  (function(){
+    var baseSrc=String(u.init_login_at||u.activated_at||u.created_at||'').slice(0,10);
+    var base=baseSrc?new Date(baseSrc+'T00:00:00'):new Date();
+    if(isNaN(base.getTime()))base=new Date();
+    base.setHours(0,0,0,0);
+    function pad(n){return (n<10?'0':'')+n;}
+    function fmt(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' 23:59:59';}
+    var dEl=document.getElementById('euAuthDays'),eEl=document.getElementById('euExpire');
+    function daysToExpire(){var d=parseInt(dEl.value,10);if(isNaN(d)||d<0)return;var e=new Date(base.getTime());e.setDate(e.getDate()+d);eEl.value=fmt(e);}
+    function expireToDays(){var v=String(eEl.value||'').trim();if(!v)return;var e=new Date(v.replace(' ','T'));if(isNaN(e.getTime()))return;e.setHours(0,0,0,0);var diff=Math.round((e-base)/86400000);if(diff>=0)dEl.value=diff;}
+    if(dEl&&!dEl.__linked){dEl.__linked=true;dEl.addEventListener('input',daysToExpire);dEl.addEventListener('change',daysToExpire);}
+    if(eEl&&!eEl.__linked){eEl.__linked=true;eEl.addEventListener('change',expireToDays);eEl.addEventListener('blur',expireToDays);}
+    if(dEl&&eEl&&!dEl.value&&eEl.value){expireToDays();}else if(dEl&&dEl.value){daysToExpire();}
+  })();
+  document.getElementById('euRemind').value=u.remind_phone||'';document.getElementById('euStatus').value=u.status||'active';document.getElementById('euCanDel').checked=!!u.can_delete_articles;document.getElementById('euShowBrand').checked=!!u.show_user_brand;
+  document.getElementById('editModal').classList.add('active');msg('editMsg','',true);}
+async function saveEdit(){var id=document.getElementById('euId').value;
+  var x=await put('/api/pack-users/'+id,{status:document.getElementById('euStatus').value,auth_days:document.getElementById('euAuthDays').value,expire_at:document.getElementById('euExpire').value,contact_phone:document.getElementById('euPhone').value,email:document.getElementById('euEmail').value,company_name:document.getElementById('euCompany').value,remind_phone:document.getElementById('euRemind').value,can_delete_articles:document.getElementById('euCanDel').checked,show_user_brand:document.getElementById('euShowBrand').checked});
+  msg('editMsg',x.d.success?'已保存':(x.d.message||'失败'),x.d.success);if(x.d.success){closeEdit();loadUsers();}}
+function closeEdit(){document.getElementById('editModal').classList.remove('active');}
+loadPacks();
+</script>
+</body>
+</html>

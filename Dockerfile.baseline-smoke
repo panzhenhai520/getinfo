@@ -1,0 +1,12 @@
+ARG BASE_IMAGE=firecrawlapp-crawler@sha256:5d373112a765764daad67dfe431a87a3a2ef3886900d1c13aec4cf9b2cb06e23
+FROM ${BASE_IMAGE}
+
+COPY baseline/runtime-pip-freeze.txt /tmp/runtime-pip-freeze.txt
+RUN python -m pip freeze --all > /tmp/installed-pip-freeze.txt \
+    && diff -u /tmp/runtime-pip-freeze.txt /tmp/installed-pip-freeze.txt
+
+COPY . /app
+WORKDIR /app
+RUN DATABASE_PATH=/tmp/baseline-smoke.sqlite3 \
+    DEFAULT_ADMIN_PASSWORD=baseline-smoke-not-for-production \
+    python -c "from firecrawl_app import app; response = app.test_client().get('/api/system/health'); assert response.status_code == 200; assert response.get_json().get('success') is True"

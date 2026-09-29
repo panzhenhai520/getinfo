@@ -1,0 +1,4516 @@
+{
+  "configuration_sha256": "2aa93f7038422fbb954ac3b8cf71b9ae2abc78a559b7bea5b8ea7912940b6071",
+  "counts": {
+    "errors": 0,
+    "family_office_sources": 103,
+    "managed_urls_scanned": 94,
+    "protected_manual_sources": 0,
+    "scheduled_tasks_scanned": 56,
+    "shared_financial_sources": 7,
+    "unique_physical_sources": 110
+  },
+  "database_writes": 0,
+  "errors": [],
+  "export_version": "industry-pack-family-office-export-v1",
+  "installed_family_seed": {
+    "pack_version": "2.1.0",
+    "path": "/home/timebot/app/config/industry_packs/family_office.json",
+    "sha256": "1698dee856f15b3ee7bc0729a3ec51068667a57b345fa5e00095dd221118ac50",
+    "source_count": 103
+  },
+  "passed": true,
+  "proposed_manifests": {
+    "family_office": {
+      "candidate_gate": {
+        "anchor_keywords": [
+          "家族办公室",
+          "家办",
+          "单一家族办公室",
+          "联合家族办公室",
+          "Family Office",
+          "Single Family Office",
+          "Multi Family Office",
+          "FIHV",
+          "family-owned investment holding vehicle",
+          "家族信托",
+          "信托架构",
+          "财富传承",
+          "传承规划",
+          "家族治理",
+          "跨境财富",
+          "落户香港"
+        ],
+        "description": "文章必须命中行业锚点或已备案行业机构实体；报告、政策、获奖、合作等仅用于分类。机构实体仅限已备案的行业参与者及其官方网站。",
+        "entity_keywords": [
+          "时和资产",
+          "时和资产管理",
+          "Time Asset"
+        ]
+      },
+      "capabilities": [
+        {
+          "enabled": true,
+          "implementation_status": "existing",
+          "key": "family_office_content_intelligence",
+          "name": "家族办公室资讯聚合与分类"
+        }
+      ],
+      "classification": {
+        "core_weight": 3,
+        "event_weight": 2,
+        "expanded_weight": 1,
+        "llm_confidence_threshold": 0.65,
+        "minimum_relevance_score": 2,
+        "negative_weight": -3,
+        "tie_break_order": [
+          "trend",
+          "event",
+          "other"
+        ],
+        "trend_weight": 2
+      },
+      "core_keywords": [
+        "家族办公室",
+        "家办",
+        "单一家族办公室",
+        "联合家族办公室",
+        "Family Office",
+        "Single Family Office",
+        "Multi Family Office",
+        "FIHV",
+        "family-owned investment holding vehicle"
+      ],
+      "dashboard_capabilities": {
+        "show_financial_news": true,
+        "show_market_index_cards": true,
+        "show_watched_stock_cards": true
+      },
+      "dashboard_categories": [
+        {
+          "enabled": true,
+          "implementation_status": "existing",
+          "key": "family_office_intelligence",
+          "name": "家族办公室行业信息"
+        }
+      ],
+      "default_market": "HK",
+      "default_sources": [
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "海问律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "10:55",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "http://www.haiwen-law.com/en"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "时和资产管理",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "http://www.rtamc.com.hk/index.php?a=Home&f=news&cid=2"
+        },
+        {
+          "authority_level": 2,
+          "browser_fetch_enabled": true,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "STEP",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "00:52",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "http://www.step.org"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "中国信托业协会",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "http://www.xtxh.net/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "36氪",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://36kr.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "ACTEC Foundation",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://actecfoundation.org/podcasts/family-office-landscape-models-services-options/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "香港科技大学家办研究",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://afbfo.hkust.edu.hk/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "中伦律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "12:39",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://en.zhonglun.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Family Office Insider",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://familyofficeinsider.substack.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "FOInsight（家办新智点）",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://foinsight.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Acclime",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "17:53",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://hongkong.acclime.com/zh-hant/"
+        },
+        {
+          "authority_level": 2,
+          "browser_fetch_enabled": true,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Dentons律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "14:24",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://hongkong.dentons.com/zh/office-details/hong-kong"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "IQEQ",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "17:01",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://iqeq.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "KPMG",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "19:12",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://kpmg.com/xx/en.html"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "新京报瑞银家办报告",
+          "polling_interval_minutes": 1440,
+          "source_type": "website",
+          "url": "https://m.bjnews.com.cn/detail/1781010421129664.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Maples律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "04:48",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://maples.com/"
+        },
+        {
+          "authority_level": 3,
+          "browser_fetch_enabled": true,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "PitchBook",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://pitchbook.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "PKWA Law律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "08:17",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://pkwalaw.com/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "摩根大通私人银行家族办公室服务",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://privatebank.jpmorgan.com/apac/en/who-we-serve/family-office"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "大成律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "13:58",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://w.dacheng.com/en/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": false,
+          "market": "HK",
+          "name": "知网",
+          "polling_interval_minutes": 1440,
+          "source_type": "website",
+          "url": "https://wap.cnki.net/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "财策智库（WealthPlus）",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://wealthplus.org.cn/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Amati Law律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "07:25",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.amatilaw.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Apex Group",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "16:09",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.apexgroup.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Appleby律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "05:40",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.applebyglobal.com/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "汇丰环球私人银行家族办公室",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.asia.privatebanking.hsbc.com.hk/family-office-uhnw/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "新加坡银行香港家族办公室咨询",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.bankofsingapore.com/hk/private-banking-hong-kong.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Bedell Cristin律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "09:10",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.bedellcristin.com/"
+        },
+        {
+          "authority_level": 3,
+          "browser_fetch_enabled": true,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Bloomberg Wealth",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.bloomberg.com/wealth"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "中银香港家族办公室政策研究",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.bochk.com/dam/investment/bocecon/SY2024011%28en%29.pdf"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "财新",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "20:31",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.caixin.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Campden Wealth",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.campdenwealth.com/research-reports-portfolio"
+        },
+        {
+          "authority_level": 2,
+          "browser_fetch_enabled": true,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Carey Olsen律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "02:37",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.careyolsen.com/locations/carey-olsen-asia"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Charltons律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "06:59",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.charltonslaw.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Collas Crill律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "03:56",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.collascrill.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Conyers律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "06:07",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.conyers.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Dakota",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.dakota.com/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "星展香港私人银行财富规划",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.dbs.com.hk/private-banking/wealth-planning?source=external"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "德恒律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "13:32",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.dehenglaw.com/EN/index/0001.aspx"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Deloitte",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "01:19",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.deloitte.com/cn/en.html"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Deloitte Private",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.deloitte.com/global/en/services/deloitte-private/research/family-office-insights-series-collections.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "EY",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "00:00",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.ey.com/en_gl"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "is_enabled": true,
+          "name": "FamilyOfficeHK",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.familyofficehk.gov.hk/en/news-and-events/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Family Office Magazine",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.familyofficemag.com/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Family Wealth Report",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.familywealthreport.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "方达律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "10:28",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.fangdalaw.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "方达律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "18:20",
+          "schedule_rule": "daily",
+          "source_type": "list_page",
+          "url": "https://www.fangdalaw.com/news"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "FINTRX",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.fintrx.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "GJC Law律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "07:51",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.gjclaw.com.sg/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "环球律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "11:47",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.glo.com.cn/en/"
+        },
+        {
+          "authority_level": 2,
+          "browser_fetch_enabled": true,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Harneys律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "05:14",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.harneys.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "event",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "香港中国金融协会发表文章",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.hcfa.org.hk/a-list/30836-cht"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "信报",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "02:11",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkej.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "信报dailynews",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "21:23",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkej.com/dailynews/headline"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "信报instantnews",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "21:49",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkej.com/instantnews"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "地产投资",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "22:15",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkej.com/property"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "信报-财富",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "22:41",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkej.com/wm/currency1"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "fund",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "20:57",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkej.com/wm/fund"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "HKMA",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "19:38",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.hkma.gov.hk/eng/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "香港新闻社",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.hkong.cn/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": false,
+          "market": "HK",
+          "name": "香港新闻社｜卓越跨境金融服务大奖",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.hkong.cn/2024/0926/26246.shtml"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "InvestHK",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "20:04",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.investhk.gov.hk/en/how-change-text-size/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "界面新闻",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.jiemian.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "竞天公诚律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "11:21",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.jingtian.com/en/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "经济参考报财富频道",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.jjckb.cn/caifuindex.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "JTC Group",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "15:43",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.jtcgroup.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "君和律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "10:02",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.junhe.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "君合律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "18:46",
+          "schedule_rule": "daily",
+          "source_type": "list_page",
+          "url": "https://www.junhe.com/news"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Kaizen",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "17:27",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.kaizencpa.com/Services/index.html"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "金杜律师事务所",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.kwm.com/cn/zh/insights/latest-thinking.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "金杜律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "09:36",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.kwm.com/hk/en/home.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Singapore MAS",
+          "polling_interval_minutes": 1440,
+          "source_type": "website",
+          "url": "https://www.mas.gov.sg/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Singapore MAS_3",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "00:26",
+          "schedule_rule": "daily",
+          "source_type": "list_page",
+          "url": "https://www.mas.gov.sg/news"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Singapore MAS_2",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "00:26",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.mas.gov.sg/publications"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Singapore MAS_1",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "00:26",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.mas.gov.sg/regulation"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "McKinsey & Company",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.mckinsey.com/industries/financial-services/our-insights"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "植德律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "14:50",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.meritsandtree.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Mourant律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "03:29",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.mourant.com/"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "国家金融监督管理总局",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.nfra.gov.cn/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Northern Trust",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.northerntrust.com/united-states/institute/segment/family-offices"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Ogier律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "03:03",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.ogier.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "清华五道口金融学院",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.pbcsf.tsinghua.edu.cn/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Preqin",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.preqin.com/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "花旗私人银行香港家族办公室",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.privatebank.citibank.com/office-locations/hong-kong"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Citibank Private Bank",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.privatebank.citibank.com/sc/insights/the-family-office-survey"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "PwC",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "01:45",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.pwchk.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "RBC 财富管理家族办公室",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.rbcwealthmanagement.com/en-je/how-we-help/family-offices"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "other",
+          "is_enabled": true,
+          "name": "SCMP Family Offices",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.scmp.com/topics/family-office"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "证券时报瑞银家办报告",
+          "polling_interval_minutes": 1440,
+          "source_type": "website",
+          "url": "https://www.stcn.com/article/detail/3954440.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Tembusu Law律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "08:44",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.tembusulaw.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Timothy Loh律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "06:33",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.timothyloh.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "通商律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "12:13",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.tongshang.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Trident Trust",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "15:16",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.tridenttrust.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "天元律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "13:05",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.tylaw.com.cn/en/"
+        },
+        {
+          "authority_level": 4,
+          "browser_fetch_enabled": true,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "瑞银2026全球家族办公室报告",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.ubs.com/global/en/media/display-page-ndp/en-20260528-global-family-office-report-2026.html"
+        },
+        {
+          "authority_level": 3,
+          "browser_fetch_enabled": true,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "UBS",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.ubs.com/global/en/wealthmanagement/family-office-uhnw/series/family-office-insights.html"
+        },
+        {
+          "authority_level": 4,
+          "browser_fetch_enabled": true,
+          "content_type": "report",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "瑞银香港家族咨询",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.ubs.com/hk/en/wealthmanagement/what-we-offer/planning/family-advisory.html"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Vistra",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "16:35",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.vistra.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "Walkers律师事务所",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "04:22",
+          "schedule_rule": "daily",
+          "source_type": "website",
+          "url": "https://www.walkersglobal.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "WealthBriefing",
+          "polling_interval_minutes": 1440,
+          "source_type": "list_page",
+          "url": "https://www.wealthbriefing.com/"
+        },
+        {
+          "authority_level": 3,
+          "content_type": "media",
+          "is_enabled": true,
+          "market": "HK",
+          "name": "新加坡联合早报",
+          "polling_interval_minutes": 1440,
+          "preferred_scan_time": "06:30",
+          "schedule_rule": "daily",
+          "source_type": "list_page",
+          "url": "https://www.zaobao.com.sg/home/"
+        },
+        {
+          "authority_level": 4,
+          "content_type": "media",
+          "is_enabled": true,
+          "name": "信报财经新闻",
+          "polling_interval_minutes": 1440,
+          "source_type": "website",
+          "url": "https://www1.hkej.com/"
+        },
+        {
+          "authority_level": 2,
+          "content_type": "other",
+          "is_enabled": false,
+          "market": "HK",
+          "name": "新加坡联合早报",
+          "polling_interval_minutes": 1440,
+          "source_type": "website",
+          "url": "https://zaobao.com"
+        }
+      ],
+      "enabled": true,
+      "event_keywords": [
+        "获奖",
+        "荣获",
+        "宣布",
+        "签约",
+        "任命",
+        "投资",
+        "推出",
+        "发布",
+        "峰会",
+        "论坛",
+        "合作",
+        "收购",
+        "开设",
+        "成立"
+      ],
+      "expanded_keywords": [
+        "跨境财富",
+        "财富传承",
+        "信托架构",
+        "家族信托",
+        "落户香港"
+      ],
+      "fixed_topics": [
+        {
+          "key": "policy_tax",
+          "keywords": [
+            "政策",
+            "税务",
+            "税改",
+            "税务宽免",
+            "监管"
+          ],
+          "name": "政策与税务"
+        },
+        {
+          "key": "hong_kong_landing",
+          "keywords": [
+            "落户香港",
+            "香港",
+            "财富管理中心"
+          ],
+          "name": "落户香港"
+        },
+        {
+          "key": "cross_border_wealth",
+          "keywords": [
+            "跨境财富",
+            "跨境理财",
+            "财富管理"
+          ],
+          "name": "跨境财富管理"
+        },
+        {
+          "key": "trust_succession",
+          "keywords": [
+            "家族信托",
+            "信托架构",
+            "财富传承",
+            "传承规划"
+          ],
+          "name": "信托与传承"
+        },
+        {
+          "key": "investment_preferences",
+          "keywords": [
+            "投资",
+            "资产配置"
+          ],
+          "name": "投资偏好"
+        },
+        {
+          "key": "events_awards",
+          "keywords": [
+            "峰会",
+            "论坛",
+            "获奖"
+          ],
+          "name": "行业活动与奖项"
+        },
+        {
+          "key": "institution_updates",
+          "keywords": [
+            "成立",
+            "任命",
+            "收购",
+            "合作"
+          ],
+          "name": "机构动态"
+        },
+        {
+          "key": "research_reports",
+          "keywords": [
+            "研究",
+            "报告",
+            "统计"
+          ],
+          "name": "研究报告"
+        }
+      ],
+      "id": "family_office",
+      "includes": [
+        {
+          "pack_id": "financial_markets",
+          "required": true
+        }
+      ],
+      "name": "家族办公室",
+      "negative_keywords": [
+        "家用办公室",
+        "家庭办公",
+        "home office furniture"
+      ],
+      "pack_kind": "primary",
+      "pack_version": "2.1.0",
+      "schema_version": 3,
+      "serpapi_queries": [
+        "家族办公室",
+        "家族信托",
+        "家办",
+        "财富传承",
+        "家族财富管理"
+      ],
+      "timezone": "Asia/Hong_Kong",
+      "trend_keywords": [
+        "政策",
+        "税改",
+        "税务宽免",
+        "监管",
+        "新政",
+        "落户",
+        "增长",
+        "统计",
+        "报告",
+        "行业趋势",
+        "财富管理中心",
+        "跨境理财",
+        "资产配置",
+        "传承规划",
+        "治理"
+      ]
+    },
+    "financial_markets": {
+      "candidate_gate": {
+        "anchor_keywords": [
+          "金融市场",
+          "资本市场",
+          "证券市场",
+          "股票市场",
+          "债券市场",
+          "外汇市场",
+          "货币市场",
+          "金融监管",
+          "证券监管",
+          "银行监管",
+          "货币政策",
+          "利率决议",
+          "A股",
+          "港股",
+          "上证指数",
+          "上证综指",
+          "深证成指",
+          "创业板指",
+          "沪深300",
+          "恒生指数",
+          "恒生科技指数",
+          "公募基金",
+          "私募基金",
+          "证券投资基金",
+          "交易所买卖基金",
+          "financial market",
+          "capital market",
+          "securities market",
+          "stock market",
+          "bond market",
+          "foreign exchange market",
+          "monetary policy",
+          "interest rate decision",
+          "banking sector",
+          "government bonds",
+          "Exchange Fund",
+          "gross domestic product",
+          "consumer prices",
+          "corporate tax",
+          "gold clearing and settlement",
+          "mortgage loans",
+          "monetary statistics",
+          "virtual asset",
+          "OTC derivative",
+          "exchange-traded derivatives",
+          "mutual recognition of funds",
+          "real estate investment trusts",
+          "listed structured funds",
+          "insider dealing",
+          "market misconduct"
+        ],
+        "description": "文章必须命中明确的金融市场、监管、资产类别、指数或官方金融机构锚点；单独出现‘基金’‘证券’‘指数’等泛词不能证明金融市场相关性。",
+        "entity_keywords": [
+          "中国人民银行",
+          "中国证监会",
+          "国家金融监督管理总局",
+          "上海证券交易所",
+          "深圳证券交易所",
+          "香港金融管理局",
+          "香港证券及期货事务监察委员会",
+          "香港证监会",
+          "香港交易所",
+          "People's Bank of China",
+          "China Securities Regulatory Commission",
+          "Hong Kong Monetary Authority",
+          "Securities and Futures Commission",
+          "Hong Kong Exchanges and Clearing",
+          "HKMA",
+          "SFC",
+          "HKEX"
+        ]
+      },
+      "capabilities": [
+        {
+          "activation_flag": "FINANCIAL_INTELLIGENCE_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "financial_market_data",
+          "name": "金融时效数据聚合"
+        },
+        {
+          "activation_flag": "TRADING_AGENTS_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "tradingagents_research",
+          "name": "TradingAgents 多角色研究"
+        },
+        {
+          "activation_flag": "FINANCIAL_INTELLIGENCE_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "financial_conflict_verification",
+          "name": "金融事实冲突核验与裁决"
+        },
+        {
+          "activation_flag": "TRADING_SIMULATION_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "paper_trading",
+          "name": "交易模拟"
+        },
+        {
+          "activation_flag": "TRADING_SIMULATION_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "financial_backtesting",
+          "name": "策略回测"
+        }
+      ],
+      "classification": {
+        "core_weight": 3,
+        "event_weight": 2,
+        "expanded_weight": 1,
+        "llm_confidence_threshold": 0.65,
+        "minimum_relevance_score": 3,
+        "negative_weight": -3,
+        "tie_break_order": [
+          "trend",
+          "event",
+          "other"
+        ],
+        "trend_weight": 2
+      },
+      "core_keywords": [
+        "金融市场",
+        "资本市场",
+        "证券市场",
+        "股票市场",
+        "债券市场",
+        "外汇市场",
+        "货币市场",
+        "金融监管",
+        "证券监管",
+        "货币政策",
+        "financial market",
+        "capital market",
+        "securities market",
+        "stock market",
+        "bond market",
+        "foreign exchange market",
+        "monetary policy",
+        "banking sector",
+        "government bonds",
+        "Exchange Fund",
+        "gross domestic product",
+        "股票",
+        "证券",
+        "基金",
+        "指数"
+      ],
+      "dashboard_capabilities": {
+        "show_financial_news": true,
+        "show_market_index_cards": false,
+        "show_watched_stock_cards": false
+      },
+      "dashboard_categories": [
+        {
+          "activation_flag": "FINANCIAL_INTELLIGENCE_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "financial_market_snapshot",
+          "name": "金融市场实时概览"
+        },
+        {
+          "activation_flag": "TRADING_AGENTS_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "financial_risk_management",
+          "name": "风险管理报告"
+        },
+        {
+          "activation_flag": "TRADING_AGENTS_ENABLED",
+          "enabled": false,
+          "implementation_status": "planned",
+          "key": "financial_collaborative_assessment",
+          "name": "协同评估报告"
+        }
+      ],
+      "default_market": "CN_HK",
+      "default_sources": [
+        {
+          "approval_status": "approved",
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "event",
+            "report",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "zh-HK,en",
+          "market": "HK",
+          "name": "中国光大控股投资者关系公告",
+          "on_demand_only": true,
+          "polling_interval_minutes": 1440,
+          "source_role": "issuer_official",
+          "source_type": "list_page",
+          "url": "https://www.everbright.com/en/investor-relations"
+        },
+        {
+          "approval_status": "approved",
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "event",
+            "report",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "zh-HK,en",
+          "market": "HK",
+          "name": "港交所披露易上市公司公告",
+          "on_demand_only": true,
+          "polling_interval_minutes": 1440,
+          "source_role": "exchange_official",
+          "source_type": "list_page",
+          "url": "https://www.hkexnews.hk/homelcicontentsearch.html"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "trend",
+            "event",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "en",
+          "license_profile": "hkma_press_release_public_rss",
+          "market": "HK",
+          "name": "香港金融管理局新闻稿",
+          "polling_interval_minutes": 1440,
+          "source_type": "rss",
+          "url": "https://www.hkma.gov.hk/eng/other-information/rss/rss_press-release.xml"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "trend",
+            "event",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "en",
+          "license_profile": "hk_news_finance_public_rss",
+          "market": "HK",
+          "name": "香港政府新闻网财经",
+          "polling_interval_minutes": 1440,
+          "source_type": "rss",
+          "url": "https://www.news.gov.hk/en/categories/finance/html/articlelist.rss.xml"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "trend",
+            "event",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "en",
+          "license_profile": "sfc_circulars_public_rss",
+          "market": "HK",
+          "name": "香港证监会通函",
+          "polling_interval_minutes": 1440,
+          "source_type": "rss",
+          "url": "https://www.sfc.hk/en/RSS-Feeds/Circulars"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "trend",
+            "event",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "en",
+          "license_profile": "sfc_consultations_public_rss",
+          "market": "HK",
+          "name": "香港证监会咨询及结论",
+          "polling_interval_minutes": 1440,
+          "source_type": "rss",
+          "url": "https://www.sfc.hk/en/RSS-Feeds/Consultations-and-Conclusions"
+        },
+        {
+          "authority_level": 5,
+          "content_type": "official",
+          "expected_classifications": [
+            "trend",
+            "event",
+            "other"
+          ],
+          "is_enabled": true,
+          "language": "en",
+          "license_profile": "sfc_press_release_public_rss",
+          "market": "HK",
+          "name": "香港证监会新闻稿",
+          "polling_interval_minutes": 1440,
+          "source_type": "rss",
+          "url": "https://www.sfc.hk/en/RSS-Feeds/Press-releases"
+        }
+      ],
+      "enabled": true,
+      "event_keywords": [
+        "发布",
+        "公告",
+        "上市",
+        "停牌",
+        "复牌",
+        "增持",
+        "减持",
+        "回购",
+        "分红",
+        "发行",
+        "获批",
+        "处罚",
+        "调查",
+        "并购",
+        "收购",
+        "launches",
+        "issues",
+        "announces",
+        "reprimands",
+        "fines",
+        "suspends",
+        "concludes",
+        "circular",
+        "tender results",
+        "restriction notice"
+      ],
+      "expanded_keywords": [
+        "A股",
+        "港股",
+        "公募基金",
+        "私募基金",
+        "交易所买卖基金",
+        "ETF",
+        "IPO",
+        "上市公司",
+        "资产管理",
+        "财富管理",
+        "银行间市场",
+        "virtual asset",
+        "OTC derivative",
+        "exchange-traded derivatives",
+        "mortgage loans",
+        "consumer prices",
+        "retail sales"
+      ],
+      "fixed_topics": [
+        {
+          "key": "monetary_policy",
+          "keywords": [
+            "货币政策",
+            "利率",
+            "降息",
+            "加息",
+            "降准"
+          ],
+          "name": "货币政策与利率"
+        },
+        {
+          "key": "market_regulation",
+          "keywords": [
+            "金融监管",
+            "证券监管",
+            "监管政策",
+            "处罚",
+            "调查"
+          ],
+          "name": "市场监管"
+        },
+        {
+          "key": "mainland_market",
+          "keywords": [
+            "A股",
+            "上证指数",
+            "深证成指",
+            "创业板指",
+            "沪深300"
+          ],
+          "name": "A股与内地市场"
+        },
+        {
+          "key": "hong_kong_market",
+          "keywords": [
+            "港股",
+            "恒生指数",
+            "恒生科技指数",
+            "香港交易所"
+          ],
+          "name": "港股与香港市场"
+        },
+        {
+          "key": "funds",
+          "keywords": [
+            "公募基金",
+            "私募基金",
+            "证券投资基金",
+            "交易所买卖基金",
+            "资产管理"
+          ],
+          "name": "基金与资产管理"
+        },
+        {
+          "key": "fixed_income_fx",
+          "keywords": [
+            "债券市场",
+            "外汇市场",
+            "银行间市场"
+          ],
+          "name": "债券与外汇"
+        },
+        {
+          "key": "listed_companies",
+          "keywords": [
+            "上市公司",
+            "IPO",
+            "回购",
+            "分红",
+            "并购"
+          ],
+          "name": "上市公司动态"
+        },
+        {
+          "key": "market_risk",
+          "keywords": [
+            "市场波动",
+            "风险溢价",
+            "估值",
+            "资金流向"
+          ],
+          "name": "市场风险"
+        }
+      ],
+      "id": "financial_markets",
+      "includes": [],
+      "name": "金融市场资讯",
+      "negative_keywords": [
+        "科研基金",
+        "慈善基金",
+        "社会保险基金宣传",
+        "证券从业培训广告",
+        "股票软件广告"
+      ],
+      "pack_kind": "hybrid",
+      "pack_version": "2.0.0",
+      "schema_version": 3,
+      "serpapi_queries": [
+        "A股 市场 监管 最新",
+        "港股 市场 香港证监会 最新",
+        "上证指数 深证成指 市场走势",
+        "中国人民银行 货币政策",
+        "香港金融管理局 金融市场"
+      ],
+      "timezone": "Asia/Hong_Kong",
+      "trend_keywords": [
+        "监管政策",
+        "货币政策",
+        "利率",
+        "降息",
+        "加息",
+        "降准",
+        "市场走势",
+        "资金流向",
+        "成交量",
+        "估值",
+        "风险溢价",
+        "市场波动",
+        "指数调整",
+        "制度改革",
+        "regulatory framework",
+        "monetary policy",
+        "interest rate",
+        "market trading",
+        "market systems",
+        "economic growth",
+        "inflation",
+        "consultation",
+        "regulatory regime"
+      ]
+    }
+  },
+  "protected_manual_sources": [],
+  "read_only": true,
+  "replay": {
+    "actual_source_count": 110,
+    "empty_pack_apply": {
+      "applied": true,
+      "counts": {
+        "add_sources": 0,
+        "deactivate_associations": 0,
+        "update_sources": 0,
+        "upsert_associations": 0
+      },
+      "industry_pack_id": "migration_empty",
+      "plan_sha256": "2de6873ae027917487ce4a2aa9c2592049258f3f90c3fb282b1ae5a7d9dec413"
+    },
+    "expected_source_count": 110,
+    "first_apply": {
+      "applied": true,
+      "counts": {
+        "add_sources": 110,
+        "deactivate_associations": 0,
+        "update_sources": 0,
+        "upsert_associations": 110
+      },
+      "industry_pack_id": "family_office",
+      "plan_sha256": "5a46e423afc32ac1388f36ef5e8eb7c0f05e9f151a75c41783cd7016f3137fee"
+    },
+    "idempotent": true,
+    "keyword_sha256": "3c9c39c7c156ccdf5af56cd8923219b9ea95d716d04597f323218b14a98adc51",
+    "missing_sources": [],
+    "passed": true,
+    "published_version": {
+      "content_sha256": "5f8528feb002d80d62bd21c63c7dc9ec63f44fe36407315afd23fa03d6c9f5c5",
+      "id": 1,
+      "pack_version": "2.1.0",
+      "version_number": 1
+    },
+    "return_apply": {
+      "applied": true,
+      "counts": {
+        "add_sources": 0,
+        "deactivate_associations": 0,
+        "update_sources": 0,
+        "upsert_associations": 0
+      },
+      "industry_pack_id": "family_office",
+      "plan_sha256": "3233fe083107cda91bf4cb45043db35e7048699637e74d5092742a26339448d8"
+    },
+    "second_plan_counts": {
+      "add_sources": 0,
+      "deactivate_associations": 0,
+      "update_sources": 0,
+      "upsert_associations": 0
+    },
+    "unexpected_sources": []
+  },
+  "source_audit": [
+    {
+      "canonical_source_url": "http://www.haiwen-law.com/en",
+      "origins": [
+        {
+          "index": 0,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 26,
+          "type": "intel_source"
+        },
+        {
+          "id": 85,
+          "type": "managed_url"
+        },
+        {
+          "id": 132,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "9eb5083df572c3c339b24f20644f7383fe2ba64c4b6e6e10f6419c23b0fe3e6e"
+    },
+    {
+      "canonical_source_url": "http://www.rtamc.com.hk/index.php?a=Home&f=news&cid=2",
+      "origins": [
+        {
+          "index": 1,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 62,
+          "type": "intel_source"
+        },
+        {
+          "id": 183,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "4424863faef8a571df0a1072aa04e5e0317229d9eab12463ac9c3cb60ae1fdd7"
+    },
+    {
+      "canonical_source_url": "http://www.step.org/",
+      "origins": [
+        {
+          "index": 2,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 3,
+          "type": "intel_source"
+        },
+        {
+          "id": 62,
+          "type": "managed_url"
+        },
+        {
+          "id": 109,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "5c23411e9b51b5c5815109c7a3f2b188d3b426588ed76e403a6f19568c311056"
+    },
+    {
+      "canonical_source_url": "http://www.xtxh.net/",
+      "origins": [
+        {
+          "index": 3,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 80,
+          "type": "intel_source"
+        },
+        {
+          "id": 201,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "72ca17eb5b6b2f4baab180c60e9e32e3d0eed353f24d872279f5f23ae9a64322"
+    },
+    {
+      "canonical_source_url": "https://36kr.com/",
+      "origins": [
+        {
+          "index": 4,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 86,
+          "type": "intel_source"
+        },
+        {
+          "id": 207,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "4221ba5837f5dbba29d217bde86cbc834ad5cc3fc4b1c64dc6eba7ac9c15fe4e"
+    },
+    {
+      "canonical_source_url": "https://actecfoundation.org/podcasts/family-office-landscape-models-services-options/",
+      "origins": [
+        {
+          "index": 5,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 69,
+          "type": "intel_source"
+        },
+        {
+          "id": 190,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "1fa934fa4fe623ee5a9c69fba272b4d9f37db597d09e577fd518629956f87318"
+    },
+    {
+      "canonical_source_url": "https://afbfo.hkust.edu.hk/",
+      "origins": [
+        {
+          "index": 6,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 84,
+          "type": "intel_source"
+        },
+        {
+          "id": 205,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "6a75cf2112b4198fa981caf2751a6af156dd6fd3a55b3458ecbdc6095941fa4c"
+    },
+    {
+      "canonical_source_url": "https://en.zhonglun.com/",
+      "origins": [
+        {
+          "index": 7,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 30,
+          "type": "intel_source"
+        },
+        {
+          "id": 89,
+          "type": "managed_url"
+        },
+        {
+          "id": 136,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "c09f59d7f81aa60a258a05bb4dd7738ae41bf9f665f7de87b68103e1ed3638d0"
+    },
+    {
+      "canonical_source_url": "https://familyofficeinsider.substack.com/",
+      "origins": [
+        {
+          "index": 8,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 74,
+          "type": "intel_source"
+        },
+        {
+          "id": 195,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "9c69e54cbabb34196452926e41ae974f9950ff983b0c1f944f419e9db7076341"
+    },
+    {
+      "canonical_source_url": "https://foinsight.com/",
+      "origins": [
+        {
+          "index": 9,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 82,
+          "type": "intel_source"
+        },
+        {
+          "id": 203,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "c44a4404ae524cb8f7f72ec252844fa975a275ce1b4e0a477b26a84dfe07a39f"
+    },
+    {
+      "canonical_source_url": "https://hongkong.acclime.com/zh-hant/",
+      "origins": [
+        {
+          "index": 10,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 42,
+          "type": "intel_source"
+        },
+        {
+          "id": 101,
+          "type": "managed_url"
+        },
+        {
+          "id": 148,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "9892dd603a06bf388df68547856490567be5754a09e24a938aba9bc1e95a7eb1"
+    },
+    {
+      "canonical_source_url": "https://hongkong.dentons.com/zh/office-details/hong-kong",
+      "origins": [
+        {
+          "index": 11,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 34,
+          "type": "intel_source"
+        },
+        {
+          "id": 93,
+          "type": "managed_url"
+        },
+        {
+          "id": 140,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "e59a9c667e057d37788ae7ea9e55294cfc429d03283c6e603a0645793954e259"
+    },
+    {
+      "canonical_source_url": "https://iqeq.com/",
+      "origins": [
+        {
+          "index": 12,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 40,
+          "type": "intel_source"
+        },
+        {
+          "id": 99,
+          "type": "managed_url"
+        },
+        {
+          "id": 146,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "d79fabeabf4c1ce00f6496907cbca4972afafedf44fb308331668842231c415f"
+    },
+    {
+      "canonical_source_url": "https://kpmg.com/xx/en.html",
+      "origins": [
+        {
+          "index": 13,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 45,
+          "type": "intel_source"
+        },
+        {
+          "id": 107,
+          "type": "managed_url"
+        },
+        {
+          "id": 151,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "ba2126c3f62b5721837afd748778740c42891518adbcb5cec503951455400cd5"
+    },
+    {
+      "canonical_source_url": "https://m.bjnews.com.cn/detail/1781010421129664.html",
+      "origins": [
+        {
+          "index": 14,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 99,
+          "type": "intel_source"
+        },
+        {
+          "id": 220,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "895ecf70fe96af0b74ffbb4dfd220992adf6aa9344f927f920b3e3d2eae19f06"
+    },
+    {
+      "canonical_source_url": "https://maples.com/",
+      "origins": [
+        {
+          "index": 15,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 12,
+          "type": "intel_source"
+        },
+        {
+          "id": 71,
+          "type": "managed_url"
+        },
+        {
+          "id": 118,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "6c0aff3c1eef0bef073457445a23838e160b4ba13193ef2d61c5f1a5091ab189"
+    },
+    {
+      "canonical_source_url": "https://pitchbook.com/",
+      "origins": [
+        {
+          "index": 16,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 76,
+          "type": "intel_source"
+        },
+        {
+          "id": 197,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "8f18b2585d991dcbcbb30d4bfe31faa806f15ff7e1daab306bfd99b8bf30106e"
+    },
+    {
+      "canonical_source_url": "https://pkwalaw.com/",
+      "origins": [
+        {
+          "index": 17,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 20,
+          "type": "intel_source"
+        },
+        {
+          "id": 79,
+          "type": "managed_url"
+        },
+        {
+          "id": 126,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "a91487f210494371514e04e016f849083241a76709bda5d729f68a3e5df26140"
+    },
+    {
+      "canonical_source_url": "https://privatebank.jpmorgan.com/apac/en/who-we-serve/family-office",
+      "origins": [
+        {
+          "index": 18,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 92,
+          "type": "intel_source"
+        },
+        {
+          "id": 213,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "0ba09014dc96d6322c14c37d1abd732eb58fb631862ebfef2c16de2adaefdc02"
+    },
+    {
+      "canonical_source_url": "https://w.dacheng.com/en/",
+      "origins": [
+        {
+          "index": 19,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 33,
+          "type": "intel_source"
+        },
+        {
+          "id": 92,
+          "type": "managed_url"
+        },
+        {
+          "id": 139,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "d664b1233abee2154e0b0d132fb61ed9c297eb46d22825783f4e499711a42efd"
+    },
+    {
+      "canonical_source_url": "https://wap.cnki.net/",
+      "origins": [
+        {
+          "index": 20,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 54,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "a0344a9c62e44946b8e09d178851e50ca303fb9db527702589f76f68dffe78a0"
+    },
+    {
+      "canonical_source_url": "https://wealthplus.org.cn/",
+      "origins": [
+        {
+          "index": 21,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 81,
+          "type": "intel_source"
+        },
+        {
+          "id": 202,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "780c6f4cfebddd6404be00c172f356441e909571ed554fdd2b5470ea3ee370fc"
+    },
+    {
+      "canonical_source_url": "https://www.amatilaw.com/",
+      "origins": [
+        {
+          "index": 22,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 18,
+          "type": "intel_source"
+        },
+        {
+          "id": 77,
+          "type": "managed_url"
+        },
+        {
+          "id": 124,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "57c258f0ada48df72d1798b17d05c1142218c06307bc7cd4d8d210ae2868b25b"
+    },
+    {
+      "canonical_source_url": "https://www.apexgroup.com/",
+      "origins": [
+        {
+          "index": 23,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 38,
+          "type": "intel_source"
+        },
+        {
+          "id": 97,
+          "type": "managed_url"
+        },
+        {
+          "id": 144,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "2ec24b4938f872ab193017ec7484cf4edc1c4894dd847a3cd569b13815f3a575"
+    },
+    {
+      "canonical_source_url": "https://www.applebyglobal.com/",
+      "origins": [
+        {
+          "index": 24,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 14,
+          "type": "intel_source"
+        },
+        {
+          "id": 73,
+          "type": "managed_url"
+        },
+        {
+          "id": 120,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "0576632bcf57b54a2139cbaeb4fb93668c1975ec9656b1008034cd9655a00a9d"
+    },
+    {
+      "canonical_source_url": "https://www.asia.privatebanking.hsbc.com.hk/family-office-uhnw/",
+      "origins": [
+        {
+          "index": 25,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 89,
+          "type": "intel_source"
+        },
+        {
+          "id": 210,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "154d8928fbff23ff0fe1821f5f0785de54551ccd984aebdeec8a02b4c5ac7f20"
+    },
+    {
+      "canonical_source_url": "https://www.bankofsingapore.com/hk/private-banking-hong-kong.html",
+      "origins": [
+        {
+          "index": 26,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 94,
+          "type": "intel_source"
+        },
+        {
+          "id": 215,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "bc0ad3389a60c04bb04d647528f6fdcbc2bbee0ce906cb549588e0559b2b3a2b"
+    },
+    {
+      "canonical_source_url": "https://www.bedellcristin.com/",
+      "origins": [
+        {
+          "index": 27,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 22,
+          "type": "intel_source"
+        },
+        {
+          "id": 81,
+          "type": "managed_url"
+        },
+        {
+          "id": 128,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "107cdf79e8ccdb0c26416ae44ced165df0f5d87c1651e400fe900b7933bcf8b9"
+    },
+    {
+      "canonical_source_url": "https://www.bloomberg.com/wealth",
+      "origins": [
+        {
+          "index": 28,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 72,
+          "type": "intel_source"
+        },
+        {
+          "id": 193,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "2ccaa924a315e4dac690ff90abf128c0f9fd8b8f5c8494bafdcf50e0e7b0842d"
+    },
+    {
+      "canonical_source_url": "https://www.bochk.com/dam/investment/bocecon/SY2024011%28en%29.pdf",
+      "origins": [
+        {
+          "index": 29,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 95,
+          "type": "intel_source"
+        },
+        {
+          "id": 216,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "0ed84f9e3ca537917916794f959c549a1a189bae8b8f95ab52b60e020b3e795a"
+    },
+    {
+      "canonical_source_url": "https://www.caixin.com/",
+      "origins": [
+        {
+          "index": 30,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 48,
+          "type": "intel_source"
+        },
+        {
+          "id": 111,
+          "type": "managed_url"
+        },
+        {
+          "id": 154,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "411984442a1e231a9cad92c6a9e5bb4a5bfe242fb12bd5317f67933055152b84"
+    },
+    {
+      "canonical_source_url": "https://www.campdenwealth.com/research-reports-portfolio",
+      "origins": [
+        {
+          "index": 31,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 65,
+          "type": "intel_source"
+        },
+        {
+          "id": 186,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "24018bf0590da073f3c4481a886973f9a3b7503461705dc814827b744c9b33ec"
+    },
+    {
+      "canonical_source_url": "https://www.careyolsen.com/locations/carey-olsen-asia",
+      "origins": [
+        {
+          "index": 32,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 7,
+          "type": "intel_source"
+        },
+        {
+          "id": 66,
+          "type": "managed_url"
+        },
+        {
+          "id": 113,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "1dec45db0fdd4243623da99fcbede557e2f745629a58148874123c40483748de"
+    },
+    {
+      "canonical_source_url": "https://www.charltonslaw.com/",
+      "origins": [
+        {
+          "index": 33,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 17,
+          "type": "intel_source"
+        },
+        {
+          "id": 76,
+          "type": "managed_url"
+        },
+        {
+          "id": 123,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "1192a3fe614b024715a859cd9892ce0138842873be931d0869aeaa234f31de92"
+    },
+    {
+      "canonical_source_url": "https://www.collascrill.com/",
+      "origins": [
+        {
+          "index": 34,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 10,
+          "type": "intel_source"
+        },
+        {
+          "id": 69,
+          "type": "managed_url"
+        },
+        {
+          "id": 116,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "f8779dd7a83dcc71af74c9764c78fbf86b99b6906c5279ff3e4a605d184eef57"
+    },
+    {
+      "canonical_source_url": "https://www.conyers.com/",
+      "origins": [
+        {
+          "index": 35,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 15,
+          "type": "intel_source"
+        },
+        {
+          "id": 74,
+          "type": "managed_url"
+        },
+        {
+          "id": 121,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "9edfc74e97a003360fecb1aab25a68732d79f18b452cc5459234f03d48506055"
+    },
+    {
+      "canonical_source_url": "https://www.dakota.com/",
+      "origins": [
+        {
+          "index": 36,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 78,
+          "type": "intel_source"
+        },
+        {
+          "id": 199,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "557af8058d3160fb11fd5d2b3214b9caed7f3f5a47767226b10a827a952d8ea7"
+    },
+    {
+      "canonical_source_url": "https://www.dbs.com.hk/private-banking/wealth-planning?source=external",
+      "origins": [
+        {
+          "index": 37,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 91,
+          "type": "intel_source"
+        },
+        {
+          "id": 212,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "8329fc4f93d89647bd656d5c1071272bc22df6f70e4039f3d56d1c9862c32fcb"
+    },
+    {
+      "canonical_source_url": "https://www.dehenglaw.com/EN/index/0001.aspx",
+      "origins": [
+        {
+          "index": 38,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 32,
+          "type": "intel_source"
+        },
+        {
+          "id": 91,
+          "type": "managed_url"
+        },
+        {
+          "id": 138,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "eb94864e87ece720f56685339b89599dd1b45b2168e1949190a113f605ce3348"
+    },
+    {
+      "canonical_source_url": "https://www.deloitte.com/cn/en.html",
+      "origins": [
+        {
+          "index": 39,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 4,
+          "type": "intel_source"
+        },
+        {
+          "id": 63,
+          "type": "managed_url"
+        },
+        {
+          "id": 110,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "a895c39ee471bbe2965fd11ecdb23f9ad537e33f7eee4f41b919b5f059d7866b"
+    },
+    {
+      "canonical_source_url": "https://www.deloitte.com/global/en/services/deloitte-private/research/family-office-insights-series-collections.html",
+      "origins": [
+        {
+          "index": 40,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 63,
+          "type": "intel_source"
+        },
+        {
+          "id": 184,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "80d9711e83fce40ade8c50d666f9deb793fcb2ec147171557db554b528bbeba7"
+    },
+    {
+      "canonical_source_url": "https://www.everbright.com/en/investor-relations",
+      "origins": [
+        {
+          "index": 6,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "e161ca4595c6ed080ec3952047fe5a827947d19bb14e967a16008e19f4cb0a9d"
+    },
+    {
+      "canonical_source_url": "https://www.ey.com/en_gl",
+      "origins": [
+        {
+          "index": 41,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 1,
+          "type": "intel_source"
+        },
+        {
+          "id": 56,
+          "type": "managed_url"
+        },
+        {
+          "id": 107,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "0b27478afb7c7adde1a64df9331ac76165e7e59a4f9988bc7736adfc78b47d21"
+    },
+    {
+      "canonical_source_url": "https://www.familyofficehk.gov.hk/en/news-and-events/",
+      "origins": [
+        {
+          "index": 42,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 103,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "c0472bf5a3dd8e2dfd992d7fa465c56cb68ddb0f320d4bc601eb411c53a94511"
+    },
+    {
+      "canonical_source_url": "https://www.familyofficemag.com/",
+      "origins": [
+        {
+          "index": 43,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 71,
+          "type": "intel_source"
+        },
+        {
+          "id": 192,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "18d0ccfe318b9c45b81f9967ca6fce5a727be806463d74cd18428b5787b768d9"
+    },
+    {
+      "canonical_source_url": "https://www.familywealthreport.com/",
+      "origins": [
+        {
+          "index": 44,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 70,
+          "type": "intel_source"
+        },
+        {
+          "id": 191,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "a451578ef6487e5320a6d7b29361a1d22b3d7f1cb1bbd99b5809053361da57d2"
+    },
+    {
+      "canonical_source_url": "https://www.fangdalaw.com/",
+      "origins": [
+        {
+          "index": 45,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 25,
+          "type": "intel_source"
+        },
+        {
+          "id": 84,
+          "type": "managed_url"
+        },
+        {
+          "id": 131,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "fb40f5a84e42a1611681f23de62df8a10911dc50fa2400acdf7f2b33fc8946ec"
+    },
+    {
+      "canonical_source_url": "https://www.fangdalaw.com/news",
+      "origins": [
+        {
+          "index": 46,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 43,
+          "type": "intel_source"
+        },
+        {
+          "id": 102,
+          "type": "managed_url"
+        },
+        {
+          "id": 149,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "c81ce80246ae136c0550f109def0a39559e74dbe35e1dcca9c28b51e6b1a26e8"
+    },
+    {
+      "canonical_source_url": "https://www.fintrx.com/",
+      "origins": [
+        {
+          "index": 47,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 75,
+          "type": "intel_source"
+        },
+        {
+          "id": 196,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "42b31730eb6029ab79f144360eab3277a0dafdab136b0f44dcf5ae20d2e6b2ab"
+    },
+    {
+      "canonical_source_url": "https://www.gjclaw.com.sg/",
+      "origins": [
+        {
+          "index": 48,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 19,
+          "type": "intel_source"
+        },
+        {
+          "id": 78,
+          "type": "managed_url"
+        },
+        {
+          "id": 125,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "ad466cf78603ca4ee57d125ba8f313366cb2c8848ab6dad6798e79e0239848ca"
+    },
+    {
+      "canonical_source_url": "https://www.glo.com.cn/en/",
+      "origins": [
+        {
+          "index": 49,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 28,
+          "type": "intel_source"
+        },
+        {
+          "id": 87,
+          "type": "managed_url"
+        },
+        {
+          "id": 134,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "2edf036ed8f0a1341fcd7ec8205bf79017cb72edf861661b76ef9626dec48d35"
+    },
+    {
+      "canonical_source_url": "https://www.harneys.com/",
+      "origins": [
+        {
+          "index": 50,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 13,
+          "type": "intel_source"
+        },
+        {
+          "id": 72,
+          "type": "managed_url"
+        },
+        {
+          "id": 119,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "3f1cf664cb511252961fdb953842fc5083ee26c9e33cfcaf762ffd4bf1d1565a"
+    },
+    {
+      "canonical_source_url": "https://www.hcfa.org.hk/a-list/30836-cht",
+      "origins": [
+        {
+          "index": 51,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 100,
+          "type": "intel_source"
+        },
+        {
+          "id": 221,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "b8b44d50b50dc4d08b82506654b3773916291db38edc9ac6eb9adf171b97e09a"
+    },
+    {
+      "canonical_source_url": "https://www.hkej.com/",
+      "origins": [
+        {
+          "index": 52,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 6,
+          "type": "intel_source"
+        },
+        {
+          "id": 65,
+          "type": "managed_url"
+        },
+        {
+          "id": 112,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "6d24b37f96b85f87befe34b773ffbd03116b915eeb4cb635b6bb6bc31add9bf6"
+    },
+    {
+      "canonical_source_url": "https://www.hkej.com/dailynews/headline",
+      "origins": [
+        {
+          "index": 53,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 50,
+          "type": "intel_source"
+        },
+        {
+          "id": 172,
+          "type": "managed_url"
+        },
+        {
+          "id": 156,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "26ab715dc96781de7f373f236409670acf82c187a66b6cd59bb1dca2f02bc3bf"
+    },
+    {
+      "canonical_source_url": "https://www.hkej.com/instantnews",
+      "origins": [
+        {
+          "index": 54,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 51,
+          "type": "intel_source"
+        },
+        {
+          "id": 173,
+          "type": "managed_url"
+        },
+        {
+          "id": 157,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "805bb883761db3992ecd010b879e20315ef6af255b0dafc801a6de9fe7d1920f"
+    },
+    {
+      "canonical_source_url": "https://www.hkej.com/property",
+      "origins": [
+        {
+          "index": 55,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 52,
+          "type": "intel_source"
+        },
+        {
+          "id": 174,
+          "type": "managed_url"
+        },
+        {
+          "id": 158,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "ff76256d250dc8daddfd70f117d623f54524011c3411c79d5e6b810a5e5393b6"
+    },
+    {
+      "canonical_source_url": "https://www.hkej.com/wm/currency1",
+      "origins": [
+        {
+          "index": 56,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 53,
+          "type": "intel_source"
+        },
+        {
+          "id": 175,
+          "type": "managed_url"
+        },
+        {
+          "id": 159,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "5dee884bfb410074dfb66ae8e259beaa93b14c4c72482de1b34e3fb073b8ce2b"
+    },
+    {
+      "canonical_source_url": "https://www.hkej.com/wm/fund",
+      "origins": [
+        {
+          "index": 57,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 49,
+          "type": "intel_source"
+        },
+        {
+          "id": 170,
+          "type": "managed_url"
+        },
+        {
+          "id": 155,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "29d9523df24e21f8d84af3d86abe788e3e980d7fd82be9f3478a36fc58583529"
+    },
+    {
+      "canonical_source_url": "https://www.hkexnews.hk/homelcicontentsearch.html",
+      "origins": [
+        {
+          "index": 5,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "1c341530b583fc267ca78f08f28d619484ed236a671a96b3145dba3450c1ba62"
+    },
+    {
+      "canonical_source_url": "https://www.hkma.gov.hk/eng/",
+      "origins": [
+        {
+          "index": 58,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 46,
+          "type": "intel_source"
+        },
+        {
+          "id": 109,
+          "type": "managed_url"
+        },
+        {
+          "id": 152,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "96a4b5417ad24832ef9767a465f57189f980ff9b6c99fa20c7d9dd35e4041534"
+    },
+    {
+      "canonical_source_url": "https://www.hkma.gov.hk/eng/other-information/rss/rss_press-release.xml",
+      "origins": [
+        {
+          "index": 1,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 102,
+          "type": "intel_source"
+        },
+        {
+          "ownership_type": "shared_financial",
+          "pack_id": "financial_markets",
+          "source_id": 102,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "629232c86028c29dbe3563964781a5ffcb571510fa9b16833732337bb4ba4411"
+    },
+    {
+      "canonical_source_url": "https://www.hkong.cn/",
+      "origins": [
+        {
+          "index": 59,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 61,
+          "type": "intel_source"
+        },
+        {
+          "id": 182,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "3f470c99ad1c1ed723c66b40521ced035b9c7bd4c44a2f20fa8b45a35bd8c9d6"
+    },
+    {
+      "canonical_source_url": "https://www.hkong.cn/2024/0926/26246.shtml",
+      "origins": [
+        {
+          "index": 60,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 60,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "753cf04cda0bd791d7cda8355493a1c604be4aa09803e6f9ac25fd82e5c4b275"
+    },
+    {
+      "canonical_source_url": "https://www.investhk.gov.hk/en/how-change-text-size/",
+      "origins": [
+        {
+          "index": 61,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 47,
+          "type": "intel_source"
+        },
+        {
+          "id": 110,
+          "type": "managed_url"
+        },
+        {
+          "id": 153,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "12aec884e57aff302c1d82ed11cd9b3d0079294d2b5407c24f0a67a8c33f717d"
+    },
+    {
+      "canonical_source_url": "https://www.jiemian.com/",
+      "origins": [
+        {
+          "index": 62,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 87,
+          "type": "intel_source"
+        },
+        {
+          "id": 208,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "3eeb7e960572a70faf1d1defe4ad1ce1d6c129fcf0c4f59bcd32f1cce6a0c801"
+    },
+    {
+      "canonical_source_url": "https://www.jingtian.com/en/",
+      "origins": [
+        {
+          "index": 63,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 27,
+          "type": "intel_source"
+        },
+        {
+          "id": 86,
+          "type": "managed_url"
+        },
+        {
+          "id": 133,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "72dbcf726ee92eedc950426b54585c6e49e057a7237992aa7576e317732325d0"
+    },
+    {
+      "canonical_source_url": "https://www.jjckb.cn/caifuindex.html",
+      "origins": [
+        {
+          "index": 64,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 98,
+          "type": "intel_source"
+        },
+        {
+          "id": 219,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "e4e004315a896406552d19f05d5c25b5f66e3360ff7e2db1c91fe5472f1958d4"
+    },
+    {
+      "canonical_source_url": "https://www.jtcgroup.com/",
+      "origins": [
+        {
+          "index": 65,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 37,
+          "type": "intel_source"
+        },
+        {
+          "id": 96,
+          "type": "managed_url"
+        },
+        {
+          "id": 143,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "4be7a2e68fab98aeb21ab053f3acf5a26f79e08e2c08a75688a7f49884fd4761"
+    },
+    {
+      "canonical_source_url": "https://www.junhe.com/",
+      "origins": [
+        {
+          "index": 66,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 24,
+          "type": "intel_source"
+        },
+        {
+          "id": 83,
+          "type": "managed_url"
+        },
+        {
+          "id": 130,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "a5f7d25d2d8d959dd4b0ca3f2f383c51d7dc2ea927f5fa0b48b48bbebb0097f0"
+    },
+    {
+      "canonical_source_url": "https://www.junhe.com/news",
+      "origins": [
+        {
+          "index": 67,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 44,
+          "type": "intel_source"
+        },
+        {
+          "id": 103,
+          "type": "managed_url"
+        },
+        {
+          "id": 150,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "91f885c6fa0e09c6d3352d027f1a3796e51b34643f6c2c257a0f93e26ea7f37a"
+    },
+    {
+      "canonical_source_url": "https://www.kaizencpa.com/Services/index.html",
+      "origins": [
+        {
+          "index": 68,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 41,
+          "type": "intel_source"
+        },
+        {
+          "id": 100,
+          "type": "managed_url"
+        },
+        {
+          "id": 147,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "39adcf267c1c0f8d8852b2aed20313d25f117ce27dc6735e985983d1ca439b6d"
+    },
+    {
+      "canonical_source_url": "https://www.kwm.com/cn/zh/insights/latest-thinking.html",
+      "origins": [
+        {
+          "index": 69,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 85,
+          "type": "intel_source"
+        },
+        {
+          "id": 206,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "1ae691b4cf28543ea75e1e230b3e6fbbdcfed2f82b8d11563d3d0d905604d772"
+    },
+    {
+      "canonical_source_url": "https://www.kwm.com/hk/en/home.html",
+      "origins": [
+        {
+          "index": 70,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 23,
+          "type": "intel_source"
+        },
+        {
+          "id": 82,
+          "type": "managed_url"
+        },
+        {
+          "id": 129,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "edde5b74a7b8e1006e4c5e1040fca2c20cc3b4c1ca2b7d385a5b959c3f92996e"
+    },
+    {
+      "canonical_source_url": "https://www.mas.gov.sg/",
+      "origins": [
+        {
+          "index": 71,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 2,
+          "type": "intel_source"
+        },
+        {
+          "id": 61,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "c41c08d1bed41a8b4da64f1427c1134a5add383d2ba945a77d140ae89bf91023"
+    },
+    {
+      "canonical_source_url": "https://www.mas.gov.sg/news",
+      "origins": [
+        {
+          "index": 72,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 58,
+          "type": "intel_source"
+        },
+        {
+          "id": 163,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "3c6f5180ed7a03633795db855434ff61bfdfa4592cf60372fc093ce073ac65a4"
+    },
+    {
+      "canonical_source_url": "https://www.mas.gov.sg/publications",
+      "origins": [
+        {
+          "index": 73,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 57,
+          "type": "intel_source"
+        },
+        {
+          "id": 162,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "7170dfa2258f390494b6b77baf5a5a6db37e5d6a646c3537a9628524079d1b9c"
+    },
+    {
+      "canonical_source_url": "https://www.mas.gov.sg/regulation",
+      "origins": [
+        {
+          "index": 74,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 56,
+          "type": "intel_source"
+        },
+        {
+          "id": 108,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "a340a94ea5f594610f507089d21bd6ee41c9275aec76b7ac7d63d6981bf9848b"
+    },
+    {
+      "canonical_source_url": "https://www.mckinsey.com/industries/financial-services/our-insights",
+      "origins": [
+        {
+          "index": 75,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 68,
+          "type": "intel_source"
+        },
+        {
+          "id": 189,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "45a1e50a649734313f057ae57a2b43e8f3232d0c5587bf71c8785f2d2aebc9aa"
+    },
+    {
+      "canonical_source_url": "https://www.meritsandtree.com/",
+      "origins": [
+        {
+          "index": 76,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 35,
+          "type": "intel_source"
+        },
+        {
+          "id": 94,
+          "type": "managed_url"
+        },
+        {
+          "id": 141,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "ac8b4835010ad64730a2e2ae93b0db8d5479ae4587c5b37804887c9353b7d237"
+    },
+    {
+      "canonical_source_url": "https://www.mourant.com/",
+      "origins": [
+        {
+          "index": 77,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 9,
+          "type": "intel_source"
+        },
+        {
+          "id": 68,
+          "type": "managed_url"
+        },
+        {
+          "id": 115,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "ef20a0acbafa49f6eb0a69ff479b9ac72bbf73d70de2423ce42e4dd13ecbe908"
+    },
+    {
+      "canonical_source_url": "https://www.news.gov.hk/en/categories/finance/html/articlelist.rss.xml",
+      "origins": [
+        {
+          "index": 0,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 101,
+          "type": "intel_source"
+        },
+        {
+          "ownership_type": "shared_financial",
+          "pack_id": "financial_markets",
+          "source_id": 101,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "616dbba777acc51c17230694367b7a7cb4f29815eec78f72a2b2539adb44e359"
+    },
+    {
+      "canonical_source_url": "https://www.nfra.gov.cn/",
+      "origins": [
+        {
+          "index": 78,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 79,
+          "type": "intel_source"
+        },
+        {
+          "id": 200,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "ca5f2197860b23ce3c5ed52561c7ddaf2ad7ee03833e8fcd06a8b5d9673decd1"
+    },
+    {
+      "canonical_source_url": "https://www.northerntrust.com/united-states/institute/segment/family-offices",
+      "origins": [
+        {
+          "index": 79,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 67,
+          "type": "intel_source"
+        },
+        {
+          "id": 188,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "3c8c5a7d64cec0da75df809a4ef24eae3d871606bb06d670e34483db0861b040"
+    },
+    {
+      "canonical_source_url": "https://www.ogier.com/",
+      "origins": [
+        {
+          "index": 80,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 8,
+          "type": "intel_source"
+        },
+        {
+          "id": 67,
+          "type": "managed_url"
+        },
+        {
+          "id": 114,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "d304e3482f69ed9141277d2b7fc40027a97d76ed74a5cf92007f2d958245e3d4"
+    },
+    {
+      "canonical_source_url": "https://www.pbcsf.tsinghua.edu.cn/",
+      "origins": [
+        {
+          "index": 81,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 83,
+          "type": "intel_source"
+        },
+        {
+          "id": 204,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "d842e8966062497e266c74d0670c6114d739fec66487efced820c1193522df6b"
+    },
+    {
+      "canonical_source_url": "https://www.preqin.com/",
+      "origins": [
+        {
+          "index": 82,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 77,
+          "type": "intel_source"
+        },
+        {
+          "id": 198,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "98feab91388889cf103f41ee10a5490217fb4117ceedc9c7542538761642bb3e"
+    },
+    {
+      "canonical_source_url": "https://www.privatebank.citibank.com/office-locations/hong-kong",
+      "origins": [
+        {
+          "index": 83,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 93,
+          "type": "intel_source"
+        },
+        {
+          "id": 214,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "8ea70a0ae36a57427c971bab90f5259e081ecc3a21318e3111ca104d82f7373d"
+    },
+    {
+      "canonical_source_url": "https://www.privatebank.citibank.com/sc/insights/the-family-office-survey",
+      "origins": [
+        {
+          "index": 84,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 66,
+          "type": "intel_source"
+        },
+        {
+          "id": 187,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "7593706c62d1859f119bd58c81b80a377e22036b6d9c69dc7d65e917f33a44ff"
+    },
+    {
+      "canonical_source_url": "https://www.pwchk.com/",
+      "origins": [
+        {
+          "index": 85,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 5,
+          "type": "intel_source"
+        },
+        {
+          "id": 64,
+          "type": "managed_url"
+        },
+        {
+          "id": 111,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "6b6f85a006b921e2224430565e848315f3fba2f8025790683e05f4601802e542"
+    },
+    {
+      "canonical_source_url": "https://www.rbcwealthmanagement.com/en-je/how-we-help/family-offices",
+      "origins": [
+        {
+          "index": 86,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 88,
+          "type": "intel_source"
+        },
+        {
+          "id": 209,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "512011ee49cb62801f43974460963841bed640b87a00bbd1bb3873134439fceb"
+    },
+    {
+      "canonical_source_url": "https://www.scmp.com/topics/family-office",
+      "origins": [
+        {
+          "index": 87,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 104,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "0d9badc71fc4329db21337b635d2a13bff7587f3ce283c63f06e94afb440f983"
+    },
+    {
+      "canonical_source_url": "https://www.sfc.hk/en/RSS-Feeds/Circulars",
+      "origins": [
+        {
+          "index": 3,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "shared_financial",
+          "pack_id": "financial_markets",
+          "source_id": 107,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "f23243050c15254b051d0fe7246ec6ed08bb57a341489aa2edc17e7b48a7eb5f"
+    },
+    {
+      "canonical_source_url": "https://www.sfc.hk/en/RSS-Feeds/Consultations-and-Conclusions",
+      "origins": [
+        {
+          "index": 4,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "shared_financial",
+          "pack_id": "financial_markets",
+          "source_id": 108,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "3f9fc57a7d46f8cc7b9f7d56430ffd1ebbe5ded79066eabde39dc4efe0e36ff9"
+    },
+    {
+      "canonical_source_url": "https://www.sfc.hk/en/RSS-Feeds/Press-releases",
+      "origins": [
+        {
+          "index": 2,
+          "pack_id": "financial_markets",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "shared_financial",
+          "pack_id": "financial_markets",
+          "source_id": 106,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "shared_financial",
+      "spec_sha256": "4a266f8e3baaba39c0e7b7f72cb7b9afe59d000d5105fd9d74292c9c247eaf3d"
+    },
+    {
+      "canonical_source_url": "https://www.stcn.com/article/detail/3954440.html",
+      "origins": [
+        {
+          "index": 88,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 97,
+          "type": "intel_source"
+        },
+        {
+          "id": 218,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "1ccb4a93910d3821b350748aee4fd61dcbbe97f7b4a3c67eb9a8467908498127"
+    },
+    {
+      "canonical_source_url": "https://www.tembusulaw.com/",
+      "origins": [
+        {
+          "index": 89,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 21,
+          "type": "intel_source"
+        },
+        {
+          "id": 80,
+          "type": "managed_url"
+        },
+        {
+          "id": 127,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "060141cfdf2f48df8c1d8a6a84d357a03d94817255b7889c37bd2df0f1b4ac52"
+    },
+    {
+      "canonical_source_url": "https://www.timothyloh.com/",
+      "origins": [
+        {
+          "index": 90,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 16,
+          "type": "intel_source"
+        },
+        {
+          "id": 75,
+          "type": "managed_url"
+        },
+        {
+          "id": 122,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "c419e42e2d29d2df9d291e63059984ac1fd4ba5f4855b4f647fb7461fe70964f"
+    },
+    {
+      "canonical_source_url": "https://www.tongshang.com/",
+      "origins": [
+        {
+          "index": 91,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 29,
+          "type": "intel_source"
+        },
+        {
+          "id": 88,
+          "type": "managed_url"
+        },
+        {
+          "id": 135,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "4702aaa741c402d01427409825cc001526247b387da6b39d417ffeb4f93ad65c"
+    },
+    {
+      "canonical_source_url": "https://www.tridenttrust.com/",
+      "origins": [
+        {
+          "index": 92,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 36,
+          "type": "intel_source"
+        },
+        {
+          "id": 95,
+          "type": "managed_url"
+        },
+        {
+          "id": 142,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "d6fff1ecac7b8265603a6e24eb377ba2f976c22d1a386843066003262dabd647"
+    },
+    {
+      "canonical_source_url": "https://www.tylaw.com.cn/en/",
+      "origins": [
+        {
+          "index": 93,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 31,
+          "type": "intel_source"
+        },
+        {
+          "id": 90,
+          "type": "managed_url"
+        },
+        {
+          "id": 137,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "d64cbc5402cc7c997fd0b7d857f441667f3b393c957aa16632564fc0907d96d4"
+    },
+    {
+      "canonical_source_url": "https://www.ubs.com/global/en/media/display-page-ndp/en-20260528-global-family-office-report-2026.html",
+      "origins": [
+        {
+          "index": 94,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 96,
+          "type": "intel_source"
+        },
+        {
+          "id": 217,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "45fd046544a7567c1831613fc05085e91ecd071f8eeda940dbfed750046bc105"
+    },
+    {
+      "canonical_source_url": "https://www.ubs.com/global/en/wealthmanagement/family-office-uhnw/series/family-office-insights.html",
+      "origins": [
+        {
+          "index": 95,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 64,
+          "type": "intel_source"
+        },
+        {
+          "id": 185,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "b6b744f98597df947ac6d3cff9cc2f8489160cbf36389c4ef79f6fc11abadb29"
+    },
+    {
+      "canonical_source_url": "https://www.ubs.com/hk/en/wealthmanagement/what-we-offer/planning/family-advisory.html",
+      "origins": [
+        {
+          "index": 96,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 90,
+          "type": "intel_source"
+        },
+        {
+          "id": 211,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "f35424693f4eaa0024cf179b50612d720683278fb97e82b3c1161557abd87449"
+    },
+    {
+      "canonical_source_url": "https://www.vistra.com/",
+      "origins": [
+        {
+          "index": 97,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 39,
+          "type": "intel_source"
+        },
+        {
+          "id": 98,
+          "type": "managed_url"
+        },
+        {
+          "id": 145,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "026fc8f65db2e8b200e72fcc60c4040b40186ec9001241411e1150c595ac9804"
+    },
+    {
+      "canonical_source_url": "https://www.walkersglobal.com/",
+      "origins": [
+        {
+          "index": 98,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 11,
+          "type": "intel_source"
+        },
+        {
+          "id": 70,
+          "type": "managed_url"
+        },
+        {
+          "id": 117,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "b690bd2cd1a2e50f4eccf503e86d52b4bfdb500ae3f015d305f7453306c94631"
+    },
+    {
+      "canonical_source_url": "https://www.wealthbriefing.com/",
+      "origins": [
+        {
+          "index": 99,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 73,
+          "type": "intel_source"
+        },
+        {
+          "id": 194,
+          "type": "managed_url"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "429af152de424772659cc9f2e1f84ef34fbb46a63fe44058cc4e2d78cb5c5175"
+    },
+    {
+      "canonical_source_url": "https://www.zaobao.com.sg/home/",
+      "origins": [
+        {
+          "index": 100,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 59,
+          "type": "intel_source"
+        },
+        {
+          "id": 180,
+          "type": "managed_url"
+        },
+        {
+          "id": 164,
+          "type": "scheduled_task"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "320cd8aa1288fefc757c86012b0ac8abe5a6a27c07343cf14186b139fb1d8247"
+    },
+    {
+      "canonical_source_url": "https://www1.hkej.com/",
+      "origins": [
+        {
+          "index": 101,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 105,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "9e60bea3613227fd70453e9d0bf2048a330ce0231810fe9812d5e97d1ebbd06d"
+    },
+    {
+      "canonical_source_url": "https://zaobao.com/",
+      "origins": [
+        {
+          "index": 102,
+          "pack_id": "family_office",
+          "type": "manifest"
+        },
+        {
+          "ownership_type": "legacy",
+          "pack_id": "family_office",
+          "source_id": 55,
+          "type": "intel_source"
+        }
+      ],
+      "ownership": "pack_owned",
+      "spec_sha256": "4516a1ff1f3547a06c39493c65d9d29759d3d663e5c45de81da7aa4976083575"
+    }
+  ]
+}

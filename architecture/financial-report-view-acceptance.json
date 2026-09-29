@@ -1,0 +1,49 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 6
+  },
+  "scenarios": {
+    "authentication_required": true,
+    "bull_bear_expandable": true,
+    "complete_role_outputs": true,
+    "missing_sections_explicit": true,
+    "mobile_layout": true,
+    "one_screen_summary": true,
+    "prompt_and_chain_of_thought_hidden": true,
+    "report_versions_immutable": true,
+    "risk_and_portfolio_groups": true
+  },
+  "static": {
+    "direct_model_or_network_imports": [],
+    "endpoint": "GET /api/financial/reports/{id}",
+    "frontend": {
+      "missing_markers": [],
+      "safe": true,
+      "template": "/home/timebot/app/templates/mapindex.html",
+      "unsafe_markers": []
+    },
+    "groups": [
+      "analysis",
+      "bull_bear",
+      "decision",
+      "risk",
+      "final"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-report-view-v1"
+  },
+  "task": "3.14",
+  "verification": {
+    "frontend_javascript_syntax": "passed",
+    "full_regression_tests": 384,
+    "offline_image": "sha256:774c688ff4d68b6db13d7122d0d3da88e4bcbba8db77d002679837a7bb1cab27"
+  }
+}

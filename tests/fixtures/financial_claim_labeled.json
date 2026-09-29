@@ -1,0 +1,19 @@
+{
+  "dataset_id": "financial-claim-human-review-v1",
+  "review_status": "approved",
+  "numeric_coverage_threshold": 0.95,
+  "examples": [
+    {"text": "腾讯股价为500港元。", "metrics": ["last_price"], "types": ["fact"]},
+    {"text": "腾讯收盘价报498.5港元。", "metrics": ["close"], "types": ["fact"]},
+    {"text": "营业收入为100亿元，同比增长8%。", "metrics": ["revenue", "revenue_yoy"], "types": ["fact"]},
+    {"text": "净利润为20亿元，环比下降3.5%。", "metrics": ["net_income", "net_income_qoq"], "types": ["fact"]},
+    {"text": "CPI为2.4%，失业率为5.1%。", "metrics": ["cpi", "unemployment_rate"], "types": ["fact"]},
+    {"text": "目标价为480至520港元。", "metrics": ["target_price"], "types": ["conditional_prediction"]},
+    {"text": "指数上涨2.3%。", "metrics": ["change_percent"], "types": ["fact"]},
+    {"text": "公司公告宣布派息2港元。", "metrics": ["announced_event", "dividend"], "types": ["fact"]},
+    {"text": "腾讯仍为恒生指数成分股。", "metrics": ["index_membership"], "types": ["fact"]},
+    {"text": "我们建议持有，估值偏高。", "metrics": ["investment_opinion"], "types": ["opinion"]},
+    {"text": "如果盈利改善，股价可能上涨10%。", "metrics": ["change_percent", "forecast_statement"], "types": ["conditional_prediction"]},
+    {"text": "基金单位净值为1.245元。", "metrics": ["nav"], "types": ["fact"]}
+  ]
+}

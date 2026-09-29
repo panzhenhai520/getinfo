@@ -1,0 +1,2222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置管理 - {{ platform_name }}</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+        .text-dark { color: #1f2937; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.04); }
+        .config-shell {
+            display: grid;
+            grid-template-columns: 16rem minmax(0, 1fr);
+            gap: 1.25rem;
+            align-items: start;
+        }
+        .config-nav {
+            position: sticky;
+            top: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: .5rem;
+        }
+        .config-nav-title {
+            padding: .35rem .75rem .65rem;
+            color: #6b7280;
+            font-size: .75rem;
+            font-weight: 700;
+        }
+        .nav-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: .625rem;
+            border-radius: 6px;
+            padding: .65rem .75rem;
+            color: #4b5563;
+            font-size: .875rem;
+            text-align: left;
+        }
+        .nav-item:hover { background: #f3f4f6; color: #1d4ed8; }
+        .nav-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 700; }
+        .nav-item .nav-tag {
+            margin-left: auto;
+            color: #9ca3af;
+            font-size: .7rem;
+            font-weight: 600;
+        }
+        .config-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fff;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .field-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            color: #374151;
+            font-size: .875rem;
+            font-weight: 600;
+            margin-bottom: .375rem;
+        }
+        .field-input {
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: .625rem .75rem;
+            outline: none;
+            background: #fff;
+        }
+        .field-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.16);
+        }
+        .field-hint { color: #6b7280; font-size: .75rem; line-height: 1.25rem; margin-top: .25rem; }
+        .section-subtitle {
+            color: #111827;
+            font-size: .875rem;
+            font-weight: 800;
+            padding-top: .25rem;
+        }
+        .toggle-row {
+            min-height: 2.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: .75rem;
+            background: #f9fafb;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: .125rem .5rem;
+            font-size: .75rem;
+            white-space: nowrap;
+        }
+        .badge-warn { background: #fffbeb; color: #92400e; }
+        .badge-ok { background: #ecfdf5; color: #047857; }
+        .badge-muted { background: #f3f4f6; color: #4b5563; }
+        .status-box {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: .75rem;
+            background: #f8fafc;
+            color: #475569;
+            font-size: .875rem;
+        }
+        .status-box.ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+        .status-box.warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+        .status-box.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+        .secret-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
+        #toastHost { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .toast-item { min-width: 240px; max-width: 360px; color: #fff; border-radius: 10px; padding: 12px 16px; box-shadow: 0 12px 32px rgba(0,0,0,.35); font-size: 14px; line-height: 1.5; pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; animation: toastIn .25s ease; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+        @media (max-width: 1024px) {
+            .config-shell { grid-template-columns: 1fr; }
+            .config-nav {
+                position: static;
+                display: flex;
+                gap: .5rem;
+                overflow-x: auto;
+                padding: .5rem;
+                scrollbar-width: thin;
+            }
+            .config-nav-title { display: none; }
+            .nav-item {
+                width: auto;
+                min-width: 8rem;
+                flex: 0 0 auto;
+                justify-content: center;
+                white-space: nowrap;
+            }
+            .nav-item .nav-tag { display: none; }
+        }
+        @media (max-width: 640px) {
+            .config-actions { flex-direction: column-reverse; }
+            .config-actions button { width: 100%; }
+            .section-title { align-items: flex-start; flex-direction: column; }
+            .secret-row { grid-template-columns: minmax(0, 1fr) 2.75rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">{% include "_dashboard_nav.html" %}
+<style>
+body.skin-darkblue{background:#08101f !important}
+body.skin-darkblue .bg-gray-50,body.skin-darkblue .bg-gray-100{background:#0e1d3a !important}
+body.skin-darkblue .card-shadow,body.skin-darkblue .config-nav,body.skin-darkblue .bg-white{background:#0e1d3a !important;border-color:rgba(96,165,250,.22) !important;color:#e6f0ff !important}
+body.skin-darkblue .config-nav-title,body.skin-darkblue .section-title,body.skin-darkblue h1,body.skin-darkblue h2,body.skin-darkblue h3,body.skin-darkblue h4{color:#e6f0ff !important}
+body.skin-darkblue .nav-item{color:#b8c9e6 !important}
+body.skin-darkblue .nav-item:hover,body.skin-darkblue .nav-item.active{background:rgba(56,189,248,.16) !important;color:#7dd3fc !important}
+body.skin-darkblue .nav-tag{background:rgba(56,189,248,.18);color:#9ed2f7}
+body.skin-darkblue label,body.skin-darkblue .field-label,body.skin-darkblue .text-gray-700,body.skin-darkblue .text-gray-600,body.skin-darkblue .text-gray-800{color:#dbeafe !important}
+body.skin-darkblue .text-gray-500,body.skin-darkblue .text-gray-400,body.skin-darkblue .section-subtitle,body.skin-darkblue .hint{color:#8ea6c8 !important}
+body.skin-darkblue input,body.skin-darkblue select,body.skin-darkblue textarea{background:#0e1d3a !important;border-color:rgba(96,165,250,.3) !important;color:#e6f0ff !important}
+body.skin-darkblue input::placeholder,body.skin-darkblue textarea::placeholder{color:#5b7a9d}
+/* 统一浅色底区块：状态提示框 */
+body.skin-darkblue .status-box{background:rgba(148,197,255,.08) !important;border-color:rgba(96,165,250,.22) !important;color:#dbeafe !important}
+body.skin-darkblue .status-box.ok{background:rgba(16,185,129,.14) !important;border-color:rgba(52,211,153,.35) !important;color:#a7f3d0 !important}
+body.skin-darkblue .status-box.warn{background:rgba(245,158,11,.14) !important;border-color:rgba(251,191,36,.35) !important;color:#fde68a !important}
+body.skin-darkblue .status-box.error{background:rgba(239,68,68,.14) !important;border-color:rgba(248,113,113,.35) !important;color:#fecaca !important}
+/* 淡色提示框（amber/blue/emerald/slate）统一深色化 */
+body.skin-darkblue .bg-amber-50{background:rgba(245,158,11,.12) !important}
+body.skin-darkblue .border-amber-200{border-color:rgba(251,191,36,.32) !important}
+body.skin-darkblue .text-amber-900,body.skin-darkblue .text-amber-800,body.skin-darkblue .text-amber-700{color:#fcd34d !important}
+body.skin-darkblue .bg-blue-50{background:rgba(59,130,246,.12) !important}
+body.skin-darkblue .bg-blue-100{background:rgba(59,130,246,.2) !important}
+body.skin-darkblue .border-blue-200,body.skin-darkblue .border-blue-100{border-color:rgba(96,165,250,.32) !important}
+body.skin-darkblue .text-blue-900,body.skin-darkblue .text-blue-800,body.skin-darkblue .text-blue-700,body.skin-darkblue .text-blue-600{color:#7dd3fc !important}
+body.skin-darkblue .bg-emerald-50{background:rgba(16,185,129,.12) !important}
+body.skin-darkblue .bg-emerald-50\/50{background:rgba(16,185,129,.12) !important}
+body.skin-darkblue .border-emerald-200,body.skin-darkblue .border-emerald-100{border-color:rgba(52,211,153,.32) !important}
+body.skin-darkblue .text-emerald-900,body.skin-darkblue .text-emerald-800,body.skin-darkblue .text-emerald-700{color:#a7f3d0 !important}
+body.skin-darkblue .bg-slate-50{background:rgba(148,163,184,.10) !important}
+body.skin-darkblue .border-slate-200{border-color:rgba(148,163,184,.28) !important}
+body.skin-darkblue .text-slate-800,body.skin-darkblue .text-slate-700{color:#e2e8f0 !important}
+body.skin-darkblue .text-slate-500{color:#94a3b8 !important}
+body.skin-darkblue .border-gray-200,body.skin-darkblue .border-gray-100{border-color:rgba(96,165,250,.2) !important}
+</style>
+
+
+    <main class="container mx-auto px-4 py-8">
+        <div class="mb-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+            <div>
+                <h2 class="text-2xl font-bold text-dark">配置管理</h2>
+                <p id="envPath" class="mt-1 text-sm text-gray-500">正在加载配置...</p>
+            </div>
+            <div class="config-actions flex items-center gap-2">
+                <button id="reloadBtn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium bg-white text-gray-700 hover:bg-gray-50">
+                    <i class="fa fa-refresh mr-1.5"></i>刷新
+                </button>
+                <button id="testRagflowBtn" class="px-4 py-2 border border-blue-200 rounded-md text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100">
+                    <i class="fa fa-plug mr-1.5"></i>测试知识库
+                </button>
+                <button id="saveBtn" class="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">
+                    <i class="fa fa-save mr-1.5"></i>保存配置
+                </button>
+            </div>
+        </div>
+
+        <div id="messageBox" class="status-box mb-5 hidden"></div>
+
+        <div class="config-shell">
+            <aside class="config-nav card-shadow" aria-label="配置分组">
+                <div class="config-nav-title">配置分组</div>
+                <button class="nav-item active" data-target="section-ragflow"><i class="fa fa-database w-4"></i>知识库<span class="nav-tag">常用</span></button>
+                <button class="nav-item" data-target="section-brand"><i class="fa fa-flag w-4"></i>品牌设置<span class="nav-tag">平台</span></button>
+                <button class="nav-item" data-target="section-tts"><i class="fa fa-volume-up w-4"></i>文章朗读<span class="nav-tag">独立</span></button>
+                <button class="nav-item" data-target="section-financial"><i class="fa fa-line-chart w-4"></i>金融研究<span class="nav-tag">默认关闭</span></button>
+                <button class="nav-item" data-target="section-serpapi"><i class="fa fa-search w-4"></i>搜索引擎支持<span class="nav-tag">资讯发现</span></button>
+                <button class="nav-item" data-target="section-sources"><i class="fa fa-share-alt w-4"></i>信源<span class="nav-tag">平台</span></button>
+                <button class="nav-item" data-target="section-proxy"><i class="fa fa-random w-4"></i>代理<span class="nav-tag">常用</span></button>
+                <button class="nav-item" data-target="section-crawl"><i class="fa fa-spider w-4"></i>聚合策略<span class="nav-tag">关键</span></button>
+                <button class="nav-item" data-target="section-scheduler"><i class="fa fa-clock w-4"></i>定时并发<span class="nav-tag">关键</span></button>
+                <button class="nav-item" data-target="section-home"><i class="fa fa-home w-4"></i>首页设置<span class="nav-tag">资讯</span></button>
+                <button class="nav-item" data-target="section-system"><i class="fa fa-cog w-4"></i>系统<span class="nav-tag">高级</span></button>
+                <button class="nav-item" data-target="section-storage"><i class="fa fa-folder-open w-4"></i>存储<span class="nav-tag">高级</span></button>
+                <button class="nav-item" data-target="section-redis"><i class="fa fa-bolt w-4"></i>Redis<span class="nav-tag">高级</span></button>
+                <button class="nav-item" data-target="section-admin"><i class="fa fa-user w-4"></i>登录初始化<span class="nav-tag">交付</span></button>
+                <button class="nav-item" data-target="section-chat"><i class="fa fa-robot w-4"></i>AI助手<span class="nav-tag">常用</span></button>
+            </aside>
+
+            <div>
+                <section id="section-brand" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">平台品牌设置</h3>
+                            <p class="text-sm text-gray-500 mt-1">设置公司名称与 Logo，替换全站【资讯情报系统】品牌文字与 Logo。</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="platformName">公司名称</label>
+                            <input id="platformName" class="field-input" type="text" maxlength="60" placeholder="资讯情报系统">
+                            <p class="field-hint">保存后替换各页面标题与导航栏中的平台名称。</p>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <label class="field-label">平台 Logo</label>
+                            <div class="flex items-center gap-4">
+                                <div id="platformLogoPreview" class="w-24 h-24 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden"></div>
+                                <div class="flex-1">
+                                    <input id="platformLogoFile" class="field-input" type="file" accept=".png,.jpg,.jpeg,.gif,.webp,.svg">
+                                    <p class="field-hint">上传后替换导航栏/登录页的 Logo（通常为方形或横向 Logo）。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-3">
+                        <button id="savePlatformBtn" type="button" class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800" onclick="savePlatformSettings()">保存品牌设置</button>
+                        <span id="platformSaveStatus" class="text-sm text-green-700"></span>
+                    </div>
+                </section>
+                <section id="section-ragflow" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">知识库</h3>
+                            <p class="text-sm text-gray-500 mt-1">AI Server上传和知识库下拉列表使用这组配置。</p>
+                        </div>
+                        <span id="ragflowStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="ragflowBaseUrl">AI Server API地址</label>
+                            <input id="ragflowBaseUrl" class="field-input bg-gray-100 text-gray-500 cursor-not-allowed" type="text" placeholder="http://192.168.1.246:9380" readonly aria-readonly="true">
+                            <p id="ragflowBaseUrlHint" class="field-hint">正在检查配置状态...</p>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="ragflowApiKey">AI Server API Key</label>
+                            <div class="secret-row">
+                                <input id="ragflowApiKey" class="field-input bg-gray-100 text-gray-500 cursor-not-allowed" type="password" autocomplete="new-password" readonly aria-readonly="true" placeholder="正在检查配置状态...">
+                                <button id="toggleRagflowKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
+                                <input id="clearApiKey" type="checkbox" class="rounded text-blue-600" disabled>
+                                清空当前API Key
+                            </label>
+                            <p id="apiKeyHint" class="field-hint">正在检查API Key状态...</p>
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">上传到知识库</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">关闭后任务仍聚合，但不入库。</span>
+                            </span>
+                            <input id="ragflowUploadEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">上传后自动解析</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">AI Server收到文档后自动切片。</span>
+                            </span>
+                            <input id="ragflowAutoParse" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">已存在文档覆盖重传</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">本地正文更新后，同名文档会先删除再上传。</span>
+                            </span>
+                            <input id="ragflowReuploadExisting" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div>
+                            <label class="field-label" for="ragflowTimeout">接口超时（秒）</label>
+                            <input id="ragflowTimeout" class="field-input" type="number" min="5" max="600">
+                        </div>
+                        <div>
+                            <label class="field-label" for="ragflowRetries">失败重试（次）</label>
+                            <input id="ragflowRetries" class="field-input" type="number" min="0" max="5">
+                        </div>
+                    </div>
+                    <div id="section-tts" class="mt-10 pt-6 border-t-2 border-emerald-100 scroll-mt-6">
+                        <div class="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <h4 class="text-base font-bold text-gray-800">文章朗读独立设置</h4>
+                                <p class="text-xs text-gray-500 mt-1">仅控制本资讯平台文章的朗读接口、模型、音色、语言与缓存；不会修改 RAGFlow 问答、知识库或其自身的朗读配置。保存后立即生效。</p>
+                            </div>
+                            <label class="toggle-row flex items-center justify-between gap-3 min-w-[150px]">
+                                <span class="text-sm font-semibold text-gray-800">启用朗读</span>
+                                <input id="ragflowTtsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div class="lg:col-span-2 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
+                                <p class="text-sm font-semibold text-emerald-900">资讯平台 CosyVoice3 声音档案</p>
+                                <p class="mt-1 text-xs leading-5 text-emerald-800">以下选项只附在本平台的文章朗读请求中，不读取、不覆盖 Panython / RAGFlow 的全局 TTS 设置。修改后，新生成的音频使用新档案；已缓存音频仍可立即播放。</p>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <label class="field-label" for="remotePipelineUrl">LLM及语音处理服务器地址：</label>
+                                <input id="remotePipelineUrl" class="field-input" type="text"
+                                       placeholder="http://10.88.0.1:11236"
+                                       autocomplete="off">
+                                <p class="field-hint">VPN 处理服务器（提炼/翻译/语音/OCR）地址；修改后需重启 intel-worker 容器才会生效。</p>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <p class="text-sm font-semibold text-gray-800">VPN 远端朗读音色（分层配置）</p>
+                                <p class="mt-1 text-xs text-gray-500">选择“语言 → 中文方言 → 性别”，保存后会映射为 Ubuntu CosyVoice2 上的具体音色 ID；只影响新生成的摘要/译文音频。</p>
+                            </div>
+                            <div>
+                                <label class="field-label" for="remotePipelineTtsLanguage">语言</label>
+                                <select id="remotePipelineTtsLanguage" class="field-input">
+                                    <option value="zh">中文</option>
+                                    <option value="en">英语</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="remotePipelineTtsDialect">中文方言</label>
+                                <select id="remotePipelineTtsDialect" class="field-input">
+                                    <option value="mandarin">普通话</option>
+                                    <option value="cantonese">粤语</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="remotePipelineTtsGender">性别</label>
+                                <select id="remotePipelineTtsGender" class="field-input">
+                                    <option value="female">女声</option>
+                                    <option value="male">男声</option>
+                                </select>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <div id="remotePipelineTtsVoiceHint" class="field-hint"></div>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsEngine">朗读引擎</label>
+                                <select id="intelTtsEngine" class="field-input"><option value="CosyVoice3">CosyVoice3</option><option value="CosyVoice2">CosyVoice2</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsVoiceProfile">声音档案</label>
+                                <select id="intelTtsVoiceProfile" class="field-input">
+                                    <option value="male_mandarin_01">普通话男声</option><option value="female_mandarin_01">普通话女声</option>
+                                    <option value="male_cantonese_01">粤语男声</option><option value="female_cantonese_01">粤语女声</option>
+                                    <option value="male_english_01">英文男声</option><option value="female_english_01">英文女声</option>
+                                    <option value="male_sichuan_01">四川话男声</option><option value="female_sichuan_01">四川话女声</option>
+                                    <option value="female_shanghai_01">上海话女声</option><option value="female_dongbei_01">东北话女声</option><option value="female_minnan_01">闽南语女声</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsDialect">方言 / 语种</label>
+                                <select id="intelTtsDialect" class="field-input"><option value="mandarin">普通话</option><option value="cantonese">粤语</option><option value="sichuan">四川话</option><option value="shanghai">上海话</option><option value="dongbei">东北话</option><option value="minnan">闽南语</option><option value="tianjin">天津话</option><option value="shandong">山东话</option><option value="english">英语</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsGender">声音性别</label>
+                                <select id="intelTtsGender" class="field-input"><option value="male">男声</option><option value="female">女声</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsEmotion">表达风格</label>
+                                <select id="intelTtsEmotion" class="field-input"><option value="professional">专业</option><option value="calm">平和</option><option value="friendly">亲切</option><option value="formal">正式</option><option value="lively">活力</option><option value="serious">严肃</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsSpeed">语速</label>
+                                <select id="intelTtsSpeed" class="field-input"><option value="0.8">0.8×（舒缓）</option><option value="1">1.0×（标准）</option><option value="1.15">1.15×（推荐）</option><option value="1.3">1.3×（较快）</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsBufferMs">播放预缓冲</label>
+                                <select id="intelTtsBufferMs" class="field-input"><option value="800">800 毫秒</option><option value="1200">1200 毫秒</option><option value="1400">1400 毫秒（推荐）</option><option value="1600">1600 毫秒</option><option value="2000">2000 毫秒</option><option value="3000">3000 毫秒</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsSegmentMaxCharsZh">中文单段长度</label>
+                                <select id="intelTtsSegmentMaxCharsZh" class="field-input"><option value="30">30 字</option><option value="45">45 字</option><option value="50">50 字（推荐）</option><option value="60">60 字</option><option value="80">80 字</option><option value="100">100 字</option></select>
+                            </div>
+                            <div>
+                                <label class="field-label" for="intelTtsSegmentMaxWordsEn">英文单段长度</label>
+                                <select id="intelTtsSegmentMaxWordsEn" class="field-input"><option value="12">12 词</option><option value="18">18 词</option><option value="20">20 词（推荐）</option><option value="24">24 词</option><option value="36">36 词</option><option value="48">48 词</option></select>
+                            </div>
+                            <div class="lg:col-span-2 border-t border-gray-100 pt-4 mt-1">
+                                <p class="text-sm font-semibold text-gray-700">兼容接口与缓存</p>
+                                <p class="mt-1 text-xs text-gray-500">下列参数控制请求链路、缓存与分段播放；“声音档案”以上的 CosyVoice3 配置优先使用。</p>
+                            </div>
+                            <input id="ragflowTtsModel" type="hidden">
+                            <select id="ragflowTtsLanguageMode" class="hidden"><option value="auto">自动</option><option value="zh">中文</option><option value="en">英文</option></select>
+                            <select id="ragflowTtsVoiceZh" class="hidden"></select>
+                            <select id="ragflowTtsVoiceEn" class="hidden"></select>
+                            <textarea id="ragflowTtsVoiceCatalog" class="hidden"></textarea>
+                            <div>
+                                <label class="field-label" for="ragflowTtsPrebuffer">开始前预缓存句数</label>
+                                <input id="ragflowTtsPrebuffer" class="field-input" type="number" min="1" max="10">
+                                <p class="field-hint">建议 3 句：三句音频就绪后开始播放，后续在播放过程中继续生成。</p>
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowTtsMaxChars">单段最长字符数</label>
+                                <input id="ragflowTtsMaxChars" class="field-input" type="number" min="100" max="1000">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowTtsTimeout">语音任务超时（秒）</label>
+                                <input id="ragflowTtsTimeout" class="field-input" type="number" min="5" max="300">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowTtsCacheDays">音频缓存保留（天）</label>
+                                <input id="ragflowTtsCacheDays" class="field-input" type="number" min="1" max="365">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowTtsCacheMaxMb">音频缓存上限（MB）</label>
+                                <input id="ragflowTtsCacheMaxMb" class="field-input" type="number" min="64" max="10240">
+                                <p class="field-hint">缓存存于本机 <code>data/intel_tts_cache</code>；超过期限或容量将自动清理最旧文件。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <details class="mt-4">
+                        <summary class="cursor-pointer text-sm font-semibold text-gray-700">AI Server专用代理</summary>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+                            <label class="toggle-row flex items-center justify-between gap-3 lg:col-span-3">
+                                <span class="text-sm font-semibold text-gray-800">AI Server请求走代理</span>
+                                <input id="ragflowProxyEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                            </label>
+                            <div>
+                                <label class="field-label" for="ragflowProxyHttp">HTTP代理</label>
+                                <input id="ragflowProxyHttp" class="field-input" type="text">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowProxyHttps">HTTPS代理</label>
+                                <input id="ragflowProxyHttps" class="field-input" type="text">
+                            </div>
+                            <div>
+                                <label class="field-label" for="ragflowProxySocks5">SOCKS5代理</label>
+                                <input id="ragflowProxySocks5" class="field-input" type="text">
+                            </div>
+                        </div>
+                    </details>
+                </section>
+
+                <section id="section-financial" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">金融研究与 TradingAgents</h3>
+                            <p class="text-sm text-gray-500 mt-1">所有能力默认关闭。保存后 Web 进程立即使用新门禁，intel-worker 需重启后使用新配置。</p>
+                        </div>
+                        <span id="financialStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                        输出仅供研究参考，不连接真实券商。“开启模拟数据”只控制纸面模拟与回测入口，不代表真实行情或真实交易。
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="lg:col-span-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="field-label" for="financialRolloutStage">有序灰度阶段</label>
+                                    <select id="financialRolloutStage" class="field-input">
+                                        <option value="off">0 · 全部关闭</option>
+                                        <option value="rss">1 · 金融 RSS</option>
+                                        <option value="snapshot_readonly">2 · 金融快照只读</option>
+                                        <option value="dashboard">3 · Dashboard 金融专区</option>
+                                        <option value="ai_fact">4 · AI 金融事实路由</option>
+                                        <option value="stock_research">5 · 单股研究</option>
+                                        <option value="index_research">6 · 指数与市场研究</option>
+                                        <option value="history_review">7 · 历史会话 ×/÷ 金融核验</option>
+                                        <option value="auto_research">8 · 自动研究</option>
+                                        <option value="simulation_backtest">9 · 模拟与回测</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="financialRolloutObservation">升阶观察窗口（秒）</label>
+                                    <input id="financialRolloutObservation" class="field-input" type="number" min="60" max="604800">
+                                </div>
+                            </div>
+                            <p id="financialRolloutState" class="field-hint mt-3">每次只能前进一级；当前层健康且观察期完成后才可升阶。回退立即生效且不回滚数据库。</p>
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">开启金融行业信息</span><span class="block text-xs text-gray-500 mt-0.5">金融数据、金融问答路由和 Dashboard 金融分类的总开关。</span></span>
+                            <input id="financialIntelligenceEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">开启 TradingAgents 研究</span><span class="block text-xs text-gray-500 mt-0.5">允许多代理研究、动态讨论和终极报告。</span></span>
+                            <input id="tradingAgentsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">开启自动市场研究</span><span class="block text-xs text-gray-500 mt-0.5">允许开盘、盘中、收盘及事件触发研究。</span></span>
+                            <input id="financialAutoResearchEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">开启模拟数据</span><span class="block text-xs text-gray-500 mt-0.5">唯一模拟开关；控制纸面交易与回测菜单及任务创建。</span></span>
+                            <input id="tradingSimulationEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 AKShare</span><span class="block text-xs text-gray-500 mt-0.5">无需 API Key 的研究级中国市场源，无 SLA。</span></span>
+                            <input id="akshareCnEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 Tushare</span><span class="block text-xs text-gray-500 mt-0.5">只有 Token 已配置且权限探测通过后才会有效。</span></span>
+                            <input id="tushareCnEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="tushareToken">Tushare Token</label>
+                            <div class="secret-row">
+                                <input id="tushareToken" class="field-input" type="password" autocomplete="new-password" placeholder="已配置时留空表示不修改">
+                                <button id="toggleTushareTokenBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏"><i class="fa fa-eye"></i></button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600"><input id="clearTushareToken" type="checkbox" class="rounded text-blue-600">清空当前 Token</label>
+                            <p id="tushareTokenStatus" class="field-hint">正在检查 Token 状态...</p>
+                            <button id="probeTushareBtn" type="button" class="mt-2 px-3 py-2 border border-blue-200 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100">探测 Tushare 权限</button>
+                        </div>
+
+                        <div class="lg:col-span-2 section-subtitle mt-2">全球、宏观与辅助 Provider（全部默认关闭）</div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 Yahoo/yfinance</span><span class="block text-xs text-gray-500 mt-0.5">仅限个人研究级港股/全球回退；A 股不会标记为官方实时行情。</span></span>
+                            <input id="yahooFinanceEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 Alpha Vantage</span><span class="block text-xs text-gray-500 mt-0.5">免费 Key 当前为每天 25 次；默认股票报价为日终数据。</span></span>
+                            <input id="alphaVantageEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="alphaVantageApiKey">Alpha Vantage API Key（<a class="text-blue-600 hover:underline" href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer">免费申请</a>）</label>
+                            <div class="secret-row">
+                                <input id="alphaVantageApiKey" class="field-input" type="password" autocomplete="new-password" placeholder="已配置时留空表示不修改">
+                                <button id="toggleAlphaVantageKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏"><i class="fa fa-eye"></i></button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600"><input id="clearAlphaVantageApiKey" type="checkbox" class="rounded text-blue-600">清空当前 API Key</label>
+                            <p id="alphaVantageApiKeyStatus" class="field-hint">正在检查 API Key 状态...</p>
+                            <label class="field-label mt-3" for="alphaVantageQuoteEntitlement">报价时效模式</label>
+                            <select id="alphaVantageQuoteEntitlement" class="field-input">
+                                <option value="none">免费日终（不发送 entitlement）</option>
+                                <option value="delayed">15 分钟延迟（delayed）</option>
+                                <option value="realtime">实时（realtime）</option>
+                            </select>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700"><input id="alphaVantageRealtimeEntitled" type="checkbox" class="rounded text-blue-600">确认账户已购买并激活上述 delayed/realtime 授权</label>
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 FRED/ALFRED</span><span class="block text-xs text-gray-500 mt-0.5">免费注册 Key；历史查询会锁定 vintage，防止使用后来修订值。</span></span>
+                            <input id="fredEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div>
+                            <label class="field-label" for="fredApiKey">FRED API Key（<a class="text-blue-600 hover:underline" href="https://fredaccount.stlouisfed.org/apikeys" target="_blank" rel="noopener noreferrer">免费申请</a>）</label>
+                            <div class="secret-row">
+                                <input id="fredApiKey" class="field-input" type="password" autocomplete="new-password" placeholder="已配置时留空表示不修改">
+                                <button id="toggleFredKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏"><i class="fa fa-eye"></i></button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600"><input id="clearFredApiKey" type="checkbox" class="rounded text-blue-600">清空当前 API Key</label>
+                            <p id="fredApiKeyStatus" class="field-hint">正在检查 API Key 状态...</p>
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 Polymarket 只读预期</span><span class="block text-xs text-gray-500 mt-0.5">仅公共只读价格；结果是参与者预期，不是事实。</span></span>
+                            <input id="polymarketEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 easyquotation 回退</span><span class="block text-xs text-gray-500 mt-0.5">只在上游主源故障后的显式轻量回退中使用。</span></span>
+                            <input id="easyquotationEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3 lg:col-span-2">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用现有官方 RSS/网页证据</span><span class="block text-xs text-gray-500 mt-0.5">复用 articles 表和原始官方链接，不增加聚合服务；文章数字不能替代行情快照。</span></span>
+                            <input id="officialEvidenceEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+
+                        <div class="lg:col-span-2 section-subtitle mt-2">Provider 请求与额度</div>
+                        <div><label class="field-label" for="financialProviderTimeout">请求超时（秒）</label><input id="financialProviderTimeout" class="field-input" type="number" min="5" max="120"></div>
+                        <div><label class="field-label" for="financialProviderRetries">失败重试（次）</label><input id="financialProviderRetries" class="field-input" type="number" min="0" max="5"></div>
+                        <div><label class="field-label" for="financialProviderConcurrency">最大并发</label><input id="financialProviderConcurrency" class="field-input" type="number" min="1" max="16"></div>
+                        <div><label class="field-label" for="financialProviderDailyBudget">每日调用预算</label><input id="financialProviderDailyBudget" class="field-input" type="number" min="0" max="100000"></div>
+
+                        <div class="lg:col-span-2 section-subtitle mt-2">数据新鲜度阈值（秒）</div>
+                        <div><label class="field-label" for="financialQuoteFreshness">行情快照</label><input id="financialQuoteFreshness" class="field-input" type="number" min="15" max="3600"></div>
+                        <div><label class="field-label" for="financialBreadthFreshness">市场宽度</label><input id="financialBreadthFreshness" class="field-input" type="number" min="60" max="7200"></div>
+                        <div><label class="field-label" for="financialNewsFreshness">新闻证据</label><input id="financialNewsFreshness" class="field-input" type="number" min="60" max="86400"></div>
+                        <div><label class="field-label" for="financialFundamentalFreshness">基本面</label><input id="financialFundamentalFreshness" class="field-input" type="number" min="3600" max="31536000"></div>
+
+                        <div class="lg:col-span-2 section-subtitle mt-2">单次研究预算</div>
+                        <div><label class="field-label" for="financialResearchMaxCalls">最多 LLM 调用</label><input id="financialResearchMaxCalls" class="field-input" type="number" min="1" max="200"></div>
+                        <div><label class="field-label" for="financialResearchMaxTokens">最多 Token</label><input id="financialResearchMaxTokens" class="field-input" type="number" min="1000" max="1000000"></div>
+                        <div><label class="field-label" for="financialResearchDebateRounds">最多辩论轮数</label><input id="financialResearchDebateRounds" class="field-input" type="number" min="1" max="10"></div>
+                        <div><label class="field-label" for="financialResearchTimeout">研究超时（秒）</label><input id="financialResearchTimeout" class="field-input" type="number" min="60" max="7200"></div>
+                        <div><label class="field-label" for="financialResearchCache">研究报告缓存（秒）</label><input id="financialResearchCache" class="field-input" type="number" min="60" max="86400"><p class="field-hint">仅复用标的、时点、图版本、Provider profile 与配置哈希完全兼容的报告。</p></div>
+                        <div><label class="field-label" for="financialAutoDailyBudget">每日自动研究次数</label><input id="financialAutoDailyBudget" class="field-input" type="number" min="0" max="100"></div>
+                    </div>
+                    <p id="financialEffectiveState" class="mt-4 text-xs leading-5 text-gray-500"></p>
+                </section>
+
+                <section id="section-serpapi" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">搜索引擎支持（SerpAPI / Tavily）</h3>
+                            <p class="text-sm text-gray-500 mt-1">用于补充发现全网资讯。搜索只负责发现 URL，结果先进入候选队列，聚合正文并通过行业包关键词校验后才可能入库；主题归属由正文关键词决定，与搜索词无关。</p>
+                        </div>
+                        <span id="serpapiStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="lg:col-span-2">
+                            <label class="field-label" for="serpapiApiKey">SerpAPI API Key</label>
+                            <div class="secret-row">
+                                <input id="serpapiApiKey" class="field-input" type="password" autocomplete="new-password" placeholder="已配置时留空表示不修改">
+                                <button id="toggleSerpapiKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏"><i class="fa fa-eye"></i></button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600"><input id="clearSerpapiKey" type="checkbox" class="rounded text-blue-600">清空当前 API Key</label>
+                            <p class="mt-2 text-sm">
+                                <a href="https://serpapi.com/users/sign_up" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">
+                                    <i class="fa fa-external-link-alt mr-1"></i>免费申请 SerpAPI API Key
+                                </a>
+                            </p>
+                            <p id="serpapiApiKeyStatus" class="field-hint">正在检查 API Key 状态...</p>
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span><span class="block text-sm font-semibold text-gray-800">启用 SerpAPI 扫描</span><span class="block text-xs text-gray-500 mt-0.5">关闭后不会发起 SerpAPI 搜索请求。</span></span>
+                            <input id="serpapiEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div>
+                            <label class="field-label" for="serpapiEngine">搜索引擎</label>
+                            <input id="serpapiEngine" class="field-input" type="text" placeholder="google">
+                        </div>
+                        <div><label class="field-label" for="serpapiRegion">默认地区</label><input id="serpapiRegion" class="field-input" type="text" placeholder="hk"></div>
+                        <div><label class="field-label" for="serpapiLanguage">默认语言</label><input id="serpapiLanguage" class="field-input" type="text" placeholder="zh-cn"></div>
+                        <div><label class="field-label" for="serpapiResultLanguage">结果语言倾向</label><select id="serpapiResultLanguage" class="field-input"><option value="zh">仅中文（默认）</option><option value="en">仅英文</option><option value="all">不限语言</option></select></div>
+                        <div><label class="field-label" for="serpapiRecencyDays">资讯时间窗口（天）</label><input id="serpapiRecencyDays" class="field-input" type="number" min="1" max="31"><p class="field-hint">每日搜索仅获取该时间窗口内的最新结果</p></div>
+                        <div><label class="field-label" for="serpapiTimeout">请求超时（秒）</label><input id="serpapiTimeout" class="field-input" type="number" min="5" max="120"></div>
+                        <div><label class="field-label" for="serpapiRetries">失败重试（次）</label><input id="serpapiRetries" class="field-input" type="number" min="0" max="5"></div>
+                        <div><label class="field-label" for="serpapiMaxQueries">单次最多搜索词</label><input id="serpapiMaxQueries" class="field-input" type="number" min="1" max="100"></div>
+                        <div><label class="field-label" for="serpapiDailyBudget">每日查询额度</label><input id="serpapiDailyBudget" class="field-input" type="number" min="0" max="100000"></div>
+                    </div>
+                    <div class="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm font-semibold text-slate-800">当前行业包 <span id="serpapiIndustryPack" class="font-normal"></span> 的实际搜索词</p>
+                        <p class="mt-1 text-xs text-slate-500">搜索词由行业包维护；修改行业包后将在下次扫描时生效。</p>
+                        <ul id="serpapiQueries" class="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700"></ul>
+
+            <!-- ── Tavily（与 SerpAPI 同构；密钥不回显）── -->
+            <div class="mt-6 pt-5 border-t border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-base font-bold text-gray-900">Tavily</h4>
+                    <span id="tavilyStatus" class="badge badge-muted">未加载</span>
+                </div>
+                <p class="text-sm text-gray-500 mt-1">Tavily 免费额度比 SerpAPI 宽裕，默认承担主要搜索量；默认"分开搜"，每个关键词单独搜索、结果更全。</p>
+                <div class="mt-4 space-y-4">
+                    <div>
+                        <label class="field-label" for="tavilyApiKey">Tavily API Key</label>
+                        <div class="flex gap-2">
+                            <input id="tavilyApiKey" class="field-input" type="password" autocomplete="new-password" placeholder="已配置时留空表示不修改">
+                            <button type="button" id="toggleTavilyKeyBtn" class="btn-secondary">显示</button>
+                            <button type="button" id="clearTavilyKey" class="btn-secondary">清除</button>
+                        </div>
+                        <p id="tavilyApiKeyStatus" class="field-hint">正在检查 API Key 状态...</p>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span><span class="block text-sm font-semibold text-gray-800">启用 Tavily 搜索</span><span class="block text-xs text-gray-500 mt-0.5">关闭后不会发起任何 Tavily 请求。</span></span>
+                        <input id="tavilyEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div><label class="field-label" for="tavilyQueryMode">搜索方式</label><select id="tavilyQueryMode" class="field-input"><option value="separate">分开搜（每词一次，结果更全）</option><option value="merged">合并搜（OR 合并，省额度）</option></select></div>
+                        <div><label class="field-label" for="tavilyMaxResults">每次结果条数</label><input id="tavilyMaxResults" class="field-input" type="number" min="1" max="20"></div>
+                        <div><label class="field-label" for="tavilyDepth">搜索深度</label><select id="tavilyDepth" class="field-input"><option value="basic">basic（省额度）</option><option value="advanced">advanced（更贵）</option></select></div>
+                        <div><label class="field-label" for="tavilyPerRun">每轮调用上限</label><input id="tavilyPerRun" class="field-input" type="number" min="1" max="50"></div>
+                        <div><label class="field-label" for="tavilyPerMonth">每月调用上限</label><input id="tavilyPerMonth" class="field-input" type="number" min="1" max="10000"><p class="field-hint">免费档约 1000/月</p></div>
+                        <div><label class="field-label" for="tavilyTimeout">请求超时（秒）</label><input id="tavilyTimeout" class="field-input" type="number" min="5" max="120"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 调用时机与配额（全局；只搜当前生效行业包）── -->
+            <div class="mt-6 pt-5 border-t border-slate-200">
+                <h4 class="text-base font-bold text-gray-900">调用时机与配额</h4>
+                <p class="text-sm text-gray-500 mt-1">只搜索「当前生效行业包」的关键词精选；配额按引擎各自计数，到达上限自动跳过（不会硬跑超额）。</p>
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="flex items-center justify-between md:col-span-3">
+                        <span><span class="block text-sm font-semibold text-gray-800">启用定时搜索</span><span class="block text-xs text-gray-500 mt-0.5">默认关闭。开启后按下方时间自动搜索，结果进入候选队列。</span></span>
+                        <input id="searchEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                    </div>
+                    <div><label class="field-label" for="searchProvider">使用引擎</label><select id="searchProvider" class="field-input"><option value="serpapi">SerpAPI</option><option value="tavily">Tavily</option><option value="both">两个都用</option></select></div>
+                    <div><label class="field-label" for="searchRunHours">每天调用时间</label><input id="searchRunHours" class="field-input" type="text" placeholder="08:30"><p class="field-hint">格式 HH:MM，多个用逗号分隔</p></div>
+                    <div><label class="field-label" for="searchRunsPerDay">每天轮数</label><input id="searchRunsPerDay" class="field-input" type="number" min="0" max="6"></div>
+                    <div><label class="field-label" for="searchPacksPerRun">每轮行业包数</label><input id="searchPacksPerRun" class="field-input" type="number" min="1" max="9"></div>
+                    <div><label class="field-label" for="searchKeywordsPerPack">每包关键词数</label><input id="searchKeywordsPerPack" class="field-input" type="number" min="1" max="10"><p class="field-hint">3 个用 OR 合并成 1 次查询</p></div>
+                    <div><label class="field-label" for="serpapiQueryMode">SerpAPI 搜索方式</label><select id="serpapiQueryMode" class="field-input"><option value="merged">合并搜（省额度，默认）</option><option value="separate">分开搜</option></select></div>
+                    <div><label class="field-label" for="serpapiPerRun">SerpAPI 每轮上限</label><input id="serpapiPerRun" class="field-input" type="number" min="1" max="50"></div>
+                    <div><label class="field-label" for="serpapiPerMonth">SerpAPI 每月上限</label><input id="serpapiPerMonth" class="field-input" type="number" min="1" max="10000"><p class="field-hint">免费档 100/月，建议 ≤60</p></div>
+                </div>
+            </div>
+                    </div>
+                </section>
+
+                <section id="section-sources" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">信源（外部平台）</h3>
+                            <p class="text-sm text-gray-500 mt-1">配置用于获取行业资讯的 13 个外部平台信源。请为启用的信源填写前置凭据（按平台类型为 Cookie / Token / API Key / 订阅地址）；未配置凭据的信源不会拉取。保存后需重启生效。</p>
+                        </div>
+                        <span id="sourcesStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <div id="platformSourcesList" class="mt-4 grid gap-4 lg:grid-cols-2"></div>
+                </section>
+
+                <section id="section-proxy" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">代理</h3>
+                            <p class="text-sm text-gray-500 mt-1">外部网站访问使用这组代理，AI Server默认不走这里。</p>
+                        </div>
+                        <span id="proxyStatus" class="badge badge-muted">未加载</span>
+                    </div>
+                    <label class="toggle-row flex items-center justify-between gap-3 mb-4">
+                        <span class="text-sm font-semibold text-gray-800">启用聚合代理</span>
+                        <input id="proxyEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                    </label>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label class="field-label" for="proxyHttp">HTTP代理</label>
+                            <input id="proxyHttp" class="field-input" type="text" placeholder="http://127.0.0.1:7890">
+                        </div>
+                        <div>
+                            <label class="field-label" for="proxyHttps">HTTPS代理</label>
+                            <input id="proxyHttps" class="field-input" type="text" placeholder="http://127.0.0.1:7890">
+                        </div>
+                        <div>
+                            <label class="field-label" for="proxySocks5">SOCKS5代理</label>
+                            <input id="proxySocks5" class="field-input" type="text" placeholder="socks5://127.0.0.1:7891">
+                        </div>
+                        <div>
+                            <label class="field-label" for="proxyPlaywright">Playwright代理</label>
+                            <input id="proxyPlaywright" class="field-input" type="text" placeholder="http://127.0.0.1:7890">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-crawl" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">自动识别与防漏</h3>
+                            <p class="text-sm text-gray-500 mt-1">系统会自动识别栏目主区、文章链接、日期和分页；这里只调整默认强度。</p>
+                        </div>
+                        <span class="badge badge-ok">实时生效</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="lg:col-span-3 section-subtitle">基础聚合</div>
+                        <div class="lg:col-span-3">
+                            <label class="field-label" for="crawlUserAgent">浏览器标识</label>
+                            <input id="crawlUserAgent" class="field-input" type="text">
+                            <p class="field-hint">请求和补充发现会使用这个 User-Agent。</p>
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlTimeout">请求超时（秒）</label>
+                            <input id="crawlTimeout" class="field-input" type="number" min="5" max="600">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlWaitTime">普通等待（秒）</label>
+                            <input id="crawlWaitTime" class="field-input" type="number" min="0" max="120">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlRenderWaitMs">动态渲染等待（毫秒）</label>
+                            <input id="crawlRenderWaitMs" class="field-input" type="number" min="1000" max="60000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlClickTimeoutMs">翻页点击超时（毫秒）</label>
+                            <input id="crawlClickTimeoutMs" class="field-input" type="number" min="250" max="5000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlMaxPages">栏目最大翻页</label>
+                            <input id="crawlMaxPages" class="field-input" type="number" min="1" max="1000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlMaxPagesWithLimit">有文章上限时翻页</label>
+                            <input id="crawlMaxPagesWithLimit" class="field-input" type="number" min="1" max="1000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlMaxEmptyPages">连续空页停止</label>
+                            <input id="crawlMaxEmptyPages" class="field-input" type="number" min="1" max="50">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlDetailRetries">正文重试（次）</label>
+                            <input id="crawlDetailRetries" class="field-input" type="number" min="1" max="5">
+                        </div>
+
+                        <div class="lg:col-span-3 section-subtitle mt-2">防漏策略</div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">按日期范围收全文章</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">开启后不让文章数量上限提前截断日期范围。</span>
+                            </span>
+                            <input id="crawlDateRangePriority" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">动态接口补链</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">捕获前端接口返回的文章链接。</span>
+                            </span>
+                            <input id="crawlNetworkJsonEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">多来源补链</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">从页面、Feed、Sitemap等入口补充候选文章。</span>
+                            </span>
+                            <input id="crawlSupplementalEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">预过滤链接日期</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">按日期范围聚合时建议开启，只跳过列表日期明确超出范围的候选。</span>
+                            </span>
+                            <input id="crawlCandidateDatePrefilter" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-800">新任务默认使用代理</span>
+                                <span class="block text-xs text-gray-500 mt-0.5">需要先在代理分组配置地址。</span>
+                            </span>
+                            <input id="crawlUseProxyDefault" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+
+                        <div class="lg:col-span-3 section-subtitle mt-2">补充来源</div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">静态HTML链接</span>
+                            <input id="crawlSupplementalHtmlEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">标签属性链接</span>
+                            <input id="crawlSupplementalAttributesEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">结构化数据</span>
+                            <input id="crawlSupplementalStructuredEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">脚本JSON</span>
+                            <input id="crawlSupplementalScriptsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">静态翻页</span>
+                            <input id="crawlSupplementalStaticPaginationEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">RSS / Atom</span>
+                            <input id="crawlSupplementalFeedsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">Sitemap</span>
+                            <input id="crawlSupplementalSitemapsEnabled" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+
+                        <div class="lg:col-span-3 section-subtitle mt-2">补充规模</div>
+                        <div>
+                            <label class="field-label" for="crawlSupplementalMaxPerSource">单来源最大链接</label>
+                            <input id="crawlSupplementalMaxPerSource" class="field-input" type="number" min="100" max="5000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlSupplementalMaxSitemaps">最多Sitemap数</label>
+                            <input id="crawlSupplementalMaxSitemaps" class="field-input" type="number" min="1" max="200">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlSupplementalMaxStaticPages">静态翻页补充页数</label>
+                            <input id="crawlSupplementalMaxStaticPages" class="field-input" type="number" min="1" max="100">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-scheduler" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">Scheduling Concurrency</h3>
+                            <p class="text-sm text-gray-500 mt-1">大规模任务调度主要看这里。</p>
+                        </div>
+                        <span class="badge badge-warn">部分需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="schedulerMaxConcurrent">最大并发任务 <span class="badge badge-warn">需重启</span></label>
+                            <input id="schedulerMaxConcurrent" class="field-input" type="number" min="1" max="32">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerMaxPerDomain">单域名并发</label>
+                            <input id="schedulerMaxPerDomain" class="field-input" type="number" min="1" max="8">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerRetries">失败重试</label>
+                            <input id="schedulerRetries" class="field-input" type="number" min="0" max="5">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerRetryBackoff">重试间隔（秒）</label>
+                            <input id="schedulerRetryBackoff" class="field-input" type="number" min="0" max="600">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerDomainCooldown">域名冷却（秒）</label>
+                            <input id="schedulerDomainCooldown" class="field-input" type="number" min="0" max="300">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerTaskTimeout">任务超时（秒）</label>
+                            <input id="schedulerTaskTimeout" class="field-input" type="number" min="300" max="86400">
+                        </div>
+                        <div>
+                            <label class="field-label" for="schedulerCompletedRetention">完成记录保留（秒）</label>
+                            <input id="schedulerCompletedRetention" class="field-input" type="number" min="60" max="86400">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-home" class="config-section card-shadow">
+                    <div class="section-title"><div><h3 class="text-lg font-bold text-gray-900">首页资讯时间窗口</h3><p class="text-sm text-gray-500 mt-1">Dashboard 仅显示发布日期落在该窗口内、且通过行业门禁的文章。保存后刷新首页立即生效。</p></div></div>
+                    <div class="flex flex-wrap items-end gap-3"><div><label class="field-label" for="dashboardWindowDays">发布日期窗口（天）</label><select id="dashboardWindowDays" class="field-input"><option value="30">30 天</option><option value="90">90 天</option><option value="120">120 天</option><option value="180">180 天</option><option value="365">365 天</option></select></div><div><label class="field-label" for="dashboardWindowCustom">自定义天数</label><input id="dashboardWindowCustom" class="field-input" type="number" min="1" max="730" placeholder="1–730"></div><button id="saveDashboardWindowBtn" class="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700">保存首页设置</button><span id="dashboardWindowStatus" class="text-sm text-gray-500"></span></div>
+                </section>
+
+                <section id="section-system" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">系统</h3>
+                            <p class="text-sm text-gray-500 mt-1">服务启动、日志和会话相关配置。</p>
+                        </div>
+                        <span class="badge badge-warn">端口需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="flaskHost">监听地址 <span class="badge badge-warn">需重启</span></label>
+                            <input id="flaskHost" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="flaskPort">端口 <span class="badge badge-warn">需重启</span></label>
+                            <input id="flaskPort" class="field-input" type="number" min="1" max="65535">
+                        </div>
+                        <label class="toggle-row flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-gray-800">调试模式</span>
+                            <input id="flaskDebug" type="checkbox" class="h-5 w-5 rounded text-blue-600">
+                        </label>
+                        <div>
+                            <label class="field-label" for="sessionLifetime">登录有效期（秒）</label>
+                            <input id="sessionLifetime" class="field-input" type="number" min="300" max="2592000">
+                        </div>
+                        <div>
+                            <label class="field-label" for="authCheckInterval">认证检查间隔（秒）</label>
+                            <input id="authCheckInterval" class="field-input" type="number" min="60" max="86400">
+                        </div>
+                        <div>
+                            <label class="field-label" for="logLevel">日志级别</label>
+                            <select id="logLevel" class="field-input">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label" for="logFile">日志文件</label>
+                            <input id="logFile" class="field-input" type="text">
+                        </div>
+                        <div class="lg:col-span-3">
+                            <label class="field-label" for="secretKey">SECRET_KEY <span id="secretKeyStatus" class="badge badge-muted">未加载</span></label>
+                            <div class="secret-row">
+                                <input id="secretKey" class="field-input" type="password" autocomplete="new-password">
+                                <button id="toggleSecretKeyBtn" type="button" class="px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-600 hover:bg-gray-50" title="显示或隐藏">
+                                    <i class="fa fa-eye"></i>
+                                </button>
+                            </div>
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearSecretKey" type="checkbox" class="rounded text-blue-600">
+                                清空SECRET_KEY
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-storage" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">存储</h3>
+                            <p class="text-sm text-gray-500 mt-1">本地数据库、聚合结果和登录态文件路径。</p>
+                        </div>
+                        <span class="badge badge-warn">需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="lg:col-span-3">
+                            <label class="field-label">数据库类型</label>
+                            <div id="storageDbType" class="field-input bg-gray-100 text-gray-700"></div>
+                            <p id="storageDbHint" class="field-hint"></p>
+                        </div>
+                        <div>
+                            <label class="field-label" for="databasePath">SQLite 回退/备份路径</label>
+                            <input id="databasePath" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="crawlResultsDir">聚合结果目录</label>
+                            <input id="crawlResultsDir" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="authStorageDir">登录态目录</label>
+                            <input id="authStorageDir" class="field-input" type="text">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-redis" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">Redis</h3>
+                            <p class="text-sm text-gray-500 mt-1">任务状态缓存和运行队列使用。</p>
+                        </div>
+                        <span class="badge badge-warn">需重启</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="field-label" for="redisHost">主机</label>
+                            <input id="redisHost" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="redisPort">端口</label>
+                            <input id="redisPort" class="field-input" type="number" min="1" max="65535">
+                        </div>
+                        <div>
+                            <label class="field-label" for="redisDb">DB</label>
+                            <input id="redisDb" class="field-input" type="number" min="0" max="15">
+                        </div>
+                        <div class="lg:col-span-3">
+                            <label class="field-label" for="redisPassword">密码 <span id="redisPasswordStatus" class="badge badge-muted">未加载</span></label>
+                            <input id="redisPassword" class="field-input" type="password" autocomplete="new-password">
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearRedisPassword" type="checkbox" class="rounded text-blue-600">
+                                清空Redis密码
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="section-admin" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">登录初始化</h3>
+                            <p class="text-sm text-gray-500 mt-1">只影响首次初始化管理员；已有账号请在用户管理里改。</p>
+                        </div>
+                        <span class="badge badge-muted">初始化配置</span>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                            <label class="field-label" for="adminUsername">默认管理员账号</label>
+                            <input id="adminUsername" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="adminEmail">邮箱</label>
+                            <input id="adminEmail" class="field-input" type="email">
+                        </div>
+                        <div>
+                            <label class="field-label" for="adminFullName">显示名</label>
+                            <input id="adminFullName" class="field-input" type="text">
+                        </div>
+                        <div>
+                            <label class="field-label" for="adminPassword">默认管理员密码 <span id="adminPasswordStatus" class="badge badge-muted">未加载</span></label>
+                            <input id="adminPassword" class="field-input" type="password" autocomplete="new-password">
+                            <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-600">
+                                <input id="clearAdminPassword" type="checkbox" class="rounded text-blue-600">
+                                清空默认密码配置
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AI助手配置 -->
+                <section id="section-chat" class="config-section card-shadow">
+                    <div class="section-title">
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900">AI助手</h3>
+                            <p class="text-sm text-gray-500 mt-1">配置 AI 模型 API 密钥与默认知识库</p>
+                        </div>
+                    </div>
+
+                    <!-- 模型选择 -->
+                    <div class="config-grid" style="margin-bottom:16px;">
+                        <label class="config-label">当前模型</label>
+                        <div class="lg:col-span-2">
+                            <select id="chatCfgModel" onchange="chatCfgSwitchModel(this.value)"
+                                style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;background:#fff;">
+                                <option value="doubao">豆包</option>
+                                <option value="deepseek">DeepSeek（官方）</option>
+                                <option value="chatgpt">ChatGPT（官方）</option>
+                                <option value="openrouter">OpenRouter（可接 Claude/Llama 等其它模型）</option>
+                                <option value="local">本地 LLM</option>
+                                <option value="glm52">GLM</option>
+                                <option value="kimi">Kimi</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="claude">Claude</option>
+                            </select>
+                            <div id="chatCfgMetricStatus" style="font-size:12px;margin-top:6px;min-height:16px;color:#6b7280;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 本地模型专属：接入地址配置 -->
+                    <div class="config-grid" id="chatCfgBaseUrlRow" style="display:none;margin-bottom:8px;">
+                        <label class="config-label" for="chatCfgBaseUrl">接入地址</label>
+                        <div class="lg:col-span-2">
+                            <div style="display:flex;gap:8px;">
+                                <input id="chatCfgBaseUrl" type="text" placeholder="http://192.168.0.64:8106/v1"
+                                    style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;">
+                                <button onclick="chatCfgSaveBaseUrl()" class="btn-primary" style="white-space:nowrap;">保存地址</button>
+                            </div>
+                            <div id="chatCfgBaseUrlStatus" style="font-size:12px;margin-top:4px;min-height:16px;color:#6b7280;">OpenAI 兼容接口，末尾不含 /chat/completions</div>
+                        </div>
+                    </div>
+
+                    <div class="config-grid" id="chatCfgFixedBaseUrlRow" style="display:none;margin-bottom:8px;">
+                        <label class="config-label">接入地址</label>
+                        <div class="lg:col-span-2">
+                            <div style="padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;background:#f9fafb;color:#374151;">
+                                GLM 固定使用 Z.AI 云 API：<code>https://api.z.ai/api/paas/v4</code>
+                            </div>
+                            <div style="font-size:12px;margin-top:4px;color:#6b7280;">该地址由后端固定，不在页面开放修改。</div>
+                        </div>
+                    </div>
+
+                    <div class="section-subtitle">API 密钥</div>
+
+                    <div class="config-grid">
+                        <label class="config-label" for="chatCfgApiKey">API Key</label>
+                        <div class="lg:col-span-2">
+                            <div style="display:flex;gap:8px;">
+                                <input id="chatCfgApiKey" type="password" placeholder="留空则不修改已保存的密钥"
+                                    style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;">
+                                <button onclick="chatCfgSaveKey()" class="btn-primary" style="white-space:nowrap;">保存密钥</button>
+                                <button onclick="chatCfgTestConn()" id="chatTestBtn" class="btn-secondary" style="white-space:nowrap;">连接测试</button>
+                            </div>
+                            <div id="chatCfgKeyStatus" style="font-size:12px;margin-top:4px;min-height:16px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="config-grid" style="margin-top:8px;">
+                        <label class="config-label" for="chatCfgModelName">模型名称</label>
+                        <div class="lg:col-span-2">
+                            <input id="chatCfgModelName" type="text" placeholder="留空使用默认值"
+                                style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;">
+                        </div>
+                    </div>
+
+                    <div class="config-grid" style="margin-top:8px;">
+                        <label class="config-label">使用代理</label>
+                        <div class="lg:col-span-2">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;">
+                                <input type="checkbox" id="chatCfgProxy" onchange="chatCfgSaveProxy()" style="width:15px;height:15px;cursor:pointer;">
+                                <span>开启后通过 CHAT_PROXY 代理访问（Gemini / ChatGPT / Claude 等境外模型需要）</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="section-subtitle" style="margin-top:16px;">默认知识库</div>
+
+                    <div class="config-grid">
+                        <label class="config-label">知识库</label>
+                        <div class="lg:col-span-2">
+                            <div style="display:flex;gap:8px;">
+                                <select id="chatCfgKbId"
+                                    style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;background:#fff;">
+                                    <option value="">-- 点击「加载」获取列表 --</option>
+                                </select>
+                                <button onclick="chatCfgLoadKb()" id="chatCfgLoadKbBtn" class="btn-secondary" style="white-space:nowrap;">加载</button>
+                                <button onclick="chatCfgSaveKb()" class="btn-primary" style="white-space:nowrap;">保存</button>
+                            </div>
+                            <div id="chatCfgKbStatus" style="font-size:12px;margin-top:4px;min-height:16px;"></div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        let keyState = {};
+
+        function setMessage(text, type = '') {
+            const box = $('messageBox');
+            if (!text) {
+                box.classList.add('hidden');
+                box.textContent = '';
+                return;
+            }
+            box.className = `status-box mb-5 ${type}`;
+            box.textContent = text;
+        }
+
+        function showToast(message, type = 'info') {
+            let host = document.getElementById('toastHost');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'toastHost';
+                document.body.appendChild(host);
+            }
+            const palette = {
+                ok:    { background: '#059669', border: '#34d399', icon: 'fa-check-circle' },
+                warn:  { background: '#d97706', border: '#fbbf24', icon: 'fa-exclamation-triangle' },
+                error: { background: '#dc2626', border: '#f87171', icon: 'fa-times-circle' },
+                info:  { background: '#2563eb', border: '#60a5fa', icon: 'fa-info-circle' }
+            };
+            const style = palette[type] || palette.info;
+            const toast = document.createElement('div');
+            toast.className = 'toast-item';
+            toast.style.background = style.background;
+            toast.style.border = `1px solid ${style.border}`;
+            const icon = document.createElement('i');
+            icon.className = `fa ${style.icon}`;
+            icon.style.marginTop = '2px';
+            const span = document.createElement('span');
+            span.style.flex = '1';
+            span.textContent = message;
+            toast.appendChild(icon);
+            toast.appendChild(span);
+            host.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transition = 'opacity .3s ease, transform .3s ease';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(24px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function setBadge(id, text, type) {
+            const el = $(id);
+            if (!el) return;
+            const styles = {
+                ok: 'badge badge-ok',
+                warn: 'badge badge-warn',
+                idle: 'badge badge-muted',
+                muted: 'badge badge-muted'
+            };
+            el.className = styles[type] || styles.muted;
+            el.textContent = text;
+        }
+
+        function setButtonLoading(button, loading, text) {
+            if (!button) return;
+            if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+            button.disabled = loading;
+            button.innerHTML = loading ? `<i class="fa fa-spinner fa-spin mr-1.5"></i>${text}` : button.dataset.originalHtml;
+        }
+
+        function setVal(id, value) {
+            const el = $(id);
+            if (el) el.value = value ?? '';
+        }
+
+        function setChecked(id, value) {
+            const el = $(id);
+            if (el) el.checked = !!value;
+        }
+
+        function val(id) {
+            return ($(id)?.value || '').trim();
+        }
+
+        function checked(id) {
+            return !!$(id)?.checked;
+        }
+
+        function setLockedInput(id, locked) {
+            const el = $(id);
+            if (!el) return;
+            el.readOnly = !!locked;
+            el.setAttribute('aria-readonly', locked ? 'true' : 'false');
+            el.classList.toggle('bg-gray-100', !!locked);
+            el.classList.toggle('text-gray-500', !!locked);
+            el.classList.toggle('cursor-not-allowed', !!locked);
+        }
+
+        function fillSecret(inputId, clearId, configured, labelId, name) {
+            keyState[inputId] = !!configured;
+            setVal(inputId, '');
+            $(inputId).placeholder = configured ? '已配置，留空表示不修改' : `请输入${name}`;
+            setChecked(clearId, false);
+            $(inputId).disabled = false;
+            setBadge(labelId, configured ? '已配置' : '未配置', configured ? 'ok' : 'warn');
+        }
+
+        function parseVoiceCatalog(raw) {
+            try {
+                const items = JSON.parse(raw || '[]');
+                return Array.isArray(items) ? items.filter(item => item && typeof item.id === 'string') : [];
+            } catch (_) { return []; }
+        }
+
+        function fillVoiceSelect(id, catalog, language, selected) {
+            const select = $(id);
+            if (!select) return;
+            const options = [{id: '', label: 'AI Server 默认音色', language: 'all'}]
+                .concat(catalog.filter(item => ['all', language].includes(String(item.language || 'all').toLowerCase())));
+            if (selected && !options.some(item => item.id === selected)) options.push({id: selected, label: `已保存音色：${selected}`, language});
+            select.replaceChildren(...options.map(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.label || item.id;
+                return option;
+            }));
+            select.value = selected || '';
+        }
+
+        function fillConfig(data) {
+            $('envPath').textContent = `配置文件：${data.env_path || '.env'}`;
+
+            const system = data.system || {};
+            setVal('flaskHost', system.flask_host);
+            setVal('flaskPort', system.flask_port);
+            setChecked('flaskDebug', system.flask_debug);
+            fillSecret('secretKey', 'clearSecretKey', system.secret_key_configured, 'secretKeyStatus', 'SECRET_KEY');
+            setVal('sessionLifetime', system.session_lifetime);
+            setVal('authCheckInterval', system.auth_check_interval);
+            setVal('logLevel', system.log_level || 'INFO');
+            setVal('logFile', system.log_file);
+
+            const admin = data.admin || {};
+            setVal('adminUsername', admin.username);
+            setVal('adminEmail', admin.email);
+            setVal('adminFullName', admin.full_name);
+            fillSecret('adminPassword', 'clearAdminPassword', admin.password_configured, 'adminPasswordStatus', '默认管理员密码');
+
+            const storage = data.storage || {};
+            // 平台品牌设置
+            const platform = data.platform || {};
+            $('platformName').value = platform.name || '资讯情报系统';
+            const logoPreview = $('platformLogoPreview');
+            if (platform.logo_url) { logoPreview.innerHTML = `<img src="${platform.logo_url}" alt="Logo" style="max-width:100%;max-height:100%" onerror="this.style.display='none'">`; }
+            else { logoPreview.innerHTML = '<i class="fa fa-image text-gray-300 text-2xl"></i>'; }
+            $('platformLogoFile').addEventListener('change', function(){ const f = this.files && this.files[0]; if (f) { const url = URL.createObjectURL(f); logoPreview.innerHTML = `<img src="${url}" alt="Logo" style="max-width:100%;max-height:100%">`; } });
+            setVal('databasePath', storage.database_path);
+            setVal('crawlResultsDir', storage.crawl_results_dir);
+            setVal('authStorageDir', storage.auth_storage_dir);
+            const _dbType = String(storage.database_type || 'sqlite').toLowerCase();
+            const _dbTypeLabel = _dbType === 'postgres' ? 'PostgreSQL' : 'SQLite';
+            $('storageDbType').textContent = _dbTypeLabel;
+            if (_dbType === 'postgres') {
+                const _pg = `${storage.postgres_host || ''}:${storage.postgres_port || ''}/${storage.postgres_db || ''}`;
+                $('storageDbHint').textContent = `当前使用 ${_dbTypeLabel}（${_pg}）；下方 SQLite 路径仅为回退/备份，不再作为主存储。`;
+            } else {
+                $('storageDbHint').textContent = `当前使用 SQLite，主数据库文件即下方路径。`;
+            }
+
+            const redis = data.redis || {};
+            setVal('redisHost', redis.host);
+            setVal('redisPort', redis.port);
+            setVal('redisDb', redis.db);
+            fillSecret('redisPassword', 'clearRedisPassword', redis.password_configured, 'redisPasswordStatus', 'Redis密码');
+
+            const scheduler = data.scheduler || {};
+            setVal('schedulerMaxConcurrent', scheduler.max_concurrent);
+            setVal('schedulerMaxPerDomain', scheduler.max_per_domain);
+            setVal('schedulerRetries', scheduler.retries);
+            setVal('schedulerRetryBackoff', scheduler.retry_backoff);
+            setVal('schedulerDomainCooldown', scheduler.domain_cooldown);
+            setVal('schedulerTaskTimeout', scheduler.task_timeout);
+            setVal('schedulerCompletedRetention', scheduler.completed_retention);
+
+            const crawl = data.crawl || {};
+            setVal('crawlUserAgent', crawl.user_agent);
+            setVal('crawlTimeout', crawl.timeout);
+            setVal('crawlWaitTime', crawl.wait_time);
+            setVal('crawlRenderWaitMs', crawl.render_wait_ms);
+            setVal('crawlClickTimeoutMs', crawl.click_timeout_ms);
+            setVal('crawlMaxPages', crawl.max_pages);
+            setVal('crawlMaxPagesWithLimit', crawl.max_pages_with_limit);
+            setVal('crawlMaxEmptyPages', crawl.max_empty_pages);
+            setVal('crawlDetailRetries', crawl.detail_max_retries);
+            setChecked('crawlDateRangePriority', crawl.date_range_priority);
+            setChecked('crawlCandidateDatePrefilter', crawl.candidate_date_prefilter);
+            setChecked('crawlNetworkJsonEnabled', crawl.network_json_enabled);
+            setChecked('crawlSupplementalEnabled', crawl.supplemental_enabled);
+            setChecked('crawlSupplementalHtmlEnabled', crawl.supplemental_html);
+            setChecked('crawlSupplementalAttributesEnabled', crawl.supplemental_attributes);
+            setChecked('crawlSupplementalStructuredEnabled', crawl.supplemental_structured);
+            setChecked('crawlSupplementalScriptsEnabled', crawl.supplemental_scripts);
+            setChecked('crawlSupplementalStaticPaginationEnabled', crawl.supplemental_static_pagination);
+            setChecked('crawlSupplementalFeedsEnabled', crawl.supplemental_feeds);
+            setChecked('crawlSupplementalSitemapsEnabled', crawl.supplemental_sitemaps);
+            setVal('crawlSupplementalMaxPerSource', crawl.supplemental_max_per_source);
+            setVal('crawlSupplementalMaxSitemaps', crawl.supplemental_max_sitemaps);
+            setVal('crawlSupplementalMaxStaticPages', crawl.supplemental_max_static_pages);
+            setChecked('crawlUseProxyDefault', crawl.use_proxy_default);
+
+            const proxy = data.proxy || {};
+            setChecked('proxyEnabled', proxy.enabled);
+            setVal('proxyHttp', proxy.http);
+            setVal('proxyHttps', proxy.https);
+            setVal('proxySocks5', proxy.socks5);
+            setVal('proxyPlaywright', proxy.playwright);
+            setBadge('proxyStatus', proxy.enabled ? '已启用' : '已关闭', proxy.enabled ? 'ok' : 'idle');
+
+            const ragflow = data.ragflow || {};
+            const remotePipeline = data.remote_pipeline || {};
+            setVal('remotePipelineUrl', remotePipeline.url || '');
+            setVal('remotePipelineTtsLanguage', remotePipeline.tts_language || 'zh');
+            setVal('remotePipelineTtsDialect', remotePipeline.tts_dialect || 'mandarin');
+            setVal('remotePipelineTtsGender', remotePipeline.tts_gender || 'female');
+            window._remoteTtsVoiceId = remotePipeline.tts_voice || 'default';
+            setVal('ragflowBaseUrl', ragflow.base_url);
+            const ragflowBaseConfigured = !!String(ragflow.base_url || '').trim();
+            setLockedInput('ragflowBaseUrl', ragflowBaseConfigured);
+            $('ragflowBaseUrlHint').textContent = ragflowBaseConfigured
+                ? '该地址已配置，不能在页面修改。'
+                : '尚未配置，可在此首次录入。';
+            fillSecret('ragflowApiKey', 'clearApiKey', ragflow.api_key_configured, 'apiKeyHint', 'AI Server API Key');
+            setLockedInput('ragflowApiKey', !!ragflow.api_key_configured);
+            $('ragflowApiKey').value = ragflow.api_key_configured ? '••••••••••••••••' : '';
+            $('clearApiKey').checked = false;
+            $('clearApiKey').disabled = !!ragflow.api_key_configured;
+            $('apiKeyHint').textContent = ragflow.api_key_configured ? 'API Key已配置，不能在页面修改。' : 'API Key未配置，可在此首次录入。';
+            $('apiKeyHint').className = 'field-hint';
+            setChecked('ragflowUploadEnabled', ragflow.upload_enabled);
+            setChecked('ragflowAutoParse', ragflow.auto_parse);
+            setChecked('ragflowReuploadExisting', ragflow.reupload_existing);
+            setVal('ragflowTimeout', ragflow.timeout);
+            setVal('ragflowRetries', ragflow.upload_retries);
+            setChecked('ragflowTtsEnabled', ragflow.tts_enabled);
+            setVal('intelTtsEngine', ragflow.intel_tts_engine || 'CosyVoice3');
+            setVal('intelTtsVoiceProfile', ragflow.intel_tts_voice_profile || 'male_mandarin_01');
+            setVal('intelTtsDialect', ragflow.intel_tts_dialect || 'mandarin');
+            setVal('intelTtsGender', ragflow.intel_tts_gender || 'male');
+            setVal('intelTtsEmotion', ragflow.intel_tts_emotion || 'lively');
+            setVal('intelTtsSpeed', ragflow.intel_tts_speed || '1.15');
+            setVal('intelTtsBufferMs', ragflow.intel_tts_buffer_ms || '1400');
+            setVal('intelTtsSegmentMaxCharsZh', ragflow.intel_tts_segment_max_chars_zh || '50');
+            setVal('intelTtsSegmentMaxWordsEn', ragflow.intel_tts_segment_max_words_en || '20');
+            setVal('ragflowTtsModel', ragflow.tts_model);
+            setVal('ragflowTtsLanguageMode', ragflow.tts_language_mode || 'auto');
+            setVal('ragflowTtsVoiceCatalog', ragflow.tts_voice_catalog || '[]');
+            const voiceCatalog = parseVoiceCatalog(ragflow.tts_voice_catalog);
+            fillVoiceSelect('ragflowTtsVoiceZh', voiceCatalog, 'zh', ragflow.tts_voice_zh || '');
+            fillVoiceSelect('ragflowTtsVoiceEn', voiceCatalog, 'en', ragflow.tts_voice_en || '');
+            setVal('ragflowTtsPrebuffer', ragflow.tts_prebuffer_sentences);
+            setVal('ragflowTtsMaxChars', ragflow.tts_max_chars);
+            setVal('ragflowTtsTimeout', ragflow.tts_timeout);
+            setVal('ragflowTtsCacheDays', ragflow.tts_cache_days);
+            setVal('ragflowTtsCacheMaxMb', ragflow.tts_cache_max_mb);
+            setChecked('ragflowProxyEnabled', ragflow.proxy_enabled);
+            setVal('ragflowProxyHttp', ragflow.proxy_http);
+            setVal('ragflowProxyHttps', ragflow.proxy_https);
+            setVal('ragflowProxySocks5', ragflow.proxy_socks5);
+            setBadge(
+                'ragflowStatus',
+                ragflow.base_url && ragflow.api_key_configured ? '已配置' : '未配置完整',
+                ragflow.base_url && ragflow.api_key_configured ? 'ok' : 'warn'
+            );
+
+            const serpapi = data.serpapi || {};
+            fillSecret('serpapiApiKey', 'clearSerpapiKey', serpapi.api_key_configured, 'serpapiApiKeyStatus', 'SerpAPI API Key');
+            setChecked('serpapiEnabled', serpapi.enabled);
+            setVal('serpapiEngine', serpapi.engine || 'google');
+            setVal('serpapiRegion', serpapi.default_region || 'hk');
+            setVal('serpapiLanguage', serpapi.default_language || 'zh-cn');
+            setVal('serpapiTimeout', serpapi.timeout_seconds);
+            setVal('serpapiRetries', serpapi.max_retries);
+            setVal('serpapiMaxQueries', serpapi.max_queries_per_run);
+            setVal('serpapiDailyBudget', serpapi.daily_query_budget);
+            setVal('serpapiResultLanguage', serpapi.result_language || 'zh');
+            setVal('serpapiRecencyDays', serpapi.recency_days || 3);
+            $('serpapiIndustryPack').textContent = serpapi.industry_pack_id || '未配置';
+            const queryList = $('serpapiQueries');
+            queryList.innerHTML = '';
+            (Array.isArray(serpapi.queries) ? serpapi.queries : []).forEach(query => {
+                const item = document.createElement('li');
+                item.textContent = query;
+                queryList.appendChild(item);
+            });
+            if (!queryList.children.length) queryList.innerHTML = '<li>当前行业包尚未配置 SerpAPI 搜索词。</li>';
+            const serpapiReady = serpapi.enabled && serpapi.api_key_configured;
+            setBadge('serpapiStatus', serpapiReady ? '已启用' : (serpapi.api_key_configured ? '已关闭' : '未配置'), serpapiReady ? 'ok' : 'warn');
+            // ── Tavily（密钥只显示"已配置/未配置"，不回显明文）──
+            const tavily = data.tavily || {};
+            fillSecret('tavilyApiKey', 'clearTavilyKey', tavily.api_key_configured, 'tavilyApiKeyStatus', 'Tavily API Key');
+            setChecked('tavilyEnabled', tavily.enabled);
+            setVal('tavilyQueryMode', tavily.query_mode || 'separate');
+            setVal('tavilyMaxResults', tavily.max_results);
+            setVal('tavilyDepth', tavily.search_depth || 'basic');
+            setVal('tavilyPerRun', tavily.max_calls_per_run);
+            setVal('tavilyPerMonth', tavily.max_calls_per_month);
+            setVal('tavilyTimeout', tavily.timeout_seconds);
+            const tavilyReady = tavily.enabled && tavily.api_key_configured;
+            setBadge('tavilyStatus', tavilyReady ? '已启用' : (tavily.api_key_configured ? '已关闭' : '未配置'), tavilyReady ? 'ok' : 'warn');
+            // ── 调用时机与配额（全局）──
+            const searchEngine = data.search_engine || {};
+            setChecked('searchEnabled', searchEngine.enabled);
+            setVal('searchProvider', searchEngine.provider || 'serpapi');
+            setVal('searchRunHours', searchEngine.run_hours || '08:30');
+            setVal('searchRunsPerDay', searchEngine.runs_per_day);
+            setVal('searchPacksPerRun', searchEngine.packs_per_run);
+            setVal('searchKeywordsPerPack', searchEngine.keywords_per_pack);
+            setVal('serpapiQueryMode', searchEngine.serpapi_query_mode || 'merged');
+            setVal('serpapiPerRun', searchEngine.serpapi_max_calls_per_run);
+            setVal('serpapiPerMonth', searchEngine.serpapi_max_calls_per_month);
+
+            const sources = (data.platform_sources || {}).sources || [];
+            renderPlatformSources(sources);
+            const cfgCount = (data.platform_sources || {}).configured_count || 0;
+            setBadge('sourcesStatus', (cfgCount > 0 ? '已配置 ' + cfgCount + '/' + sources.length : '未配置'), cfgCount > 0 ? 'ok' : 'warn');
+
+            function renderPlatformSources(sources) {
+                const host = $('platformSourcesList');
+                host.innerHTML = '';
+                (sources || []).forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'p-4 rounded-lg bg-white border border-gray-200';
+                    card.innerHTML = '<div class="flex items-center justify-between">' +
+                        '<div class="min-w-0">' +
+                          '<div class="text-sm font-semibold text-gray-800">' + s.label + '</div>' +
+                          '<div class="text-xs text-gray-400">' + (s.category || '') + ' · 凭据: ' + (s.credential_label || '') + (s.configured ? ' · <span class="text-green-600">已配置</span>' : '') + '</div>' +
+                          '<div class="text-xs text-gray-400 mt-0.5">' + (s.hint || '') + '</div>' +
+                        '</div>' +
+                        '<label class="inline-flex items-center shrink-0 ml-2"><input type="checkbox" data-plat-enable data-plat-id="' + s.id + '"' + (s.enabled ? ' checked' : '') + ' class="h-4 w-4 rounded text-blue-600"><span class="ml-1 text-sm">启用</span></label>' +
+                      '</div>' +
+                      '<input type="password" data-plat-auth data-plat-id="' + s.id + '" class="field-input mt-2" autocomplete="new-password" placeholder="凭据（已配置时留空则不修改）">' +
+                      '<div class="mt-2 flex items-center gap-2">' +
+                        '<button type="button" class="btn text-xs" data-plat-test data-plat-id="' + s.id + '" data-plat-label="' + s.label + '">测试</button>' +
+                        '<span class="text-xs text-gray-500 truncate" data-plat-test-result data-plat-id="' + s.id + '"></span>' +
+                      '</div>' +
+                      '<p class="mt-1 text-[11px] text-gray-400">' + (s.configured ? '已保存凭据，留空保存则保留原值' : '尚未配置凭据，需填写后保存') + '</p>';
+                    host.appendChild(card);
+                });
+                host.querySelectorAll('[data-plat-test]').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        testPlatformSource(btn.getAttribute('data-plat-id'), btn);
+                    });
+                });
+            }
+            window.testPlatformSource = function(id, btn) {
+                const res = document.querySelector('#platformSourcesList [data-plat-test-result][data-plat-id="' + id + '"]');
+                if (res) res.textContent = '测试中...';
+                fetch('/api/config-management/platform-sources/test/' + encodeURIComponent(id), {method: 'POST', credentials: 'include'})
+                    .then(r => r.json()).then(d => {
+                        const msg = d.message || (d.success ? '可用' : '失败');
+                        if (res) res.textContent = msg;
+                        if (btn) {
+                            const lbl = btn.getAttribute('data-plat-label') || id;
+                            btn.classList.remove('text-green-600','text-red-600');
+                            btn.classList.add(d.success ? 'text-green-600' : 'text-red-600');
+                        }
+                    }).catch(e => { if (res) res.textContent = '测试出错: ' + e; });
+            };
+            window.collectPlatformSources = function() {
+                return Array.from(document.querySelectorAll('#platformSourcesList input[data-plat-enable]')).map(function(cb) {
+                    const id = cb.getAttribute('data-plat-id');
+                    const authEl = document.querySelector('#platformSourcesList input[data-plat-auth][data-plat-id="' + id + '"]');
+                    const auth = authEl ? authEl.value : '';
+                    const out = { id: id, enabled: !!cb.checked };
+                    if (auth) out.auth = auth;
+                    return out;
+                });
+            };
+
+            const financial = data.financial || {};
+            const rollout = financial.rollout || {};
+            setVal('financialRolloutStage', rollout.stage || 'off');
+            setVal('financialRolloutObservation', rollout.observation_seconds || 3600);
+            setChecked('financialIntelligenceEnabled', financial.financial_intelligence_enabled);
+            setChecked('tradingAgentsEnabled', financial.trading_agents_enabled);
+            setChecked('financialAutoResearchEnabled', financial.auto_research_enabled);
+            setChecked('tradingSimulationEnabled', financial.simulation_enabled);
+            setChecked('akshareCnEnabled', financial.akshare_cn_enabled);
+            setChecked('tushareCnEnabled', financial.tushare_cn_enabled);
+            fillSecret('tushareToken', 'clearTushareToken', financial.tushare_token_configured, 'tushareTokenStatus', 'Tushare Token');
+            const tushareState = financial.tushare_status || {};
+            const tushareLabels = {
+                not_configured: '未配置 Token',
+                disabled: '已配置 Token，能力开关未生效',
+                configured_unverified: '已配置 Token，尚未进行权限探测',
+                available: 'Token 有效，已探测能力全部可用',
+                partial: 'Token 有效，仅部分能力可用',
+                no_permissions: 'Token 有效，但所需能力均无权限',
+                invalid_token: 'Token 无效，请重新配置',
+                unavailable: '权限探测时服务暂不可用'
+            };
+            $('tushareTokenStatus').textContent = tushareLabels[tushareState.availability]
+                || 'Tushare 权限状态未知';
+            setChecked('yahooFinanceEnabled', financial.yahoo_finance_enabled);
+            setChecked('alphaVantageEnabled', financial.alpha_vantage_enabled);
+            setVal('alphaVantageQuoteEntitlement', financial.alpha_vantage_quote_entitlement || 'none');
+            setChecked('alphaVantageRealtimeEntitled', financial.alpha_vantage_realtime_entitled);
+            fillSecret('alphaVantageApiKey', 'clearAlphaVantageApiKey', financial.alpha_vantage_api_key_configured, 'alphaVantageApiKeyStatus', 'Alpha Vantage API Key');
+            setChecked('fredEnabled', financial.fred_enabled);
+            fillSecret('fredApiKey', 'clearFredApiKey', financial.fred_api_key_configured, 'fredApiKeyStatus', 'FRED API Key');
+            setChecked('polymarketEnabled', financial.polymarket_enabled);
+            setChecked('easyquotationEnabled', financial.easyquotation_enabled);
+            setChecked('officialEvidenceEnabled', financial.official_evidence_enabled);
+            setVal('financialProviderTimeout', financial.provider_timeout_seconds);
+            setVal('financialProviderRetries', financial.provider_max_retries);
+            setVal('financialProviderConcurrency', financial.provider_max_concurrency);
+            setVal('financialProviderDailyBudget', financial.provider_daily_call_budget);
+            setVal('financialQuoteFreshness', financial.quote_freshness_seconds);
+            setVal('financialBreadthFreshness', financial.market_breadth_freshness_seconds);
+            setVal('financialNewsFreshness', financial.news_freshness_seconds);
+            setVal('financialFundamentalFreshness', financial.fundamental_freshness_seconds);
+            setVal('financialResearchMaxCalls', financial.research_max_llm_calls);
+            setVal('financialResearchMaxTokens', financial.research_max_tokens);
+            setVal('financialResearchDebateRounds', financial.research_max_debate_rounds);
+            setVal('financialResearchTimeout', financial.research_timeout_seconds);
+            setVal('financialResearchCache', financial.research_cache_seconds);
+            setVal('financialAutoDailyBudget', financial.auto_research_daily_budget);
+            const effective = financial.effective_capabilities || {};
+            setBadge(
+                'financialStatus',
+                rollout.stage && rollout.stage !== 'off' ? `灰度：${rollout.stage_label || rollout.stage}` : '全部默认关闭',
+                rollout.stage && rollout.stage !== 'off' ? 'ok' : 'idle'
+            );
+            $('financialRolloutState').textContent = rollout.stage === 'off'
+                ? '当前全部关闭；可直接启用金融 RSS。回退不需要数据库回滚。'
+                : `当前：${rollout.stage_label || rollout.stage}；已观察 ${rollout.observed_seconds ?? 0}/${rollout.observation_seconds || 3600} 秒；下一层：${rollout.next_stage_label || '已到最终层'}。`;
+            const enabledNames = [
+                ['trading_agents', 'TradingAgents'],
+                ['auto_research', '自动研究'],
+                ['simulation', '纸面模拟/回测'],
+                ['akshare_cn', 'AKShare'],
+                ['tushare_cn', 'Tushare']
+            ].filter(([key]) => effective[key]).map(([, label]) => label);
+            $('financialEffectiveState').textContent = effective.financial_intelligence
+                ? `当前有效：金融行业信息${enabledNames.length ? '、' + enabledNames.join('、') : ''}。工作进程重启后生效。`
+                : '当前有效：无。子开关即使已保存，也必须先开启“金融行业信息”总开关。';
+            loadRemoteTtsVoices();
+        }
+
+        let remoteTtsVoices = [];
+
+        function remoteTtsExpectedVoiceId(language, dialect, gender) {
+            language = String(language || 'zh').toLowerCase();
+            dialect = String(dialect || 'mandarin').toLowerCase();
+            gender = String(gender || 'female').toLowerCase();
+            if (language === 'en') return gender === 'male' ? 'english_male' : 'english_female';
+            if (language !== 'zh') return 'default';
+            if (dialect === 'cantonese') return gender === 'male' ? 'cantonese_male' : 'cantonese_female';
+            return gender === 'male' ? 'mandarin_male' : 'default';
+        }
+
+        function updateRemoteTtsVoiceHint() {
+            const language = val('remotePipelineTtsLanguage') || 'zh';
+            const dialect = val('remotePipelineTtsDialect') || 'mandarin';
+            const gender = val('remotePipelineTtsGender') || 'female';
+            const dialectEl = $('remotePipelineTtsDialect');
+            if (dialectEl) {
+                const wrapper = dialectEl.closest('div');
+                if (wrapper) wrapper.style.display = language === 'zh' ? '' : 'none';
+            }
+            const voiceId = remoteTtsExpectedVoiceId(language, dialect, gender);
+            window._remoteTtsVoiceId = voiceId;
+            const hint = $('remotePipelineTtsVoiceHint');
+            if (!hint) return;
+            const registered = remoteTtsVoices.some(item => String(item.id || '') === voiceId);
+            const status = registered ? 'VPN 已注册该音色，新任务可正常生成' : '该音色尚未在 VPN 注册，新任务合成可能失败';
+            hint.textContent = `当前映射：${voiceId}。${status}。`;
+            hint.className = `field-hint ${registered ? 'text-emerald-700' : 'text-amber-700'}`;
+        }
+
+        async function loadRemoteTtsVoices() {
+            const fallbackVoices = [
+                { id: 'default', display_name: '默认女声（普通话）', type: 'zero_shot' },
+                { id: 'cantonese_female', display_name: '粤语女声', type: 'instruct' },
+                { id: 'cantonese_male', display_name: '粤语男声', type: 'instruct' }
+            ];
+            try {
+                const response = await fetch('/api/intel/speech/voices');
+                const data = await response.json();
+                if (!response.ok || !data.success || !Array.isArray(data.voices)) {
+                    throw new Error(data.error || '读取远端音色失败');
+                }
+                remoteTtsVoices = data.voices;
+            } catch (error) {
+                remoteTtsVoices = fallbackVoices;
+            }
+            updateRemoteTtsVoiceHint();
+        }
+
+        function collectConfig() {
+            const payload = {
+                system: {
+                    flask_host: val('flaskHost'),
+                    flask_port: val('flaskPort'),
+                    flask_debug: checked('flaskDebug'),
+                    secret_key: val('secretKey'),
+                    clear_secret_key: checked('clearSecretKey'),
+                    session_lifetime: val('sessionLifetime'),
+                    auth_check_interval: val('authCheckInterval'),
+                    log_level: val('logLevel'),
+                    log_file: val('logFile')
+                },
+                admin: {
+                    username: val('adminUsername'),
+                    password: val('adminPassword'),
+                    clear_password: checked('clearAdminPassword'),
+                    email: val('adminEmail'),
+                    full_name: val('adminFullName')
+                },
+                storage: {
+                    database_path: val('databasePath'),
+                    crawl_results_dir: val('crawlResultsDir'),
+                    auth_storage_dir: val('authStorageDir')
+                },
+                redis: {
+                    host: val('redisHost'),
+                    port: val('redisPort'),
+                    db: val('redisDb'),
+                    password: val('redisPassword'),
+                    clear_password: checked('clearRedisPassword')
+                },
+                scheduler: {
+                    max_concurrent: val('schedulerMaxConcurrent'),
+                    max_per_domain: val('schedulerMaxPerDomain'),
+                    retries: val('schedulerRetries'),
+                    retry_backoff: val('schedulerRetryBackoff'),
+                    domain_cooldown: val('schedulerDomainCooldown'),
+                    task_timeout: val('schedulerTaskTimeout'),
+                    completed_retention: val('schedulerCompletedRetention')
+                },
+                crawl: {
+                    user_agent: val('crawlUserAgent'),
+                    timeout: val('crawlTimeout'),
+                    wait_time: val('crawlWaitTime'),
+                    render_wait_ms: val('crawlRenderWaitMs'),
+                    click_timeout_ms: val('crawlClickTimeoutMs'),
+                    max_pages: val('crawlMaxPages'),
+                    max_pages_with_limit: val('crawlMaxPagesWithLimit'),
+                    max_empty_pages: val('crawlMaxEmptyPages'),
+                    detail_max_retries: val('crawlDetailRetries'),
+                    date_range_priority: checked('crawlDateRangePriority'),
+                    candidate_date_prefilter: checked('crawlCandidateDatePrefilter'),
+                    network_json_enabled: checked('crawlNetworkJsonEnabled'),
+                    supplemental_enabled: checked('crawlSupplementalEnabled'),
+                    supplemental_html: checked('crawlSupplementalHtmlEnabled'),
+                    supplemental_attributes: checked('crawlSupplementalAttributesEnabled'),
+                    supplemental_structured: checked('crawlSupplementalStructuredEnabled'),
+                    supplemental_scripts: checked('crawlSupplementalScriptsEnabled'),
+                    supplemental_static_pagination: checked('crawlSupplementalStaticPaginationEnabled'),
+                    supplemental_feeds: checked('crawlSupplementalFeedsEnabled'),
+                    supplemental_sitemaps: checked('crawlSupplementalSitemapsEnabled'),
+                    supplemental_max_per_source: val('crawlSupplementalMaxPerSource'),
+                    supplemental_max_sitemaps: val('crawlSupplementalMaxSitemaps'),
+                    supplemental_max_static_pages: val('crawlSupplementalMaxStaticPages'),
+                    use_proxy_default: checked('crawlUseProxyDefault')
+                },
+                proxy: {
+                    enabled: checked('proxyEnabled'),
+                    http: val('proxyHttp'),
+                    https: val('proxyHttps'),
+                    socks5: val('proxySocks5'),
+                    playwright: val('proxyPlaywright')
+                },
+                remote_pipeline: {
+                    url: val('remotePipelineUrl'),
+                    tts_language: val('remotePipelineTtsLanguage'),
+                    tts_dialect: val('remotePipelineTtsDialect'),
+                    tts_gender: val('remotePipelineTtsGender')
+                },
+                ragflow: {
+                    upload_enabled: checked('ragflowUploadEnabled'),
+                    auto_parse: checked('ragflowAutoParse'),
+                    reupload_existing: checked('ragflowReuploadExisting'),
+                    timeout: val('ragflowTimeout'),
+                    upload_retries: val('ragflowRetries'),
+                    tts_enabled: checked('ragflowTtsEnabled'),
+                    intel_tts_engine: val('intelTtsEngine'),
+                    intel_tts_voice_profile: val('intelTtsVoiceProfile'),
+                    intel_tts_dialect: val('intelTtsDialect'),
+                    intel_tts_gender: val('intelTtsGender'),
+                    intel_tts_emotion: val('intelTtsEmotion'),
+                    intel_tts_speed: val('intelTtsSpeed'),
+                    intel_tts_buffer_ms: val('intelTtsBufferMs'),
+                    intel_tts_segment_max_chars_zh: val('intelTtsSegmentMaxCharsZh'),
+                    intel_tts_segment_max_words_en: val('intelTtsSegmentMaxWordsEn'),
+                    tts_model: val('ragflowTtsModel'),
+                    tts_language_mode: val('ragflowTtsLanguageMode'),
+                    tts_voice_zh: val('ragflowTtsVoiceZh'),
+                    tts_voice_en: val('ragflowTtsVoiceEn'),
+                    tts_voice_catalog: val('ragflowTtsVoiceCatalog'),
+                    tts_prebuffer_sentences: val('ragflowTtsPrebuffer'),
+                    tts_max_chars: val('ragflowTtsMaxChars'),
+                    tts_timeout: val('ragflowTtsTimeout'),
+                    tts_cache_days: val('ragflowTtsCacheDays'),
+                    tts_cache_max_mb: val('ragflowTtsCacheMaxMb'),
+                    proxy_enabled: checked('ragflowProxyEnabled'),
+                    proxy_http: val('ragflowProxyHttp'),
+                    proxy_https: val('ragflowProxyHttps'),
+                    proxy_socks5: val('ragflowProxySocks5')
+                },
+                serpapi: {
+                    api_key: val('serpapiApiKey'),
+                    clear_api_key: checked('clearSerpapiKey'),
+                    enabled: checked('serpapiEnabled'),
+                    engine: val('serpapiEngine'),
+                    default_region: val('serpapiRegion'),
+                    default_language: val('serpapiLanguage'),
+                    timeout_seconds: val('serpapiTimeout'),
+                    max_retries: val('serpapiRetries'),
+                    max_queries_per_run: val('serpapiMaxQueries'),
+                    daily_query_budget: val('serpapiDailyBudget'),
+                    result_language: val('serpapiResultLanguage'),
+                    recency_days: val('serpapiRecencyDays'),
+                    query_mode: val('serpapiQueryMode'),
+                    max_calls_per_run: val('serpapiPerRun'),
+                    max_calls_per_month: val('serpapiPerMonth')
+                },
+                tavily: {
+                    api_key: val('tavilyApiKey'),
+                    clear_api_key: checked('clearTavilyKey'),
+                    enabled: checked('tavilyEnabled'),
+                    query_mode: val('tavilyQueryMode'),
+                    max_results: val('tavilyMaxResults'),
+                    search_depth: val('tavilyDepth'),
+                    timeout_seconds: val('tavilyTimeout'),
+                    max_calls_per_run: val('tavilyPerRun'),
+                    max_calls_per_month: val('tavilyPerMonth')
+                },
+                search_engine: {
+                    enabled: checked('searchEnabled'),
+                    provider: val('searchProvider'),
+                    runs_per_day: val('searchRunsPerDay'),
+                    run_hours: val('searchRunHours'),
+                    packs_per_run: val('searchPacksPerRun'),
+                    keywords_per_pack: val('searchKeywordsPerPack'),
+                    serpapi_query_mode: val('serpapiQueryMode'),
+                    serpapi_max_calls_per_run: val('serpapiPerRun'),
+                    serpapi_max_calls_per_month: val('serpapiPerMonth')
+                },
+                platform_sources: {
+                    sources: collectPlatformSources()
+                },
+                financial: {
+                    rollout_stage: val('financialRolloutStage'),
+                    rollout_observation_seconds: val('financialRolloutObservation'),
+                    financial_intelligence_enabled: checked('financialIntelligenceEnabled'),
+                    trading_agents_enabled: checked('tradingAgentsEnabled'),
+                    auto_research_enabled: checked('financialAutoResearchEnabled'),
+                    simulation_enabled: checked('tradingSimulationEnabled'),
+                    akshare_cn_enabled: checked('akshareCnEnabled'),
+                    tushare_cn_enabled: checked('tushareCnEnabled'),
+                    tushare_token: val('tushareToken'),
+                    clear_tushare_token: checked('clearTushareToken'),
+                    yahoo_finance_enabled: checked('yahooFinanceEnabled'),
+                    alpha_vantage_enabled: checked('alphaVantageEnabled'),
+                    alpha_vantage_api_key: val('alphaVantageApiKey'),
+                    clear_alpha_vantage_api_key: checked('clearAlphaVantageApiKey'),
+                    alpha_vantage_quote_entitlement: val('alphaVantageQuoteEntitlement'),
+                    alpha_vantage_realtime_entitled: checked('alphaVantageRealtimeEntitled'),
+                    fred_enabled: checked('fredEnabled'),
+                    fred_api_key: val('fredApiKey'),
+                    clear_fred_api_key: checked('clearFredApiKey'),
+                    polymarket_enabled: checked('polymarketEnabled'),
+                    easyquotation_enabled: checked('easyquotationEnabled'),
+                    official_evidence_enabled: checked('officialEvidenceEnabled'),
+                    provider_timeout_seconds: val('financialProviderTimeout'),
+                    provider_max_retries: val('financialProviderRetries'),
+                    provider_max_concurrency: val('financialProviderConcurrency'),
+                    provider_daily_call_budget: val('financialProviderDailyBudget'),
+                    quote_freshness_seconds: val('financialQuoteFreshness'),
+                    market_breadth_freshness_seconds: val('financialBreadthFreshness'),
+                    news_freshness_seconds: val('financialNewsFreshness'),
+                    fundamental_freshness_seconds: val('financialFundamentalFreshness'),
+                    research_max_llm_calls: val('financialResearchMaxCalls'),
+                    research_max_tokens: val('financialResearchMaxTokens'),
+                    research_max_debate_rounds: val('financialResearchDebateRounds'),
+                    research_timeout_seconds: val('financialResearchTimeout'),
+                    research_cache_seconds: val('financialResearchCache'),
+                    auto_research_daily_budget: val('financialAutoDailyBudget')
+                }
+            };
+            if (!$('ragflowBaseUrl')?.readOnly) {
+                payload.ragflow.base_url = val('ragflowBaseUrl');
+            }
+            if (!$('ragflowApiKey')?.readOnly) {
+                payload.ragflow.api_key = val('ragflowApiKey');
+                payload.ragflow.clear_api_key = checked('clearApiKey');
+            }
+            return payload;
+        }
+
+        function loadConfig() {
+            setMessage('');
+            return fetch('/api/config-management/config')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || '读取配置失败');
+                    fillConfig(data);
+                })
+                .catch(error => setMessage(error.message, 'error'));
+        }
+
+        async function savePlatformSettings() {
+            const status = $('platformSaveStatus');
+            status.textContent = '保存中...';
+            try {
+                const name = $('platformName').value || '资讯情报系统';
+                const r1 = await fetch('/api/platform/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+                if (!r1.ok) throw Error('保存名称失败');
+                const d1 = await r1.json(); let logoUrl = d1.logo_url || '';
+                const fileInput = $('platformLogoFile');
+                if (fileInput && fileInput.files && fileInput.files[0]) {
+                    const fd = new FormData(); fd.append('logo', fileInput.files[0]);
+                    const r2 = await fetch('/api/platform/logo', { method: 'POST', body: fd });
+                    if (!r2.ok) throw Error('上传 Logo 失败');
+                    logoUrl = (await r2.json()).logo_url || logoUrl;
+                }
+                status.textContent = '已保存，请刷新页面生效';
+                if (logoUrl) { const p = $('platformLogoPreview'); p.innerHTML = `<img src="${logoUrl}?t=${Date.now()}" alt="Logo" style="max-width:100%;max-height:100%">`; }
+            } catch (e) { status.textContent = String(e.message || e); }
+        }
+        async function saveConfig() {
+            setMessage('');
+            const saveBtn = $('saveBtn');
+            setButtonLoading(saveBtn, true, '保存中');
+            try {
+                // 一并保存平台品牌设置（公司名称 + Logo）
+                const nameInput = $('platformName');
+                const fileInput = $('platformLogoFile');
+                const name = nameInput ? (nameInput.value || '资讯情报系统') : '资讯情报系统';
+                const r1 = await fetch('/api/platform/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+                if (!r1.ok) throw Error('保存品牌名称失败');
+                if (fileInput && fileInput.files && fileInput.files[0]) {
+                    const fd = new FormData(); fd.append('logo', fileInput.files[0]);
+                    const r2 = await fetch('/api/platform/logo', { method: 'POST', body: fd });
+                    if (!r2.ok) throw Error('上传 Logo 失败');
+                }
+                const data = await fetch('/api/config-management/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(collectConfig()) }).then(r => r.json());
+                if (!data.success) throw new Error(data.error || '保存配置失败');
+                fillConfig(data);
+                const extra = data.restart_reasons && data.restart_reasons.length ? `：${data.restart_reasons.join('；')}` : '';
+                const savedMsg = (data.message || '配置已保存') + extra;
+                setMessage(savedMsg, data.restart_required ? 'warn' : 'ok');
+                showToast(savedMsg, data.restart_required ? 'warn' : 'ok');
+            } catch (error) {
+                setMessage(error.message, 'error');
+                showToast(error.message, 'error');
+            } finally {
+                setButtonLoading(saveBtn, false);
+            }
+        }
+
+        function testRagflow() {
+            setMessage('');
+            const btn = $('testRagflowBtn');
+            setButtonLoading(btn, true, '测试中');
+            fetch('/api/schedule-management/ragflow/datasets')
+                .then(response => response.json().then(data => {
+                    if (!response.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
+                    return data;
+                }))
+                .then(data => {
+                    if (!data.success) throw new Error(data.error || data.message || '知识库测试失败');
+                    if (data.configured === false) {
+                        setMessage(data.message || 'AI Server未配置', 'warn');
+                        setBadge('ragflowStatus', '未配置完整', 'warn');
+                        return;
+                    }
+                    const count = Array.isArray(data.datasets) ? data.datasets.length : 0;
+                    const uploadText = data.upload_enabled === false ? '，但上传开关关闭' : '';
+                    setMessage(`AI Server连接正常，已加载 ${count} 个知识库${uploadText}`, data.upload_enabled === false ? 'warn' : 'ok');
+                    showToast(`AI Server连接正常，已加载 ${count} 个知识库${uploadText}`, data.upload_enabled === false ? 'warn' : 'ok');
+                    setBadge('ragflowStatus', '连接正常', data.upload_enabled === false ? 'warn' : 'ok');
+                })
+                .catch(error => {
+                    setMessage(error.message, 'error');
+                    showToast(error.message, 'error');
+                    setBadge('ragflowStatus', '连接失败', 'warn');
+                })
+                .finally(() => setButtonLoading(btn, false));
+        }
+
+        function probeTusharePermissions() {
+            setMessage('');
+            const btn = $('probeTushareBtn');
+            setButtonLoading(btn, true, '探测中');
+            fetch('/api/config-management/financial/tushare/probe', { method: 'POST' })
+                .then(response => response.json().then(data => {
+                    if (!response.ok || !data.success) throw new Error(data.error || '权限探测失败');
+                    return data;
+                }))
+                .then(data => {
+                    const state = data.tushare_status || {};
+                    const available = Object.values(state.capabilities || {}).filter(value => value === 'available').length;
+                    const total = Object.keys(state.capabilities || {}).length;
+                    $('tushareTokenStatus').textContent = `探测结果：${state.availability || 'unknown'}（${available}/${total} 项可用）`;
+                    setMessage('Tushare 权限探测完成；状态已保存。', state.availability === 'available' ? 'ok' : 'warn');
+                    showToast('Tushare 权限探测完成；状态已保存。', state.availability === 'available' ? 'ok' : 'warn');
+                })
+                .catch(error => {
+                    setMessage(error.message, 'error');
+                    showToast(error.message, 'error');
+                })
+                .finally(() => setButtonLoading(btn, false));
+        }
+
+        function bindSecretClear(inputId, clearId) {
+            $(clearId).addEventListener('change', function() {
+                $(inputId).disabled = this.checked;
+                if (this.checked) setVal(inputId, '');
+            });
+        }
+
+        function bindTogglePassword(buttonId, inputId) {
+            $(buttonId).addEventListener('click', function() {
+                const input = $(inputId);
+                input.type = input.type === 'password' ? 'text' : 'password';
+                this.innerHTML = input.type === 'password' ? '<i class="fa fa-eye"></i>' : '<i class="fa fa-eye-slash"></i>';
+            });
+        }
+
+        document.querySelectorAll('.nav-item').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(this.dataset.target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        // Direct menu entry /config-management#section-tts opens the
+        // independent TTS area without requiring users to locate it first.
+        if (location.hash === '#section-tts') {
+            const ttsNav = document.querySelector('.nav-item[data-target="section-tts"]');
+            ttsNav?.classList.add('active');
+            document.querySelector('.nav-item[data-target="section-ragflow"]')?.classList.remove('active');
+            requestAnimationFrame(() => document.getElementById('section-tts')?.scrollIntoView({block: 'start'}));
+        }
+
+        $('menuBtn').addEventListener('click', () => $('mobileMenu').classList.toggle('hidden'));
+        $('reloadBtn').addEventListener('click', loadConfig);
+        $('saveBtn').addEventListener('click', saveConfig);
+        $('testRagflowBtn').addEventListener('click', testRagflow);
+        $('probeTushareBtn').addEventListener('click', probeTusharePermissions);
+        bindTogglePassword('toggleRagflowKeyBtn', 'ragflowApiKey');
+        bindTogglePassword('toggleSerpapiKeyBtn', 'serpapiApiKey');
+        bindTogglePassword('toggleTushareTokenBtn', 'tushareToken');
+        bindTogglePassword('toggleAlphaVantageKeyBtn', 'alphaVantageApiKey');
+        bindTogglePassword('toggleFredKeyBtn', 'fredApiKey');
+        bindTogglePassword('toggleSecretKeyBtn', 'secretKey');
+        bindSecretClear('ragflowApiKey', 'clearApiKey');
+        bindSecretClear('serpapiApiKey', 'clearSerpapiKey');
+        // Tavily：显示/隐藏 + 清除（与 SerpAPI 同款）
+        bindTogglePassword('toggleTavilyKeyBtn', 'tavilyApiKey');
+        bindSecretClear('tavilyApiKey', 'clearTavilyKey');
+        bindSecretClear('tushareToken', 'clearTushareToken');
+        bindSecretClear('alphaVantageApiKey', 'clearAlphaVantageApiKey');
+        bindSecretClear('fredApiKey', 'clearFredApiKey');
+        bindSecretClear('secretKey', 'clearSecretKey');
+        bindSecretClear('redisPassword', 'clearRedisPassword');
+        bindSecretClear('adminPassword', 'clearAdminPassword');
+        ['remotePipelineTtsLanguage', 'remotePipelineTtsDialect', 'remotePipelineTtsGender'].forEach(id => {
+            $(id)?.addEventListener('change', updateRemoteTtsVoiceHint);
+        });
+        loadConfig();
+
+        async function loadDashboardWindow() { try { const d=await (await fetch('/api/intel/dashboard-settings')).json(); if(d.success){ $('dashboardWindowDays').value=['30','90','120','180','365'].includes(String(d.window_days))?String(d.window_days):'90'; $('dashboardWindowCustom').value=d.window_days; } } catch(e){} }
+        $('saveDashboardWindowBtn').addEventListener('click', async () => { const value=$('dashboardWindowCustom').value || $('dashboardWindowDays').value; try { const d=await (await fetch('/api/intel/dashboard-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({window_days:Number(value)})})).json(); if(!d.success) throw Error(d.error||'保存失败'); $('dashboardWindowStatus').textContent=`已保存：最近 ${d.window_days} 天；刷新首页生效`; } catch(e) { $('dashboardWindowStatus').textContent=e.message; } });
+        $('dashboardWindowDays').addEventListener('change',()=>{$('dashboardWindowCustom').value=$('dashboardWindowDays').value});
+        loadDashboardWindow();
+
+        // ── AI助手配置 ──
+        const MODEL_NAMES_CFG = {kimi:'Kimi', doubao:'豆包', deepseek:'DeepSeek', glm52:'GLM', gemini:'Gemini', chatgpt:'ChatGPT', claude:'Claude', openrouter:'OpenRouter', local:'本地 LLM'};
+        let _chatCfg = {};
+
+        // 点击「AI助手」导航时自动加载配置
+        document.querySelector('.nav-item[data-target="section-chat"]')
+            ?.addEventListener('click', () => { if (!_chatCfg.models) chatCfgLoad(); });
+
+        async function chatCfgLoad() {
+            try {
+                const res = await fetch('/api/chat/config');
+                const d = await res.json();
+                if (!d.success) return;
+                _chatCfg = d.config;
+                const sel = $('chatCfgModel');
+                sel.value = d.config.active_model || 'deepseek';
+                chatCfgSwitchModel(sel.value);
+                // 若已有知识库缓存则填充
+                const savedKb = d.config.ragflow_kb_id || '';
+                if (savedKb) {
+                    const kbSel = $('chatCfgKbId');
+                    kbSel.innerHTML = `<option value="${savedKb}" selected>已保存: ${savedKb}</option>`;
+                }
+            } catch(e) {}
+        }
+
+        function chatCfgSwitchModel(modelId) {
+            const meta = (_chatCfg.models || {})[modelId] || {};
+            $('chatCfgModelName').value = meta.model_id || '';
+            $('chatCfgApiKey').value = '';
+            $('chatCfgProxy').checked = !!meta.use_proxy;
+            $('chatCfgKeyStatus').textContent = meta.has_key ? '✓ 已配置 API Key' : '';
+            $('chatCfgKeyStatus').style.color = meta.has_key ? '#059669' : '#6b7280';
+            const metric = (_chatCfg.metrics || {})[modelId] || {};
+            const metricEl = $('chatCfgMetricStatus');
+            if (metricEl) {
+                if (metric.updated_at) {
+                    const first = metric.first_token_elapsed_ms == null ? '-' : `${metric.first_token_elapsed_ms}ms`;
+                    const total = metric.total_elapsed_ms == null ? '-' : `${metric.total_elapsed_ms}ms`;
+                    const err = metric.success === false && metric.error ? `，错误：${metric.error}` : '';
+                    metricEl.textContent = `最近测速：首包 ${first}，总耗时 ${total}${err}`;
+                    metricEl.style.color = metric.success === false ? '#dc2626' : '#6b7280';
+                } else {
+                    metricEl.textContent = '暂无测速记录';
+                    metricEl.style.color = '#6b7280';
+                }
+            }
+            // 只有本地模型允许编辑接入地址；GLM 固定走 Z.AI 云 API。
+            const isLocal = modelId === 'local';
+            const isGlm = modelId === 'glm52';
+            $('chatCfgBaseUrlRow').style.display = isLocal ? '' : 'none';
+            $('chatCfgFixedBaseUrlRow').style.display = isGlm ? '' : 'none';
+            if (isLocal) $('chatCfgBaseUrl').value = meta.base_url || '';
+            // 同步保存当前激活模型
+            fetch('/api/chat/config', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({active_model: modelId})});
+        }
+
+        async function chatCfgSaveBaseUrl() {
+            const baseUrl = $('chatCfgBaseUrl').value.trim();
+            if (!baseUrl) { $('chatCfgBaseUrlStatus').textContent = '请输入接入地址'; return; }
+            const res = await fetch('/api/chat/config', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({model_id: 'local', base_url: baseUrl})});
+            const d = await res.json();
+            $('chatCfgBaseUrlStatus').textContent = d.success ? '✓ 地址已保存' : (d.message || '保存失败');
+            $('chatCfgBaseUrlStatus').style.color = d.success ? '#059669' : '#dc2626';
+            if (d.success) chatCfgLoad();
+        }
+
+        async function chatCfgSaveKey() {
+            const modelId  = $('chatCfgModel').value;
+            const apiKey   = $('chatCfgApiKey').value.trim();
+            const modelName = $('chatCfgModelName').value.trim();
+            if (!apiKey) { _chatCfgStatus('请输入 API Key', false); return; }
+            const res = await fetch('/api/chat/config', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({model_id: modelId, api_key: apiKey, model_name: modelName})});
+            const d = await res.json();
+            _chatCfgStatus(d.message || (d.success ? '已保存' : '失败'), d.success);
+            if (d.success) { $('chatCfgApiKey').value = ''; chatCfgLoad(); }
+        }
+
+        async function chatCfgTestConn() {
+            const btn = $('chatTestBtn');
+            const modelId = $('chatCfgModel').value;
+            btn.textContent = '测试中…'; btn.disabled = true;
+            try {
+                const res = await fetch('/api/chat/test', {method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({model_id: modelId})});
+                const d = await res.json();
+                _chatCfgStatus(d.message, d.success);
+            } catch(e) { _chatCfgStatus('请求失败: '+e.message, false); }
+            btn.textContent = '连接测试'; btn.disabled = false;
+        }
+
+        function chatCfgSaveProxy() {
+            const modelId  = $('chatCfgModel').value;
+            const useProxy = $('chatCfgProxy').checked;
+            fetch('/api/chat/config', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({model_id: modelId, use_proxy: useProxy})});
+        }
+
+        async function chatCfgLoadKb() {
+            const btn = $('chatCfgLoadKbBtn');
+            btn.textContent = '加载中…'; btn.disabled = true;
+            try {
+                const res = await fetch('/api/schedule-management/ragflow/datasets?page=1&page_size=50');
+                const d = await res.json();
+                if (d.success && d.datasets?.length) {
+                    const savedKb = (_chatCfg.ragflow_kb_id || '');
+                    const sel = $('chatCfgKbId');
+                    sel.innerHTML = '<option value="">-- 请选择知识库 --</option>';
+                    d.datasets.forEach(ds => {
+                        const opt = document.createElement('option');
+                        opt.value = ds.id || ds.kb_id || '';
+                        opt.textContent = `${ds.name || opt.value}（${ds.document_count ?? 0}篇）`;
+                        if (opt.value === savedKb) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    $('chatCfgKbStatus').textContent = `已加载 ${d.datasets.length} 个知识库`;
+                    $('chatCfgKbStatus').style.color = '#059669';
+                } else {
+                    $('chatCfgKbStatus').textContent = d.error || 'RAGFlow 未配置或无知识库';
+                    $('chatCfgKbStatus').style.color = '#dc2626';
+                }
+            } catch(e) {
+                $('chatCfgKbStatus').textContent = '加载失败: ' + e.message;
+                $('chatCfgKbStatus').style.color = '#dc2626';
+            }
+            btn.textContent = '加载'; btn.disabled = false;
+        }
+
+        async function chatCfgSaveKb() {
+            const kbId = $('chatCfgKbId').value.trim();
+            const res = await fetch('/api/chat/config', {method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ragflow_kb_id: kbId})});
+            const d = await res.json();
+            $('chatCfgKbStatus').textContent = d.success ? (kbId ? '✓ 默认知识库已保存' : '已清除') : '保存失败';
+            $('chatCfgKbStatus').style.color = d.success ? '#059669' : '#dc2626';
+            if (d.success) _chatCfg.ragflow_kb_id = kbId;
+        }
+
+        function _chatCfgStatus(msg, ok) {
+            const el = $('chatCfgKeyStatus');
+            el.textContent = msg || '';
+            el.style.color = ok === true ? '#059669' : ok === false ? '#dc2626' : '#6b7280';
+        }
+    </script>
+</body>
+</html>

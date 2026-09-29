@@ -1,0 +1,100 @@
+{
+  "checked_at_utc": "2026-08-01T11:10:36Z",
+  "llm_mode": "deterministic_broker_fixture",
+  "network_requested": true,
+  "passed": true,
+  "report_version": "stock-research-live-v1",
+  "secrets_included": false,
+  "targets": [
+    {
+      "broker_calls": 12,
+      "canonical_symbol": "600000.SH",
+      "evidence_coverage": 0.375,
+      "execution_allowed": false,
+      "latest_observed_at": [
+        "2026-07-31T07:00:00.000Z",
+        "2026-07-30T16:00:00.000Z"
+      ],
+      "passed": true,
+      "preflight_error_codes": {
+        "fundamentals": "",
+        "market_history": "",
+        "news": "",
+        "sentiment": "",
+        "verified_market": ""
+      },
+      "preflight_statuses": {
+        "fundamentals": "unavailable",
+        "market_history": "fetched",
+        "news": "unavailable",
+        "sentiment": "limited",
+        "verified_market": "completed"
+      },
+      "providers": ["akshare_cn", "tradingagents_cn_derived", "yahoo"],
+      "recommendation": "Hold",
+      "report_status": "degraded_unverified",
+      "requested_symbol": "600000.SS",
+      "section_count": 14
+    },
+    {
+      "broker_calls": 12,
+      "canonical_symbol": "000001.SZ",
+      "evidence_coverage": 0.375,
+      "execution_allowed": false,
+      "latest_observed_at": [
+        "2026-07-31T07:00:00.000Z",
+        "2026-07-30T16:00:00.000Z"
+      ],
+      "passed": true,
+      "preflight_error_codes": {
+        "fundamentals": "",
+        "market_history": "",
+        "news": "",
+        "sentiment": "",
+        "verified_market": ""
+      },
+      "preflight_statuses": {
+        "fundamentals": "unavailable",
+        "market_history": "fetched",
+        "news": "unavailable",
+        "sentiment": "limited",
+        "verified_market": "completed"
+      },
+      "providers": ["akshare_cn", "tradingagents_cn_derived", "yahoo"],
+      "recommendation": "Hold",
+      "report_status": "degraded_unverified",
+      "requested_symbol": "000001.SZ",
+      "section_count": 14
+    },
+    {
+      "broker_calls": 12,
+      "canonical_symbol": "0700.HK",
+      "evidence_coverage": 0.375,
+      "execution_allowed": false,
+      "latest_observed_at": [
+        "2026-07-31T08:08:42.000Z",
+        "2026-07-30T16:00:00.000Z"
+      ],
+      "passed": true,
+      "preflight_error_codes": {
+        "fundamentals": "",
+        "market_history": "",
+        "news": "",
+        "sentiment": "",
+        "verified_market": ""
+      },
+      "preflight_statuses": {
+        "fundamentals": "unavailable",
+        "market_history": "fetched",
+        "news": "unavailable",
+        "sentiment": "limited",
+        "verified_market": "completed"
+      },
+      "providers": ["easyquotation", "tradingagents_cn_derived", "yahoo"],
+      "recommendation": "Hold",
+      "report_status": "degraded_unverified",
+      "requested_symbol": "0700.HK",
+      "section_count": 14
+    }
+  ]
+}

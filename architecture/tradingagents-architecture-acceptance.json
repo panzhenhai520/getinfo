@@ -1,0 +1,81 @@
+{
+  "acceptance": {
+    "compose_service_set_matches_baseline": true,
+    "dockerfile_exposed_ports_unchanged": true,
+    "mapped_existing_tables_exist": true,
+    "mapped_processes_exist": true,
+    "new_port_disabled_by_policy": true,
+    "new_service_disabled_by_policy": true,
+    "no_prohibited_dependency_present": true,
+    "no_prohibited_service_present": true,
+    "passed": true,
+    "published_ports_unchanged": true,
+    "real_trading_disabled_by_policy": true,
+    "registry_schema_and_mappings_valid": true,
+    "runtime_install_disabled_by_policy": true,
+    "stage2_service_set_unchanged": true
+  },
+  "check_version": "tradingagents-architecture-static-v1",
+  "checked_at_utc": "2026-08-01T13:25:20Z",
+  "compose": {
+    "expected_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "prohibited_services_found": [],
+    "published_container_ports": [
+      8003
+    ],
+    "services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "stage2_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ]
+  },
+  "database_mapping": {
+    "baseline_table_count": 44,
+    "mapped_existing_table_count": 18,
+    "missing_mapped_tables": []
+  },
+  "dependencies": {
+    "prohibited_dependencies_found": [],
+    "requirement_package_count": 42
+  },
+  "ports": {
+    "allowed": [
+      8003
+    ],
+    "compose_published_container_ports": [
+      8003
+    ],
+    "dockerfile_exposed_ports": [
+      8003
+    ]
+  },
+  "process_mapping": {
+    "mapped_processes": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "unknown_mapped_processes": []
+  },
+  "registry": {
+    "component_count": 31,
+    "errors": [],
+    "forbidden_decision_count": 7,
+    "passed": true,
+    "path": "architecture/tradingagents-component-registry.json",
+    "version": "tradingagents-component-registry-v1"
+  }
+}

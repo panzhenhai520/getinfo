@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "provider_id": "polymarket",
+  "display_name": "Polymarket 市场隐含预期",
+  "access_tier": "public_read_only_endpoints",
+  "default_enabled": false,
+  "license_profile": "polymarket_public_read_only_expectation_not_fact",
+  "provider_type": "https_api",
+  "priority": 90,
+  "daily_call_budget": 300,
+  "fallback_rank": 90,
+  "gamma_base_url": "https://gamma-api.polymarket.com",
+  "clob_base_url": "https://clob.polymarket.com",
+  "documentation_url": "https://docs.polymarket.com/api-reference/introduction",
+  "terms_url": "https://polymarket.com/tos",
+  "attribution_text": "Prediction-market prices supplied by Polymarket public read-only APIs.",
+  "terms_note": "只调用公开只读市场与价格端点，不接入交易、钱包或订单接口。价格表达参与者预期，不是已发生事实，也不是投资建议。",
+  "sla": "none",
+  "capabilities": ["macro"],
+  "logical_endpoints": {"market_expectation": ["/markets/{market_id}"], "expectation_history": ["/prices-history"]}
+}

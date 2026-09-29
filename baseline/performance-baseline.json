@@ -1,0 +1,203 @@
+{
+  "acceptance": {
+    "all_samples_successful": true,
+    "local_and_live_separated": true,
+    "minimum_three_samples_each": true,
+    "passed": true,
+    "raw_prompts_responses_and_tokens_recorded": false
+  },
+  "captured_at_utc": "2026-08-01T04:02:42Z",
+  "live_metrics": {
+    "chat_first_content_token": {
+      "error_types": [],
+      "max_ms": 2940.764,
+      "median_ms": 1818.798,
+      "min_ms": 1276.862,
+      "p95_ms": 2828.567,
+      "sample_count": 3,
+      "samples_ms": [
+        2940.764,
+        1276.862,
+        1818.798
+      ],
+      "scope": "live_local_llm",
+      "success_count": 3
+    },
+    "chat_first_sse_event": {
+      "error_types": [],
+      "max_ms": 8.489,
+      "median_ms": 7.589,
+      "min_ms": 2.116,
+      "p95_ms": 8.399,
+      "sample_count": 3,
+      "samples_ms": [
+        2.116,
+        7.589,
+        8.489
+      ],
+      "scope": "live_local_llm",
+      "success_count": 3
+    },
+    "dashboard_api": {
+      "error_types": [],
+      "max_ms": 104.3,
+      "median_ms": 101.406,
+      "min_ms": 69.173,
+      "p95_ms": 104.011,
+      "sample_count": 3,
+      "samples_ms": [
+        69.173,
+        104.3,
+        101.406
+      ],
+      "scope": "live_local_http",
+      "success_count": 3
+    },
+    "history_multiply_synthesis": {
+      "error_types": [],
+      "max_ms": 22526.275,
+      "median_ms": 17033.898,
+      "min_ms": 16452.463,
+      "p95_ms": 21977.037,
+      "sample_count": 3,
+      "samples_ms": [
+        16452.463,
+        17033.898,
+        22526.275
+      ],
+      "scope": "live_local_llm",
+      "success_count": 3
+    },
+    "rss_fetch_parse_20_items": {
+      "error_types": [],
+      "max_ms": 3178.185,
+      "median_ms": 349.074,
+      "min_ms": 339.232,
+      "p95_ms": 2895.274,
+      "sample_count": 3,
+      "samples_ms": [
+        3178.185,
+        339.232,
+        349.074
+      ],
+      "scope": "live_external_network",
+      "success_count": 3
+    }
+  },
+  "local_metrics": {
+    "chat_first_content_token": {
+      "error_types": [],
+      "max_ms": 1.151,
+      "median_ms": 0.89,
+      "min_ms": 0.821,
+      "p95_ms": 1.125,
+      "sample_count": 3,
+      "samples_ms": [
+        1.151,
+        0.89,
+        0.821
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    },
+    "chat_first_sse_event": {
+      "error_types": [],
+      "max_ms": 0.81,
+      "median_ms": 0.614,
+      "min_ms": 0.601,
+      "p95_ms": 0.791,
+      "sample_count": 3,
+      "samples_ms": [
+        0.81,
+        0.614,
+        0.601
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    },
+    "classification_worker_job": {
+      "error_types": [],
+      "max_ms": 11.665,
+      "median_ms": 5.435,
+      "min_ms": 5.42,
+      "p95_ms": 11.042,
+      "sample_count": 3,
+      "samples_ms": [
+        11.665,
+        5.435,
+        5.42
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    },
+    "dashboard_api": {
+      "error_types": [],
+      "max_ms": 3.359,
+      "median_ms": 2.973,
+      "min_ms": 2.798,
+      "p95_ms": 3.32,
+      "sample_count": 3,
+      "samples_ms": [
+        3.359,
+        2.973,
+        2.798
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    },
+    "history_divide_gcd": {
+      "error_types": [],
+      "max_ms": 0.163,
+      "median_ms": 0.131,
+      "min_ms": 0.122,
+      "p95_ms": 0.159,
+      "sample_count": 3,
+      "samples_ms": [
+        0.163,
+        0.131,
+        0.122
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    },
+    "rss_parse_20_items": {
+      "error_types": [],
+      "max_ms": 1.707,
+      "median_ms": 1.398,
+      "min_ms": 1.181,
+      "p95_ms": 1.676,
+      "sample_count": 3,
+      "samples_ms": [
+        1.398,
+        1.181,
+        1.707
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    },
+    "sqlite_committed_write": {
+      "error_types": [],
+      "max_ms": 0.04,
+      "median_ms": 0.034,
+      "min_ms": 0.033,
+      "p95_ms": 0.039,
+      "sample_count": 3,
+      "samples_ms": [
+        0.04,
+        0.034,
+        0.033
+      ],
+      "scope": "local_deterministic",
+      "success_count": 3
+    }
+  },
+  "manifest_version": "stage1-performance-baseline-v1",
+  "repetitions": 3,
+  "scope_notes": {
+    "live_external_network": "one official HKMA RSS; network latency is not a regression threshold",
+    "live_local_http": "actual authenticated localhost API and production read path",
+    "live_local_llm": "actual configured local LLM; no web search and no response text retained",
+    "local_deterministic": "temporary SQLite, synthetic RSS, mocked LLM stream; excludes external network"
+  },
+  "server_clock_source": "datetime.now(timezone.utc) on the project host"
+}

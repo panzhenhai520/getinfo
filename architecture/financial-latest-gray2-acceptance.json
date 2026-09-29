@@ -1,0 +1,110 @@
+{
+  "acceptance": "passed",
+  "acceptance_version": "financial-latest-gray2-v1",
+  "accepted_at": "2026-08-03T19:11:09+08:00",
+  "stage": "candidate_discovery_without_auto_promotion",
+  "configuration": {
+    "FINANCIAL_INTELLIGENCE_ENABLED": true,
+    "FINANCIAL_INFORMATION_NEEDS_ENABLED": true,
+    "FINANCIAL_INSTRUMENT_DISCOVERY_ENABLED": true,
+    "FINANCIAL_INSTRUMENT_AUTO_PROMOTION_ENABLED": false,
+    "FINANCIAL_LATEST_NEWS_ENABLED": false,
+    "FINANCIAL_LATEST_BUNDLE_ENABLED": false
+  },
+  "candidate_image": {
+    "tag": "collectinfo:financial-latest-gray2-20260803",
+    "digest": "sha256:6a98886fbd9d53ee3b31fd8a7a4e2358c95766a5d7f0475b97aca1affabbaa8e",
+    "build_gates_passed": true
+  },
+  "isolated_canary": {
+    "container": "firecrawl-financial-latest-gray2",
+    "listen": "127.0.0.1:8005",
+    "production_data_mounted": false,
+    "database": "container_tmpfs",
+    "health_status": "ok",
+    "observation_seconds_at_least": 100,
+    "restart_count": 0,
+    "oom_killed": false,
+    "post_ready_error_count": 0
+  },
+  "verification": {
+    "latest_information_tests": {
+      "passed": 54,
+      "failed": 0,
+      "network_calls_observed": 0
+    },
+    "full_regression_tests": {
+      "passed": 597,
+      "failed": 0
+    },
+    "candidate_container_release_gate": {
+      "acceptance": "passed",
+      "latest_tests": 54,
+      "migration_rehearsal": true,
+      "rollback_rehearsal": true,
+      "network_policy": "none"
+    },
+    "spacex_candidate_smoke": {
+      "attempts": 2,
+      "statuses": [
+        "verified",
+        "verified"
+      ],
+      "reason_codes": [
+        "auto_promotion_disabled"
+      ],
+      "candidate_rows": 1,
+      "formal_instrument_rows": 0,
+      "promoted_instrument_id": null,
+      "candidate_identity": {
+        "canonical_symbol": "SPCX.US",
+        "display_name": "Space Exploration Technologies Corp.",
+        "asset_type": "equity",
+        "market": "US",
+        "exchange": "XNAS",
+        "currency": "USD",
+        "country_code": "US",
+        "listing_status": "active",
+        "confidence": 1.0
+      },
+      "quality_review": {
+        "authoritative_exchange_source_present": true,
+        "issuer_corroboration_present": true,
+        "approved_provider_mappings_present": true,
+        "evidence_current_at_cutoff": true,
+        "identity_conflict_observed": false,
+        "passed": true
+      }
+    }
+  },
+  "production_main": {
+    "configuration_stage": "information_needs_only",
+    "process_reloaded": false,
+    "traffic_switched": false,
+    "production_data_touched": false,
+    "active_unrelated_tasks_observed": 2,
+    "defer_reason": "active_unrelated_crawl_tasks_preserved"
+  },
+  "rollback": {
+    "database_restore_required": false,
+    "actions": [
+      "stop_the_gray2_isolated_canary",
+      "keep_FINANCIAL_INSTRUMENT_DISCOVERY_ENABLED_false_on_main"
+    ]
+  },
+  "next_gate": {
+    "stage": "internal_auto_promotion",
+    "isolated_loopback_progression_allowed": true,
+    "production_progression_allowed": false,
+    "production_requirements": [
+      "main_information_needs_observation_completed",
+      "no_active_unrelated_tasks_during_reload"
+    ]
+  },
+  "boundaries": {
+    "live_provider_smoke_executed": false,
+    "candidate_auto_promotion_executed": false,
+    "real_order_execution": false,
+    "destructive_database_action_executed": false
+  }
+}

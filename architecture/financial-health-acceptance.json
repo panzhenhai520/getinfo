@@ -1,0 +1,79 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "new_table": false,
+    "stores_credentials_or_tokens": false,
+    "stores_prompt_or_user_payload": false
+  },
+  "checked_at": "2026-08-03T03:24:56+08:00",
+  "health_version": "financial-health-v1",
+  "image_acceptance": {
+    "base_digest": "sha256:576e572ac7a0ad4deed2611bd7eaf56a311046ecaf8587233776f104a121519b",
+    "full_suite": {
+      "errors": 0,
+      "failures": 0,
+      "seconds": 22.899,
+      "tests_run": 534
+    },
+    "image": "collectinfo:financial-health-acceptance",
+    "image_digest": "sha256:d52f80f9cb7fa711ebefef4549ef55f2564ff742a92a6ca0e2eaec00da470d7d",
+    "network_mode": "none",
+    "passed": true
+  },
+  "runtime": {
+    "errors": 0,
+    "failures": 0,
+    "network_calls": 0,
+    "suites": [
+      "tests.test_financial_health",
+      "tests.test_financial_feed",
+      "tests.test_financial_feature_gate",
+      "tests.test_financial_security",
+      "tests.test_financial_resource_isolation"
+    ],
+    "tests_run": 27
+  },
+  "scenarios": {
+    "dashboard_empty_state_has_server_reason": true,
+    "llm_timeout_and_latency_locatable": true,
+    "missing_report_and_research_failure_locatable": true,
+    "provider_budget_near_limit_locatable": true,
+    "provider_permission_failure_locatable": true,
+    "sensitive_payloads_absent": true,
+    "source_scan_failure_and_recovery_locatable": true,
+    "stale_snapshot_locatable": true,
+    "verification_conflict_locatable": true,
+    "worker_expired_lease_and_recovery_locatable": true
+  },
+  "static": {
+    "architecture": {
+      "new_databases": [],
+      "new_ports": [],
+      "new_services": [],
+      "new_tables": [],
+      "passed": true,
+      "published_ports": [
+        8003
+      ],
+      "services": [
+        "crawler",
+        "intel-worker",
+        "redis",
+        "worker"
+      ]
+    },
+    "checks": {
+      "administrator_endpoint_is_protected": true,
+      "alerts_expose_safe_target_ids": true,
+      "all_required_metric_families_present": true,
+      "dashboard_uses_server_reason_without_html_injection": true,
+      "health_queries_are_read_only": true,
+      "health_thresholds_are_explicitly_configurable": true,
+      "sensitive_columns_are_not_selected": true
+    }
+  },
+  "task": "6.4"
+}

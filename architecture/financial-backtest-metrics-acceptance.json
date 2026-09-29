@@ -1,0 +1,97 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "execution_mode": "paper",
+    "existing_sqlite_reused": true,
+    "existing_worker_reused": true,
+    "historical_performance_not_future_promise": true,
+    "metrics_recomputable": true,
+    "new_database": false,
+    "new_model_client": false,
+    "real_order_execution": false,
+    "sample_limits_visible": true
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 52
+  },
+  "scenarios": {
+    "benchmark_relative_return": true,
+    "cross_year_annualization": true,
+    "extreme_finite_price": true,
+    "missing_benchmark": true,
+    "missing_trading_days": true,
+    "negative_return_and_drawdown": true,
+    "positive_return_recomputation": true,
+    "short_sample_suppression": true,
+    "snapshot_tamper": true,
+    "trade_log_tamper": true,
+    "worker_output": true,
+    "zero_trade": true
+  },
+  "static": {
+    "analytics_version": "financial-backtest-analytics-v1",
+    "checks": {
+      "benchmark_missing_is_explicit": true,
+      "coverage_and_limitations_propagated": true,
+      "equity_curve_and_log_hash_persisted": true,
+      "metrics_recomputed_from_trade_log": true,
+      "metrics_written_atomically": true,
+      "no_network_provider_model_or_broker_client": true,
+      "paper_only_no_real_order": true,
+      "pinned_snapshot_and_data_version_reverified": true,
+      "required_metrics_present": true,
+      "research_disclaimer_present": true,
+      "sample_sufficiency_is_explicit": true,
+      "tamper_evident_and_idempotent": true,
+      "trade_snapshot_lineage_reverified": true,
+      "worker_returns_metrics": true
+    },
+    "direct_prohibited_imports": [],
+    "existing_job_type": "paper_backtest",
+    "existing_tables": [
+      "backtest_runs",
+      "backtest_metrics",
+      "backtest_trades",
+      "financial_data_snapshots"
+    ],
+    "metric_keys": [
+      "total_return",
+      "annualized_return",
+      "max_drawdown",
+      "annualized_volatility",
+      "sharpe_ratio",
+      "win_rate",
+      "turnover",
+      "fee_total",
+      "slippage_cost_total",
+      "transaction_cost_total",
+      "benchmark_return",
+      "relative_return",
+      "ending_equity",
+      "trade_count",
+      "closed_trade_count",
+      "data_coverage_ratio",
+      "trade_log_sha256",
+      "equity_curve"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": []
+  },
+  "task": "5.4",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 487,
+    "offline_build": {
+      "base_image": "collectinfo:financial-backtest-acceptance",
+      "image_digest": "sha256:386249fabb0d9d4d35978a26053b845026c6598684a705577f7fc4a6f446d17d",
+      "network": "none"
+    },
+    "related_regression_tests": 52
+  }
+}

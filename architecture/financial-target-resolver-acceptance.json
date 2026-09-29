@@ -1,0 +1,54 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "legacy_sse_contract_preserved": true,
+    "llm_ranker_requires_grounded_discriminator": true,
+    "one_material_question_at_a_time": true,
+    "real_trading": false,
+    "research_paused_while_ambiguous": true
+  },
+  "runtime": {
+    "clarification_model_calls": 0,
+    "clarification_web_search_calls": 0,
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "live_model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 9
+  },
+  "scenarios": {
+    "000001_requires_clarification": true,
+    "bare_six_digit_never_guessed": true,
+    "clarification_answer_restores_original_route": true,
+    "composite_targets_preserved": true,
+    "cross_session_context_blocked": true,
+    "explicit_target_change_wins": true,
+    "fund_currency_required": true,
+    "fund_share_class_required": true,
+    "same_session_context_inherited": true,
+    "unique_tencent_and_apple_auto_continue": true
+  },
+  "static": {
+    "direct_model_or_network_imports": [],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "persistence": [
+      "chat_financial_routes.resolved_targets_json",
+      "chat_financial_routes.clarification_json"
+    ],
+    "public_clarification_events": [
+      "status",
+      "chunk",
+      "done"
+    ],
+    "resolution_layers": [
+      "rules",
+      "InstrumentRegistry_aliases",
+      "grounded_SharedLLMBroker_ranker"
+    ],
+    "schema": "financial-target-resolution-v1"
+  },
+  "task": "3.4"
+}

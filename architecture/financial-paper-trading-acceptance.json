@@ -1,0 +1,79 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "execution_mode": "paper",
+    "existing_sqlite_reused": true,
+    "existing_worker_reused": true,
+    "new_database": false,
+    "new_model_client": false,
+    "no_implicit_fx": true,
+    "persisted_snapshot_execution_only": true,
+    "real_order_execution": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 27
+  },
+  "scenarios": {
+    "buy_and_sell": true,
+    "cancellation": true,
+    "fees_and_slippage": true,
+    "idempotency": true,
+    "index_tradable_proxy_confirmation": true,
+    "insufficient_cash": true,
+    "insufficient_position": true,
+    "ledger_conservation": true,
+    "limit_and_stop": true,
+    "owner_isolation": true,
+    "partial_fill": true,
+    "price_limit": true,
+    "suspension": true
+  },
+  "static": {
+    "checks": {
+      "atomic_fill_updates": true,
+      "cash_position_and_cost_rules": true,
+      "existing_ledger_tables_reused": true,
+      "existing_worker_injected": true,
+      "idempotent_account_order_fill_cancel": true,
+      "index_requires_confirmed_proxy": true,
+      "limit_stop_and_price_limit_rules": true,
+      "no_broker_model_or_network_client": true,
+      "paper_only_no_real_order": true,
+      "report_strategy_snapshot_lineage": true,
+      "server_capability_rechecked": true,
+      "snapshot_time_integrity_and_status": true
+    },
+    "direct_prohibited_imports": [],
+    "existing_job_type": "paper_backtest",
+    "existing_tables": [
+      "paper_accounts",
+      "paper_orders",
+      "paper_fills",
+      "paper_positions",
+      "financial_instruments",
+      "financial_final_reports",
+      "financial_data_snapshots"
+    ],
+    "ledger_version": "financial-paper-ledger-v1",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": []
+  },
+  "task": "5.2"
+  ,
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 462,
+    "offline_build": {
+      "base_image": "collectinfo:financial-simulation-gate-acceptance",
+      "image_digest": "sha256:3728fd7af2625c170ef2e5eeef16f23cd76dc1a5f95522e4f51ee99f6f983f7e",
+      "network": "none"
+    },
+    "related_regression_tests": 27
+  }
+}

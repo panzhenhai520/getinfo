@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>执行日志管理 - {{ platform_name }}</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+    <style>
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f9fafb;
+        }
+        .status-running {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .status-completed {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        .status-failed {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .status-needs-review {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border: 1px solid #cbd5e1;
+        }
+    
+        /* Primary颜色定义 - 蓝色主题 */
+        .bg-primary {
+            background-color: #3b82f6 !important; /* blue-500 */
+        }
+        .bg-primary\/90 {
+            background-color: rgba(59, 130, 246, 0.9) !important;
+        }
+        .hover\:bg-primary\/90:hover {
+            background-color: rgba(59, 130, 246, 0.9) !important;
+        }
+        .text-primary {
+            color: #3b82f6 !important; /* blue-500 */
+        }
+        .hover\:text-primary:hover {
+            color: #3b82f6 !important;
+        }
+        .hover\:text-primary\/80:hover {
+            color: rgba(59, 130, 246, 0.8) !important;
+        }
+        .text-dark {
+            color: #1f2937 !important; /* gray-800 */
+        }
+        .border-primary {
+            border-color: #3b82f6 !important;
+        }
+        .focus\:ring-primary:focus {
+            --tw-ring-color: #3b82f6 !important;
+        }
+        .focus\:border-primary:focus {
+            border-color: #3b82f6 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->{% include "_dashboard_nav.html" %}
+<style>
+/* 深色皮肤适配：任务列表行 hover 变白导致文字看不见，表格与卡片仍是浅色定义。 */
+body.skin-darkblue .panel,body.skin-darkblue .card,body.skin-darkblue .box,
+body.skin-darkblue .content,body.skin-darkblue .container{background:#0e1d3a !important;border-color:rgba(96,165,250,.24) !important;color:#e6f0ff}
+body.skin-darkblue table{color:#dbeafe}
+body.skin-darkblue table th{background:#12233f !important;color:#dbeafe !important;border-color:rgba(96,165,250,.24) !important}
+body.skin-darkblue table td{background:transparent !important;color:#dbeafe;border-color:rgba(96,165,250,.16) !important}
+body.skin-darkblue table tbody tr{background:transparent !important}
+body.skin-darkblue table tbody tr:hover{background:rgba(56,189,248,.12) !important}
+body.skin-darkblue table tbody tr:hover td{color:#e6f0ff !important}
+body.skin-darkblue .task-item,body.skin-darkblue .log-item,body.skin-darkblue li:hover{background:rgba(56,189,248,.10) !important;color:#e6f0ff !important}
+body.skin-darkblue input,body.skin-darkblue select,body.skin-darkblue textarea{background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;color:#e6f0ff !important}
+body.skin-darkblue .bg-white,body.skin-darkblue [class*="bg-white"]{background:#0e1d3a !important;color:#e6f0ff !important}
+body.skin-darkblue .bg-gray-50,body.skin-darkblue [class*="bg-gray-50"],body.skin-darkblue [class*="hover:bg-gray"]:hover{background:rgba(56,189,248,.10) !important}
+body.skin-darkblue .text-gray-900,body.skin-darkblue .text-gray-800,body.skin-darkblue .text-gray-700,body.skin-darkblue .text-dark,body.skin-darkblue .text-black{color:#e6f0ff !important}
+body.skin-darkblue .text-gray-500,body.skin-darkblue .text-gray-600{color:#93a9cc !important}
+body.skin-darkblue .border,body.skin-darkblue [class*="border-gray"]{border-color:rgba(96,165,250,.24) !important}
+</style>
+
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 统计卡片区域 -->
+        <section class="mb-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div class="bg-white rounded-lg p-3 card-shadow border-l-4 border-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">总执行次数</p>
+                            <p id="totalExecutions" class="text-xl font-bold text-gray-900 mt-1">0</p>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded-lg">
+                            <i class="fa fa-clock text-blue-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg p-3 card-shadow border-l-4 border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">成功次数</p>
+                            <p id="successExecutions" class="text-xl font-bold text-green-600 mt-1">0</p>
+                        </div>
+                        <div class="bg-green-50 p-2 rounded-lg">
+                            <i class="fa fa-check text-green-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg p-3 card-shadow border-l-4 border-amber-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">需复核次数</p>
+                            <p id="needsReviewExecutions" class="text-xl font-bold text-amber-600 mt-1">0</p>
+                        </div>
+                        <div class="bg-amber-50 p-2 rounded-lg">
+                            <i class="fa fa-exclamation-triangle text-amber-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg p-3 card-shadow border-l-4 border-red-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">失败次数</p>
+                            <p id="failedExecutions" class="text-xl font-bold text-red-600 mt-1">0</p>
+                        </div>
+                        <div class="bg-red-50 p-2 rounded-lg">
+                            <i class="fa fa-times text-red-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg p-3 card-shadow border-l-4 border-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-gray-600">成功率</p>
+                            <p id="successRate" class="text-xl font-bold text-blue-600 mt-1">0%</p>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded-lg">
+                            <i class="fa fa-chart-line text-blue-600 text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 执行日志管理区域 -->
+        <section id="executions" class="mb-5">
+            <div class="bg-white rounded-lg p-4 card-shadow">
+                <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h3 class="text-base font-bold flex items-center text-dark">
+                        <i class="fa fa-list-alt text-primary mr-2 text-lg"></i> 任务调度执行记录
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="refreshExecutionsBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center shadow-sm">
+                            <i class="fa fa-refresh mr-1.5 text-xs"></i> 刷新
+                        </button>
+                        
+                        <button id="clearExecutionsBtn" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center shadow-sm">
+                            <i class="fa fa-trash mr-1.5 text-xs"></i> 清空记录
+                        </button>
+                        
+                        <div class="text-xs text-gray-500 ml-1 whitespace-nowrap">
+                            共 <span id="executionCount">0</span> 条记录
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 筛选区域 -->
+                <div class="mb-3 flex flex-col sm:flex-row gap-2">
+                    <div class="flex-1">
+                        <select id="statusFilter" class="w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-xs bg-white">
+                            <option value="">所有状态</option>
+                            <option value="running">运行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="needs_review">需复核</option>
+                            <option value="failed">已失败</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="applyFiltersBtn" class="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center">
+                            <i class="fa fa-filter mr-1.5"></i> 筛选
+                        </button>
+                        <button id="clearFiltersBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center">
+                            <i class="fa fa-undo mr-1.5"></i> 重置
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 执行日志列表 -->
+                <div id="executionList" class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200 table-hover">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">任务名称</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">消息</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">开始时间</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">更新时间</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="executionTableBody" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+                                    <div class="flex flex-col items-center justify-center py-4">
+                                        <i class="fa fa-list-alt text-2xl text-gray-300 mb-2"></i>
+                                        <p class="text-gray-500 text-sm">暂无执行日志</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- 分页组件 -->
+                <div id="paginationContainer" class="mt-3 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs hidden">
+                    <div class="text-xs text-gray-600">
+                        显示第 <span id="pageInfo">1-20</span> 条，共 <span id="totalCount">0</span> 条记录
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button id="prevPageBtn" class="px-2.5 py-1 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fa fa-chevron-left mr-1"></i> 上一页
+                        </button>
+                        <span id="currentPageInfo" class="px-2.5 py-1 text-xs text-gray-700">第 1 页</span>
+                        <button id="nextPageBtn" class="px-2.5 py-1 bg-white border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            下一页 <i class="fa fa-chevron-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- JavaScript -->
+    <script>
+        // 版本参数，用于强制浏览器重新加载JavaScript代码
+        const SCRIPT_VERSION = "1.0";
+        
+        // 移动端菜单切换
+        document.getElementById('menuBtn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobileMenu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // DOM元素
+        const refreshExecutionsBtn = document.getElementById('refreshExecutionsBtn');
+        const clearExecutionsBtn = document.getElementById('clearExecutionsBtn');
+        const executionCount = document.getElementById('executionCount');
+        const executionTableBody = document.getElementById('executionTableBody');
+        const statusFilter = document.getElementById('statusFilter');
+        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        
+        // 分页相关元素
+        const paginationContainer = document.getElementById('paginationContainer');
+        const prevPageBtn = document.getElementById('prevPageBtn');
+        const nextPageBtn = document.getElementById('nextPageBtn');
+        const currentPageInfo = document.getElementById('currentPageInfo');
+        const pageInfo = document.getElementById('pageInfo');
+        const totalCount = document.getElementById('totalCount');
+        
+        // 统计信息相关元素
+        const totalExecutions = document.getElementById('totalExecutions');
+        const successExecutions = document.getElementById('successExecutions');
+        const needsReviewExecutions = document.getElementById('needsReviewExecutions');
+        const failedExecutions = document.getElementById('failedExecutions');
+        const successRate = document.getElementById('successRate');
+
+        // 当前页面和筛选状态
+        let currentPage = 1;
+        let currentFilters = {
+            status: '',
+            schedule_id: ''
+        };
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadExecutions();
+            loadStatistics();
+        });
+
+        // 加载执行日志统计信息
+        function loadStatistics() {
+            // 🔥 修复：传入当前筛选条件
+            const params = new URLSearchParams(currentFilters);
+            
+            fetch(`/api/schedule-executions/statistics?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.statistics) {
+                        const stats = data.statistics;
+                        totalExecutions.textContent = stats.total_executions || 0;
+                        successExecutions.textContent = stats.success_count || 0;
+                        needsReviewExecutions.textContent = stats.needs_review_count || 0;
+                        failedExecutions.textContent = stats.failed_count || 0;
+                        successRate.textContent = (stats.success_rate || 0) + '%';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载统计信息失败:', error);
+                });
+        }
+
+        // 加载执行日志列表
+        function loadExecutions(page = 1) {
+            const params = new URLSearchParams({
+                page: page,
+                per_page: 10,
+                ...currentFilters
+            });
+            
+            // 显示加载状态
+            executionTableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+                        <i class="fa fa-spinner fa-spin mr-2"></i> 加载中...
+                    </td>
+                </tr>
+            `;
+            
+            fetch(`/api/schedule-executions?${params}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        renderExecutionsTable(data.executions);
+                        updatePagination(data);
+                        executionCount.textContent = data.total;
+                        currentPage = page;
+                    } else {
+                        console.error('获取执行日志列表失败:', data.error);
+                        showError('获取执行日志列表失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('获取执行日志列表失败:', error);
+                    showError('获取执行日志列表失败: ' + error.message);
+                });
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, function(ch) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[ch];
+            });
+        }
+
+        function formatRiskReasons(reasons) {
+            const labels = {
+                extract_failed: '详情抽取失败',
+                content_integrity_failed: '正文完整性失败',
+                db_failed: '入库失败',
+                stopped: '任务中途停止',
+                quality_skipped: '质量偏低跳过',
+                too_short_skipped: '正文过短跳过',
+                date_unknown_in_window: '日期范围内日期未知',
+                ragflow_delivery_risk: 'RAGFlow 上传风险',
+                playwright_discovery_error: '动态发现失败',
+                network_json_errors: '接口候选解析错误',
+                network_verification_required: '接口需要验证或登录',
+                network_json_checked_without_candidates: '接口无文章候选',
+                supplemental_discovery_errors: '补充发现错误',
+                single_source_with_discovery_warnings: '候选来源单一且有警告',
+                single_discovery_source: '候选来源单一',
+                date_window_candidates_truncated: '日期范围候选被截断',
+                no_playwright_or_supplemental_candidates: '未发现文章候选',
+                auto_profile_missing: '缺少自动识别画像',
+                auto_main_content_low_confidence: '主区域识别置信度低',
+                auto_article_link_pattern_unclear: '文章链接规则不清晰',
+                many_unknown_dates_in_window: '未知日期占比偏高'
+            };
+            return Object.entries(reasons || {})
+                .filter(([, value]) => Number(value || 0) > 0)
+                .map(([key, value]) => `${labels[key] || key}: ${value}`)
+                .join(', ');
+        }
+
+        function renderAuditSummary(execution) {
+            const summary = execution.result_summary || {};
+            const stats = summary.stats || {};
+            const needsReview = summary.needs_review || stats.needs_review || summary.recall_status === 'needs_review';
+            const riskCount = summary.recall_risk_count ?? stats.recall_risk_count ?? 0;
+            const riskReasons = summary.recall_risk_reasons || {};
+            const riskReasonText = formatRiskReasons(riskReasons);
+            const totalCandidates = summary.audit_total_candidates ?? stats.candidate_links ?? stats.total_links;
+            const remainingCandidates = summary.audit_remaining_candidates ?? stats.total_links;
+            const autoProfile = stats.auto_profile || {};
+            const auditFile = summary.audit_file;
+            const healthScore = summary.recall_health_score ?? stats.recall_health_score;
+            const healthLevel = summary.recall_health_level ?? stats.recall_health_level;
+            const healthLabel = summary.recall_health_label ?? stats.recall_health_label;
+            const healthReasons = summary.recall_health_reasons || stats.recall_health_reasons || [];
+            const chips = [];
+
+            if (healthScore !== undefined && healthScore !== null) {
+                const healthClasses = {
+                    good: 'bg-emerald-100 text-emerald-800',
+                    warning: 'bg-amber-100 text-amber-800',
+                    risky: 'bg-red-100 text-red-800'
+                }[healthLevel] || 'bg-gray-100 text-gray-700';
+                const healthTitle = Array.isArray(healthReasons)
+                    ? healthReasons.join('；')
+                    : String(healthReasons || '');
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded ${healthClasses} text-[11px] font-medium" title="${escapeHtml(healthTitle)}">健康 ${escapeHtml(healthScore)}${healthLabel ? ` · ${escapeHtml(healthLabel)}` : ''}</span>`);
+            }
+
+            if (needsReview) {
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px] font-medium" title="${escapeHtml(riskReasonText)}">需复核${riskCount ? ` ${riskCount}` : ''}</span>`);
+            } else if (summary.recall_status === 'complete') {
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-medium">审计完成</span>`);
+            }
+
+            if (totalCandidates !== undefined && totalCandidates !== null) {
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-[11px]">候选 ${escapeHtml(totalCandidates)}</span>`);
+            }
+            if (remainingCandidates !== undefined && remainingCandidates !== null && remainingCandidates !== totalCandidates) {
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-[11px]">待处理 ${escapeHtml(remainingCandidates)}</span>`);
+            }
+            if (autoProfile.enabled) {
+                const autoTitle = [
+                    autoProfile.main_content_selector ? `主区: ${autoProfile.main_content_selector}` : '',
+                    autoProfile.article_link_pattern ? `链接: ${autoProfile.article_link_pattern}` : '',
+                    autoProfile.pagination_type ? `分页: ${autoProfile.pagination_type}` : '',
+                    autoProfile.date_filter_available ? `日期控件: ${autoProfile.date_filter_type || 'yes'}` : ''
+                ].filter(Boolean).join(' | ');
+                const confidence = autoProfile.main_content_confidence ?? 0;
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[11px]" title="${escapeHtml(autoTitle)}">自动识别 ${escapeHtml(confidence)}%</span>`);
+                if (autoProfile.pagination_type) {
+                    chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[11px]">分页 ${escapeHtml(autoProfile.pagination_type)}</span>`);
+                }
+            }
+            if (auditFile) {
+                chips.push(`<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[11px]" title="${escapeHtml(auditFile)}">审计文件</span>`);
+            }
+
+            return chips.length ? `<div class="mt-1 flex flex-wrap gap-1">${chips.join('')}</div>` : '';
+        }
+
+        // 渲染执行日志表格
+        function renderExecutionsTable(executions) {
+            if (executions.length === 0) {
+                executionTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+                            <div class="flex flex-col items-center justify-center py-4">
+                                <i class="fa fa-list-alt text-2xl text-gray-300 mb-2"></i>
+                                <p class="text-gray-500 text-sm">暂无执行日志</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            executionTableBody.innerHTML = executions.map(execution => {
+                // 根据状态设置不同的样式
+                let statusClass = '';
+                let statusText = '';
+                
+                switch(execution.status) {
+                    case 'completed':
+                    case 'success':
+                        statusClass = 'status-completed';
+                        statusText = '成功';
+                        break;
+                    case 'running':
+                        statusClass = 'status-running';
+                        statusText = '运行中';
+                        break;
+                    case 'needs_review':
+                        statusClass = 'status-needs-review';
+                        statusText = '需复核';
+                        break;
+                    case 'error':
+                    case 'failed':
+                        statusClass = 'status-failed';
+                        statusText = '失败';
+                        break;
+                    default:
+                        statusClass = 'bg-gray-100 text-gray-800';
+                        statusText = execution.status || '未知';
+                }
+                
+                // 截断消息显示
+                const displayMessage = execution.message && execution.message.length > 80
+                    ? execution.message.substring(0, 80) + '...'
+                    : execution.message || '-';
+                const auditSummary = renderAuditSummary(execution);
+                
+                return `
+                    <tr>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${execution.task_name || '-'}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                                ${statusText}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900" title="${escapeHtml(execution.message || '')}">
+                            <div>${escapeHtml(displayMessage)}</div>
+                            ${auditSummary}
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${formatDate(execution.created_at)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${formatDate(execution.updated_at)}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                            <button class="delete-execution-btn text-red-600 hover:text-red-900 hidden" data-execution-id="${execution.id}">
+                                <i class="fa fa-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 添加删除按钮事件监听
+            document.querySelectorAll('.delete-execution-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const executionId = this.dataset.executionId;
+                    if (confirm('确定要删除这条执行日志吗？')) {
+                        deleteExecution(executionId);
+                    }
+                });
+            });
+        }
+
+        // 更新分页信息
+        function updatePagination(data) {
+            if (data.total_pages <= 1) {
+                paginationContainer.classList.add('hidden');
+                return;
+            }
+            
+            paginationContainer.classList.remove('hidden');
+            
+            // 更新分页信息
+            const start = (data.page - 1) * data.per_page + 1;
+            const end = Math.min(data.page * data.per_page, data.total);
+            pageInfo.textContent = `${start}-${end}`;
+            totalCount.textContent = data.total;
+            currentPageInfo.textContent = `第 ${data.page} 页`;
+            
+            // 更新按钮状态
+            prevPageBtn.disabled = data.page <= 1;
+            nextPageBtn.disabled = data.page >= data.total_pages;
+        }
+
+        // 删除执行日志
+        function deleteExecution(executionId) {
+            console.log('准备删除执行日志:', executionId);
+            
+            fetch(`/api/schedule-executions/${executionId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                console.log('删除响应状态:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('删除响应数据:', data);
+                if (data.success) {
+                    showSuccess('执行日志删除成功');
+                    // 延迟一点再刷新，确保数据库操作完成
+                    setTimeout(() => {
+                        loadExecutions(currentPage);
+                        loadStatistics();
+                    }, 500);
+                } else {
+                    showError('删除失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('删除执行日志失败:', error);
+                showError('删除失败: ' + error.message);
+            });
+        }
+
+        // 清空所有执行日志
+        function clearAllExecutions() {
+            if (confirm('确定要清空所有执行日志吗？此操作不可恢复。')) {
+                fetch('/api/schedule-executions', {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        loadExecutions(1);
+                        loadStatistics();
+                        showSuccess('所有执行日志已清空');
+                    } else {
+                        showError('清空失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('清空执行日志失败:', error);
+                    showError('清空失败: ' + error.message);
+                });
+            }
+        }
+
+        // 应用筛选
+        function applyFilters() {
+            currentFilters = {
+                status: statusFilter.value
+            };
+            loadExecutions(1);
+            loadStatistics();  // 🔥 修复：筛选后也更新统计
+        }
+
+        // 清除筛选
+        function clearFilters() {
+            statusFilter.value = '';
+            currentFilters = {
+                status: ''
+            };
+            loadExecutions(1);
+            loadStatistics();  // 🔥 修复：重置筛选后也更新统计
+        }
+
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            
+            // 处理数据库返回的本地时间格式: "2025-11-03 02:43:49"
+            // 直接按本地时间解析，不做时区转换
+            if (dateString.includes(' ') && !dateString.includes('T')) {
+                // 格式: "YYYY-MM-DD HH:mm:ss"
+                // 直接返回，不做任何转换
+                return dateString;
+            }
+            
+            // 其他格式使用默认解析
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            
+            return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+        }
+
+        // 显示成功消息
+        function showSuccess(message) {
+            // 这里可以添加Toast通知或者其他成功提示方式
+            alert(message);
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            // 这里可以添加Toast通知或者其他错误提示方式
+            alert(message);
+        }
+
+        // 事件监听器
+        refreshExecutionsBtn.addEventListener('click', function() {
+            loadExecutions(currentPage);
+            loadStatistics();
+        });
+
+        clearExecutionsBtn.addEventListener('click', clearAllExecutions);
+        applyFiltersBtn.addEventListener('click', applyFilters);
+        clearFiltersBtn.addEventListener('click', clearFilters);
+
+        // 分页按钮事件
+        prevPageBtn.addEventListener('click', function() {
+            if (currentPage > 1) {
+                loadExecutions(currentPage - 1);
+            }
+        });
+
+        nextPageBtn.addEventListener('click', function() {
+            loadExecutions(currentPage + 1);
+        });
+
+    </script>
+</body>
+</html>

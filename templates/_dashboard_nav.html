@@ -1,0 +1,677 @@
+<script>
+/* 全站自适应层：所有 include 本导航的页面统一加载 responsive.css */
+(function(){if(!document.getElementById('responsive-css')){var l=document.createElement('link');l.id='responsive-css';l.rel='stylesheet';l.href='/static/css/responsive.css?v=17';document.head.appendChild(l);}})();
+</script>
+<nav class="dashboard-global-nav" aria-label="主导航">
+    <a class="dashboard-brand" href="/">{% if platform_logo %}<img src="{{ platform_logo }}" alt="Logo" class="dashboard-brand-logo">{% endif %}<span class="pb-brand-name">{{ platform_name }}</span></a>
+    <div class="dashboard-stats" id="globalStats"></div>
+    <a class="home-link" href="/" title="返回首页"><i class="fa fa-home"></i> 首页</a>
+    <a class="trend-link" href="/reports" title="报告"><i class="fa fa-file-alt"></i> 报告</a>
+    <a class="trend-link" href="/trends" title="趋势"><i class="fa fa-line-chart"></i> 趋势</a>
+    <a class="feed-link" href="/feed" title="资讯流"><i class="fa fa-rss"></i> 资讯流</a>
+    <div class="dashboard-nav-search">
+        <i class="fa fa-search dashboard-search-icon"></i>
+        <input id="globalSearchInput" class="dashboard-search-input" type="text" placeholder="搜索资讯、领域、来源..." onkeydown="if(event.key==='Enter'){globalSearchGo()}" autocomplete="off">
+        <button type="button" class="dashboard-search-btn" onclick="globalSearchGo()" title="搜索"><i class="fa fa-arrow-right"></i></button>
+    </div>
+    <div class="dashboard-skin" id="skinSwitcher">
+        <button id="skinBtn" class="dashboard-skin-btn" type="button" title="切换皮肤" aria-label="切换皮肤"><i class="fa fa-palette"></i><span id="skinLabel">换肤</span></button>
+        <div id="skinMenu" class="dashboard-skin-menu hidden">
+            <button type="button" class="dashboard-skin-opt" data-skin="" title="浅色主题">浅色</button>
+            <button type="button" class="dashboard-skin-opt" data-skin="darkblue" title="深色主题">深色</button>
+        </div>
+    </div>
+    <button class="dashboard-user" id="globalUserBtn" type="button" title="用户中心" aria-label="用户中心"><i class="fa fa-user-circle"></i></button>
+    <div class="dashboard-nav-links hidden" id="mobileMenu">
+        <!-- 控制台已移入 admin 下拉菜单（管理级功能，普通用户菜单不再出现） -->
+        <a class="dashboard-nav-link" href="/article-management">聚合结果</a>
+        <a class="dashboard-nav-link" href="/my-ai-settings">我的 AI 助手</a>
+        <details class="dashboard-nav-menu">
+            <summary class="dashboard-nav-link">系统管理 <i class="fa fa-chevron-down"></i></summary>
+            <div class="dashboard-nav-menu-panel">
+                <a class="dashboard-nav-link" href="/source-management">信源管理</a>
+                <a class="dashboard-nav-link" href="/manual-article">手动发文章</a>
+                <!-- 批量任务（批量添加聚合关键词）→ 已移到「行业包管理」（admin）
+                     线程监控 / 执行日志 → 属调度与监控的管理级入口，不再出现在用户菜单，
+                     由 admin 在「行业包管理」与「配置管理」侧使用 -->
+            </div>
+        </details>
+    </div>
+</nav>
+<script>
+function openGlobalChat(){var w=window.open('/console','_blank');try{w.focus()}catch(e){}}
+function globalSearchGo(){ var i=document.getElementById('globalSearchInput'); var q=(i&&i.value||'').trim(); location.href='/article-management'+(q?('?q='+encodeURIComponent(q)):''); }
+/* 把 2026-09-05T06:35:47Z(UTC) 转成 港时(UTC+8) MM-DD HH:MM:SS，去掉 T/Z */
+function formatLastCrawlTime(t){
+  if(!t) return '--';
+  var m=String(t).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+  if(!m) return String(t);
+  var d=new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);    // 视为本地解析
+  d=new Date(d.getTime()+8*3600*1000);                            // 按 UTC 源 +8 得到港时
+  var p=function(n){return String(n).padStart(2,'0');};
+  return (p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()));
+}
+function tolMenu(){
+  var m=document.getElementById('mobileMenu'); if(!m)return;
+  var open=m.classList.contains('hidden');
+  if(open){
+    m.classList.remove('hidden');
+    m.style.position='fixed'; m.style.top='180px'; m.style.left='20px';
+    m.style.display='flex'; m.style.flexDirection='column'; m.style.alignItems='stretch'; m.style.gap='2px';
+    m.style.minWidth='170px'; m.style.background='#fff'; m.style.border='1px solid var(--dashboard-line)';
+    m.style.borderRadius='10px'; m.style.boxShadow='0 14px 34px rgba(33,43,38,.16)'; m.style.zIndex='95'; m.style.padding='6px';
+  } else {
+    m.classList.add('hidden'); m.style.display='none';
+  }
+}
+document.addEventListener('click',function(e){var m=document.getElementById('mobileMenu');if(m&&!m.classList.contains('hidden')&&!e.target.closest('#mobileMenu')&&!e.target.closest('.tl-menu')&&!e.target.closest('#menuBtn2')){m.classList.add('hidden');m.style.display='none';}});
+(function(){
+  var box=document.getElementById('globalStats'); if(!box)return;
+  // 显式带当前页面的行业包 id：统计条始终跟随页面所属行业包，
+  // 不依赖服务端会话（避免旧页面/切包后会话不同步时串到别的包的数字）；
+  // 后端对包用户仍强制绑定包，管理员跟随请求包。
+  var _navPack = (document.body && document.body.getAttribute('data-industry-pack-id')) || window.__intelIndustryPackId || '';
+  fetch('/api/intel/dashboard?industry_pack_id='+encodeURIComponent(_navPack),{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    var s=(d.statistics||{});
+    function stat(label,val){return '<span class="stat"><span class="stat-l">'+label+'</span><span class="stat-v">'+(val===0||val==='0'?'0':(val||0))+'</span></span>';}
+    // 统计口径（均按当前行业包隔离）：
+    //   今日入库 M = 搜索引擎入库 N1 + 信源扫描入库 N2
+    //   搜索引擎 = SerpAPI + Tavily 合并（探查=搜索发现的候选数；入库=其中今天真正落库的，
+    //   含反爬转 VPN OCR 兜底进入的）。信源扫描 = 固定信源定时扫描入库。
+    var N1=s.today_google_ingested_articles;
+    var N2=s.today_source_ingested_articles;
+    // 今日入库 M = N1 + N2 放在最前且加粗放大，其余三项短标签跟在后面
+    box.innerHTML=
+      '<span class="stat stat-main" title="今日入库 M = 探查入库 N1 + 信源扫描入库 N2"><span class="stat-l">今日入库</span><span class="stat-v">'+((N1||0)+(N2||0))+'</span></span>'+
+      stat('探查→入库',(s.today_google_search_articles||0)+'→'+(N1||0))+
+      stat('信源扫描入库',N2||0)+
+      stat('最后聚合',formatLastCrawlTime(s.last_crawl_time));
+  }).catch(function(){});
+})();
+(function(){
+  // 严格区分「没存过(null)→默认深蓝」与「显式选了浅色('')→浅色」：
+  // 空串是 falsy，不能再走 ||'darkblue' 兜底，否则选了浅色回首页又弹回深蓝。
+  var saved;
+  try { saved = localStorage.getItem('dashSkin'); } catch(e) { saved = null; }
+  if (saved === null || saved === undefined) saved = 'darkblue';
+  function applySkin(name){ document.body.classList.toggle('skin-darkblue', name==='darkblue'); }
+  function hide(){ var m=document.getElementById('skinMenu'); if(m)m.classList.add('hidden'); }
+  function refreshLabel(name){ var lb=document.getElementById('skinLabel'); if(lb) lb.textContent = '换肤'; }
+  applySkin(saved); refreshLabel(saved);
+  document.addEventListener('click', function(e){
+    var opt=e.target.closest('.dashboard-skin-opt');
+    if(opt){
+      var name=opt.getAttribute('data-skin')||'';
+      localStorage.setItem('dashSkin', name);
+      applySkin(name); refreshLabel(name); hide();
+      e.preventDefault(); e.stopPropagation();
+      return;
+    }
+    if(!e.target.closest('#skinSwitcher')) hide();
+  });
+  var btn=document.getElementById('skinBtn');
+  if(btn){ btn.addEventListener('click', function(e){ e.stopPropagation(); var m=document.getElementById('skinMenu'); if(m)m.classList.toggle('hidden'); }); }
+})();
+/* ── 多租户包用户：头像显示登录用户 + 登录/登出 ── */
+(function(){
+  var ub=document.getElementById('globalUserBtn'); if(!ub) return;
+  function refresh(badge){
+    fetch('/api/pack-users/me',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+      var u=d.user;
+      window.__canDeleteArticles = u ? !!u.can_delete_articles : true;  // 无包用户=管理员=允许
+      if (u && u.industry_pack_id) window.__intelIndustryPackId = u.industry_pack_id;  // 供各页面功能开关读取
+      // 删除类按钮默认隐藏：仅管理员或行业后台开启「允许删除文章」时才显示
+      document.querySelectorAll('[data-del-perm]').forEach(function(el){ el.classList.toggle('del-perm-on', window.__canDeleteArticles===true); });
+      try { window.dispatchEvent(new CustomEvent('deletePermChanged', {detail: window.__canDeleteArticles})); } catch(e){}
+      // 包用户：改首页中间大标题为"公司·行业包资讯"（不改左上角品牌名）
+      window.__packUserCompany = u ? (u.company_name||'') : '';
+      if(u){ var pk=(u&&u.pack_name)||window.__packName || document.body.getAttribute('data-industry-name') || ''; var dt=document.getElementById('intelDashboardTitle');
+        if(dt){ dt.textContent=window.__packUserCompany+'·'+pk+'资讯'; } }
+      showExpiryBanner(u);
+      if(u){
+        if(u.avatar){ ub.innerHTML='<img src="/'+(u.avatar.replace(/\\/g,'/'))+'" class="dashboard-user-avatar" alt="头像">'; }
+        else { ub.innerHTML='<i class="fa fa-user-circle"></i>'; }
+        ub.title=(u.nickname||u.username||u.company_name||'')+(u.expire_at?(' · 到期 '+u.expire_at):''); ub.classList.add('is-pack-user');
+      }
+      else { ub.innerHTML='<i class="fa fa-user-circle"></i>'; ub.title='登录'; ub.classList.remove('is-pack-user'); }
+    }).catch(function(){});
+  }
+  refresh(true);
+  ub.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    showAvatarMenu();
+  });
+  document.addEventListener('click', function(ev){ var m=document.getElementById('avatarMenu'); if(m && !ev.target.closest('#globalUserBtn') && !ev.target.closest('#avatarMenu')) m.style.display='none'; });
+  function escHtml(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function showAvatarMenu(active){
+    fetch('/api/pack-users/me',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+      var menu=document.getElementById('avatarMenu');
+      if(!menu){ menu=document.createElement('div'); menu.id='avatarMenu'; menu.className='dashboard-avatar-menu'; document.body.appendChild(menu); }
+      if(d.user){
+        var u=d.user;
+        menu.innerHTML =
+          '<div class="am-head"><i class="fa fa-user-circle"></i> '+escHtml(u.username)+'</div>'+
+          '<div class="am-row">公司：'+escHtml(u.company_name||u.nickname||'—')+'</div>'+
+          '<div class="am-row">邮箱：'+escHtml(u.email||'—')+'</div>'+
+          '<div class="am-row">授权到期：'+escHtml(u.expire_at||'—')+'</div>'+
+          '<a class="am-item" href="/pack-console">个人中心（改头像/口令）</a>'+
+          '<a class="am-item" href="javascript:void(0)" onclick="logoutPackUser()">退出登录</a>';
+      } else {
+        menu.innerHTML =
+          '<div class="am-head"><i class="fa fa-shield-alt"></i> 管理员</div>'+
+          '<a class="am-item" href="/select-pack">切换行业</a>'+
+          '<a class="am-item" href="/panython/admin">行业包设置</a>'+
+          '<a class="am-item" href="/pack-admin">行业包用户管理</a>'+
+          '<a class="am-item" href="/user-management">用户管理</a>'+
+          '<a class="am-item" href="/manual-article">手动发文章</a>'+
+          // 控制台与任务调度属管理级功能：入口放在 admin 下拉菜单里（用户管理下方、退出登录之前）
+          '<a class="am-item" href="/console">控制台</a>'+
+          '<a class="am-item" href="/schedule-management">任务调度</a>'+
+          '<a class="am-item" href="/logout">退出登录</a>';
+      }
+      menu.style.display='block';
+    }).catch(function(){});
+  }
+  // ── 包用户完整登录流程：账号口令 → 邮箱验证码 → 首登强制改密 ──
+  function doPackLogin(){
+    var un=prompt('包用户登录：请输入用户名'); if(!un) return;
+    var pw=prompt('请输入口令');
+    fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,password:pw})})
+      .then(function(r){return r.json();})
+      .then(function(l){ if(!l.success){ alert('登录失败：'+(l.message||'未知')); return; } autoVerify(un,pw,l); })
+      .catch(function(e){ alert('登录失败：'+e.message); });
+  }
+  function autoVerify(un,pw,l){
+    var hint=(l.email_sent===false&&l.dev_code)?('（测试模式验证码：'+l.dev_code+'）'):('（已发送到邮箱，请查收）');
+    var code=prompt('请输入邮箱验证码'+hint); if(!code) return;
+    fetch('/api/pack-users/login/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,code:code})})
+      .then(function(r){return r.json();})
+      .then(function(v){
+        if(!v.success){ alert('验证码错误：'+(v.message||'未知')); return; }
+        if(v.step==='change_password'){ autoChange(un,pw); return; }
+        alert('登录成功：'+(v.username||un)); refresh(true);
+      }).catch(function(e){ alert('验证失败：'+e.message); });
+  }
+  function autoChange(un,pw){
+    var np=prompt('首次登录需设置新口令（字母+数字，至少6位）：'); if(!np) return;
+    fetch('/api/pack-users/login/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:un,old_password:pw,new_password:np})})
+      .then(function(r){return r.json();})
+      .then(function(c){ if(c.success){ alert('登录成功：'+(c.username||un)); refresh(true); } else { alert('改密失败：'+(c.message||'未知')); } })
+      .catch(function(e){ alert('改密失败：'+e.message); });
+  }
+  function logoutPackUser(){ fetch('/api/pack-users/logout',{method:'POST'}).then(function(){ refresh(true); var m=document.getElementById('avatarMenu'); if(m)m.style.display='none'; }).catch(function(){}); }
+  // ── 授权到期/临期顶部提示：即将到期请联系 [提醒号] 续期 ──
+  function showExpiryBanner(u){
+    var b=document.getElementById('packExpiryBanner');
+    if(!u||!u.expire_at){ if(b){b.style.display='none';} return; }
+    var exp=String(u.expire_at).slice(0,10), today=new Date(), expD=new Date(exp+'T23:59:59');
+    var days=Math.ceil((expD-today)/86400000);
+    var phone=u.remind_phone||u.contact_phone||'';
+    var msg='';
+    if(days<0){ msg='⚠️ 授权已到期，请联系 '+phone+' 续期'; }
+    else if(days<=7){ msg='⚠️ 授权将于 '+exp+' 到期（剩余 '+days+' 天），即将到期请联系 '+phone+' 续期'; }
+    else { if(b){b.style.display='none';} return; }
+    if(!b){ b=document.createElement('div'); b.id='packExpiryBanner'; b.className='pack-expiry-banner';
+      b.innerHTML='<span id="packExpiryText"></span><button class="pb-close" onclick="closeExpiryBanner()">&times;</button>';
+      document.body.insertBefore(b, document.body.firstChild); }
+    document.getElementById('packExpiryText').textContent=msg;
+    b.style.display='flex';
+  }
+  function closeExpiryBanner(){ var b=document.getElementById('packExpiryBanner'); if(b) b.style.display='none'; }
+  window.closeExpiryBanner=closeExpiryBanner;
+  window.doPackLogin=doPackLogin; window.autoVerify=autoVerify; window.autoChange=autoChange; window.logoutPackUser=logoutPackUser;
+  window.__setNavUser=function(){ refresh(true); };
+})();
+</script>
+<link rel="stylesheet" href="/static/css/confirm-dialog.css"><script src="/static/js/confirm-dialog.js"></script>
+<style>
+.dashboard-brand{display:inline-flex;align-items:center;height:52px;overflow:hidden;min-width:0}
+.dashboard-brand-logo{display:block;vertical-align:middle;height:44px;width:auto;max-width:200px;margin-right:10px;object-fit:contain;flex-shrink:0}
+.dashboard-global-nav{display:flex;align-items:center;gap:12px}
+.dashboard-nav-search{display:flex;align-items:center;gap:5px;flex:1;max-width:220px;margin:0 12px 0 0;padding:0 6px 0 12px;height:34px;border:1px solid var(--dashboard-line);border-radius:999px;background:rgba(255,255,255,.7)}
+.dashboard-search-icon{color:#9ca3af;font-size:13px;flex-shrink:0}
+.dashboard-search-btn{flex-shrink:0;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;background:rgba(29,127,104,.12);color:var(--dashboard-accent-dark);cursor:pointer;font-size:12px}
+.dashboard-search-btn:hover{background:rgba(29,127,104,.22)}
+.dashboard-user{flex-shrink:0;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--dashboard-line);border-radius:999px;background:rgba(255,255,255,.7);color:var(--dashboard-ink);cursor:pointer;font-size:18px}
+.dashboard-user:hover{background:rgba(29,127,104,.12);color:var(--dashboard-accent-dark)}
+.dashboard-user-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1px solid rgba(96,165,250,.3);display:block;margin:auto}
+.feed-link{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#e6f2ef;color:#0f766e;font-weight:700;font-size:13px;white-space:nowrap;text-decoration:none;margin-right:10px;flex-shrink:0}
+.trend-link{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#e6f2ef;color:#0f766e;font-weight:700;font-size:13px;white-space:nowrap;text-decoration:none;flex-shrink:0}
+.home-link{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#0f766e;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;text-decoration:none;margin-right:10px;flex-shrink:0}
+.feed-link:hover,.trend-link:hover{background:#d5ebe4}
+.home-link:hover{background:#0a5f52;color:#fff}
+.dashboard-search-input{flex:1;border:0;outline:0;background:transparent;font-size:13px;color:var(--dashboard-ink)}
+.dashboard-nav-actions{display:none}
+.dashboard-stats{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;overflow:hidden;flex:1}
+.dashboard-stats .stat{display:inline-flex;align-items:baseline;gap:4px;white-space:nowrap;font-size:12px;border:0;background:transparent;box-shadow:none;border-radius:0;padding:0;margin:0}
+.dashboard-stats .stat-l{color:#6b7280;font-size:11px}
+.dashboard-stats .stat-v{color:#0f766e;font-weight:800;font-size:14px}
+/* 今日入库 M=N1+N2：首个胶囊，标签与数值放大，一眼可见 */
+.dashboard-stats .stat-main{align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:rgba(15,118,110,.10);border:1px solid rgba(15,118,110,.25)}
+.dashboard-stats .stat-main .stat-l{font-size:12px;color:#0f766e}
+.dashboard-stats .stat-main .stat-v{font-size:19px;line-height:1}
+body.skin-darkblue .dashboard-stats .stat-main{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.35)}
+body.skin-darkblue .dashboard-stats .stat-main .stat-l{color:#7dd3fc}
+/* 删除类操作（卡片删除/清空本地等）：默认隐藏，仅管理员或行业后台开启
+   「允许删除文章」后由 JS 加上 .del-perm-on 显示 */
+[data-del-perm]:not(.del-perm-on){display:none}
+
+/* ── 换肤控件 ── */
+.dashboard-skin{position:relative;flex-shrink:0}
+.dashboard-skin-btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 12px;border:1px solid var(--dashboard-line);border-radius:999px;background:rgba(255,255,255,.7);color:var(--dashboard-ink);font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.dashboard-skin-btn:hover{background:rgba(29,127,104,.12);color:var(--dashboard-accent-dark)}
+.dashboard-skin-menu{position:absolute;right:0;top:42px;z-index:70;min-width:130px;padding:6px;border:1px solid var(--dashboard-line);border-radius:10px;background:rgba(250,252,249,.98);box-shadow:0 14px 34px rgba(33,43,38,.16)}
+.dashboard-skin-menu.hidden{display:none}
+.dashboard-skin-opt{display:flex;align-items:center;width:100%;padding:7px 10px;border:0;border-radius:7px;background:transparent;color:var(--dashboard-ink);font-size:13px;font-weight:600;text-align:left;cursor:pointer}
+.dashboard-skin-opt:hover{background:rgba(29,127,104,.12);color:var(--dashboard-accent-dark)}
+
+/* ── 深蓝色大屏皮肤 (body.skin-darkblue) ── */
+body.skin-darkblue{
+  --dashboard-bg:#0a1428;
+  --dashboard-panel:rgba(13,28,56,0.80);
+  --dashboard-panel-strong:#0e1d3a;
+  --dashboard-ink:#e6f0ff;
+  --dashboard-muted:#93a9cc;
+  --dashboard-line:rgba(96,165,250,0.24);
+  --dashboard-accent:#38bdf8;
+  --dashboard-accent-dark:#7dd3fc;
+  --dashboard-warm:#fbbf24;
+  --dashboard-danger:#f87171;
+  --dashboard-shadow:0 16px 40px rgba(0,0,0,0.45);
+  color:#e6f0ff;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(56,189,248,0.20), transparent 30%),
+    radial-gradient(circle at 85% 90%, rgba(59,130,246,0.16), transparent 34%),
+    linear-gradient(160deg,#0e1d3a 0%,#08101f 55%,#060b1c 100%) !important;
+}
+body.skin-darkblue .dashboard-global-nav,
+body.skin-darkblue nav.bg-white{
+  background:rgba(9,20,42,0.85) !important;
+  border-bottom:1px solid rgba(96,165,250,0.22) !important;
+  box-shadow:0 10px 30px rgba(0,0,0,0.5) !important;
+}
+body.skin-darkblue ::-webkit-scrollbar{width:10px;height:10px;background:#0a1428}
+body.skin-darkblue ::-webkit-scrollbar-thumb{background:#1c3a5e;border-radius:6px}
+body.skin-darkblue ::-webkit-scrollbar-thumb:hover{background:#27507f}
+body.skin-darkblue ::-webkit-scrollbar-track{background:#0a1428}
+body.skin-darkblue .badge,body.skin-darkblue .badge-muted,body.skin-darkblue .badge-secondary{background:rgba(56,189,248,.16);color:#9ed2f7;border-color:rgba(56,189,248,.2)}
+body.skin-darkblue .bg-white,body.skin-darkblue .bg-gray-50,body.skin-darkblue .bg-gray-100,
+body.skin-darkblue .card,body.skin-darkblue .panel,body.skin-darkblue .panel-body,body.skin-darkblue .check-card{
+  background:#0e1d3a !important;color:#e6f0ff !important;border-color:rgba(96,165,250,.22) !important;}
+body.skin-darkblue input,body.skin-darkblue select,body.skin-darkblue textarea{
+  background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;color:#e6f0ff !important;}
+body.skin-darkblue input::placeholder,body.skin-darkblue textarea::placeholder{color:#5b7a9d}
+body.skin-darkblue table,body.skin-darkblue thead{color:#e6f0ff}
+body.skin-darkblue .text-gray-800,body.skin-darkblue .text-gray-900,body.skin-darkblue .text-gray-700,
+body.skin-darkblue .text-gray-600,body.skin-darkblue .text-gray-500{color:#c9d8ee !important}
+body.skin-darkblue .muted,body.skin-darkblue .text-muted,body.skin-darkblue .hint{color:#8ea6c8 !important}
+body.skin-darkblue .shadow-sm,body.skin-darkblue .shadow,body.skin-darkblue .shadow-md{box-shadow:none !important}
+
+  background:rgba(9,20,42,0.85) !important;
+  border-bottom:1px solid rgba(96,165,250,0.22) !important;
+  box-shadow:0 10px 30px rgba(0,0,0,0.5) !important;
+}
+body.skin-darkblue .dashboard-stats .stat-l{color:#8ea6c8}
+body.skin-darkblue .dashboard-stats .stat-v{color:#38bdf8}
+body.skin-darkblue .trend-link,body.skin-darkblue .feed-link{background:rgba(56,189,248,0.14);color:#7dd3fc}
+body.skin-darkblue .trend-link:hover,body.skin-darkblue .feed-link:hover{background:rgba(56,189,248,0.22)}
+body.skin-darkblue .home-link{background:#2563eb;color:#fff}
+body.skin-darkblue .home-link:hover{background:#1d4ed8;color:#fff}
+body.skin-darkblue .dashboard-nav-search{background:rgba(13,28,56,0.7);border-color:rgba(96,165,250,0.28)}
+body.skin-darkblue .dashboard-search-input{color:#e6f0ff}
+body.skin-darkblue .dashboard-brand{color:#e6f0ff}
+body.skin-darkblue .dashboard-skin-btn{background:rgba(13,28,56,0.7);border-color:rgba(96,165,250,0.28);color:#e6f0ff}
+body.skin-darkblue .dashboard-skin-menu{background:rgba(13,28,56,0.96);border-color:rgba(96,165,250,0.28)}
+body.skin-darkblue .dashboard-skin-opt{color:#dbeafe}
+body.skin-darkblue .dashboard-skin-opt:hover{background:rgba(56,189,248,0.16);color:#7dd3fc}
+/* ── 头像下拉菜单：默认浅色皮肤，深蓝皮肤另行覆盖（与全站皮肤统一） ── */
+.dashboard-avatar-menu{position:fixed;right:16px;top:54px;z-index:80;min-width:240px;padding:8px;border:1px solid rgba(23,32,29,.14);border-radius:12px;background:rgba(250,252,249,.98);box-shadow:0 16px 40px rgba(33,43,38,.16);display:none;color:#1f2937}
+.dashboard-avatar-menu .am-head{font-size:14px;font-weight:800;color:#111827;padding:8px 10px;border-bottom:1px solid rgba(23,32,29,.10);margin-bottom:4px}
+.dashboard-avatar-menu .am-row{font-size:12px;color:#6b7280;padding:4px 10px}
+.dashboard-avatar-menu .am-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:0;background:transparent;color:#374151;text-decoration:none;font-size:13px;font-weight:600;border-radius:8px;cursor:pointer;width:100%;text-align:left}
+.dashboard-avatar-menu .am-item:hover{background:rgba(29,127,104,.10);color:#0f766e}
+body.skin-darkblue .dashboard-avatar-menu{background:rgba(13,28,56,.97);border-color:rgba(96,165,250,.28);box-shadow:0 16px 40px rgba(0,0,0,.5);color:#dbeafe}
+body.skin-darkblue .dashboard-avatar-menu .am-head{color:#e6f0ff;border-bottom-color:rgba(96,165,250,.16)}
+body.skin-darkblue .dashboard-avatar-menu .am-row{color:#a7b8d4}
+body.skin-darkblue .dashboard-avatar-menu .am-item{color:#dbeafe}
+body.skin-darkblue .dashboard-avatar-menu .am-item:hover{background:rgba(56,189,248,.16);color:#7dd3fc}
+/* ── 授权到期/临期顶部横幅 ── */
+.pack-expiry-banner{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(154,52,18,.96);color:#fff;padding:11px 16px;font-size:13px;font-weight:700;display:none;justify-content:center;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.pack-expiry-banner .pb-close{background:rgba(255,255,255,.2);border:0;color:#fff;font-size:20px;line-height:1;width:26px;height:26px;border-radius:50%;cursor:pointer}
+body.skin-darkblue .dashboard-nav-links{background:rgba(9,20,42,0.97) !important}
+body.skin-darkblue #mobileMenu{background:rgba(9,20,42,0.97) !important;border:1px solid rgba(96,165,250,0.28) !important;border-radius:12px !important;box-shadow:0 16px 40px rgba(0,0,0,0.5) !important}
+body.skin-darkblue .dashboard-nav-link{background:transparent !important; color:#b8c9e6}
+body.skin-darkblue .dashboard-nav-link:hover,body.skin-darkblue .dashboard-nav-link.active{background:rgba(56,189,248,0.16) !important;color:#7dd3fc !important}
+body.skin-darkblue .dashboard-nav-menu-panel{background:rgba(13,28,56,0.96) !important;border-color:rgba(96,165,250,0.28) !important;box-shadow:0 14px 34px rgba(0,0,0,0.5)}
+/* 首页主题驾驶舱 / 时间轴 (mapindex) */
+body.skin-darkblue .mapindex-shell{background:transparent}
+body.skin-darkblue .intel-theme-dashboard .intel-theme-menu{border-bottom-color:rgba(96,165,250,0.20)}
+body.skin-darkblue .intel-theme-menu .menu-label{color:#7dd3fc}
+body.skin-darkblue .intel-theme-menu .theme-radio{color:#b8c9e6}
+body.skin-darkblue .intel-theme-menu .theme-radio.active{color:#38bdf8}
+body.skin-darkblue .intel-theme-card{background:rgba(13,28,56,0.72);border-color:rgba(96,165,250,0.22);box-shadow:0 8px 26px rgba(0,0,0,0.4)}
+body.skin-darkblue .intel-theme-card .intel-theme-card-title{color:#dbeafe}
+body.skin-darkblue .intel-theme-card-title .dot{background:#38bdf8;box-shadow:0 0 8px rgba(56,189,248,.8)}
+body.skin-darkblue .intel-theme-card-count .num{color:#38bdf8}
+body.skin-darkblue .intel-theme-card-count .lbl{color:#8ea6c8}
+body.skin-darkblue .intel-theme-card .insights{color:#c7d7ee}
+body.skin-darkblue .intel-theme-card .insight-num{color:#38bdf8}
+body.skin-darkblue .intel-theme-card .tag{background:rgba(96,165,250,0.14);color:#b8c9e6}
+body.skin-darkblue .intel-theme-card .tag:hover{background:rgba(56,189,248,0.22);color:#7dd3fc}
+body.skin-darkblue .intel-theme-card:hover{border-color:#38bdf8;background:rgba(16,34,66,0.85)}
+body.skin-darkblue .tl-item .tl-title{color:#dbeafe}
+body.skin-darkblue .tl-item:hover .tl-title{color:#7dd3fc}
+body.skin-darkblue .tl-topic{background:rgba(56,189,248,0.14);color:#7dd3fc}
+body.skin-darkblue .intel-theme-timeline .tl-list:before{background:rgba(56,189,248,0.28)}
+body.skin-darkblue .tl-dot{background:#38bdf8;border-color:#0a1428}
+body.skin-darkblue .intel-empty{color:#8ea6c8}
+body.skin-darkblue .icon-button{color:#c7d7ee}
+body.skin-darkblue .icon-button:hover{background:rgba(56,189,248,0.16)}
+body.skin-darkblue .page-title,body.skin-darkblue .dashboard-title,body.skin-darkblue h1,body.skin-darkblue h2,body.skin-darkblue h3{color:#e6f0ff}
+
+/* ── 深蓝色大屏：补齐大量未深蓝的元素 ── */
+/* 卡片 donut 环：白色内圆 → 深蓝，占位色/文字 → 蓝系 */
+body.skin-darkblue .intel-theme-card .donut:after{background:rgba(13,28,56,0.85)}
+body.skin-darkblue .donut-pct{color:#b8c9e6}
+body.skin-darkblue .donut-pct .dp:first-child .dp-bar{background:#38bdf8}
+body.skin-darkblue .donut-pct .dp:nth-child(2) .dp-bar{background:rgba(96,165,250,0.30)}
+/* 卡片主题名悬停 / insight 悬停：绿色 → 蓝 */
+body.skin-darkblue .intel-theme-card .theme-title-link:hover{color:#7dd3fc}
+body.skin-darkblue .intel-theme-card .insight-title:hover .insight-text{color:#7dd3fc;font-weight:700}
+body.skin-darkblue .intel-theme-card .insight-text:hover{color:#7dd3fc}
+/* 时间轴：时间戳/来源/查看全部/侧栏按钮 → 蓝系，去掉绿色与白底 */
+body.skin-darkblue .tl-time{color:#7dd3fc}
+body.skin-darkblue .tl-src{color:#8ea6c8}
+body.skin-darkblue .tl-all{color:#8ea6c8}
+body.skin-darkblue .tl-menu{background:rgba(13,28,56,0.80);border-color:rgba(96,165,250,0.28);color:#7dd3fc}
+body.skin-darkblue .tl-head .tl-title{color:#dbeafe}
+/* 菜单"全领域/主题"数量 */
+body.skin-darkblue .intel-theme-menu .theme-radio .n{color:#8ea6c8}
+/* 通用：硬编码浅灰面板 → 深蓝面板 */
+body.skin-darkblue .bg-white{background-color:rgba(13,28,56,0.80) !important}
+/* 通用：卡片上的浅色内边栏恢复深蓝面板 */
+body.skin-darkblue .card,
+body.skin-darkblue .panel,
+body.skin-darkblue .box{background-color:rgba(13,28,56,0.80)}
+
+/* ── 深蓝大屏：所有页面通用主容器/输入框/表格深蓝覆盖 ── */
+body.skin-darkblue .article-card,
+body.skin-darkblue .reports-list,
+body.skin-darkblue .reports-panel,
+body.skin-darkblue .preview-panel,
+body.skin-darkblue .stat-card,
+body.skin-darkblue .operation-card,
+body.skin-darkblue .url-catalog-tree,
+body.skin-darkblue .url-row,
+body.skin-darkblue .url-category-head,
+body.skin-darkblue .article-content-display,
+body.skin-darkblue .article-reading-panel,
+body.skin-darkblue .dyn-item,
+body.skin-darkblue .intel-trend-modal-card,
+body.skin-darkblue .intel-trend-article,
+body.skin-darkblue .gate-panel,
+body.skin-darkblue .gate-entities,
+body.skin-darkblue .schedule-table-wrap{
+  background:#0e1d3a !important;border-color:rgba(96,165,250,.22) !important;color:#dbeafe;
+}
+body.skin-darkblue input,
+body.skin-darkblue select,
+body.skin-darkblue textarea{
+  background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;color:#e6f0ff;
+}
+body.skin-darkblue .bg-gray-100,
+body.skin-darkblue .bg-gray-50{background-color:#0e1d3a !important;color:#dbeafe}
+/* mapindex：驾驶舱包装（浅底 #eef2ef）与标题条（浅渐变）→ 深蓝 */
+body.skin-darkblue .intel-dashboard{background:transparent}
+body.skin-darkblue .intel-theme-dashboard{background:transparent}
+body.skin-darkblue .mapindex-shell{background:transparent}
+body.skin-darkblue .intel-dashboard-hero{
+  background:linear-gradient(135deg, rgba(13,28,56,0.90) 0%, rgba(16,34,66,0.80) 100%);
+  border-color:rgba(96,165,250,0.24);
+}
+body.skin-darkblue .intel-dashboard-title{color:#e6f0ff}
+body.skin-darkblue .intel-dashboard-meta{color:#8ea6c8}
+body.skin-darkblue .intel-dashboard-badge{background:rgba(56,189,248,0.14);color:#7dd3fc;border-color:rgba(96,165,250,0.28)}
+/* mapindex：主题菜单条背景（含"实时热点"行）深蓝 */
+body.skin-darkblue .intel-theme-main{background:transparent}
+/* 白底搜索框/表单控件 → 深蓝 */
+body.skin-darkblue .filter-control,
+body.skin-darkblue .search-control,
+body.skin-darkblue .article-filter-panel input,
+body.skin-darkblue .search-input,
+body.skin-darkblue .toolbar-input{background:#0e1d3a !important;color:#e6f0ff;border-color:rgba(96,165,250,.28)}
+/* 白底 tab/分页按钮 → 深蓝 */
+body.skin-darkblue .tabs button,
+body.skin-darkblue .intel-trend-tab,
+body.skin-darkblue .schedule-view-tab,
+body.skin-darkblue .dyn-pagination button{
+  background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;color:#dbeafe !important;
+}
+body.skin-darkblue .tabs button.active,
+body.skin-darkblue .intel-trend-tab.active{background:#2563eb !important;color:#fff !important;border-color:#2563eb !important}
+/* 趋势页加载/图表容器 → 深蓝 */
+body.skin-darkblue .intel-trend-evolution{background:transparent}
+body.skin-darkblue .intel-trend-chart-wrap,body.skin-darkblue .intel-trend-chart{background:rgba(13,28,56,.82) !important}
+body.skin-darkblue .intel-trend-empty{color:#a7b8d4;background:transparent}
+body.skin-darkblue .intel-trend-legend-bar{color:#c7d7ee}
+body.skin-darkblue .intel-trend-state-key.is-declining{color:#8ea6c8}
+/* 文章详情弹窗 → 深蓝 */
+body.skin-darkblue .article-modal-content,
+body.skin-darkblue #modalContent{background:#0e1d3a !important;color:#dbeafe !important}
+body.skin-darkblue .article-modal-header,
+body.skin-darkblue .article-modal-footer,
+body.skin-darkblue #modalContent th{background:#12233f !important;border-color:rgba(96,165,250,.22) !important;color:#dbeafe}
+body.skin-darkblue #modalContent td{background:transparent;color:#dbeafe}
+
+/* ── 文章详情弹窗：标题/meta/按钮/正文 → 深蓝 ── */
+body.skin-darkblue #modalTitle{color:#e6f0ff !important}
+body.skin-darkblue .article-meta-label{color:#8ea6c8}
+body.skin-darkblue .article-meta-value{color:#dbeafe}
+body.skin-darkblue .article-meta-title .article-meta-value{color:#e6f0ff}
+body.skin-darkblue #modalUrl{color:#7dd3fc}
+body.skin-darkblue .article-reading-panel-heading{color:#dbeafe}
+body.skin-darkblue .article-content-display,
+body.skin-darkblue #modalContent,
+body.skin-darkblue #modalTranslation{background:#0e1d3a !important;border-color:rgba(96,165,250,.22) !important;color:#dbeafe}
+body.skin-darkblue #modalContent th{background:#12233f;color:#dbeafe;border-color:rgba(96,165,250,.28)}
+body.skin-darkblue #modalContent td{color:#dbeafe;border-color:rgba(96,165,250,.20)}
+body.skin-darkblue #modalContent a{color:#7dd3fc}
+/* 底部按钮：绿→蓝；次要(停止朗读/关闭)→深蓝灰 */
+body.skin-darkblue .article-modal-action.is-quote,
+body.skin-darkblue .article-modal-action.is-translate,
+body.skin-darkblue .modal-translate-action,
+body.skin-darkblue #modalTranslateBtn{background:#2563eb !important;color:#fff !important;border-color:#2563eb !important}
+body.skin-darkblue .article-modal-action.is-secondary{background:#12233f !important;color:#dbeafe !important;border-color:rgba(96,165,250,.28) !important}
+body.skin-darkblue .article-modal-action.is-active{background:#2563eb !important}
+body.skin-darkblue .article-speech-action{background:#12233f;color:#7dd3fc}
+body.skin-darkblue .article-speech-action:hover{background:rgba(56,189,248,.24)}
+body.skin-darkblue .article-speech-action.is-ready{background:#2563eb;color:#fff}
+/* 匹配关键词徽章（正文内） */
+body.skin-darkblue #modalContent mark.kw-hl,body.skin-darkblue .kw-hl{background:#fbbf24;color:#1f2430;padding:0 2px;border-radius:3px}
+
+/* ── 趋势页 → 深蓝 ── */
+body.skin-darkblue .intel-section-title{color:#e6f0ff}
+body.skin-darkblue .intel-section-description{color:#93a9cc}
+body.skin-darkblue .intel-section-count{color:#8ea6c8}
+body.skin-darkblue .intel-trend-evolution{background:transparent}
+body.skin-darkblue .intel-trend-reading{color:#c7d7ee;border-bottom-color:rgba(96,165,250,0.16)}
+body.skin-darkblue .intel-trend-reading-kw{color:#7dd3fc}
+body.skin-darkblue .intel-trend-reading-text{color:#93a9cc}
+body.skin-darkblue .intel-trend-content-arrow{color:#7dd3fc;font-size:13px;padding:2px 8px}
+body.skin-darkblue .intel-trend-content-arrow:hover{background:rgba(56,189,248,0.16);color:#e6f0ff}
+body.skin-darkblue .intel-trend-content-toggle{background:rgba(56,189,248,0.20);color:#7dd3fc;border:1px solid rgba(96,165,250,.30)}
+body.skin-darkblue .intel-trend-content-toggle:hover{background:rgba(56,189,248,0.32);color:#e6f0ff}
+body.skin-darkblue .intel-trend-inline-title{color:#dbeafe}
+body.skin-darkblue .intel-trend-inline-title:hover{color:#7dd3fc}
+body.skin-darkblue .intel-trend-article{color:#dbeafe}
+body.skin-darkblue .intel-trend-article:nth-child(odd){background:#0d1a34 !important}
+body.skin-darkblue .intel-trend-article:nth-child(even){background:#182c50 !important}
+body.skin-darkblue .intel-trend-article:hover{background:rgba(56,189,248,0.28) !important}
+body.skin-darkblue .intel-trend-article-title{color:#e6f0ff}
+/* 趋势页文章标题字号统一放大（原来继承父级过小，看久了累）；行高同步放宽便于阅读。
+   中英文同样生效（只设字号不指定字体，中英文都会按该字号渲染）。 */
+.intel-trend-article-title{font-size:17px;line-height:1.6}
+.intel-trend-article-meta{font-size:13.5px;line-height:1.55}
+body.skin-darkblue .intel-trend-article .rt-dot{background:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.2)}
+body.skin-darkblue .intel-trend-article-meta{color:#93a9cc}
+body.skin-darkblue .intel-trend-article-meta .time{color:#8ea6c8}
+body.skin-darkblue .intel-trend-page-btn{background:#0e1d3a;color:#dbeafe;border:1px solid rgba(96,165,250,.28)}
+body.skin-darkblue #intelTrendModalFoot{background:#12233f;border-top-color:rgba(96,165,250,.20)}
+
+/* ── 资讯流页 → 深蓝 ── */
+body.skin-darkblue .feed-hero-title,
+body.skin-darkblue .feed-sec-title{color:#e6f0ff}
+body.skin-darkblue .feed-meta,
+body.skin-darkblue .feed-sec-desc,
+body.skin-darkblue .feed-sec-count{color:#93a9cc}
+body.skin-darkblue .feed-more{color:#7dd3fc}
+body.skin-darkblue .feed-sec-head:hover .feed-sec-title{color:#7dd3fc}
+body.skin-darkblue .feed-caret{color:#7dd3fc}
+body.skin-darkblue .feed-sec-head{border-bottom-color:rgba(96,165,250,0.20)}
+body.skin-darkblue .feed-search-input{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#e6f0ff}
+body.skin-darkblue .feed-search-btn{background:#2563eb;color:#fff}
+body.skin-darkblue .feed-search-btn:hover{background:#1d4ed8}
+body.skin-darkblue .article-card{background:#0e1d3a;border-color:rgba(96,165,250,.22)}
+body.skin-darkblue .article-card:hover{background:rgba(16,34,66,.85);border-color:#38bdf8;box-shadow:none}
+body.skin-darkblue .article-card-title{color:#e6f0ff}
+body.skin-darkblue .article-card-meta{color:#93a9cc}
+body.skin-darkblue .article-card-preview{color:#c7d7ee}
+body.skin-darkblue .article-card-footer{border-top-color:rgba(96,165,250,.16)}
+body.skin-darkblue .keyword-badge-content{background:rgba(56,189,248,.16);color:#7dd3fc;border-color:rgba(96,165,250,.28)}
+body.skin-darkblue .task-origin-empty{color:#8ea6c8}
+
+/* ── 聚合结果：搜索/筛选面板与控件 → 深蓝 ── */
+body.skin-darkblue .article-filter-panel{background:rgba(14,29,58,0.85) !important;border-color:rgba(96,165,250,.22)}
+body.skin-darkblue .filter-control,
+body.skin-darkblue .article-filter-panel select{background:#0e1d3a !important;color:#e6f0ff;border-color:rgba(96,165,250,.28)}
+body.skin-darkblue .filter-control:focus{border-color:#38bdf8 !important}
+body.skin-darkblue .article-filter-panel .btn,
+body.skin-darkblue .article-actions .btn{background:#0e1d3a;color:#dbeafe;border-color:rgba(96,165,250,.28)}
+
+/* ── 文章管理：列表视图深蓝适配 ── */
+body.skin-darkblue .article-list-header{background:#12233f;color:#8ea6c8;border-bottom-color:rgba(96,165,250,.16)}
+body.skin-darkblue .article-list-row{border-bottom-color:rgba(96,165,250,.14)}
+body.skin-darkblue .article-list-row:hover{background:rgba(56,189,248,.08)}
+/* 行悬停高亮：原为 Tailwind hover:bg-gray-50（深色皮肤下是近白色，明显不搭）→ 换成皮肤蓝 */
+body.skin-darkblue .article-list-item:hover{background:rgba(56,189,248,.10)}
+body.skin-darkblue .article-list-item{background:transparent}
+body.skin-darkblue .article-list-title{color:#e6f0ff}
+body.skin-darkblue .article-list-meta{color:#8ea6c8}
+body.skin-darkblue .article-theme-kw{background:rgba(96,165,250,.12);color:#8ea6c8}
+body.skin-darkblue .article-theme-kw.is-hit{background:rgba(56,189,248,.28);color:#e6f0ff}
+body.skin-darkblue .divide-y > :not([hidden])~:not([hidden]){border-color:rgba(96,165,250,.14)}
+body.skin-darkblue mark.bg-yellow-300{background:rgba(56,189,248,.30);color:#eaf3ff;padding:0 2px;border-radius:3px}
+/* 按钮 → 深蓝蓝皮肤匹配（语义色保留） */
+body.skin-darkblue .compact-action-btn.primary-action{background:#2563eb;color:#fff}
+body.skin-darkblue .compact-action-btn.primary-action:hover{background:#1d4ed8}
+body.skin-darkblue .compact-action-btn.success-action{background:#12233f;border-color:rgba(96,165,250,.28);color:#7dd3fc}
+body.skin-darkblue .compact-action-btn.success-action:hover{background:rgba(56,189,248,.16)}
+body.skin-darkblue .compact-action-btn.danger-action{background:#2a1420;border-color:rgba(248,113,113,.30);color:#f87171}
+body.skin-darkblue .compact-action-btn.danger-action:hover{background:#3a1a2a;border-color:#f87171}
+
+/* ── 聊天抽屉（mapindex .chat-*）→ 深蓝 ── */
+/* 开关按钮：淡蓝底 + 亮图标对比 */
+body.skin-darkblue .chat-toggle{background:rgba(56,189,248,0.16);border-color:rgba(96,165,250,0.32);color:#eaf3ff;box-shadow:0 10px 28px rgba(0,0,0,0.5)}
+body.skin-darkblue .chat-toggle:hover{background:rgba(56,189,248,0.28);color:#fff;transform:translateY(-1px)}
+body.skin-darkblue .chat-toggle[aria-expanded="true"]{background:#2563eb;border-color:#2563eb;color:#fff}
+body.skin-darkblue .chat-drawer{background:rgba(10,20,40,0.92);border-left-color:rgba(96,165,250,0.22);box-shadow:-18px 0 50px rgba(0,0,0,0.5)}
+body.skin-darkblue .chat-head{border-bottom-color:rgba(96,165,250,0.20)}
+body.skin-darkblue .chat-title{color:#e6f0ff}
+body.skin-darkblue .chat-actions .icon-button{background:#12233f;color:#7dd3fc;border:1px solid rgba(96,165,250,0.28)}
+body.skin-darkblue .chat-actions .icon-button:hover{background:rgba(56,189,248,0.24);color:#fff}
+body.skin-darkblue .chat-body{background:transparent}
+body.skin-darkblue .session-list{background:#0e1d3a;border-right-color:rgba(96,165,250,0.20)}
+body.skin-darkblue .session-tools{background:rgba(13,28,56,0.9);border-bottom-color:rgba(96,165,250,0.20);color:#8ea6c8}
+body.skin-darkblue .session-tools button{background:#12233f;color:#7dd3fc;border-color:rgba(96,165,250,0.28)}
+body.skin-darkblue .session-item{color:#dbeafe;border-bottom-color:rgba(96,165,250,0.12)}
+body.skin-darkblue .session-item:hover{background:rgba(56,189,248,0.12)}
+/* 消息气泡：用户(原来亮蓝) → 低饱和灰蓝；助手文字浅色 */
+body.skin-darkblue .message.user{background:#4e6089;color:#f1f5ff}
+body.skin-darkblue .message.answer{color:#e6f0ff}
+body.skin-darkblue .assistant-avatar{background:rgba(56,189,248,0.18);color:#7dd3fc}
+body.skin-darkblue .message-content{color:#dbeafe}
+/* 底部输入区 */
+body.skin-darkblue .chat-compose{border-top-color:rgba(96,165,250,0.20)}
+body.skin-darkblue .toggle-row{background:rgba(96,165,250,.10) !important;border-color:rgba(96,165,250,.22) !important;color:#8ea6c8}
+body.skin-darkblue .model-icon{color:#8ea6c8;opacity:.55;background:rgba(148,163,184,.14);border-radius:10px;padding:4px 6px}
+body.skin-darkblue .model-icon.active{color:#38bdf8;opacity:1;filter:none}
+body.skin-darkblue .web-search-button{background:#12233f;border-color:rgba(96,165,250,0.28);color:#dbeafe}
+body.skin-darkblue .web-search-button.active{background:#2563eb;border-color:#2563eb;color:#fff}
+/* 输入框：低饱和浅蓝底 + 输入文字高亮对比 */
+body.skin-darkblue #chatInput{background:#15284a !important;border-color:rgba(96,165,250,0.30) !important;color:#eaf3ff}
+body.skin-darkblue #chatInput::placeholder{color:#7d97bf}
+body.skin-darkblue #chatInput:focus{border-color:#38bdf8}
+body.skin-darkblue .send-button{background:#2563eb;color:#fff}
+body.skin-darkblue .save-kb-button{background:#12233f;color:#7dd3fc;border-color:rgba(96,165,250,0.28)}
+body.skin-darkblue .save-kb-button:hover{background:rgba(56,189,248,0.20)}
+body.skin-darkblue .status-line{color:#8ea6c8}
+body.skin-darkblue .search-sources{background:rgba(56,189,248,0.08);border-color:rgba(96,165,250,0.20);color:#c7d7ee}
+/* 历史会话上下文提示条（暗绿→深蓝可读） */
+body.skin-darkblue .history-context-banner{background:rgba(56,189,248,0.12);border-color:rgba(96,165,250,0.30);color:#dbeafe}
+body.skin-darkblue .model-slider-thumb{background:#2563eb;color:#fff;box-shadow:0 8px 18px rgba(37,99,235,.40)}
+body.skin-darkblue .model-slider-rail{background:rgba(96,165,250,0.20)}
+
+/* ── 全部动态页(dynamics) → 深蓝 ── */
+body.skin-darkblue .dyn-item{background:#0e1d3a;border-color:rgba(96,165,250,.22);color:#dbeafe}
+body.skin-darkblue .dyn-item:hover{border-color:#38bdf8;box-shadow:none}
+body.skin-darkblue .dyn-item .tl-title{color:#e6f0ff}
+body.skin-darkblue .dyn-item:hover .tl-title{color:#7dd3fc}
+body.skin-darkblue .dyn-item .tl-time{color:#7dd3fc}
+body.skin-darkblue .dyn-item .tl-topic{background:rgba(56,189,248,.16);color:#7dd3fc}
+body.skin-darkblue .dyn-item .tl-dot{background:#38bdf8}
+body.skin-darkblue .dyn-item .tl-src{color:#8ea6c8}
+body.skin-darkblue .dyn-pagination .dyn-page-info{color:#8ea6c8}
+body.skin-darkblue .dynamics-title{color:#e6f0ff}
+body.skin-darkblue .dynamics-meta{color:#93a9cc}
+
+/* ── 趋势弹窗(下钻文章) → 深蓝：滚动条暗化、正文提亮、右侧面板 ── */
+body.skin-darkblue .intel-trend-modal-right{background:#0e1d3a;border-left-color:rgba(96,165,250,.20)}
+body.skin-darkblue .intel-trend-content-title{color:#e6f0ff}
+body.skin-darkblue .intel-trend-content-meta{color:#8ea6c8}
+body.skin-darkblue .intel-trend-content-meta a{color:#7dd3fc}
+body.skin-darkblue .intel-trend-content-text{color:#dbeafe}
+body.skin-darkblue .intel-trend-modal-left{border-right-color:rgba(96,165,250,.20)}
+body.skin-darkblue .intel-trend-modal-card .intel-trend-modal-head{border-bottom-color:rgba(96,165,250,.20)}
+body.skin-darkblue .intel-trend-modal-card .intel-trend-modal-head h3{color:#e6f0ff}
+/* 滚动条暗化（全局，深蓝皮肤下所有滚动条变暗） */
+body.skin-darkblue ::-webkit-scrollbar{width:10px;height:10px}
+body.skin-darkblue ::-webkit-scrollbar-thumb{background:#1a2c4e;border-radius:8px;border:2px solid #0a1428}
+body.skin-darkblue ::-webkit-scrollbar-thumb:hover{background:#23406b}
+body.skin-darkblue ::-webkit-scrollbar-track{background:transparent}
+body.skin-darkblue ::-webkit-scrollbar-corner{background:transparent}
+
+/* ── 首页底部系统运行状态药丸 → 深蓝 ── */
+body.skin-darkblue .sys-status{background:rgba(13,28,56,0.88);border-color:rgba(96,165,250,0.26);color:#dbeafe;box-shadow:0 6px 18px rgba(0,0,0,0.5)}
+body.skin-darkblue .sys-status:hover{border-color:#38bdf8}
+body.skin-darkblue .sys-status .txt{color:#e6f0ff}
+body.skin-darkblue .sys-status .tl{color:#8ea6c8}
+body.skin-darkblue .sys-status.green .light{background:#22c55e;color:#22c55e}
+body.skin-darkblue .sys-status.red .light{background:#ef4444;color:#ef4444}
+
+/* 导航：搜索按钮/用户头像 → 深蓝可读 */
+body.skin-darkblue .dashboard-nav-search{background:rgba(13,28,56,0.7) !important;border-color:rgba(96,165,250,0.28) !important}
+body.skin-darkblue .dashboard-search-input{background:transparent !important;color:#e6f0ff !important}
+body.skin-darkblue .dashboard-search-btn{background:rgba(56,189,248,0.18) !important;color:#7dd3fc !important}
+body.skin-darkblue .trend-link,body.skin-darkblue .feed-link{background:rgba(56,189,248,0.14) !important;color:#7dd3fc !important}
+body.skin-darkblue .home-link{background:#2563eb !important;color:#fff !important}
+body.skin-darkblue .dashboard-user{background:rgba(13,28,56,0.7);border-color:rgba(96,165,250,0.28);color:#dbeafe}
+body.skin-darkblue .dashboard-user:hover{background:rgba(56,189,248,0.16);color:#7dd3fc}
+/* 文章朗读分段：虚线分隔线 → 低饱和、隐约可见（不要那么亮） */
+body.skin-darkblue .translation-segment + .translation-segment{border-top-color:rgba(96,165,250,0.16)}
+body.skin-darkblue .article-reading-columns .article-reading-panel{border-color:rgba(96,165,250,0.20)}
+body.skin-darkblue .intel-trend-inline-article{border-bottom-color:rgba(96,165,250,0.14)}
+
+/* ── 换肤通用可读性修复：text-gray-800 / 弹窗朗读标题 / 预缓存波形 / 卡片任务来源 ── */
+body.skin-darkblue .text-gray-800{color:#e6f0ff}
+body.skin-darkblue .article-section-title{color:#dbeafe}
+body.skin-darkblue .article-reading-panel-heading{color:#dbeafe}
+body.skin-darkblue .speech-buffer-wave{color:#b8c9e6}
+body.skin-darkblue .translation-segment.is-speaking{background:rgba(56,189,248,.16);box-shadow:inset 3px 0 #38bdf8;color:#eaf3ff}
+body.skin-darkblue .task-origin-link,
+body.skin-darkblue .task-origin a,
+body.skin-darkblue .task-origin span.truncate{color:#7dd3fc}
+body.skin-darkblue .card-task-origin a{color:#7dd3fc}
+/* 控制台页 .text-dark 标题、报告页 .preview-title → 浅色 */
+body.skin-darkblue .text-dark{color:#e6f0ff !important}
+body.skin-darkblue .preview-title{color:#e6f0ff}
+</style>

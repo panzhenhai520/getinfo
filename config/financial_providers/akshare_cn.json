@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "provider_id": "akshare_cn",
+  "display_name": "AKShare 中国市场研究数据",
+  "package_version": "1.18.72",
+  "package_wheel_sha256": "d1d990e2d9e2f4f5286ad0bfe557bc799b31c040414d9d88d44fc3d41c1a107b",
+  "access_tier": "free_no_api_key",
+  "default_enabled": false,
+  "license_profile": "akshare_mit_wrapper_upstream_terms",
+  "provider_type": "sdk_adapter",
+  "priority": 20,
+  "daily_call_budget": 1000,
+  "fallback_rank": 20,
+  "package_license_url": "https://github.com/akfamily/akshare/blob/main/LICENSE",
+  "documentation_url": "https://akshare.akfamily.xyz/",
+  "attribution_text": "Data normalized through AKShare; upstream source terms apply.",
+  "terms_note": "AKShare 代码采用 MIT 许可；底层行情、指数、基金和发行人数据的展示、缓存与再分发仍受各原始网站条款约束。",
+  "sla": "none",
+  "capabilities": ["quote", "bar", "constituent", "fundamental", "macro"],
+  "logical_endpoints": {
+    "quote": ["stock_zh_a_hist_tx", "fund_etf_hist_min_em", "stock_zh_index_spot_sina"],
+    "bars": ["stock_zh_a_hist", "stock_zh_a_hist_min_em", "fund_etf_hist_em", "fund_etf_hist_min_em", "index_zh_a_hist"],
+    "constituents": ["index_stock_cons_weight_csindex"],
+    "industry": ["stock_individual_info_em"],
+    "market_breadth": ["stock_zh_a_spot"],
+    "sector_rotation": ["stock_board_industry_name_em"],
+    "fund": ["fund_etf_fund_info_em", "fund_open_fund_info_em", "fund_portfolio_hold_em", "fund_manager_em", "fund_fee_em"]
+  },
+  "upstream_sources": {
+    "eastmoney": "https://quote.eastmoney.com/",
+    "tencent": "https://gu.qq.com/",
+    "csindex": "https://www.csindex.com.cn/"
+  }
+}

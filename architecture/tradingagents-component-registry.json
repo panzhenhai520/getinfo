@@ -1,0 +1,1476 @@
+{
+  "registry_version": "tradingagents-component-registry-v1",
+  "baseline_tag": "financial-tradingagents-baseline-v1",
+  "decision_legend": {
+    "reuse": "现有能力原样复用，只允许增加调用方或配置映射",
+    "extend": "在现有组件内增量扩展，不增加同类服务",
+    "add_embedded": "项目当前不存在，新增为同一进程/镜像中的库、表、蓝图或页面",
+    "forbid": "禁止引入或禁止绕过既定适配层"
+  },
+  "architecture_invariants": {
+    "compose_services_before": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "compose_services_after_stage2": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "published_container_ports": [
+      8003
+    ],
+    "durable_relational_store": "现有 crawler_articles.db (SQLite)",
+    "queue_and_checkpoint_store": "现有 SQLite intel_jobs 及新增同库金融表",
+    "optional_cache_and_coordination": "现有 Redis",
+    "semantic_memory": "现有 RAGFlow 专用 KB",
+    "artifact_store": "现有 data volume，文件原子替换并在 SQLite 保存 hash",
+    "authentication": "现有 user_database + decorators + Flask 全局鉴权",
+    "llm_runtime": "现有 AI 助手 local OpenAI-compatible 配置",
+    "new_service_allowed": false,
+    "new_published_port_allowed": false,
+    "runtime_git_clone_or_install_allowed": false,
+    "real_broker_or_order_gateway_allowed": false
+  },
+  "approved_embedded_packages": [
+    "akshare",
+    "exchange-calendars",
+    "jsonschema",
+    "langgraph",
+    "pandas",
+    "stockstats",
+    "tradingagents",
+    "tushare",
+    "yfinance"
+  ],
+  "prohibited_packages": [
+    "celery",
+    "chromadb",
+    "faiss-cpu",
+    "faiss-gpu",
+    "fastapi",
+    "ollama",
+    "psycopg",
+    "psycopg2",
+    "pymongo",
+    "qdrant-client",
+    "rq",
+    "uvicorn",
+    "weaviate-client"
+  ],
+  "prohibited_service_terms": [
+    "celery",
+    "chroma",
+    "milvus",
+    "mongodb",
+    "mysql",
+    "ollama",
+    "postgres",
+    "qdrant",
+    "rabbitmq",
+    "tradingagents",
+    "weaviate"
+  ],
+  "components": [
+    {
+      "id": "flask_application",
+      "capability": "Web、API、SSE 与页面承载",
+      "disposition": "reuse",
+      "current_state": "available",
+      "existing": {
+        "files": [
+          "firecrawl_app.py",
+          "chat_api.py",
+          "intel_api.py",
+          "mapindex_api.py"
+        ],
+        "processes": [
+          "crawler"
+        ],
+        "tables": [],
+        "apis": [
+          "POST /api/chat/send",
+          "GET /api/intel/dashboard",
+          "GET /api/system/health"
+        ]
+      },
+      "planned": {
+        "files": [
+          "financial_api.py"
+        ],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "新增金融 Blueprint 注册到同一 Flask app；禁止 FastAPI、上游 TradingAgents Web 或第二监听端口。"
+    },
+    {
+      "id": "authentication_and_authorization",
+      "capability": "登录、管理员权限与 API 会话",
+      "disposition": "reuse",
+      "current_state": "available_with_stage62_financial_api_authz_gate",
+      "existing": {
+        "files": [
+          "user_database.py",
+          "decorators.py",
+          "firecrawl_app.py",
+          "financial_security.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py",
+          "architecture/financial-security-acceptance.json"
+        ],
+        "processes": [
+          "crawler"
+        ],
+        "tables": [
+          "users",
+          "user_sessions",
+          "user_logs"
+        ],
+        "apis": [
+          "POST /api/user/login"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "所有 /api/financial/* 与配置写操作复用 login_required/admin_required；冲突裁决和知识写入门禁只允许管理员；专项攻击回归持续验证未登录读取返回 401、非管理员写入返回 403。禁止代理自建用户、Token 或 RBAC。"
+    },
+    {
+      "id": "configuration_management",
+      "capability": "金融开关、Provider、预算、新鲜度和 secret 状态",
+      "disposition": "extend",
+      "current_state": "financial_flags_and_effective_pack_aware_product_capability_projection_available",
+      "existing": {
+        "files": [
+          "config.py",
+          ".env.example",
+          "financial_config.py",
+          "financial_worker_jobs.py",
+          "financial_full_research.py",
+          "config_management_api.py",
+          "intel_api.py",
+          "chat_api.py",
+          "templates/config_management.html",
+          "templates/_dashboard_nav.html",
+          "tools/check_financial_feature_gate.py",
+          "tests/test_financial_feature_gate.py",
+          "architecture/financial-feature-gate-acceptance.json",
+          "financial_resource_isolation.py",
+          "tools/check_financial_resource_isolation.py",
+          "tests/test_financial_resource_isolation.py",
+          "architecture/financial-resource-isolation-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_runtime_settings"
+        ],
+        "apis": [
+          "GET /api/config-management/config",
+          "PUT /api/config-management/config",
+          "GET /api/intel/financial/capabilities"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "只扩展现有 BOOL_KEYS/MANAGED_KEYS/DEFAULTS/SECRET_KEYS 与有界资源预算；secret 只显示是否配置。金融专区、报告、模拟和回测统一由有效行业包组合叠加父子开关投影；菜单关闭不能绕过报告 API、研究创建或 worker 门禁。已 claim 的安全任务按启动时能力快照完成，之后排队和新任务显式跳过，历史不删除。互动、Dashboard、RSS、SQLite、Provider 和制品 I/O 的边界均由部署配置给出且 fail-bounded。"
+    },
+    {
+      "id": "sqlite_database",
+      "capability": "交易研究、快照、报告、核验、纸面交易和回测的关系数据",
+      "disposition": "extend",
+      "current_state": "financial_schema_v5_and_transactional_chat_history_audit_available",
+      "existing": {
+        "files": [
+          "sqlite_database.py",
+          "financial_schema.py",
+          "financial_chat_history.py",
+          "tools/check_financial_chat_history.py",
+          "tests/test_financial_chat_history.py",
+          "architecture/financial-chat-history-acceptance.json",
+          "intel_schema.py",
+          "intel_database.py",
+          "financial_resource_isolation.py",
+          "tools/check_financial_resource_isolation.py",
+          "tests/test_financial_resource_isolation.py",
+          "architecture/financial-resource-isolation-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "worker",
+          "intel-worker"
+        ],
+        "tables": [
+          "articles",
+          "intel_jobs",
+          "intel_reports",
+          "chat_history",
+          "chat_operations"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "financial_schema.py",
+          "financial_database.py"
+        ],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_instruments",
+          "financial_data_snapshots",
+          "financial_research_runs",
+          "financial_final_reports",
+          "financial_claims",
+          "financial_verdicts",
+          "paper_accounts",
+          "backtest_runs"
+        ]
+      },
+      "boundary": "只做幂等前向迁移和短事务；WAL 保持读路径可用，写锁等待由 SQLITE_BUSY_TIMEOUT_MS 限定并在释放后恢复。禁止 PostgreSQL、MySQL、MongoDB 或第二 SQLite 主库。"
+    },
+    {
+      "id": "persistent_job_queue",
+      "capability": "金融快照、研究、核验、概览和回测任务",
+      "disposition": "extend",
+      "current_state": "financial_handlers_lease_retry_dedupe_heartbeat_cancel_available",
+      "existing": {
+        "files": [
+          "intel_worker.py",
+          "intel_database.py",
+          "intel_schema.py",
+          "financial_worker_jobs.py",
+          "tools/check_financial_worker_jobs.py",
+          "tests/test_financial_worker_jobs.py",
+          "architecture/financial-worker-jobs-acceptance.json",
+          "intel_worker_supervisor.py",
+          "financial_resource_isolation.py",
+          "tools/check_financial_resource_isolation.py",
+          "tests/test_financial_resource_isolation.py",
+          "architecture/financial-resource-isolation-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": [
+          "GET /api/intel/jobs/{job_id}"
+        ],
+        "job_types": [
+          "financial_snapshot",
+          "financial_research",
+          "financial_verify",
+          "market_overview",
+          "paper_backtest"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "job_types": []
+      },
+      "boundary": "给 IntelWorker.handlers 注册任务；现有 intel-worker 服务和同一镜像内按显式 job type 启动 core/long-financial 两个进程 lane，长研究、核验和回测不能占用 RSS/core lane，低优先级任务随等待时间老化。不开新服务、端口、队列或数据库，不增加 Celery、RQ、RabbitMQ。"
+    },
+    {
+      "id": "redis_runtime",
+      "capability": "已有可选缓存、协调和限流辅助",
+      "disposition": "reuse",
+      "current_state": "available",
+      "existing": {
+        "files": [
+          "firecrawl_app.py",
+          "docker-compose.crawler.yml"
+        ],
+        "processes": [
+          "redis"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "研究可使用现有 Redis 做非持久协调；checkpoint 与事实仍写 SQLite；禁止第二 Redis。"
+    },
+    {
+      "id": "ragflow_semantic_memory",
+      "capability": "报告与长期语义记忆",
+      "disposition": "reuse",
+      "current_state": "financial_report_memory_adapter_available_kb_optional_not_configured",
+      "existing": {
+        "files": [
+          "ragflow_client.py",
+          "ragflow_llm_client.py",
+          "sqlite_database.py",
+          "financial_artifacts.py",
+          "tools/check_financial_research_persistence.py",
+          "tests/test_financial_artifacts.py",
+          "architecture/financial-research-persistence-acceptance.json"
+        ],
+        "processes": [],
+        "tables": [
+          "article_ragflow_documents"
+        ],
+        "apis": [
+          "GET /api/chat/kb-documents",
+          "POST /api/chat/kb-parse"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "resources": [
+          "现有 RAGFlow 中的金融专用 KB"
+        ]
+      },
+      "boundary": "复用现有 RAGFlow；不可用时报告继续生成但语义记忆降级；禁止 Chroma、FAISS、Qdrant、Milvus、Weaviate。"
+    },
+    {
+      "id": "artifact_storage",
+      "capability": "大型 Markdown/JSON 报告、checkpoint 附件与导出",
+      "disposition": "extend",
+      "current_state": "atomic_financial_report_and_checkpoint_artifacts_available",
+      "existing": {
+        "files": [
+          "intel_reports.py",
+          "chat_api.py",
+          "docker-compose.crawler.yml",
+          "financial_artifacts.py",
+          "tools/check_financial_research_persistence.py",
+          "tests/test_financial_artifacts.py",
+          "architecture/financial-research-persistence-acceptance.json",
+          "financial_resource_isolation.py",
+          "tools/check_financial_resource_isolation.py",
+          "tests/test_financial_resource_isolation.py",
+          "architecture/financial-resource-isolation-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_reports",
+          "chat_generated_files"
+        ],
+        "apis": [
+          "GET /api/chat/files/{token}"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "使用现有 data volume、原子替换和 SHA-256；制品写入有最大字节数、单独并发槽和有界等待，文件 fsync 在 SQLite 元数据短事务之外执行。禁止新增 S3/MinIO 服务。"
+    },
+    {
+      "id": "industry_pack_composition",
+      "capability": "金融行业包及家族办公室附加金融能力",
+      "disposition": "extend",
+      "current_state": "schema_v1_available_composition_missing",
+      "existing": {
+        "files": [
+          "industry_packs.py",
+          "config/industry_packs/schema.json",
+          "config/industry_packs/family_office.json",
+          "config/industry_packs/financial_markets.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_source_industries",
+          "article_intel_classifications"
+        ],
+        "apis": [
+          "GET /api/intel/industry-packs"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "industry_pack_dependencies",
+          "content_industry_packs"
+        ]
+      },
+      "boundary": "升级 schema v2 并无环解析 includes；主包关键词和分类不被附加包覆盖。"
+    },
+    {
+      "id": "rss_and_web_ingestion",
+      "capability": "官方 RSS、网页、公告和媒体原文证据",
+      "disposition": "reuse",
+      "current_state": "available_stage0_live_accepted_and_stage61_license_gated",
+      "existing": {
+        "files": [
+          "intel_light_scanner.py",
+          "intel_sources.py",
+          "candidate_dispatcher.py",
+          "candidate_crawler_adapter.py",
+          "article_link_extractor.py",
+          "config/industry_packs/financial_markets.json",
+          "config/financial_source_licenses.json",
+          "financial_source_license.py",
+          "tools/configure_financial_rss_sources.py",
+          "tools/check_financial_source_licenses.py",
+          "tests/test_financial_source_licenses.py",
+          "architecture/financial-source-license-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker",
+          "worker"
+        ],
+        "tables": [
+          "intel_sources",
+          "intel_scan_runs",
+          "intel_candidates",
+          "articles",
+          "article_intel_classifications"
+        ],
+        "apis": [
+          "POST /api/intel/scan/run",
+          "GET /api/intel/sources"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "TradingAgents 只消费已注册证据；禁止再实现一套 RSS crawler 或重复抓取同一 Feed。金融 RSS 在生产注册、手动启用和扫描时必须匹配未过期的精确 URL 授权档案并获得显式审批；无档案、错配或过期均 fail-closed，档案只允许受限缓存与原文链接/摘要展示，不允许隐式再分发。"
+    },
+    {
+      "id": "safe_external_http",
+      "capability": "Provider/RSS 出站请求的 SSRF、重定向、大小和错误脱敏边界",
+      "disposition": "extend",
+      "current_state": "stage62_safe_http_redirect_ssrf_size_and_shared_secret_redaction_available",
+      "existing": {
+        "files": [
+          "intel_http.py",
+          "intel_contracts.py",
+          "rss_feed_contract.py",
+          "financial_security.py",
+          "financial_providers/alpha_vantage.py",
+          "financial_providers/fred.py",
+          "financial_providers/tushare_cn.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py",
+          "architecture/financial-security-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "所有服务器 HTTP(S) 出站逐跳校验 DNS/IP、重定向、大小和超时；Alpha Vantage/FRED 复用 SafeHTTPClient，Tushare SDK 只允许固定 HTTPS 主机。日志、JSON、SSE 与公开 URL 统一移除配置 Secret 和敏感查询参数；禁止代理任意 URL 工具。"
+    },
+    {
+      "id": "interactive_chat_llm_runtime",
+      "capability": "当前本地 OpenAI-compatible 模型配置与普通聊天流式调用",
+      "disposition": "reuse",
+      "current_state": "available_with_stage62_redacted_log_metric_json_and_sse_errors",
+      "existing": {
+        "files": [
+          "chat_api.py",
+          "financial_security.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py"
+        ],
+        "processes": [
+          "crawler"
+        ],
+        "tables": [
+          "chat_history"
+        ],
+        "apis": [
+          "GET /api/chat/config",
+          "POST /api/chat/send"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "模型 base_url/model_id/key 仍由现有 AI 助手配置提供；上游异常进入日志、指标、JSON 或 SSE 前必须同时按应用配置与聊天配置脱敏；禁止新增 Ollama 或独立模型容器。"
+    },
+    {
+      "id": "shared_llm_broker",
+      "capability": "聊天、分类和多角色研究的优先级、并发、取消、结构化输出与审计",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v1",
+      "existing": {
+        "files": [
+          "chat_api.py",
+          "intel_llm_client.py",
+          "ragflow_llm_client.py",
+          "shared_llm_broker.py",
+          "financial_resource_isolation.py",
+          "tools/check_financial_resource_isolation.py",
+          "tests/test_financial_resource_isolation.py",
+          "architecture/financial-resource-isolation-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "shared_llm_broker.py"
+        ],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "llm_call_audit"
+        ]
+      },
+      "boundary": "这是已落地的进程内库而非服务；只复用 get_chat_model_runtime_config(local)、IntelLLMClient 和现有模型凭据，审计只存哈希。慢 scheduled/batch 调用最多使用 background capacity，chat_clarification/chat_fact 保留互动槽；不开放端口、不回退到未授权云模型。"
+    },
+    {
+      "id": "multi_role_orchestration",
+      "capability": "分析师、多空研究、Trader、风险和 Portfolio Manager 的动态讨论",
+      "disposition": "add_embedded",
+      "current_state": "not_available",
+      "existing": {
+        "files": [
+          "intel_worker.py",
+          "intel_database.py"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "tradingagents_gateway.py",
+          "financial_research_orchestrator.py"
+        ],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_research_runs",
+          "financial_report_sections",
+          "financial_final_reports"
+        ]
+      },
+      "boundary": "嵌入锁定 TradingAgents 图并复用 intel-worker；禁止启动上游 CLI/Web、自己的队列、数据库或模型进程。"
+    },
+    {
+      "id": "tradingagents_upstream_package",
+      "capability": "TradingAgents 原始角色图、辩论和终极决策逻辑",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v0.3.1_stage2_integration_gate_passed",
+      "existing": {
+        "files": [
+          "Dockerfile",
+          "Dockerfile.offline",
+          "requirements.txt",
+          "requirements-tradingagents.in",
+          "requirements-tradingagents.lock",
+          "vendor/tradingagents/TradingAgents-0.3.1-01477f9.tar.gz",
+          "vendor/tradingagents/PROVENANCE.json",
+          "architecture/tradingagents-sbom.json",
+          "tools/check_tradingagents_supply_chain.py",
+          "tools/check_financial_stage2_integration.py",
+          "architecture/financial-stage2-integration-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "tradingagents_gateway.py"
+        ],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "固定审核版本、commit 和依赖 hash，构建期安装，运行期禁止 git clone/pip install；不部署上游界面。"
+    },
+    {
+      "id": "tradingagents_llm_adapter",
+      "capability": "把所有上游代理的 LLM 调用导向 SharedLLMBroker",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v1",
+      "existing": {
+        "files": [
+          "chat_api.py",
+          "intel_llm_client.py",
+          "shared_llm_broker.py",
+          "tradingagents_llm_adapter.py",
+          "tools/check_tradingagents_llm_adapter.py",
+          "tests/test_tradingagents_llm_adapter.py",
+          "architecture/tradingagents-llm-adapter-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "角色不可直接读取环境 Key 或初始化未授权云模型；每次调用绑定 research_run_id/role/model_id/latency/hash。"
+    },
+    {
+      "id": "financial_provider_contract",
+      "capability": "行情、基本面、宏观、指数成分、新闻的统一数据契约",
+      "disposition": "add_embedded",
+      "current_state": "contract_all_embedded_adapters_and_stage61_license_gate_available",
+      "existing": {
+        "files": [
+          "intel_contracts.py",
+          "intel_http.py",
+          "financial_provider_contract.py",
+          "financial_source_license.py",
+          "config/financial_source_licenses.json",
+          "tests/test_financial_source_licenses.py",
+          "tools/check_financial_source_licenses.py",
+          "architecture/financial-source-license-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_provider_profiles",
+          "financial_data_snapshots"
+        ]
+      },
+      "boundary": "Provider 只返回事实、时点、授权和降级信息，不输出自然语言交易结论，也不静默切源。SDK 开源许可不等于底层数据生产使用权；Router 和 Provider 基类都强制校验授权档案、复核期与生产审批，无档案、错配、过期或禁止生产的来源不能创建或调用。"
+    },
+    {
+      "id": "cn_market_providers",
+      "capability": "A 股、ETF、指数、基金、财务、公告和市场宽度",
+      "disposition": "add_embedded",
+      "current_state": "akshare_and_tushare_available_with_stage61_license_gate_tushare_unconfigured",
+      "existing": {
+        "files": [
+          "intel_http.py",
+          "config_management_api.py",
+          "financial_providers/akshare_cn.py",
+          "config/financial_providers/akshare_cn.json",
+          "architecture/akshare-cn-live-acceptance.json",
+          "financial_providers/tushare_cn.py",
+          "config/financial_providers/tushare_cn.json",
+          "architecture/tushare-cn-live-acceptance.json",
+          "templates/config_management.html"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "financial_providers/tushare_cn.py"
+        ],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "AKShare 无 Key 但底层数据权利未获生产确认，因此档案禁止生产启用；Tushare 仅在购买/积分权限、Token 责任和生产审批同时明确时允许调用，未配置 Token、无接口权限或复核过期均不调用；二者都嵌入现有 intel-worker。"
+    },
+    {
+      "id": "global_and_auxiliary_providers",
+      "capability": "港股、全球行情、宏观、预期和官方证据",
+      "disposition": "add_embedded",
+      "current_state": "available_opt_in_with_stage61_license_cost_health_budget_and_explicit_fallback_policy",
+      "existing": {
+        "files": [
+          "intel_sources.py",
+          "intel_light_scanner.py",
+          "serpapi_client.py",
+          "financial_providers/yahoo.py",
+          "financial_providers/alpha_vantage.py",
+          "financial_providers/fred.py",
+          "financial_providers/polymarket.py",
+          "financial_providers/easyquotation.py",
+          "financial_providers/official_evidence.py",
+          "financial_provider_router.py",
+          "config/financial_source_licenses.json",
+          "financial_source_license.py",
+          "tools/check_financial_source_licenses.py",
+          "tests/test_financial_source_licenses.py",
+          "architecture/financial-source-license-acceptance.json",
+          "financial_resource_isolation.py",
+          "tools/check_financial_resource_isolation.py",
+          "tests/test_financial_resource_isolation.py",
+          "architecture/financial-resource-isolation-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_sources",
+          "articles"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "financial_providers/yahoo.py",
+          "financial_providers/alpha_vantage.py",
+          "financial_providers/fred.py",
+          "financial_providers/polymarket.py",
+          "financial_providers/easyquotation.py",
+          "financial_providers/official_evidence.py",
+          "financial_provider_router.py",
+          "tools/check_global_auxiliary_providers.py",
+          "architecture/global-auxiliary-provider-acceptance.json"
+        ],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "每个源已登记 license/health/budget/fallback、费用/凭据责任和复核日期；所有源默认关闭且生产需显式审批。所有调用先经过进程共享的总并发、单源并发和有界准入，429 的 Retry-After 形成共享冷却且不会重复击穿。Yahoo 只作个人研究回退并禁止生产，easyquotation 因非官方上游同样禁止生产，Reddit/StockTwits 无运行时工厂，Polymarket 只作为预期且禁止交易端点；Alpha Vantage 等付费/Key 来源必须由平台运维持有订阅与凭据。"
+    },
+    {
+      "id": "market_clock",
+      "capability": "服务器 UTC、A 股/港股日历、session state、新鲜度及自动市场快照/概览调度",
+      "disposition": "add_embedded",
+      "current_state": "available_with_exchange_aware_scheduler_and_persistent_window_dedupe",
+      "existing": {
+        "files": [
+          "financial_market_clock.py",
+          "financial_market_scheduler.py",
+          "config/market_calendars/2026.json",
+          "intel_contracts.py",
+          "utils.py",
+          "intel_worker.py",
+          "intel_database.py",
+          "tools/check_financial_market_scheduler.py",
+          "tests/test_financial_market_scheduler.py",
+          "architecture/financial-market-scheduler-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "统一捕获 server_now_utc，LLM 不计算‘今天’或交易日；不同 UTC+8 市场不能共用开盘状态；每个行情窗口只运行快照和轻量概览，不按 tick 重跑完整多代理研究。"
+    },
+    {
+      "id": "instrument_registry_and_universe",
+      "capability": "股票、指数、ETF、基金身份消歧及版本化研究范围",
+      "disposition": "add_embedded",
+      "current_state": "instrument_registry_and_versioned_universe_planner_available",
+      "existing": {
+        "files": [
+          "financial_instruments.py",
+          "config/financial_instruments.seed.json",
+          "financial_universe_planner.py",
+          "config/financial_universes.seed.json",
+          "intel_database.py"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_instruments",
+          "financial_instrument_aliases",
+          "financial_universes",
+          "financial_universe_members"
+        ]
+      },
+      "boundary": "六位代码不是唯一键；市场/指数不可用单一代表股代替；歧义必须返回候选或追问。"
+    },
+    {
+      "id": "tradingagents_cn_data_adapter",
+      "capability": "把统一 Provider 证据注册为 TradingAgents 工具",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v1_with_stage62_untrusted_external_content_policy",
+      "existing": {
+        "files": [
+          "intel_database.py",
+          "intel_sources.py",
+          "financial_provider_router.py",
+          "financial_evidence.py",
+          "tradingagents_cn_data_adapter.py",
+          "financial_security.py",
+          "fund_etf_research.py",
+          "financial_providers/akshare_cn.py",
+          "financial_providers/tushare_cn.py",
+          "tools/check_tradingagents_cn_data_adapter.py",
+          "tools/check_fund_etf_research.py",
+          "tests/test_tradingagents_cn_data_adapter.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py",
+          "tests/test_fund_etf_research.py",
+          "architecture/tradingagents-cn-data-adapter-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "articles"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_data_snapshots",
+          "financial_research_evidence"
+        ]
+      },
+      "boundary": "工具只调用选定 Provider 和已保存快照；外部 RSS/网页正文显式标记为不可信数据，不得改变配置、选择或扩展工具、触发任何订单；技术指标本地确定性计算；禁止 monkey patch 和未来数据。"
+    },
+    {
+      "id": "evidence_resolver",
+      "capability": "并行融合 Provider 快照与现有 RSS/网页原文",
+      "disposition": "add_embedded",
+      "current_state": "two_source_paths_exist_join_missing",
+      "existing": {
+        "files": [
+          "intel_database.py",
+          "intel_sources.py"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "articles",
+          "article_intel_classifications"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [
+          "financial_evidence.py"
+        ],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_claim_evidence"
+        ]
+      },
+      "boundary": "文章数值不能替代行情快照，快照不能替代公告原文；两条管线独立失败和恢复。"
+    },
+    {
+      "id": "stock_research_graph",
+      "capability": "股票完整分析、多空辩论、风险讨论和终极报告",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v1_with_stage62_prompt_injection_and_tool_escalation_guard",
+      "existing": {
+        "files": [
+          "intel_worker.py",
+          "intel_llm_client.py",
+          "stock_research_graph.py",
+          "tradingagents_llm_adapter.py",
+          "tradingagents_cn_data_adapter.py",
+          "tools/check_stock_research_graph.py",
+          "tools/check_stock_research_live.py",
+          "tests/test_stock_research_graph.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py",
+          "architecture/stock-research-graph-acceptance.json",
+          "architecture/stock-research-live-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_research_runs",
+          "financial_report_sections",
+          "financial_final_reports"
+        ]
+      },
+      "boundary": "保留 TradingAgents 原始角色产出，保存公开讨论摘要而非隐藏推理；外部文本只能作为数据，LLM 调用任何未注册工具都会确定性失败，且不能修改配置或触发订单；输出仅为 research_opinion。"
+    },
+    {
+      "id": "index_market_research_graph",
+      "capability": "上证、深证和香港大盘专用研究",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v1_with_stage62_prompt_injection_and_tool_escalation_guard",
+      "existing": {
+        "files": [
+          "intel_worker.py",
+          "index_market_research_graph.py",
+          "tradingagents_cn_data_adapter.py",
+          "tradingagents_llm_adapter.py",
+          "financial_market_clock.py",
+          "tools/check_index_market_research_graph.py",
+          "tools/check_index_market_research_live.py",
+          "tests/test_index_market_research_graph.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py",
+          "architecture/index-market-research-graph-acceptance.json",
+          "architecture/index-market-research-live-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": []
+      },
+      "boundary": "不调用公司财报/内部人交易；外部文本不能选择或扩展工具，未注册工具确定性失败；指数不可交易时不生成指数订单；显示成分日期、覆盖率和延迟。"
+    },
+    {
+      "id": "fund_and_etf_research",
+      "capability": "ETF 与开放式基金的独立模板",
+      "disposition": "add_embedded",
+      "current_state": "available_embedded_v1",
+      "existing": {
+        "files": [
+          "fund_etf_research.py",
+          "tradingagents_cn_data_adapter.py",
+          "financial_instruments.py",
+          "financial_providers/akshare_cn.py",
+          "financial_providers/tushare_cn.py",
+          "config/financial_instruments.seed.json",
+          "tools/check_fund_etf_research.py",
+          "tools/check_fund_etf_live.py",
+          "tests/test_fund_etf_research.py",
+          "architecture/fund-etf-research-acceptance.json",
+          "architecture/fund-etf-research-live-acceptance.json"
+        ],
+        "processes": [
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_instruments",
+          "financial_research_runs",
+          "financial_data_snapshots",
+          "financial_research_evidence"
+        ]
+      },
+      "boundary": "ETF、开放式基金和公司股票分流；基金份额/币种不明时追问，不伪造盘中成交。"
+    },
+    {
+      "id": "financial_intent_and_chat_route",
+      "capability": "金融意图、标的解析、实时性识别和 SSE 回答路由",
+      "disposition": "extend",
+      "current_state": "negotiated_financial_sse_with_stage62_field_allowlist_secret_redaction_and_safe_source_urls_available",
+      "existing": {
+        "files": [
+          "chat_api.py",
+          "mapindex_api.py",
+          "chat_route_orchestrator.py",
+          "tools/check_chat_sse_compatibility.py",
+          "tools/check_chat_server_time_context.py",
+          "tools/check_financial_intent_classifier.py",
+          "tools/check_financial_target_resolver.py",
+          "tools/check_financial_chat_market_scope.py",
+          "tools/check_financial_realtime_query.py",
+          "tools/check_financial_full_research.py",
+          "tools/check_financial_sse.py",
+          "tools/check_financial_chat_history.py",
+          "tests/test_chat_sse_compatibility.py",
+          "tests/test_chat_server_time_context.py",
+          "tests/test_financial_intent_classifier.py",
+          "tests/test_financial_target_resolver.py",
+          "tests/test_financial_chat_market_scope.py",
+          "tests/test_financial_realtime_query.py",
+          "tests/test_financial_full_research.py",
+          "tests/test_financial_sse.py",
+          "tests/test_financial_chat_history.py",
+          "architecture/chat-sse-compatibility-acceptance.json",
+          "architecture/chat-server-time-context-acceptance.json",
+          "architecture/financial-intent-classifier-acceptance.json",
+          "architecture/financial-target-resolver-acceptance.json",
+          "architecture/financial-chat-market-scope-acceptance.json",
+          "architecture/financial-realtime-query-acceptance.json",
+          "architecture/financial-full-research-acceptance.json",
+          "architecture/financial-sse-acceptance.json",
+          "architecture/financial-chat-history-acceptance.json",
+          "financial_intent_classifier.py",
+          "financial_target_resolver.py",
+          "financial_chat_market_scope.py",
+          "financial_realtime_query.py",
+          "financial_full_research.py",
+          "financial_sse.py",
+          "financial_security.py",
+          "tests/test_financial_security.py",
+          "tools/check_financial_security.py",
+          "financial_chat_history.py",
+          "financial_market_scheduler.py",
+          "financial_instruments.py"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "chat_history",
+          "chat_operations",
+          "chat_conflict_decisions",
+          "intel_jobs"
+        ],
+        "apis": [
+          "POST /api/chat/send",
+          "GET /api/financial/reports/{id}",
+          "POST /api/chat/history/save",
+          "GET /api/chat/history/session/{session_id}",
+          "DELETE /api/chat/history/session/{session_id}",
+          "POST /mapindex/api/chat/operations"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "chat_financial_routes",
+          "chat_financial_artifacts",
+          "financial_data_snapshots",
+          "financial_final_reports"
+        ]
+      },
+      "boundary": "保持 POST /api/chat/send 和既有 chunk/done/error；financial-sse-v1 仅由客户端显式协商且按事件类型白名单投影，所有文本递归脱敏、来源 URL 去除凭据与 fragment；历史只保存 route/标的/快照/研究任务/报告版本引用，不复制报告 JSON，删除会话不删除共享证据。"
+    },
+    {
+      "id": "financial_dashboard_and_reports",
+      "capability": "实时市场分类、终极报告卡、风险和协同评估展示",
+      "disposition": "extend",
+      "current_state": "stage62_authenticated_redacted_xss_safe_financial_feed_and_report_views_available",
+      "existing": {
+        "files": [
+          "templates/mapindex.html",
+          "chat_api.py",
+          "intel_api.py",
+          "intel_database.py",
+          "financial_feed.py",
+          "financial_report_view.py",
+          "financial_security.py",
+          "tools/check_financial_feed.py",
+          "tools/check_financial_report_view.py",
+          "tools/check_financial_dashboard_xss.py",
+          "tools/check_financial_security.py",
+          "tests/test_financial_feed.py",
+          "tests/test_financial_report_view.py",
+          "tests/test_financial_security.py",
+          "architecture/financial-dashboard-feed-acceptance.json",
+          "architecture/financial-report-view-acceptance.json"
+        ],
+        "processes": [
+          "crawler"
+        ],
+        "tables": [
+          "article_intel_classifications",
+          "intel_reports"
+        ],
+        "apis": [
+          "GET /api/intel/dashboard",
+          "GET /api/intel/financial/feed",
+          "GET /api/financial/reports/{id}"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_data_snapshots",
+          "financial_final_reports",
+          "financial_research_runs"
+        ]
+      },
+      "boundary": "沿用首页与现有鉴权，不部署上游 UI；行情事实、金融原文与研究观点分别读表、内存合并，报告不得写入 articles；报告 API 只投影经 Secret 脱敏的公开结论、引用和原始角色产物，不返回 prompt、chain-of-thought、模型配置或内部 JSON；前端只用 textContent 和受控 href，拒绝凭据、javascript、localhost 与私网地址；金融开关关闭时 Feed 返回不可见且不删除历史。"
+    },
+    {
+      "id": "verification_and_adjudication",
+      "capability": "时效判断、多源冲突裁决、人工覆盖和 RAG 门禁",
+      "disposition": "add_embedded",
+      "current_state": "stage4_heldout_gate_passed_with_atomic_claim_temporal_conflict_answer_rag_and_human_adjudication_boundaries",
+      "existing": {
+        "files": [
+          "mapindex_api.py",
+          "sqlite_database.py",
+          "financial_gcd_review.py",
+          "tools/check_financial_gcd_review.py",
+          "tests/test_financial_gcd_review.py",
+          "architecture/financial-gcd-review-acceptance.json",
+          "financial_synthesis_review.py",
+          "tools/check_financial_synthesis_review.py",
+          "tests/test_financial_synthesis_review.py",
+          "architecture/financial-synthesis-review-acceptance.json",
+          "financial_conflict_adjudication.py",
+          "tools/check_financial_conflict_adjudication.py",
+          "tests/test_financial_conflict_adjudication.py",
+          "architecture/financial-conflict-adjudication-acceptance.json",
+          "financial_claim_extractor.py",
+          "tools/check_financial_claim_extractor.py",
+          "tests/test_financial_claim_extractor.py",
+          "tests/fixtures/financial_claim_labeled.json",
+          "architecture/financial-claim-extractor-acceptance.json",
+          "financial_temporal_judge.py",
+          "tools/check_financial_temporal_judge.py",
+          "tests/test_financial_temporal_judge.py",
+          "architecture/financial-temporal-judge-acceptance.json",
+          "financial_conflict_judge.py",
+          "tools/check_financial_conflict_judge.py",
+          "tests/test_financial_conflict_judge.py",
+          "architecture/financial-conflict-judge-acceptance.json",
+          "financial_answer_composer.py",
+          "tools/check_financial_answer_composer.py",
+          "tests/test_financial_answer_composer.py",
+          "architecture/financial-answer-composer-acceptance.json",
+          "financial_rag_gate.py",
+          "financial_artifacts.py",
+          "ragflow_client.py",
+          "tools/check_financial_rag_gate.py",
+          "tests/test_financial_rag_gate.py",
+          "architecture/financial-rag-gate-acceptance.json",
+          "financial_stage4_gate.py",
+          "tools/check_financial_stage4_gate.py",
+          "tests/test_financial_stage4_gate.py",
+          "tests/fixtures/financial_stage4_heldout.json",
+          "architecture/financial-stage4-gate-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "chat_conflict_decisions",
+          "articles",
+          "article_ragflow_documents"
+        ],
+        "apis": [
+          "POST /mapindex/api/chat/operations",
+          "POST /mapindex/api/chat/operations/{operation_id}/conflicts/{conflict_key}/decision",
+          "POST /api/chat/send",
+          "GET /api/financial/snapshots/{id}",
+          "RAGFlow POST /api/v1/datasets/{dataset_id}/search"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_artifacts",
+          "financial_claims",
+          "financial_claim_evidence",
+          "financial_verdicts",
+          "financial_data_snapshots",
+          "financial_final_reports"
+        ]
+      },
+      "boundary": "÷ 审阅只从回答级快照引用提取数值，不让模型猜数，不比较不同时点/币种/调整口径，不删原会话；答案只投影双裁决事实与已保存终态报告，评级、置信度、as_of 不改写，事实必须可点击追溯；RAGFlow 仅发现候选，文档必须由同库映射登记并按标的、服务器绝对时点、effective_to、最新事实裁决及报告版本动态回查，远端 chunk 正文不得直接成为事实；TradingAgents 观点不能越过事实核验。"
+    },
+    {
+      "id": "paper_trading_and_backtest",
+      "capability": "系统开关控制的纸面账户、成交、持仓和无前视回测",
+      "disposition": "add_embedded",
+      "current_state": "server_authoritative_paper_ledger_point_in_time_backtest_recomputable_metrics_controlled_dashboard_and_stage5_isolation_gate_available",
+      "existing": {
+        "files": [
+          "financial_config.py",
+          "financial_worker_jobs.py",
+          "config_management_api.py",
+          "templates/config_management.html",
+          "templates/_dashboard_nav.html",
+          "intel_api.py",
+          "tests/test_financial_feature_gate.py",
+          "tests/test_financial_simulation_gate.py",
+          "tools/check_financial_feature_gate.py",
+          "tools/check_financial_simulation_gate.py",
+          "architecture/financial-feature-gate-acceptance.json",
+          "architecture/financial-simulation-gate-acceptance.json",
+          "financial_paper_trading.py",
+          "tests/test_financial_paper_trading.py",
+          "tools/check_financial_paper_trading.py",
+          "architecture/financial-paper-trading-acceptance.json",
+          "financial_backtest.py",
+          "tests/test_financial_backtest.py",
+          "tools/check_financial_backtest.py",
+          "architecture/financial-backtest-acceptance.json",
+          "financial_backtest_metrics.py",
+          "tests/test_financial_backtest_metrics.py",
+          "tools/check_financial_backtest_metrics.py",
+          "architecture/financial-backtest-metrics-acceptance.json",
+          "financial_simulation_view.py",
+          "tests/test_financial_simulation_view.py",
+          "tools/check_financial_simulation_view.py",
+          "tools/check_financial_simulation_browser.py",
+          "architecture/financial-simulation-view-acceptance.json",
+          "tests/fixtures/financial_stage5_golden.json",
+          "tests/test_financial_stage5_gate.py",
+          "tools/check_financial_stage5_gate.py",
+          "architecture/financial-stage5-gate-acceptance.json"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": [
+          "GET /api/intel/financial/capabilities",
+          "POST /api/intel/financial/simulation/jobs",
+          "GET /api/intel/jobs/{id}",
+          "GET /api/intel/financial/simulation/overview",
+          "GET /api/intel/financial/simulation/export"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "paper_accounts",
+          "paper_orders",
+          "paper_fills",
+          "paper_positions",
+          "backtest_runs",
+          "backtest_metrics",
+          "backtest_trades"
+        ]
+      },
+      "boundary": "只允许纸面模拟与回测；不开启‘模拟数据’时无菜单且 POST 拒绝，历史结果继续按所有者只读。回测只能使用显式固定、已入库且 hash 校验通过的数据版本，按 observed_at/available_at 和成分有效期执行无前视门禁；基金净值不插值、币种不隐式换算。收益、回撤、波动、夏普、胜率、换手、成本和相对基准必须可由固定快照与完整交易日志重算，样本或基准不足时不得伪造数值。Dashboard 一律标示‘纸面模拟’，报告、订单、回测和快照可双向追溯；分类折叠只改变布局，按用户和稳定分类 ID 保存且遵守无障碍/减少动画偏好，不停止加载或改变权限。阶段 5 总关卡必须在全路径断网守卫下把固定数据独立运行三次并匹配 golden hash，同一持久化文件 SQLite 在两个独立无网络容器中完成 seed/resume 后结果、账本、幂等和只读历史保持一致，开关关闭后新增变更为零。禁止券商 Key、Provider/模型临时调用及真实订单网络代码。"
+    },
+    {
+      "id": "observability_and_health",
+      "capability": "Provider、快照时效、任务、LLM、报告、冲突与预算可观测性",
+      "disposition": "extend",
+      "current_state": "financial_health_metrics_admin_alerts_and_dashboard_availability_available",
+      "existing": {
+        "files": [
+          "firecrawl_app.py",
+          "financial_feed.py",
+          "financial_health.py",
+          "intel_api.py",
+          "intel_database.py",
+          "logger_utils.py",
+          "templates/mapindex.html"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_api_usage",
+          "intel_jobs",
+          "intel_sources",
+          "intel_source_industries"
+        ],
+        "apis": [
+          "GET /api/system/health",
+          "GET /api/intel/summary",
+          "GET /api/intel/financial/feed",
+          "GET /api/intel/financial/health"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_provider_profiles",
+          "financial_data_snapshots",
+          "financial_research_runs",
+          "financial_final_reports",
+          "financial_verdicts",
+          "llm_call_audit"
+        ]
+      },
+      "boundary": "只读聚合复用现有审计/状态表与进程内资源控制器；管理员端点只返回安全聚合和可定位 ID，不查询或输出 prompt、回答、用户问题、会话、载荷、错误全文、凭据或 Token。普通 Dashboard 只接收安全 availability 状态、原因码和说明；不引入独立监控服务、数据库、表、端口或队列。"
+    },
+    {
+      "id": "ordered_financial_rollout",
+      "capability": "金融能力逐层灰度、健康观察与无数据库回滚",
+      "disposition": "extend",
+      "current_state": "ten_stage_fail_closed_rollout_and_immediate_rollback_available",
+      "existing": {
+        "files": [
+          ".env.example",
+          "config.py",
+          "financial_config.py",
+          "financial_rollout.py",
+          "financial_health.py",
+          "config_management_api.py",
+          "intel_api.py",
+          "intel_light_scanner.py",
+          "chat_route_orchestrator.py",
+          "financial_full_research.py",
+          "financial_worker_jobs.py",
+          "mapindex_api.py",
+          "templates/config_management.html",
+          "tests/test_financial_rollout.py",
+          "tools/check_financial_rollout.py"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [],
+        "apis": [
+          "GET /api/intel/financial/rollout",
+          "PUT /api/config-management/config"
+        ]
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": []
+      },
+      "boundary": "阶段固定为 RSS、只读快照、Dashboard、AI 事实路由、单股、指数、历史 ×/÷、自动研究、模拟/回测的累积顺序；每次只允许前进一级，并要求上一层完成观察窗口和阶段冒烟。任意层可立即回退且只改变配置门禁，不删除、迁移或回滚数据库；无新服务、端口、队列、数据库或表。"
+    },
+    {
+      "id": "production_recovery_rehearsal",
+      "capability": "金融生产回滚、兼容 schema 读取、隔离数据库恢复与 RTO/RPO 验收",
+      "disposition": "extend",
+      "current_state": "fail_closed_non_destructive_recovery_and_isolated_baseline_restore_available",
+      "existing": {
+        "files": [
+          "baseline/recovery-runbook.md",
+          "baseline/database-backup-manifest.json",
+          "financial_recovery.py",
+          "financial_rollout.py",
+          "financial_artifacts.py",
+          "financial_schema.py",
+          "financial_worker_jobs.py",
+          "intel_worker.py",
+          "tools/verify_baseline_recovery.py",
+          "tools/check_financial_recovery.py",
+          "tests/test_financial_recovery.py",
+          "tests/test_financial_artifacts.py"
+        ],
+        "processes": [
+          "crawler",
+          "intel-worker"
+        ],
+        "tables": [
+          "intel_jobs"
+        ],
+        "apis": []
+      },
+      "planned": {
+        "files": [],
+        "services": [],
+        "ports": [],
+        "tables": [
+          "financial_research_runs",
+          "financial_final_reports",
+          "financial_artifacts"
+        ]
+      },
+      "boundary": "Provider、LLM、报告、worker 与完整数据库上的 migration 故障优先通过灰度开关、hash 有效旧报告、持久任务 retry/lease 和 additive migration 恢复，RPO 为零受保护行丢失；健康数据库禁止被旧备份覆盖。只有 integrity 失败且明确批准时才可向隔离新路径恢复 checksum 匹配的基线备份，生产恢复审批不由自动测试伪造；无新服务、端口、队列、数据库或表。"
+    }
+  ],
+  "explicitly_forbidden": [
+    {
+      "id": "second_llm_runtime",
+      "disposition": "forbid",
+      "reason": "复用当前 AI 助手本地模型配置和 SharedLLMBroker，不部署 Ollama、vLLM 或新的模型端口。"
+    },
+    {
+      "id": "upstream_tradingagents_ui_cli_service",
+      "disposition": "forbid",
+      "reason": "只嵌入审核后的 Python 图；不启动上游 Web、CLI 守护进程或独立 API。"
+    },
+    {
+      "id": "second_database_or_vector_store",
+      "disposition": "forbid",
+      "reason": "关系状态复用 SQLite，语义记忆复用 RAGFlow；禁止 PostgreSQL/MongoDB/Chroma/FAISS 等重复存储。"
+    },
+    {
+      "id": "second_queue_or_scheduler",
+      "disposition": "forbid",
+      "reason": "复用 intel_jobs、IntelWorker 和现有周期调度；禁止 Celery/RQ/RabbitMQ。"
+    },
+    {
+      "id": "direct_agent_model_or_provider_access",
+      "disposition": "forbid",
+      "reason": "角色必须通过 TradingAgents LLM Adapter 和 CN Data Adapter；不可直接读 Key、任意请求 URL 或静默换源。"
+    },
+    {
+      "id": "real_trading_gateway",
+      "disposition": "forbid",
+      "reason": "本计划只提供研究参考、纸面交易和回测，禁止券商适配、真实订单和真实资金。"
+    },
+    {
+      "id": "runtime_source_install",
+      "disposition": "forbid",
+      "reason": "TradingAgents 必须在镜像构建时按版本、commit 和 hash 安装；运行时禁止 git clone 或 pip install。"
+    }
+  ]
+}

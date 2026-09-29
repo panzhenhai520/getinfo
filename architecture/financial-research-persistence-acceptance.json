@@ -1,0 +1,46 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "artifact_hashes": {
+      "json": "e6a527f63bebaadb5540cc6b920d19d7fa8e84609755adad117f91ab40304c05",
+      "markdown": "e8554de76fcc69628838599eed05fdb5902152fdf16ad3f9de9a263f3ce5ebb4"
+    },
+    "atomic_replace_verified": true,
+    "checkpoint_rows": 3,
+    "executed": true,
+    "incompatible_checkpoint_skipped": true,
+    "missing_checkpoint_error_code": "checkpoint_artifact_missing",
+    "network_outside_sqlite_transaction": true,
+    "ragflow_timeout_status": "degraded",
+    "recovered_stage_index": 5,
+    "report_artifact_rows": 2,
+    "report_available_during_memory_degradation": true,
+    "worker_kill_restart_recovery": true
+  },
+  "static": {
+    "atomic_file_replace": true,
+    "direct_model_or_transport_imports": [],
+    "existing_data_volume_reused": true,
+    "existing_ragflow_client_reused": true,
+    "module": "financial_artifacts.py",
+    "new_vector_store_imports": [],
+    "sqlite_tables_reused": [
+      "financial_research_runs",
+      "financial_research_checkpoints",
+      "financial_final_reports",
+      "financial_artifacts"
+    ]
+  },
+  "task": "2.21",
+  "topology": {
+    "new_databases": [],
+    "new_model_runtimes": [],
+    "new_ports": [],
+    "new_services": [],
+    "reused": [
+      "SQLite",
+      "CRAWL_RESULTS_DIR",
+      "RAGFlow"
+    ]
+  }
+}

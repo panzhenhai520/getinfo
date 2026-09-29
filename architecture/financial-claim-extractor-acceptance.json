@@ -1,0 +1,84 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "existing_sqlite_reused": true,
+    "extraction_implies_verification": false,
+    "facts_default_status": "pending",
+    "new_model_client": false,
+    "opinion_status": "opinion_not_fact",
+    "prediction_status": "prediction_not_fact",
+    "real_order_execution": false,
+    "shared_llm_broker_reused": true
+  },
+  "runtime": {
+    "atomic_claims_observed": 18,
+    "coverage_threshold": 0.95,
+    "covered_key_numeric_span_count": 13,
+    "errors": 0,
+    "exact_text_source_spans": 18,
+    "executed": true,
+    "failures": 0,
+    "key_numeric_coverage": 1.0,
+    "key_numeric_span_count": 13,
+    "labeled_examples": 12,
+    "live_model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 7
+  },
+  "scenarios": {
+    "announcement_and_index_membership": true,
+    "conditional_prediction_separated": true,
+    "currency_and_unit_preserved": true,
+    "idempotent_persistence_preserves_verdict": true,
+    "llm_cannot_override_as_of": true,
+    "llm_exact_span_grounding": true,
+    "llm_ungrounded_unit_currency_rejected": true,
+    "llm_ungrounded_value_rejected": true,
+    "negation": true,
+    "numeric_scalar": true,
+    "opinion_separated": true,
+    "percentage_and_basis_points": true,
+    "range": true,
+    "report_section_trace": true,
+    "structured_template_precedence": true,
+    "yoy_and_qoq": true
+  },
+  "static": {
+    "checks": {
+      "deterministic_rules_present": true,
+      "exact_source_span_required": true,
+      "existing_claim_table_reused": true,
+      "facts_pending_by_default": true,
+      "human_review_fixture": true,
+      "no_direct_model_or_network_client": true,
+      "numeric_grounding_required": true,
+      "opinions_and_predictions_separate": true,
+      "schema_is_closed": true,
+      "server_time_context_preserved": true,
+      "shared_broker_adapter_only": true,
+      "structured_templates_first": true,
+      "unit_currency_grounding_required": true
+    },
+    "decision_order": [
+      "structured_template",
+      "deterministic_rule",
+      "grounded_SharedLLMBroker_fallback"
+    ],
+    "direct_model_or_network_imports": [],
+    "existing_tables": [
+      "financial_claims"
+    ],
+    "extractor_version": "financial-claim-extractor-v1",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-claim-extraction-v1"
+  },
+  "task": "4.1",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 400,
+    "offline_build_network": "none",
+    "offline_image": "sha256:5105bed36453b118ee0daa1f0fa676e6c782b30ab832c066f5e24d643529fefb"
+  }
+}

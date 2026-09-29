@@ -1,0 +1,28 @@
+# TradingAgents is vendored as the immutable official v0.3.1 source archive.
+# Its provenance and archive hash are enforced by tools/check_tradingagents_supply_chain.py.
+./vendor/tradingagents/TradingAgents-0.3.1-01477f9.tar.gz
+
+# Freeze one mutually compatible LangChain/LangGraph generation.  The upstream
+# lower bounds span incompatible 0.x/1.x generations, so leaving these open is
+# not reproducible and can make a fresh resolver choose an impossible mix.
+langchain-core==1.5.3
+langchain-anthropic==1.5.3
+langchain-experimental==0.4.2
+langchain-google-genai==4.3.2
+langchain-openai==1.4.1
+langgraph==1.2.10
+langgraph-checkpoint-sqlite==3.1.1
+
+# Freeze the remaining direct TradingAgents dependencies that are not already
+# constrained by the application's requirements.txt.
+backtrader==1.9.78.123
+pandas==2.3.3
+parsel==1.11.0
+python-dotenv==1.2.2
+questionary==2.1.1
+rich==15.0.0
+setuptools==83.0.0
+stockstats==0.6.8
+tqdm==4.70.0
+typer==0.27.0
+typing-extensions==4.16.0

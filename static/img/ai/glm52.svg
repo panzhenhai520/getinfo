@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="GLM">
+  <defs>
+    <linearGradient id="glm52-bg" x1="8" y1="6" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5f7cff"/>
+      <stop offset="0.55" stop-color="#3158ff"/>
+      <stop offset="1" stop-color="#0f4de8"/>
+    </linearGradient>
+    <linearGradient id="glm52-mark" x1="32" y1="9" x2="32" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e5e9ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="url(#glm52-bg)"/>
+  <path fill="url(#glm52-mark)" fill-rule="evenodd" d="
+    M32 7.5
+    L53.3 19.8
+    L53.3 44.2
+    L32 56.5
+    L10.7 44.2
+    L10.7 19.8
+    Z
+    M32 15.5
+    C33.4 24.8 39.2 30.6 48.5 32
+    C39.2 33.4 33.4 39.2 32 48.5
+    C30.6 39.2 24.8 33.4 15.5 32
+    C24.8 30.6 30.6 24.8 32 15.5
+    Z"/>
+</svg>

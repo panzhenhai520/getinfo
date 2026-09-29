@@ -1,0 +1,138 @@
+{
+  "acceptance": "passed",
+  "checked_at_utc": "2026-08-01T14:01:19Z",
+  "deployment_boundary": {
+    "existing_intel_worker_reused": true,
+    "existing_llm_reused": true,
+    "existing_ragflow_reused": true,
+    "existing_sqlite_reused": true,
+    "new_ports": [],
+    "new_services": [],
+    "production_dashboard_exposed": false,
+    "real_order_execution": false,
+    "tradingagents_embedded": true
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "full_regression_tests_run": 282,
+    "network_calls": 0,
+    "skipped": 0
+  },
+  "static": {
+    "artifact_sha256": {
+      "financial-evidence-acceptance.json": "656c4def86e4afd6c65f3c18127b05f650920225c1ce48aefd3bd6c49ea8c954",
+      "financial-market-scheduler-acceptance.json": "bc25b4a23ad3d3980500c4520d607b7ac96a9b7c657304b77639e43b29017b2a",
+      "financial-research-persistence-acceptance.json": "4436884676af6fb2a9b1810921be16fa0d78c569e80a704d991838d85a345c9b",
+      "financial-schema-acceptance.json": "c3929bd76f81e7f6f0356b78cc91d02ae497dd80bdb7a1177d33debdfc0b35e3",
+      "financial-worker-jobs-acceptance.json": "6a5799659502947efec2213b38cac3237af3a78af546f626802717e458737007",
+      "fund-etf-research-acceptance.json": "7c10917a000ed177d2862e5c4d577357e7ca3c3303938803d6b37894453dd02f",
+      "global-auxiliary-provider-acceptance.json": "c2484cf952f90fa70a3df4f2921f5ba19ea52186ecbd4f55c6ec4429090ebd64",
+      "index-market-research-graph-acceptance.json": "437ba55bce3c0d6f5d36a09a02c5b336f0ee5f03b10f9679908f81937fa04e42",
+      "shared-llm-broker-acceptance.json": "2b0f376e02869f43b9fdbb04ea60a91ede472e8576ab175c08aad57eecd130ff",
+      "stock-research-graph-acceptance.json": "5bf97175ec63030837c6aeded305de46a291ea31ac295ecb48e25eb11747da38",
+      "tradingagents-cn-data-adapter-acceptance.json": "1fc987ae8713dd99a70b60cbeb78cbdacff3f29376dd9ab2b1cecd86b486407f",
+      "tradingagents-component-acceptance.json": "9fd2ab4c34476fda256c72cce076378660cfd0c4507165424452f96ff068d47a",
+      "tradingagents-llm-adapter-acceptance.json": "d76b68d1aa6424c35168989884e0b81c1ecd24f875b5726a913f524068ebd043",
+      "tradingagents-supply-chain-acceptance.json": "ead444add263b264a6b2b32a9e44add1e71a1e4a73c02cf85d94bec26ee6fa07",
+      "tushare-cn-live-acceptance.json": "6bcb1100d08c3c3ce42261cf6b45cee70933822d3d622c92be5630a5b8d696a0"
+    },
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "duplicate_ports": [],
+    "duplicate_services": [],
+    "published_ports": [
+      8003
+    ],
+    "required_artifact_count": 14,
+    "tushare_state": "not_configured"
+  },
+  "target_traceability": {
+    "indices": [
+      {
+        "canonical_symbol": "000001.SH",
+        "evidence_coverage": 0.375,
+        "execution_allowed": false,
+        "providers": [
+          "akshare_cn",
+          "tradingagents_cn_derived",
+          "yahoo"
+        ],
+        "report_status": "degraded_unverified",
+        "section_count": 15
+      },
+      {
+        "canonical_symbol": "399001.SZ",
+        "evidence_coverage": 0.375,
+        "execution_allowed": false,
+        "providers": [
+          "akshare_cn",
+          "tradingagents_cn_derived",
+          "yahoo"
+        ],
+        "report_status": "degraded_unverified",
+        "section_count": 15
+      },
+      {
+        "canonical_symbol": "HSI.HK",
+        "evidence_coverage": 0.375,
+        "execution_allowed": false,
+        "providers": [
+          "tradingagents_cn_derived",
+          "yahoo"
+        ],
+        "report_status": "degraded_unverified",
+        "section_count": 15
+      }
+    ],
+    "live_artifact_sha256": {
+      "index-market-research-live-acceptance.json": "c0991d93fefc8cb2c08bd89b887d22b6d842b04db1b363a13828bb572bf67368",
+      "stock-research-live-acceptance.json": "2afe9f96b098b97ccd839f36a899dd69a54c22765519e453bbccbd2eb9be9b7f"
+    },
+    "network_calls_during_this_gate": 0,
+    "stocks": [
+      {
+        "canonical_symbol": "0700.HK",
+        "evidence_coverage": 0.375,
+        "execution_allowed": false,
+        "providers": [
+          "easyquotation",
+          "tradingagents_cn_derived",
+          "yahoo"
+        ],
+        "report_status": "degraded_unverified",
+        "section_count": 14
+      },
+      {
+        "canonical_symbol": "600000.SH",
+        "evidence_coverage": 0.375,
+        "execution_allowed": false,
+        "providers": [
+          "akshare_cn",
+          "tradingagents_cn_derived",
+          "yahoo"
+        ],
+        "report_status": "degraded_unverified",
+        "section_count": 14
+      },
+      {
+        "canonical_symbol": "000001.SZ",
+        "evidence_coverage": 0.375,
+        "execution_allowed": false,
+        "providers": [
+          "akshare_cn",
+          "tradingagents_cn_derived",
+          "yahoo"
+        ],
+        "report_status": "degraded_unverified",
+        "section_count": 14
+      }
+    ]
+  },
+  "task": "2.24"
+}

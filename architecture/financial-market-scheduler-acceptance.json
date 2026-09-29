@@ -1,0 +1,48 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "benchmark_and_breadth_snapshot_jobs": 9,
+    "cross_market_holiday_state": {
+      "CN_A_MARKET": "closed_latest",
+      "CN_XSHE_MARKET": "closed_latest",
+      "CN_XSHG_MARKET": "closed_latest",
+      "DEFAULT_MARKET_PULSE": "cross_market_pulse",
+      "HK_MARKET": "intraday"
+    },
+    "executed": true,
+    "full_research_jobs_created": 0,
+    "network_calls": 0,
+    "restart_duplicate_jobs_created": 0,
+    "standard_and_pulse_overview_jobs": 5,
+    "startup_jobs_created": 14,
+    "unit_tests_passed": 6
+  },
+  "static": {
+    "direct_queue_model_network_imports": [],
+    "existing_database": "crawler_articles.db",
+    "existing_queue_table": "intel_jobs",
+    "existing_worker": "intel_worker.py",
+    "new_ports": [],
+    "new_queues": [],
+    "new_services": [],
+    "standard_markets": [
+      "CN_XSHG_MARKET",
+      "CN_XSHE_MARKET",
+      "CN_A_MARKET",
+      "HK_MARKET"
+    ]
+  },
+  "task": "2.23",
+  "topology": {
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "new_databases": [],
+    "new_ports": [],
+    "new_queues": [],
+    "new_services": []
+  }
+}

@@ -1,0 +1,601 @@
+/* ============================================================================
+ * 全站自适应层（responsive.css）
+ * 统一补充手机(<640px) / 平板(640~1024px) / 大屏(>1024px) 的响应式规则。
+ * 在 dashboard-theme.css 之后引入，优先级高于 Tailwind 与各模板 inline 样式。
+ * 断点：sm=640px, md=768px, lg=1024px, xl=1280px
+ * ========================================================================== */
+
+/* ── 1. 媒体自适应：图片/视频/画布不撑破容器 ── */
+img, video, svg, canvas, iframe {
+    max-width: 100%;
+}
+img {
+    height: auto;
+}
+
+/* ── 2. 表格横向滚动：小屏时宽表格不撑破页面，可在容器内横滑 ──
+ *    display:block 仅作用于 table 元素本身，tr/td 仍按 table-row/table-cell
+ *    布局，因此表格语义结构不变、列宽由内容决定：窄表自适应，宽表横向滚动。 */
+@media (max-width: 767px) {
+    table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ── 3. 全局容器在平板/手机收紧左右留白 ── */
+@media (max-width: 1024px) {
+    .container,
+    .admin-page,
+    .page-wrap,
+    .pack-wrap,
+    .feed-wrap,
+    .reports-wrap,
+    .wrap {
+        padding-left: 18px !important;
+        padding-right: 18px !important;
+    }
+}
+@media (max-width: 640px) {
+    .container,
+    .admin-page,
+    .page-wrap,
+    .pack-wrap,
+    .feed-wrap,
+    .reports-wrap,
+    .wrap {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+
+/* ── 4. 无断点的固定多列 grid（Tailwind grid-cols-N）在手机收成单列 ──
+ *    注意：只收「纯 grid-cols-3/4/5」（无 sm:/md:/lg: 前缀的那些），
+ *    带断点前缀的（如 md:grid-cols-3）由 Tailwind 自己的断点规则处理。 */
+@media (max-width: 767px) {
+    .grid-cols-3,
+    .grid-cols-4,
+    .grid-cols-5 {
+        grid-template-columns: 1fr !important;
+    }
+}
+@media (min-width: 768px) and (max-width: 1024px) {
+    .grid-cols-4,
+    .grid-cols-5 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+/* ── 4b. grid 子项默认允许收缩到 0 ──
+ *    CSS Grid 的经典坑：grid-template-columns:1fr 等价于 minmax(auto,1fr)，
+ *    内部内容（按钮组/长词/不换行 flex）会把列撑破，造成横向溢出。
+ *    手机上把已知卡片网格改成 minmax(0,1fr)，并让子项可收缩。 */
+@media (max-width: 767px) {
+    .article-card-grid,
+    .article-filter-grid,
+    .financial-market-detail-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .article-card-grid > *,
+    .article-filter-grid > *,
+    .article-card,
+    .grid > * {
+        min-width: 0;
+    }
+}
+
+/* ── 5. 宽面板/固定宽度行在手机允许收缩 + 横向滚动 ──
+ *    覆盖各模板里 min-width 固定的表格行/网格（如信源行、URL 目录行等）。 */
+@media (max-width: 767px) {
+    .source-head,
+    .source-row,
+    .url-row,
+    .url-catalog-head,
+    .financial-simulation-table,
+    .chat-table-scroll table {
+        min-width: 0 !important;
+    }
+    /* 这些多列网格行在手机改为可横向滚动的固定列布局，避免 9 列挤成一团 */
+    .source-head,
+    .source-row {
+        display: flex !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .source-head > *,
+    .source-row > * {
+        flex: 0 0 auto;
+    }
+    .url-row {
+        grid-template-columns: minmax(160px, 1fr) minmax(240px, 2fr) auto auto !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ── 6. 侧栏式布局（如 pack_admin 的 .pa-left）在手机收成上下堆叠 ── */
+@media (max-width: 720px) {
+    .pa-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .pa-left {
+        width: 100% !important;
+        flex-direction: row !important;
+        flex-wrap: wrap;
+        overflow-x: auto;
+    }
+}
+
+/* ── 7. 移动端触摸目标更大、更易点 ── */
+@media (max-width: 640px) {
+    button,
+    [role="button"],
+    .nav-link,
+    .dashboard-nav-link {
+        min-height: 38px;
+    }
+    input,
+    select,
+    textarea {
+        font-size: 16px; /* 阻止 iOS 聚焦自动放大 */
+    }
+}
+
+/* ── 7b. 表单控件允许收缩：flex 行里的 input/select 默认 min-width:auto 会被
+ *     placeholder/选项文字撑开，把整行挤出屏幕；手机上一律允许收缩到 0。 ── */
+@media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+        min-width: 0 !important;
+    }
+}
+
+/* ── 8. 长代码/长 URL 在窄屏强制折行，避免横向溢出 ── */
+@media (max-width: 640px) {
+    code,
+    pre {
+        word-break: break-all;
+        white-space: pre-wrap;
+    }
+    .url-row-url,
+    .url-row-name {
+        overflow-wrap: anywhere;
+    }
+}
+
+/* ── 9. 表单行（.row）手机换行：模型选择/按钮/输入框不挤在一行 ── */
+@media (max-width: 767px) {
+    .row {
+        flex-wrap: wrap !important;
+    }
+    .row .mname {
+        flex: 0 0 100% !important;
+    }
+    .row .key-input {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+    .row .btn2 {
+        white-space: nowrap;
+    }
+}
+
+/* ── 10. 报告页双栏（列表+预览）手机收成单栏，列表限高 ── */
+@media (max-width: 767px) {
+    .reports-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .reports-list {
+        max-height: 45vh;
+    }
+    .preview-panel {
+        min-height: 55vh;
+    }
+}
+
+/* ── 11. 配置管理侧栏导航手机强制收缩 + 横向滚动 ── */
+@media (max-width: 1024px) {
+    .config-nav {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        flex-shrink: 0;
+    }
+    .config-shell {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
+
+/* ── 12. 顶部导航统计（dashboard-stats）允许收缩：内容多时由 overflow:hidden
+ *    裁剪，不把整行撑破导致页面横向溢出 4~30px ── */
+@media (max-width: 920px) {
+    .dashboard-stats {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
+}
+
+/* ── 13. 首页主题驾驶舱（intel-theme-dashboard）响应式 ──
+ *    桌面：时间轴(300px 固定) + 主题卡 4 列并排。
+ *    手机：上下堆叠（时间轴移到下方、全宽），主题卡收成单列、不压窄；
+ *    平板：主题卡 2 列，时间轴收窄到 240px。 */
+@media (max-width: 767px) {
+    .intel-theme-body {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    .intel-theme-timeline {
+        width: 100% !important;
+        flex-shrink: 1 !important;
+        order: 2;
+    }
+    .intel-theme-main {
+        width: 100% !important;
+    }
+    .intel-theme-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .intel-theme-menu {
+        gap: 8px !important;
+    }
+}
+@media (min-width: 768px) and (max-width: 1200px) {
+    .intel-theme-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .intel-theme-timeline {
+        width: 240px !important;
+    }
+}
+
+/* ── 14. AI 助手（聊天）移动端修复 ──
+ *   ① 悬浮按钮从右上角移到右下角，避免挡住顶部导航的用户头像/头像下拉菜单；
+ *   ② 抽屉内部 grid 行默认 min-width:auto，会被消息里的长文本撑到 629px，
+ *      iPhone 上把「收起」按钮挤出屏幕；手机上一律收进容器宽 + 长文本折行。 */
+@media (max-width: 767px) {
+    /* AI 助手按钮：移入顶部导航（JS 已把它移到 nav 内），与搜索同行 */
+    .chat-toggle {
+        position: static !important;
+        order: 7 !important;
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 15px !important;
+        border-radius: 8px !important;
+        flex-shrink: 0 !important;
+    }
+    .chat-drawer > * {
+        min-width: 0 !important;
+    }
+    .chat-head,
+    .chat-body,
+    .chat-compose {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .chat-body {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    /* 历史会话面板：窄屏也要保持左列表 + 右消息两栏（否则列表与消息挤在一列，
+       点历史按钮后界面看起来"没变化"） */
+    .chat-drawer.history-open .chat-body {
+        grid-template-columns: minmax(0, 168px) minmax(0, 1fr) !important;
+    }
+    .chat-drawer.history-open .session-list {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    .messages {
+        min-width: 0 !important;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .model-row {
+        flex-wrap: wrap !important;
+    }
+    .chat-input-row,
+    #chatInput {
+        min-width: 0 !important;
+    }
+    /* 引用长文本后输入行不再被撑破：textarea 宽度由剩余空间决定（flex-basis:0），
+       长行在输入框内部滚动；发送按钮固定 44px 始终留在屏内 */
+    .chat-compose {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    .chat-input-row {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    #chatInput {
+        width: auto !important;
+        flex: 1 1 0% !important;
+        max-width: 100% !important;
+    }
+    .chat-input-row .send-button {
+        flex: 0 0 44px !important;
+    }
+    .chat-actions {
+        flex-shrink: 0 !important;
+    }
+}
+
+/* ── 15. 顶部统计条 + 底部系统状态浮条 移动端调整 ──
+ *   ① 导航统计条（今日入库/搜索引擎/信源扫描/最后聚合）桌面是 nowrap +
+ *      overflow:hidden，手机上每项被裁剪得看不全 → 允许换行、每项完整显示；
+ *   ② 左下角「系统运行中 LLM/TTS/VPN」浮条缩小贴边、隐藏细节文字，
+ *      并限制最大宽度，避免遮挡页面内容、也不与右下角 AI 按钮重叠。 */
+@media (max-width: 767px) {
+    .dashboard-stats {
+        flex-wrap: wrap !important;
+        gap: 6px 12px !important;
+        overflow: visible !important;
+    }
+    .dashboard-stats .stat {
+        white-space: nowrap !important;
+    }
+    .sys-status {
+        left: 10px !important;
+        bottom: 0 !important;
+        padding: 5px 10px !important;
+        gap: 6px !important;
+        font-size: 11px !important;
+        max-width: calc(100vw - 86px);
+        overflow: hidden;
+        border-radius: 0 999px 999px 0 !important;
+        border-left: 0 !important;
+    }
+    .sys-status .tl {
+        display: none !important;
+    }
+    .sys-status .probes {
+        gap: 4px !important;
+    }
+    .sys-status .probe-label {
+        margin-right: 3px !important;
+    }
+}
+
+/* ── 16. 首页橡皮筋滚动露白修复 ──
+ *   浅色主题下 html/body 是默认白色，iOS 在面板滚到底后继续拖动会露出白底，
+ *   与浅灰绿页面反差刺眼。手机端把底色改成主题底色并禁止滚动链；
+ *   深蓝皮肤通过 :has 让 html 底色同步变深（body 渐变背景保持原样）。 */
+@media (max-width: 767px) {
+    html,
+    body {
+        background: #eef2ef;
+        overscroll-behavior-y: none;
+    }
+    html:has(body.skin-darkblue) {
+        background: #08101f;
+    }
+}
+
+/* ── 17. 手机端顶部导航重排 ──
+ *    第1行：品牌名（左）+ 换肤/头像（右）；
+ *    第2行：统计条占满整行；
+ *    第3行：搜索框（弹性）+ 报告/趋势/资讯流 紧挨同行。 */
+@media (max-width: 767px) {
+    .dashboard-global-nav {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 6px 3px !important;
+        padding: 8px 10px !important;
+        height: auto !important;
+    }
+    .dashboard-brand {
+        order: 1 !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+    .dashboard-user {
+        order: 2 !important;
+        margin-left: auto !important;
+    }
+    .dashboard-skin {
+        order: 3 !important;
+    }
+    .dashboard-stats {
+        order: 4 !important;
+        flex: 1 1 100% !important;
+        width: 100% !important;
+    }
+    .dashboard-nav-search {
+        order: 6 !important;
+        flex: 1 1 96px !important;
+        min-width: 96px !important;
+        max-width: 150px !important;
+        margin-right: 0 !important;
+    }
+    /* 搜索框内按钮：全局 min-height:38px 会把它拉成竖椭圆，这里还原为小方块 */
+    .dashboard-nav-search .dashboard-search-btn {
+        min-height: 0 !important;
+        height: 26px !important;
+        width: 26px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        flex-shrink: 0 !important;
+    }
+    /* AI 助手按钮：保持正圆、去默认 padding，避免被拉伸变形 */
+    .chat-toggle {
+        min-height: 0 !important;
+        height: 36px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+    }
+    .trend-link,
+    .feed-link,
+    .home-link {
+        order: 5 !important;
+        margin-right: 0 !important;
+        padding: 5px 4px !important;
+        gap: 3px !important;
+        font-size: 12px !important;
+    }
+    .trend-link i,
+    .feed-link i {
+        display: none !important;
+    }
+    .dashboard-nav-links {
+        display: none !important;
+    }
+}
+/* ── 17b. 趋势页（/trends）手机适配 ──
+ *    阅读行允许换行、关键词字号收敛、折叠箭头显著放大加粗，
+ *    图表高度收紧，趋势词标签折行排列（图例由 ECharts plain 自动折行）。 */
+@media (max-width: 767px) {
+    .intel-trend-evolution {
+        padding: 10px 10px !important;
+    }
+    .intel-trend-reading {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .intel-trend-reading-kw {
+        font-size: 17px;
+        min-width: 0;
+    }
+    .intel-trend-reading-text {
+        flex: 1 1 100%;
+        order: 9;
+    }
+    .intel-trend-content-arrow {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        padding: 6px 11px !important;
+    }
+    .intel-trend-chart {
+        min-height: 220px;
+    }
+    .intel-trend-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+}
+/* ── 17d. 首页仪表盘面板贴紧顶部导航（手机） ──
+ *    原内联样式固定 inset:232px，与动态高度的导航之间留出大片空隙；
+ *    改用 JS 计算的 --dash-top 变量，面板顶边 = 导航底边 + 6px。 */
+@media (max-width: 767px) {
+    .intel-dashboard {
+        top: var(--dash-top, 200px) !important;
+    }
+}
+/* ── 17c. 资讯流页（/feed）手机适配 ──
+ *    分类头在手机上三行排布：① 标题+描述占整行（不再被挤压成竖排文字）；
+ *    ② 篇数+查看更多+折叠箭头；③ 搜索框独占一行拉满宽度。 */
+@media (max-width: 767px) {
+    .feed-wrap {
+        padding: 10px 12px 24px !important;
+    }
+    .feed-hero-title {
+        font-size: 20px !important;
+    }
+    .feed-sec-head {
+        flex-wrap: wrap !important;
+        gap: 6px 10px !important;
+        padding: 8px 0 !important;
+    }
+    .feed-sec-titlewrap {
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+    }
+    .feed-sec-title {
+        font-size: 17px !important;
+    }
+    .feed-sec-count {
+        margin-left: auto !important;
+    }
+    .feed-search {
+        flex: 1 1 100% !important;
+        order: 9 !important;
+        margin-left: 0 !important;
+    }
+    .feed-search-input {
+        flex: 1 !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+    .feed-more {
+        margin-left: auto;
+    }
+}
+/* 极窄屏（≤340px）：进一步收紧间距与搜索框，保持六元素仍同行 */
+@media (max-width: 340px) {
+    .dashboard-global-nav {
+        gap: 5px 2px !important;
+        padding: 8px 8px !important;
+    }
+    .dashboard-nav-search {
+        flex-basis: 76px !important;
+        min-width: 76px !important;
+        max-width: 110px !important;
+    }
+    .trend-link,
+    .feed-link,
+    .home-link {
+        padding: 4px 3px !important;
+    }
+    .chat-toggle {
+        width: 32px !important;
+        height: 32px !important;
+        font-size: 13px !important;
+    }
+}
+
+/* ── 19. 登录页手机端锁定视口 ──
+ *   内容正好一屏时 iOS Safari 仍允许橡皮筋上下左右拖动，体验差。
+ *   手机端把登录页 body 固定满屏并禁止溢出滚动；内容若超高（键盘弹出、
+ *   极小屏）由登录卡片内部滚动兜底，页面本身纹丝不动。 */
+@media (max-width: 767px) {
+    body:has(#loginForm) {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        overscroll-behavior: none !important;
+        padding: 1.25rem 1rem !important;
+    }
+    body:has(#loginForm) .container {
+        max-height: calc(100dvh - 2.5rem);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    #email,
+    #verifyCode {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* ── 18. 文章详情弹窗手机高度自适应 ──
+ *   桌面版 content 高 82vh + 外层 5vh padding，在 iPhone 上 Safari 工具栏
+ *   压缩可视区后，底部【引用到助手/关闭】按钮被顶出屏幕。
+ *   手机端弹窗铺满整个动态视口（100dvh），内容区内部滚动，底部按钮固定可见。 */
+@media (max-width: 767px) {
+    .article-modal.active {
+        padding: 0 !important;
+        align-items: stretch !important;
+    }
+    .article-modal-content {
+        width: 100% !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        border-radius: 0 !important;
+    }
+    @supports not (height: 100dvh) {
+        .article-modal-content {
+            height: 100vh !important;
+            max-height: 100vh !important;
+        }
+    }
+    .article-modal-footer {
+        flex-wrap: wrap;
+        gap: 8px !important;
+        padding: 10px 12px !important;
+    }
+}

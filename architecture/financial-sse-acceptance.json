@@ -1,0 +1,55 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "tests_run": 7
+  },
+  "scenarios": {
+    "asynchronous_report_ready": true,
+    "chunk_boundary": true,
+    "disconnect_retries_once": true,
+    "duplicate_done_is_idempotent": true,
+    "event_order": true,
+    "interrupted_stream_not_saved_as_success": true,
+    "sensitive_fields_allow_listed": true,
+    "unknown_event_compatibility": true
+  },
+  "static": {
+    "frontend": {
+      "article_management.html": {
+        "negotiates_financial_sse": true,
+        "report_link_allowlist": true,
+        "requires_done": true,
+        "single_reconnect": true,
+        "unknown_event_ignored": true
+      },
+      "mapindex.html": {
+        "negotiates_financial_sse": true,
+        "report_link_allowlist": true,
+        "requires_done": true,
+        "single_reconnect": true,
+        "unknown_event_ignored": true
+      }
+    },
+    "legacy_event_types_unchanged_without_negotiation": true,
+    "natural_language_event": "chunk",
+    "new_ports": [],
+    "new_services": [],
+    "optional_event_types": [
+      "route",
+      "clarification",
+      "research_status",
+      "sources",
+      "report_ready"
+    ],
+    "projection_direct_model_network_imports": [],
+    "protocol_version": "financial-sse-v1",
+    "report_entry": "GET /api/financial/reports/{id}",
+    "terminal_error_event": "error",
+    "terminal_success_event": "done"
+  },
+  "task": "3.8"
+}

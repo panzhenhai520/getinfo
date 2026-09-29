@@ -1,0 +1,48 @@
+# Offline application-layer rebuild.
+#
+# Prerequisite: preload the already accepted runtime image with `docker load`.
+# This stage deliberately performs no apt, pip, curl, git or other network work.
+ARG COLLECTINFO_LOCKED_RUNTIME_IMAGE=collectinfo:stage2-15
+FROM ${COLLECTINFO_LOCKED_RUNTIME_IMAGE}
+
+WORKDIR /app
+COPY . .
+
+RUN python tools/check_tradingagents_supply_chain.py --runtime --output /tmp/tradingagents-offline-acceptance.json \
+    && python tools/check_tradingagents_llm_adapter.py --runtime --output /tmp/tradingagents-llm-adapter-offline-acceptance.json \
+    && python tools/check_tradingagents_cn_data_adapter.py --runtime --output /tmp/tradingagents-cn-data-adapter-offline-acceptance.json \
+    && python tools/check_stock_research_graph.py --runtime --output /tmp/stock-research-graph-offline-acceptance.json \
+    && python tools/check_index_market_research_graph.py --runtime --output /tmp/index-market-research-graph-offline-acceptance.json \
+    && python tools/check_fund_etf_research.py --runtime --output /tmp/fund-etf-research-offline-acceptance.json \
+    && python tools/check_financial_research_persistence.py --runtime --output /tmp/financial-research-persistence-offline-acceptance.json \
+    && python tools/check_financial_worker_jobs.py --runtime --output /tmp/financial-worker-jobs-offline-acceptance.json \
+    && python tools/check_financial_market_scheduler.py --runtime --output /tmp/financial-market-scheduler-offline-acceptance.json \
+    && python tools/check_financial_stage2_integration.py --runtime --output /tmp/financial-stage2-integration-offline-acceptance.json \
+    && python tools/check_chat_sse_compatibility.py --runtime --output /tmp/chat-sse-compatibility-offline-acceptance.json \
+    && python tools/check_chat_server_time_context.py --runtime --output /tmp/chat-server-time-context-offline-acceptance.json \
+    && python tools/check_financial_intent_classifier.py --runtime --output /tmp/financial-intent-classifier-offline-acceptance.json \
+    && python tools/check_financial_target_resolver.py --runtime --output /tmp/financial-target-resolver-offline-acceptance.json \
+    && python tools/check_financial_chat_market_scope.py --runtime --output /tmp/financial-chat-market-scope-offline-acceptance.json \
+    && python tools/check_financial_realtime_query.py --runtime --output /tmp/financial-realtime-query-offline-acceptance.json \
+    && python tools/check_financial_full_research.py --runtime --output /tmp/financial-full-research-offline-acceptance.json \
+    && python tools/check_financial_sse.py --runtime --output /tmp/financial-sse-offline-acceptance.json \
+    && python tools/check_financial_chat_history.py --runtime --output /tmp/financial-chat-history-offline-acceptance.json \
+    && python tools/check_financial_gcd_review.py --runtime --output /tmp/financial-gcd-review-offline-acceptance.json \
+    && python tools/check_financial_synthesis_review.py --runtime --output /tmp/financial-synthesis-review-offline-acceptance.json \
+    && python tools/check_financial_conflict_adjudication.py --runtime --output /tmp/financial-conflict-adjudication-offline-acceptance.json \
+    && python tools/check_financial_feed.py --database /app/data/crawler_articles.db --industry-pack-id family_office --time-range 7d \
+    && python tools/check_financial_report_view.py --runtime --output /tmp/financial-report-view-offline-acceptance.json \
+    && python tools/check_financial_feature_gate.py --runtime --output /tmp/financial-feature-gate-offline-acceptance.json \
+    && python tools/check_financial_stage3_gate.py --runtime --output /tmp/financial-stage3-offline-acceptance.json \
+    && python tools/check_financial_claim_extractor.py --runtime --output /tmp/financial-claim-extractor-offline-acceptance.json \
+    && python tools/check_financial_temporal_judge.py --runtime --output /tmp/financial-temporal-judge-offline-acceptance.json \
+    && python tools/check_financial_conflict_judge.py --runtime --output /tmp/financial-conflict-judge-offline-acceptance.json \
+    && python tools/check_financial_answer_composer.py --runtime --output /tmp/financial-answer-composer-offline-acceptance.json \
+    && sed -i 's/\r$//' /app/docker-entrypoint.sh \
+    && chmod +x /app/docker-entrypoint.sh \
+    && mkdir -p /app/data /app/crawl_results /app/auth_storage /app/crawl_logs
+
+EXPOSE 8003
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["python", "start_with_schedule.py"]

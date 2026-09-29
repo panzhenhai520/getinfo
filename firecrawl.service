@@ -1,0 +1,30 @@
+[Unit]
+Description=Firecrawl Web Crawler Application
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=zx
+Group=zx
+WorkingDirectory=/home/zx/paichong
+ExecStart=/usr/bin/python3 /home/zx/paichong/firecrawl_app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=firecrawl
+
+# 环境变量
+Environment=PYTHONPATH=/home/zx/paichong
+Environment=PYTHONUNBUFFERED=1
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/zx/paichong
+
+[Install]
+WantedBy=multi-user.target

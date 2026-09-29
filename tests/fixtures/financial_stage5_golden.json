@@ -1,0 +1,70 @@
+{
+  "fixture_version": "financial-stage5-golden-v1",
+  "dataset_policy": {
+    "purpose": "deterministic_correctness_and_isolation_only",
+    "profitability_evaluation": "prohibited",
+    "repetitions": 3
+  },
+  "owner_user_id": "stage5-golden-owner",
+  "industry_pack_id": "family_office",
+  "clock": "2026-02-02T00:00:00Z",
+  "instrument": {
+    "canonical_symbol": "600000.SH",
+    "display_name": "阶段五固定样本",
+    "asset_type": "equity",
+    "currency": "CNY"
+  },
+  "backtest": {
+    "strategy_key": "buy_and_hold_v1",
+    "strategy_version": "stage5-golden-strategy-v1",
+    "idempotency_key": "stage5-golden-backtest",
+    "start_date": "2026-01-05",
+    "end_date": "2026-01-09",
+    "initial_capital": 10000,
+    "fee_rate": "0.001",
+    "slippage_bps": "10",
+    "random_seed": 202605,
+    "data_cutoff_at": "2026-02-01T00:00:00Z",
+    "bars": [
+      {"observed_at": "2026-01-05T08:00:00Z", "price": 100},
+      {"observed_at": "2026-01-06T08:00:00Z", "price": 102},
+      {"observed_at": "2026-01-07T08:00:00Z", "price": 101},
+      {"observed_at": "2026-01-08T08:00:00Z", "price": 105},
+      {"observed_at": "2026-01-09T08:00:00Z", "price": 107}
+    ]
+  },
+  "paper_ledger": {
+    "account_name": "阶段五固定纸面账户",
+    "initial_cash": 20000,
+    "account_idempotency_key": "stage5-golden-account",
+    "strategy_version": "stage5-paper-strategy-v1",
+    "quantity_buy": 10,
+    "quantity_sell": 4,
+    "buy_price": 100,
+    "sell_price": 110,
+    "fee_rate": "0.001",
+    "buy_slippage_bps": "10",
+    "sell_slippage_bps": "0",
+    "filled_at": "2026-01-09T09:00:00Z"
+  },
+  "network_policy": {
+    "allowed_published_ports": [8003],
+    "forbidden_broker_domains": [
+      "api.alpaca.markets",
+      "paper-api.alpaca.markets",
+      "interactivebrokers.com",
+      "tws-api",
+      "api.binance.com",
+      "api.coinbase.com",
+      "api.kraken.com"
+    ],
+    "forbidden_broker_ports": [4001, 4002, 7496, 7497]
+  },
+  "expected": {
+    "projection_sha256": "31beb458dd13ef1ab72c9b77c5eccc5435631c80ca5065426ed944376a8d5ab1",
+    "backtest_trade_count": 2,
+    "paper_fill_count": 2,
+    "paper_ledger_conserved": true,
+    "real_order_execution": false
+  }
+}

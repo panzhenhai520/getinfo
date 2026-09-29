@@ -1,0 +1,96 @@
+# Firecrawl App - 生产环境依赖
+# 核心框架
+flask==2.3.3
+flask-cors==4.0.0
+requests==2.32.5
+jsonschema==4.26.0
+# Required by requests when CHAT_PROXY uses socks5:// (Gemini/ChatGPT/Claude).
+PySocks==1.7.1
+urllib3==1.26.18  # 兼容旧版 OpenSSL (1.0.2k)
+Werkzeug==2.3.7
+
+# 数据存储
+redis==6.2.0
+psycopg2-binary==2.9.9
+
+# 网页处理
+selenium==4.15.0
+beautifulsoup4==4.12.2
+chardet==5.2.0  # Requests 2.32.x rejects chardet >=6 at import time.
+webdriver-manager==4.0.1
+lxml==5.4.0
+
+# 智能提取
+newspaper3k>=0.2.8
+lxml_html_clean
+nltk==3.8.1
+Pillow==10.0.0
+qrcode>=8.0          # 分享页二维码（长按保存图片发微信群/朋友圈）
+markdownify>=0.13.1  # 正文统一 Markdown（详情页 HTML→Markdown 转换）
+markitdown[pdf,docx,pptx,xlsx]>=0.1.7  # 报告文件内联阅读（PDF/Word/Excel/PPT → Markdown）
+autoscraper>=1.1.14  # 信源检查一键学习（样例学习标题/链接提取模板）
+scrapling>=0.4.15    # 反爬本地第一梯队（StealthyFetcher 隐身抓取，VPN 之前）
+curl_cffi>=0.16.3    # Scrapling 依赖：curl 指纹伪装
+msgspec>=0.19        # Scrapling 依赖（其 setup 未声明，需显式安装）
+patchright>=1.62.3   # Scrapling 依赖：打补丁的真实浏览器（需 python -m patchright install chromium）
+
+# 🔥 增强内容提取库（多种算法对比选择最佳结果）
+trafilatura>=1.6.0          # 强大的网页正文提取
+readability-lxml>=0.8.1     # Mozilla的文章提取算法（Firefox阅读视图）
+cssselect==1.3.0            # 兼容 readability-lxml 0.9 (<1.4) 与 pyquery (<=1.4.99)
+htmldate>=1.4.0             # 专业的网页日期提取
+justext>=3.0.0              # 基于启发式的正文提取
+boilerpy3>=1.0.6            # boilerpipe样板内容移除算法
+extruct>=0.16.0             # 结构化数据提取（JSON-LD, Schema.org）
+selectolax>=0.3.0           # 超快的CSS选择器解析
+
+# 动态内容提取
+playwright==1.40.0
+# Playwright 1.40.0 requires this exact version; make the indirect constraint
+# visible while resolving the separate TradingAgents dependency closure.
+greenlet==3.0.1
+
+# 数据处理
+python-dateutil==2.8.2
+akshare==1.18.72
+tushare==1.4.29
+yfinance==1.5.1
+easyquotation==0.7.7
+
+# 行业演化分析（趋势爆发检测 + 文章向量；sklearn/ruptures 为第三阶段聚类/变点备用）
+numpy==2.2.6
+scikit-learn==1.7.2
+ruptures==1.1.10
+
+# BERTopic 动态主题趋势（复用 bge-m3 预计算嵌入，embedding_model=None 不下载模型）
+bertopic>=0.16.4
+torch==2.5.1              # CUDA 12.4，避免最新 torch 拉入 nvidia-cu13
+sentence-transformers==3.4.1  # 兼容 torch 2.5.x，避免 sentence-transformers 6.x 拉入 torch 2.13
+umap-learn>=0.5.7
+hdbscan>=0.8.40
+jieba>=0.42.1
+
+# 时区支持
+pytz==2025.2
+backports.zoneinfo==0.2.1; python_version < '3.9'
+
+# 生产服务器
+gunicorn==21.2.0
+gevent==23.9.1
+
+# 系统监控
+psutil==5.9.5
+
+# 简繁体转换
+opencc-python-reimplemented>=0.1.7
+
+# 反爬绕过（模拟浏览器TLS指纹）
+curl-cffi>=0.15.0          # AKShare 1.18.x 与 yfinance 1.5.x 的上游请求依赖
+browserforge>=1.1.0         # 生成更真实的浏览器请求头/指纹
+
+# 大规模定时任务稳定性
+tenacity>=8.2.3             # 统一重试、指数退避和随机抖动
+requests-cache>=1.1.1       # 缓存robots/sitemap/feed等低风险发现请求
+
+# 在线助手联网搜索
+duckduckgo_search>=6.0.0

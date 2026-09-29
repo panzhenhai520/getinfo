@@ -1,0 +1,7 @@
+{
+  "report_version": "tushare-cn-live-v1",
+  "passed": false,
+  "skipped": true,
+  "reason": "tushare_token_not_configured",
+  "token_configured": false
+}

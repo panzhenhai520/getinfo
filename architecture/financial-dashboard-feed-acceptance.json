@@ -1,0 +1,60 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "production_read_only_check_ms": 4.78,
+    "tests_run": 6
+  },
+  "scenarios": {
+    "empty_window_rendered": true,
+    "family_office_dependency_visible": true,
+    "feature_disabled_hides_without_delete": true,
+    "kind_filter_and_pagination": true,
+    "non_financial_pack_hidden": true,
+    "ordinary_dashboard_statistics_unchanged": true,
+    "simulation_category_switch_gated": true,
+    "snapshot_article_report_separated": true,
+    "tradingagents_disabled_hides_reports": true,
+    "unauthenticated_request_rejected": true,
+    "xss_payloads_rendered_as_text": true
+  },
+  "static": {
+    "api": "GET /api/intel/financial/feed",
+    "card_labels": [
+      "事实",
+      "原文",
+      "研究观点"
+    ],
+    "clock_source": "application_server",
+    "content_kinds": [
+      "market_fact",
+      "source_document",
+      "research_opinion"
+    ],
+    "direct_network_or_model_imports": [],
+    "new_databases": [],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "report_inserted_into_articles": false,
+    "schema_version": "financial-dashboard-feed-v1",
+    "separate_read_tables": [
+      "financial_data_snapshots",
+      "articles + article_intel_classifications",
+      "financial_final_reports + financial_research_runs"
+    ],
+    "server_side_gate": [
+      "effective pack has financial_market_data",
+      "FINANCIAL_INTELLIGENCE_ENABLED"
+    ]
+  },
+  "task": "3.13",
+  "verification": {
+    "frontend_javascript_syntax": "passed",
+    "full_regression_tests": 378,
+    "offline_image": "sha256:0cd9c14615749c8213785f3fe82cdd354cc4bda2209769cbc94271d057339ceb"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "acceptance": "passed",
+  "compatibility": {
+    "history_save_endpoint_unchanged": true,
+    "missing_key": true,
+    "model_timeout": true,
+    "old_request_body": true,
+    "ordinary_chat": true,
+    "stream_disconnect_contract_unchanged": true,
+    "web_search": true
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "tests_run": 5
+  },
+  "static": {
+    "default_route": "legacy_chat",
+    "endpoint": "POST /api/chat/send",
+    "legacy_event_types": [
+      "status",
+      "searching",
+      "search_done",
+      "chunk",
+      "done",
+      "error"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "route_direct_model_network_imports": []
+  },
+  "task": "3.1"
+}

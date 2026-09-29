@@ -1,0 +1,234 @@
+# 生产发布编排：web + 调度 worker + 情报 worker + redis + postgres
+# 与 docker-compose.crawler.yml（开发/共存模式）的区别：
+#   - 不挂载源码目录（用镜像内代码），只挂载数据卷；
+#   - 固定镜像名 collectinfo-web:latest（可 docker save/load 打包分发）；
+#   - 默认对外端口 8003（可用 WEB_PORT 覆盖）。
+#
+# 用法：
+#   docker compose -f docker-compose.prod.yml up -d --build      # 在目标机从源码构建并启动
+#   docker compose -f docker-compose.prod.yml up -d              # 用已 docker load 的镜像启动
+services:
+  web:
+    image: collectinfo-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: collectinfo-web
+    restart: unless-stopped
+    init: true
+    command: ["gunicorn", "-w", "2", "--threads", "4", "--bind", "0.0.0.0:8003", "--timeout", "300", "firecrawl_app:app"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      PYTHONPATH: /app:/app/agent_reach_tool
+      ENABLE_SCHEDULER: "false"
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 8003
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-collectinfo}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      AUTH_STORAGE_DIR: /app/auth_storage
+      LOG_FILE: /app/crawl_logs/app.log
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CRAWL_SCHEDULER_MAX_CONCURRENT: 2
+      CRAWL_SCHEDULER_ADMIN_MAX_CONCURRENT: 3
+      CRAWL_SCHEDULER_MAX_PER_DOMAIN: 1
+      CRAWL_SCHEDULER_TASK_TIMEOUT: 3600
+      PLAYWRIGHT_MAX_CONCURRENT: 2
+      MANUAL_CRAWL_MAX_WORKERS: 2
+      MANUAL_CRAWL_MAX_QUEUED: 20
+      CRAWL_TLS_VERIFY: "true"
+      CRAWL_ALLOW_PRIVATE_NETWORKS: "false"
+      CRAWL_MAX_ARTICLES_PER_TASK: 100
+      CRAWL_LINK_DISCOVERY_MAX_PAGES: 20
+    ports:
+      - "${WEB_PORT:-8003}:8003"
+    volumes:
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./auth_storage:/app/auth_storage
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/api/system/health', timeout=5).close()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  worker:
+    image: collectinfo-web:latest
+    container_name: collectinfo-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "start_scheduler_worker.py"]
+    pids_limit: 4096
+    # 镜像自带 HEALTHCHECK 探测的是 web 的 8003 端口；worker 是调度进程、不提供 HTTP，
+    # 会持续报 unhealthy（纯误报）。这里显式禁用，避免误导监控。
+    healthcheck:
+      test: ["NONE"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      PYTHONPATH: /app:/app/agent_reach_tool
+      ENABLE_SCHEDULER: "true"
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-collectinfo}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      AUTH_STORAGE_DIR: /app/auth_storage
+      LOG_FILE: /app/crawl_logs/app.log
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CRAWL_SCHEDULER_MAX_CONCURRENT: 2
+      CRAWL_SCHEDULER_ADMIN_MAX_CONCURRENT: 3
+      CRAWL_SCHEDULER_MAX_PER_DOMAIN: 1
+      CRAWL_SCHEDULER_TASK_TIMEOUT: 3600
+      CRAWL_SCHEDULER_STALE_RUN_GRACE_SECONDS: 21600
+      PLAYWRIGHT_MAX_CONCURRENT: 2
+      CRAWL_MAX_ARTICLES_PER_TASK: 100
+      CRAWL_LINK_DISCOVERY_MAX_PAGES: 20
+    volumes:
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./auth_storage:/app/auth_storage
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  intel-worker:
+    image: collectinfo-web:latest
+    container_name: collectinfo-intel-worker
+    restart: unless-stopped
+    init: true
+    # 限流：批处理常驻任务最多 5 核，避免打满宿主机与 web 抢 CPU
+    # （实测未限流时 ~99% 全核占用，导致手机端 dashboard 偶发 4s+）。
+    deploy:
+      resources:
+        limits:
+          cpus: '5'
+    command: ["python", "intel_worker_supervisor.py"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Hong_Kong
+      PYTHONPATH: /app:/app/agent_reach_tool
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-collectinfo}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      INTEL_CLASSIFICATION_ENABLED: "true"
+      INTEL_SOURCE_SYNC_ENABLED: "true"
+      INTEL_LIGHT_SCANNER_ENABLED: "true"
+      INTEL_CANDIDATE_DISPATCH_ENABLED: "true"
+      INTEL_LIGHT_SCAN_DAILY_TIME: "08:30"
+      INTEL_SCAN_MAX_SOURCES_PER_RUN: "150"
+      INTEL_TOPIC_CLUSTER_ENABLED: "true"
+      RAGFLOW_LLM_ENABLED: "false"
+      INTEL_WORKER_POLL_SECONDS: "5"
+    volumes:
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "tools/check_intel_worker_health.py", "--database", "/app/data/crawler_articles.db"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: collectinfo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: collectinfo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-collectinfo}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      TZ: Asia/Shanghai
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-collectinfo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+
+volumes:
+  redis_data:
+  pg_data:

@@ -1,0 +1,33 @@
+{
+  "report_version": "financial-schema-acceptance-v1",
+  "checked_at_utc": "2026-08-01T16:41:24.513712+00:00",
+  "baseline_database": "/home/timebot/app/backups/baseline/crawler_articles-20260731T164045Z.sqlite3",
+  "baseline_table_count": 44,
+  "baseline_row_count_total": 64918,
+  "financial_schema_version": 5,
+  "financial_table_count": 28,
+  "readonly_queries": {
+    "articles": "passed",
+    "chat_history": "passed",
+    "users": "passed"
+  },
+  "integrity_check": [
+    "ok"
+  ],
+  "preexisting_foreign_key_violation_count": 255,
+  "foreign_key_violation_count_after": 255,
+  "acceptance": {
+    "all_financial_tables_present": true,
+    "baseline_table_schema_unchanged": true,
+    "baseline_indexes_unchanged": true,
+    "baseline_row_counts_unchanged": true,
+    "history_and_dashboard_readers_passed": true,
+    "idempotent_schema": true,
+    "integrity_check_passed": true,
+    "foreign_key_violations_unchanged": true,
+    "no_financial_foreign_key_violations": true,
+    "schema_version_current": true,
+    "single_applied_migration": true,
+    "passed": true
+  }
+}

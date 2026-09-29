@@ -1,0 +1,183 @@
+{
+  "check_version": "tradingagents-cn-data-adapter-v1",
+  "checked_at_utc": "2026-08-01T12:54:55Z",
+  "static": {
+    "adapter_path": "tradingagents_cn_data_adapter.py",
+    "target_markets": [
+      "CN",
+      "CN_FUND",
+      "XHKG"
+    ],
+    "provider_chains": {
+      "CN": {
+        "quote": [
+          "tushare_cn",
+          "akshare_cn",
+          "easyquotation",
+          "yahoo"
+        ],
+        "bars": [
+          "tushare_cn",
+          "akshare_cn",
+          "yahoo"
+        ],
+        "financials": [
+          "tushare_cn"
+        ],
+        "industry": [
+          "akshare_cn"
+        ],
+        "announcements": [
+          "tushare_cn"
+        ],
+        "constituents": [
+          "akshare_cn"
+        ],
+        "market_breadth": [
+          "akshare_cn"
+        ],
+        "sector_rotation": [
+          "akshare_cn"
+        ],
+        "fund_basic": [
+          "tushare_cn"
+        ],
+        "fund_nav": [
+          "tushare_cn",
+          "akshare_cn"
+        ],
+        "fund_holdings": [
+          "tushare_cn",
+          "akshare_cn"
+        ],
+        "fund_manager": [
+          "tushare_cn",
+          "akshare_cn"
+        ],
+        "fund_share": [
+          "tushare_cn"
+        ],
+        "fund_fees": [
+          "akshare_cn"
+        ],
+        "fund_trading": [
+          "akshare_cn"
+        ]
+      },
+      "CN_FUND": {
+        "quote": [
+          "tushare_cn",
+          "akshare_cn",
+          "yahoo"
+        ],
+        "bars": [
+          "tushare_cn",
+          "akshare_cn",
+          "yahoo"
+        ],
+        "fund_basic": [
+          "tushare_cn"
+        ],
+        "fund_nav": [
+          "tushare_cn",
+          "akshare_cn"
+        ],
+        "fund_holdings": [
+          "tushare_cn",
+          "akshare_cn"
+        ],
+        "fund_manager": [
+          "tushare_cn",
+          "akshare_cn"
+        ],
+        "fund_share": [
+          "tushare_cn"
+        ],
+        "fund_fees": [
+          "akshare_cn"
+        ],
+        "fund_trading": [
+          "akshare_cn"
+        ]
+      },
+      "XHKG": {
+        "quote": [
+          "easyquotation",
+          "yahoo"
+        ],
+        "bars": [
+          "yahoo"
+        ],
+        "constituents": [],
+        "market_breadth": [],
+        "sector_rotation": []
+      },
+      "MACRO": {
+        "macro": [
+          "fred"
+        ]
+      }
+    },
+    "deterministic_indicators": [
+      "atr",
+      "boll",
+      "boll_lb",
+      "boll_ub",
+      "close_10_ema",
+      "close_200_sma",
+      "close_50_sma",
+      "macd",
+      "macdh",
+      "macds",
+      "rsi",
+      "vwma"
+    ],
+    "upstream_tradingagents_imports": [],
+    "runtime_monkey_patch_paths": 0,
+    "vendor_bypass_paths": 0
+  },
+  "runtime": {
+    "executed": true,
+    "langchain_structured_tool_count": 29,
+    "tool_categories": [
+      "core_stock_apis",
+      "etf_tracking",
+      "fund_disclosures",
+      "fund_identity",
+      "fund_terms",
+      "fund_valuation",
+      "fundamental_data",
+      "index_constituents",
+      "index_identity",
+      "macro_data",
+      "market_breadth",
+      "market_liquidity",
+      "news_data",
+      "prediction_markets",
+      "sector_rotation",
+      "sentiment",
+      "technical_indicators"
+    ],
+    "upstream_tool_nodes_constructed": 7,
+    "derived_indicator_snapshot_id": 2,
+    "source_snapshot_ids": [
+      1
+    ],
+    "evidence_links": 1,
+    "provider_calls": 0,
+    "network_calls": 0
+  },
+  "acceptance": {
+    "explicit_a_h_provider_chains": true,
+    "all_tool_categories_registered": true,
+    "technical_indicators_use_persisted_ohlcv_only": true,
+    "numeric_output_has_snapshot_lineage": true,
+    "future_data_contract_enforced": true,
+    "mainland_social_proxy_disabled": true,
+    "index_identity_composition_breadth_rotation_and_liquidity_registered": true,
+    "etf_and_open_fund_tools_registered": true,
+    "no_upstream_monkey_patch": true,
+    "runtime_tool_and_evidence_gate_passed": true,
+    "passed": true
+  }
+}

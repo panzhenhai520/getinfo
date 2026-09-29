@@ -1,0 +1,152 @@
+{
+  "acceptance": "passed",
+  "artifacts": {
+    "artifact_sha256": {
+      "../rss-live-acceptance.json": "afe663083dcd790dfdf385463745a708185880cffb8b352df4711b586c633e67",
+      "chat-server-time-context-acceptance.json": "64ad6ec2210132b82d265a74bab4ea9b3b59be1d541119e957d3f85ded150759",
+      "chat-sse-compatibility-acceptance.json": "626b1641412424b41507b59b2cc238b23430f5fb6b990b6024f86ff582aa9130",
+      "financial-chat-history-acceptance.json": "d5723e9ad8225abe25571d3de7efe6aee600b937e7e6652e32d247759909f787",
+      "financial-chat-market-scope-acceptance.json": "4a200ba8d288b86354fdcfabdf1742359767fe496bb4059b1e40440b057cb6a9",
+      "financial-conflict-adjudication-acceptance.json": "b79f783b031b29c67e8aca6551236818af22db81b75b90607e75f4ffa3ad4afe",
+      "financial-dashboard-feed-acceptance.json": "44b2599606ef3280ea1fb8019df95574fc891c53ab41181d419d1c49ce16d6a3",
+      "financial-feature-gate-acceptance.json": "e6a5722e1b76e9dcfde0f04d139e767e6a54effb5127c1e2b4c773e628cd16aa",
+      "financial-full-research-acceptance.json": "f118f6c7c12c33022fe53b96563344874bf1507d0703d9f81ead418ff12499f4",
+      "financial-gcd-review-acceptance.json": "3fb9262bd2d79a74551b6d4a28eac55eece102924774e1844cd859bc72195dc8",
+      "financial-intent-classifier-acceptance.json": "b2e92694549af6fe36633f035fc310a8467e338e8c4c76030be82074787f3334",
+      "financial-realtime-query-acceptance.json": "63756684621749d5b5a0aa6fa7f0ba753e92d531093945c0ddb773eadb6e8a3f",
+      "financial-report-view-acceptance.json": "2c5e2b79fdcb1268425aa209da8493dde96f40576507137d441d1cb43d457aec",
+      "financial-sse-acceptance.json": "bfd4515a8173e95a55aac73381a3eacfe523dc57b884e1ec195a0c419e187a30",
+      "financial-stage2-integration-acceptance.json": "2ad5604b1add892bf4d938fb0dc30bfa999a682dd25e9feae57d561b783189c6",
+      "financial-stage3-akshare-live-acceptance.json": "3989d5bd2b86ae31149ed24d92d63759c4778de631995361644fa35df57b83e0",
+      "financial-stage3-browser-acceptance.json": "a54bf934ec0c1e7d5cdbf79585955b1e033cec1e74c102329012ffd6cf68dc70",
+      "financial-synthesis-review-acceptance.json": "49f958873baa1d4bc1cd38a26f00aa3917bf0e00390531ce98168552d8da59cd",
+      "financial-target-resolver-acceptance.json": "0b27f2c99e295a8610b01b884acec08d703eee8c67f14dbadf7727e84038a1bc"
+    },
+    "browser": {
+      "menu_entries": [
+        "backtesting",
+        "financial_zone",
+        "simulation",
+        "tradingagents_reports"
+      ],
+      "network_scope": "loopback_fixture_only",
+      "page_errors": 0,
+      "report_group_count": 5
+    },
+    "live_provider": {
+      "access_tier": "free_no_api_key",
+      "numeric_values_asserted": false,
+      "provider_id": "akshare_cn",
+      "sdk_version": "1.18.72",
+      "snapshots_persisted": true,
+      "targets": [
+        "000001.SH",
+        "000001.SZ",
+        "399001.SZ"
+      ]
+    },
+    "required_artifact_count": 19,
+    "rss": {
+      "api_keys_required": false,
+      "official_feed_count": 5,
+      "pipeline_complete_count": 5,
+      "shared_source_fetch_once": true
+    }
+  },
+  "boundaries": {
+    "browser_external_network_calls": 0,
+    "existing_llm_reused": true,
+    "existing_sqlite_reused": true,
+    "existing_worker_reused": true,
+    "financial_errors_fail_closed": true,
+    "fixed_live_prices_asserted": false,
+    "live_order_endpoints_called": false,
+    "ordinary_chat_endpoint": "POST /api/chat/send",
+    "ordinary_sse_event_order": [
+      "status",
+      "chunk",
+      "done"
+    ],
+    "runtime_external_network_calls": 0
+  },
+  "checked_at_utc": "2026-08-01T22:20:18Z",
+  "performance": {
+    "acceptance_threshold_ms": 15.0,
+    "external_network_calls": 0,
+    "median_ms": 2.586,
+    "p95_ms": 2.926,
+    "passed": true,
+    "sample_count": 7,
+    "scope": "local_deterministic_full_response_with_mocked_model",
+    "stage1_first_event_baseline_p95_ms": 0.791
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "external_network_calls": 0,
+    "failures": 0,
+    "full_regression_tests_run": 393,
+    "skipped": 0
+  },
+  "scenario_matrix": {
+    "deferred_to_stage5": {
+      "24": "paper-order ledger is task 5.2",
+      "25": "point-in-time reproducible backtest is task 5.3"
+    },
+    "final_all_phase_gate_complete": false,
+    "preliminary_rejection_only": {
+      "23": "menu and capability are closed; final paper-order POST gate is task 5.1"
+    },
+    "stage3_verified": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      26,
+      27,
+      28
+    ]
+  },
+  "task": "3.16",
+  "topology": {
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "new_databases": [],
+    "new_llm_services": [],
+    "new_vector_databases": [],
+    "published_ports": [
+      8003
+    ],
+    "real_broker_connections": false,
+    "real_order_execution": false,
+    "standalone_tradingagents_web": false
+  },
+  "verification": {
+    "clean_full_regression_runs": 2,
+    "offline_build_network": "none",
+    "offline_image": "sha256:0b899b65ee1273132d38d01c14b710e5cc3c90e12b426c67b3bfcf4eb2fa40e4",
+    "worker_heartbeat_repetitions": 5
+  }
+}

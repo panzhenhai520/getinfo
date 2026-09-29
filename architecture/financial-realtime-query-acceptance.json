@@ -1,0 +1,75 @@
+{
+  "acceptance": "passed",
+  "answer_contract": {
+    "required_fields": [
+      "observed_at",
+      "fetched_at",
+      "market_status",
+      "source"
+    ],
+    "server_clock_only": true,
+    "unverified_llm_numbers_allowed": false
+  },
+  "boundaries": {
+    "complete_tradingagents_research_started": false,
+    "legacy_sse_event_types": [
+      "status",
+      "chunk",
+      "done"
+    ],
+    "network_io_inside_database_lock": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "external_network_calls": 0,
+    "failures": 0,
+    "full_research_jobs_created": 0,
+    "generic_model_calls": 0,
+    "tests_run": 7
+  },
+  "scenarios": {
+    "closed_market_snapshot_is_not_called_realtime": true,
+    "first_sse_status_under_one_second": true,
+    "fresh_cache_hit_without_provider": true,
+    "material_provider_conflict_refuses_single_value": true,
+    "open_stale_cache_synchronously_refreshed_and_persisted": true,
+    "permission_failure_without_data_returns_no_numeric_claim": true,
+    "provider_timeout_falls_back_to_labeled_stale_snapshot": true,
+    "same_session_target_context_survives_realtime_outcome": true
+  },
+  "static": {
+    "configured_provider_timeout_key": "FINANCIAL_PROVIDER_TIMEOUT_SECONDS",
+    "direct_network_or_model_imports": [],
+    "existing_database": "crawler_articles.db",
+    "existing_provider_router": "financial_provider_router.py",
+    "existing_sse_endpoint": "POST /api/chat/send",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "quote_provider_chains": {
+      "CN": [
+        "tushare_cn",
+        "akshare_cn",
+        "easyquotation",
+        "yahoo"
+      ],
+      "CN_FUND": [
+        "tushare_cn",
+        "akshare_cn",
+        "yahoo"
+      ],
+      "MACRO": [],
+      "US": [
+        "yahoo",
+        "alpha_vantage"
+      ],
+      "XHKG": [
+        "easyquotation",
+        "yahoo"
+      ]
+    },
+    "schema": "financial-realtime-query-v1"
+  },
+  "task": "3.6"
+}

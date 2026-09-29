@@ -1,0 +1,75 @@
+{
+  "akshare_enabled": true,
+  "checked_at_utc": "2026-08-01T12:58:27Z",
+  "network_requested": true,
+  "passed": true,
+  "report_version": "fund-etf-research-live-v1",
+  "secrets_included": false,
+  "targets": [
+    {
+      "asset_type": "etf",
+      "canonical_symbol": "510300.SH",
+      "company_fundamentals_used": false,
+      "display_name": "华泰柏瑞沪深300ETF",
+      "evidence_coverage": 0.714286,
+      "execution_target_created": false,
+      "intraday_trade_assumption_used": false,
+      "latest_disclosed_nav_date": null,
+      "live_data_status": "available",
+      "missing_sections": [
+        "nav",
+        "tracking"
+      ],
+      "passed": true,
+      "providers": [
+        "akshare_cn",
+        "tradingagents_cn_derived",
+        "yahoo"
+      ],
+      "requested_date": "2026-08-01",
+      "section_statuses": {
+        "fees": "complete",
+        "identity": "complete",
+        "liquidity": "completed",
+        "market_history": "fetched",
+        "nav": "unavailable",
+        "tracked_index_constituents": "fetched",
+        "tracking": "insufficient_data"
+      },
+      "template": "etf"
+    },
+    {
+      "asset_type": "fund",
+      "canonical_symbol": "110020.OF",
+      "company_fundamentals_used": false,
+      "display_name": "易方达沪深300ETF联接A",
+      "evidence_coverage": 0.625,
+      "execution_target_created": false,
+      "intraday_trade_assumption_used": false,
+      "latest_disclosed_nav_date": "2026-07-31",
+      "live_data_status": "available",
+      "missing_sections": [
+        "profile_and_benchmark",
+        "share_records",
+        "manager"
+      ],
+      "passed": true,
+      "providers": [
+        "akshare_cn"
+      ],
+      "requested_date": "2026-08-01",
+      "section_statuses": {
+        "fees": "complete",
+        "holdings_disclosure": "fetched",
+        "identity": "complete",
+        "manager": "not_requested_in_live_smoke",
+        "nav": "fetched",
+        "profile_and_benchmark": "unavailable",
+        "share_records": "unavailable",
+        "subscription_redemption": "fetched"
+      },
+      "template": "open_end_fund"
+    }
+  ],
+  "tushare_enabled": false
+}

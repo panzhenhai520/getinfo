@@ -1,0 +1,2767 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>行业包设置管理</title>
+  <link rel="stylesheet" href="/static/css/responsive.css?v=17">
+  
+  <style>
+    :root {
+      --admin-bg: #f4f7f8;
+      --admin-panel: #ffffff;
+      --admin-ink: #17242d;
+      /* 次要文字：原 #667782 在浅底只有 4.3:1，调深至 5.14:1 以满足 WCAG AA */
+      --admin-muted: #5b6b73;
+      --admin-line: #dfe8ea;
+      /* 行分隔虚线：虚线断续、感知强度只有实线一半，用略强的颜色补偿才看得见 */
+      --admin-row-line: #cfdcdf;
+      --admin-soft: #edf5f3;
+      --admin-brand: #0f766e;
+      --admin-brand-dark: #0b5c56;
+      --admin-blue: #2563eb;
+      --admin-warn: #b45309;
+      --admin-danger: #b42318;
+      --admin-shadow: 0 14px 38px rgba(26, 56, 64, .08);
+    }
+
+    body { margin: 0; color: var(--admin-ink); background: var(--admin-bg); }
+    button, input, textarea, select { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .hidden { display: none !important; }
+    .muted { color: var(--admin-muted); }
+
+    .admin-page { max-width: 1680px; margin: 0 auto; padding: 26px 28px 46px; }
+    .page-hero {
+      display: flex; align-items: center; justify-content: space-between; gap: 24px;
+      margin-bottom: 20px; padding: 4px 2px;
+    }
+    .page-kicker { margin: 0 0 7px; color: var(--admin-brand); font-size: 12px; font-weight: 800; letter-spacing: .14em; }
+    .page-hero h1 { margin: 0; font-size: clamp(25px, 3vw, 36px); letter-spacing: -.03em; }
+    .page-hero p { max-width: 880px; margin: 8px 0 0; color: var(--admin-muted); line-height: 1.65; }
+
+    /* ── 按钮统一体系 ──
+       一套尺寸 + 一个强调色（品牌青），其余动作用同尺寸的中性描边；
+       警示/危险不再用整块底色，只在文字与描边上带语义色，避免页面花绿。
+       所有按钮共用同一种悬停反馈（描边/底色变化 + 轻微上浮）。 */
+    .action {
+      min-height: 32px; padding: 6px 12px; border: 1px solid transparent; border-radius: 8px;
+      font-size: 13px; font-weight: 700; line-height: 1.25; color: #fff; background: var(--admin-brand);
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
+    }
+    .action:hover { background: var(--admin-brand-dark); box-shadow: 0 4px 12px rgba(15, 118, 110, .22); transform: translateY(-1px); }
+    .action:active { transform: translateY(0); }
+    .action:focus-visible { outline: 2px solid var(--admin-brand); outline-offset: 2px; }
+    /* 次要动作：与主按钮同尺寸、同悬停反馈 */
+    .action.secondary { color: #3b4d57; border-color: #cddadd; background: #fff; }
+    .action.secondary:hover { color: var(--admin-brand-dark); border-color: #9dc4bd; background: #f1f8f6; box-shadow: 0 4px 12px rgba(15, 118, 110, .12); }
+    /* 警示动作：中性描边 + 琥珀色文字，悬停才轻微上色 */
+    .action.warning { color: #96601a; border-color: #dcd3c4; background: #fff; }
+    .action.warning:hover { color: #7c4d12; border-color: #e0b877; background: #fdf7ec; box-shadow: 0 4px 12px rgba(180, 83, 9, .14); }
+    /* 危险动作：中性描边 + 红色文字，悬停才轻微上色（仍可一眼分辨） */
+    .action.danger, .action.ghost-danger { color: #a8342a; border-color: #e0cfcd; background: #fff; }
+    .action.danger:hover, .action.ghost-danger:hover { color: #8f2a21; border-color: #e6a9a2; background: #fdf2f1; box-shadow: 0 4px 12px rgba(180, 35, 24, .14); }
+    /* 兼容历史写法 action primary（此前未定义，会意外落到 .action 上） */
+    .action.primary { background: var(--admin-brand); }
+    .action:disabled { color: #7d8b93; background: #eef2f3; border-color: #dbe3e5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .workspace { display: grid; grid-template-columns: 292px minmax(0, 1fr); gap: 20px; align-items: start; }
+    .pack-sidebar, .editor-surface {
+      border: 1px solid var(--admin-line); border-radius: 18px; background: var(--admin-panel); box-shadow: var(--admin-shadow);
+    }
+    .pack-sidebar { position: sticky; top: 18px; overflow: hidden; }
+    .editor-surface { position: relative; overflow: hidden; }
+    .sidebar-head { padding: 18px; border-bottom: 1px solid var(--admin-line); }
+    .sidebar-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .sidebar-title h2 { margin: 0; font-size: 17px; }
+    .count-badge { min-width: 25px; padding: 3px 8px; border-radius: 999px; color: var(--admin-brand); background: #dff5ef; font-size: 12px; text-align: center; }
+    .search-box { position: relative; margin-top: 13px; }
+    .search-box input { width: 100%; box-sizing: border-box; padding: 10px 12px 10px 34px; border: 1px solid #ccd9dc; border-radius: 10px; background: #f9fbfb; }
+    .search-box span { position: absolute; left: 12px; top: 10px; color: #87969d; }
+    .pack-grid { display: grid; gap: 8px; max-height: calc(100vh - 235px); padding: 12px; overflow: auto; }
+    .pack-card {
+      width: 100%; padding: 13px; border: 1px solid transparent; border-radius: 12px;
+      color: inherit; background: transparent; text-align: left; cursor: pointer;
+    }
+    .pack-card:hover { background: #f7faf9; }
+    .pack-card.selected { border-color: #5ebfa9; background: #e6f7f1; box-shadow: inset 3px 0 0 0 #1d7f68; }
+    .pack-card h3 { margin: 8px 0 5px; font-size: 15px; }
+    .pack-card p { margin: 0; color: var(--admin-muted); font-size: 12px; line-height: 1.5; }
+    /* 运行时状态行：未激活=警示，采集中=正常（深色皮肤另有覆盖） */
+    .pack-status { display: block; margin-top: 6px; font-size: 11px; line-height: 1.5; }
+    .pack-status.is-live { color: #1d7f68; }
+    .pack-status.is-warn { color: #b45309; }
+    .pack-status.is-idle { color: #94a3b8; }
+    .pack-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+    .badge, .status-chip {
+      display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px;
+      color: #52616a; background: #e9eef0; font-size: 11px; font-weight: 700;
+    }
+    .badge.current { color: #087067; background: #ccf2e8; }
+    .badge.custom { color: #1d4ed8; background: #dbeafe; }
+    .badge.draft { color: #92400e; background: #fef3c7; }
+    .badge.deleted { color: #b91c1c; background: #fee2e2; }
+
+    .empty-state { padding: 110px 30px; text-align: center; }
+    .empty-icon { display: grid; place-items: center; width: 62px; height: 62px; margin: 0 auto 16px; border-radius: 18px; color: var(--admin-brand); background: #e4f5f1; font-size: 27px; }
+    .empty-state h2 { margin: 0 0 8px; }
+    .empty-state p { margin: 0; color: var(--admin-muted); }
+
+    .editor-header { padding: 22px 24px 17px; border-bottom: 1px solid var(--admin-line); }
+    .editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    /* 左侧标题块允许收缩（#summary 文案很长，会把右侧按钮组挤到自己换行） */
+    .editor-heading > div:first-child { flex: 1 1 auto; min-width: 0; }
+    .editor-heading h2 { margin: 5px 0 5px; font-size: 23px; }
+    .editor-heading p { margin: 0; color: var(--admin-muted); line-height: 1.55; }
+    .editor-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    /* 动作按钮排成一排：不换行、宽度按内容、整体靠右 */
+    .editor-actions { display: flex; flex: 0 0 auto; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; }
+    /* 激活说明：整体右移并收窄，不再横跨整幅编辑区 */
+    .switch-window { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin: 12px 0 0 auto; max-width: 640px; padding: 10px 12px; border: 1px solid #d7e4e5; border-radius: 10px; background: #f7fbfb; }
+    .switch-window label { display: grid; gap: 3px; color: #52636a; font-size: 12px; }
+    .switch-window input { min-width: 190px; padding: 7px 8px; border: 1px solid #c9d9dc; border-radius: 7px; font: inherit; }
+    .switch-window .field-note { margin: 0; color: var(--admin-muted); font-size: 12px; flex: 1 1 100%; }
+    .status { min-height: 22px; margin-top: 12px; color: var(--admin-brand); font-size: 13px; }
+    .status.error { color: var(--admin-danger); }
+
+    .tab-bar { display: flex; gap: 5px; padding: 10px 18px 0; border-bottom: 1px solid var(--admin-line); overflow-x: auto; }
+    .tab-button {
+      flex: 0 0 auto; padding: 8px 11px; border: 0; border-bottom: 2px solid transparent;
+      color: #63737b; background: transparent; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: color .15s ease, background .15s ease;
+    }
+    .tab-button:hover { color: var(--admin-brand); background: var(--admin-soft); }
+    .tab-button.active { color: var(--admin-brand); border-bottom-color: var(--admin-brand); }
+
+    /* ── 换肤菜单（原先内联 background:#fff，深色皮肤下白底浅字几乎不可读）── */
+    .skin-menu {
+      position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; display: none;
+      min-width: 148px; padding: 6px; border: 1px solid var(--admin-line); border-radius: 10px;
+      background: var(--admin-panel); box-shadow: 0 12px 28px rgba(15, 23, 42, .18);
+    }
+    body.skin-darkblue .skin-menu { background: #0e1d3a; border-color: rgba(96, 165, 250, .28); box-shadow: 0 16px 34px rgba(0, 0, 0, .5); }
+    .skin-opt {
+      display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: 7px;
+      color: var(--admin-ink); background: transparent; font-size: 13px; text-align: left; cursor: pointer;
+      transition: background .15s ease, color .15s ease;
+    }
+    .skin-opt:hover { color: var(--admin-brand-dark); background: var(--admin-soft); }
+    body.skin-darkblue .skin-opt:hover { color: #7dd3fc; background: rgba(56, 189, 248, .16); }
+    .skin-opt.is-current { font-weight: 800; }
+    .skin-opt.is-current::after { content: '✓'; float: right; color: var(--admin-brand); }
+    .rc-group{background:transparent;border:0;border-radius:0;padding:0;margin-bottom:18px}
+    .rc-group-title{font-weight:800;font-size:14px;color:var(--admin-brand);margin-bottom:10px}
+    body.skin-darkblue .rc-group{background:transparent;border:0}
+    .tab-panel { display: none; padding: 22px 24px 26px; }
+    .tab-panel.active { display: block; }
+
+    .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+    .section-head h3 { margin: 0 0 5px; font-size: 18px; }
+    .section-head p { margin: 0; color: var(--admin-muted); line-height: 1.55; }
+    .panel-card { padding: 18px; border: 1px solid var(--admin-line); border-radius: 14px; background: #fbfcfc; }
+    .panel-card + .panel-card { margin-top: 14px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+    .form-field { min-width: 0; }
+    .form-field.full { grid-column: 1 / -1; }
+    .form-field label { display: block; margin-bottom: 7px; color: #40515b; font-size: 13px; font-weight: 800; }
+    .form-field input, .form-field textarea, .form-field select {
+      width: 100%; box-sizing: border-box; border: 1px solid #cbd8dc; border-radius: 10px; padding: 10px 11px; color: var(--admin-ink); background: #fff;
+    }
+    .form-field input:focus, .form-field textarea:focus, .form-field select:focus { outline: 3px solid rgba(15, 118, 110, .12); border-color: var(--admin-brand); }
+    .form-field input[readonly] { color: #6b7c85; background: #f2f5f6; }
+    .form-field textarea { min-height: 112px; resize: vertical; line-height: 1.55; }
+    /* 运行配置(remote)：紧凑 3 列，标签在下划线前面(同排)，去框、减高、减间距 */
+    .tab-panel[data-panel="remote"] .form-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px 14px}
+    .tab-panel[data-panel="remote"] .form-field{display:flex;align-items:baseline;gap:4px}
+    .tab-panel[data-panel="remote"] .form-field label{font-size:12px;margin:0;font-weight:700;white-space:nowrap;flex-shrink:0}
+    .tab-panel[data-panel="remote"] .form-field input,
+    .tab-panel[data-panel="remote"] .form-field textarea,
+    .tab-panel[data-panel="remote"] .form-field select{
+      background:transparent;border:0;border-bottom:1px solid rgba(147,169,204,.45);
+      border-radius:0;padding:1px 2px;font-size:13px;height:auto;min-height:18px;line-height:1.3;flex:1;min-width:0;width:auto;}
+    .tab-panel[data-panel="remote"] .form-field select{appearance:none;background:transparent}
+    .tab-panel[data-panel="remote"] .form-field input:focus,
+    .tab-panel[data-panel="remote"] .form-field select:focus,
+    .tab-panel[data-panel="remote"] .form-field textarea:focus{outline:none;border-bottom:2px solid #38bdf8}
+    .tab-panel[data-panel="remote"] .form-grid .form-field.full{grid-column:auto}
+    body.skin-darkblue .tab-panel[data-panel="remote"] .form-field input,
+    body.skin-darkblue .tab-panel[data-panel="remote"] .form-field select,
+    body.skin-darkblue .tab-panel[data-panel="remote"] .form-field textarea{border-bottom:1px solid rgba(96,165,250,.4)}
+    .rc-group{padding:0;margin-bottom:14px}
+    .rc-group-title{font-size:13px;margin-bottom:5px}
+    .field-note { margin: 7px 0 0; color: var(--admin-muted); font-size: 12px; line-height: 1.5; }
+
+    .capability-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .check-card { display: flex; gap: 9px; padding: 13px; border: 1px solid var(--admin-line); border-radius: 11px; background: #fff; line-height: 1.45; }
+    .check-card input { margin-top: 3px; accent-color: var(--admin-brand); }
+
+    .keyword-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .keyword-card { padding: 16px; border: 1px solid var(--admin-line); border-radius: 14px; background: #fff; }
+    .keyword-card.wide { grid-column: 1 / -1; }
+    .keyword-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+    .keyword-title label { font-weight: 800; }
+    .weight-chip { padding: 3px 8px; border-radius: 999px; color: #047857; background: #ecfdf5; font-size: 11px; font-weight: 800; }
+    .keyword-card textarea { width: 100%; min-height: 150px; box-sizing: border-box; padding: 11px; border: 1px solid #cbd8dc; border-radius: 10px; resize: vertical; line-height: 1.55; }
+    .keyword-note { margin-top: 9px; color: var(--admin-muted); font-size: 12px; line-height: 1.6; }
+    .keyword-note-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .keyword-note-chip { padding: 2px 7px; border-radius: 999px; color: #075985; background: #e0f2fe; font-weight: 700; }
+    .keyword-title-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .keyword-title-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .help-tip {
+      width: 18px; height: 18px; border-radius: 50%; border: 1px solid #cbd8dc;
+      color: #5b6b73; background: #f4f7f8; font-size: 12px; font-weight: 800; line-height: 1;
+      cursor: pointer; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .help-tip:hover { color: var(--admin-brand); border-color: #9dc4bd; background: #f1f8f6; }
+    .help-popover {
+      position: fixed; z-index: 9999; max-width: 360px; padding: 12px 14px;
+      background: #10233f; color: #e6f0ff; border: 1px solid rgba(96,165,250,.32);
+      border-radius: 10px; font-size: 13px; line-height: 1.7; box-shadow: 0 12px 32px rgba(0,0,0,.42);
+      display: none;
+    }
+    .help-popover b { color: #7dd3fc; }
+    .help-popover code { color: #fbbf24; background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 4px; }
+    .help-popover .help-rule { margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(148,163,184,.4); color: #bfe3a0; }
+    .weight-guide { margin: 0 0 14px; padding: 12px 14px; border: 1px solid #c7e0d9; border-radius: 12px; background: #f0faf6; font-size: 13px; line-height: 1.7; color: #2f4a44; }
+    .weight-guide b { color: #0f766e; }
+    .weight-guide code { padding: 1px 5px; border-radius: 4px; background: #e2f1ec; color: #0f766e; }
+    .weight-guide ul, .weight-guide ol { margin: 6px 0 0 18px; padding: 0; }
+    .weight-guide li { margin: 3px 0; }
+    body.skin-darkblue .weight-guide { background: #122c33; border-color: #1f4a4a; color: #b8d8cf; }
+    body.skin-darkblue .weight-guide b, body.skin-darkblue .weight-guide code { color: #7dd3c8; }
+    body.skin-darkblue .weight-guide code { background: #173b3b; }
+
+    .topic-head, .topic-row { display: grid; grid-template-columns: minmax(132px, .5fr) minmax(120px, .58fr) minmax(140px, .75fr) minmax(240px, 1.55fr) 150px; gap: 9px; }
+    /* 表头是路标不是标题：小字号 + 中等字重 + 结构线，让数据成为视觉主体 */
+    .topic-head { padding: 0 11px 11px; color: var(--admin-muted); font-size: 13.5px; font-weight: 600; letter-spacing: .01em; border-bottom: 1px solid var(--admin-line); }
+    .topic-head > span { white-space: nowrap; }
+    .topic-head-help { display: inline-flex; align-items: center; gap: 5px; }
+    .topic-head-help .help-tip { flex: 0 0 auto; width: 16px; height: 16px; font-size: 11px; }
+    .topic-search-terms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .topic-search-terms input { min-height: 30px; min-width: 0; }
+    .topic-row { align-items: start; padding: 12px 11px; border: none; border-bottom: 1px dashed var(--admin-row-line); border-radius: 0; background: transparent; }
+    .topic-row:last-child { border-bottom: none; }
+    .topic-row input, .topic-row textarea { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #cbd8dc; border-radius: 9px; padding: 9px; }
+    .topic-row textarea { min-height: 72px; resize: vertical; }
+    /* 自动生成的 key：给个看得见的提示，运营想改成语义化 key 直接改即可 */
+    .topic-row input.key-auto { border-color: #d9a441; background: #fffaf0; }
+    body.skin-darkblue .topic-row input.key-auto { background: #2a2340; border-color: #fbbf24; color: #fde68a; }
+    .topic-actions { display: grid; grid-template-columns: repeat(4, 32px); gap: 5px; }
+    .icon-button {
+      height: 30px; min-width: 30px; border: 1px solid #cddadd; border-radius: 8px;
+      color: #43545e; background: #fff; cursor: pointer;
+      transition: background .15s ease, border-color .15s ease, color .15s ease;
+    }
+    .icon-button:hover { color: var(--admin-brand); border-color: #9dc4bd; background: #f1f8f6; }
+    .icon-button.danger { color: #a8342a; }
+    .icon-button.danger:hover { color: #8f2a21; border-color: #e6a9a2; background: #fdf2f1; }
+
+    .source-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .metric { padding: 13px 14px; border: 1px solid var(--admin-line); border-radius: 12px; background: #fff; }
+    .metric strong { display: block; margin-bottom: 4px; font-size: 22px; }
+    .metric span { color: var(--admin-muted); font-size: 12px; }
+    .source-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) 180px auto; gap: 9px; margin-bottom: 12px; }
+    .source-toolbar input, .source-toolbar select { min-width: 0; border: 1px solid #cbd8dc; border-radius: 10px; padding: 10px 11px; background: #fff; }
+    .source-table-wrap { overflow-x: auto; border: 1px solid var(--admin-line); border-radius: 13px; background: #fff; }
+    .source-head, .source-row { display: grid; grid-template-columns: minmax(145px, 1fr) minmax(250px, 1.7fr) 150px 90px 78px 70px 55px 132px 78px; gap: 7px; min-width: 1160px; }
+    .source-head { padding: 10px 11px; color: var(--admin-muted); background: #f3f7f7; font-size: 11px; font-weight: 800; }
+    .source-row { align-items: center; padding: 9px 11px; border-top: 1px solid #edf1f2; }
+    .source-row.filtered-out { display: none; }
+    .source-row input, .source-row select { min-width: 0; box-sizing: border-box; border: 1px solid #cbd8dc; border-radius: 8px; padding: 8px; background: #fff; }
+    .source-enabled { display: flex; justify-content: center; }
+    .source-enabled input { width: 18px; height: 18px; accent-color: var(--admin-brand); }
+    .source-validation { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .source-actions { display: flex; justify-content: flex-end; gap: 5px; }
+    .source-actions .icon-button {
+      display: inline-flex; flex: 0 0 34px; align-items: center; justify-content: center;
+      width: 34px; min-width: 34px; padding: 0;
+    }
+    .source-smart-button { color: #6d28d9; border-color: #c4b5fd; background: #f5f3ff; }
+    .source-learn-button { color: #0f766e; border-color: #a7f3d0; background: #ecfdf5; }
+    .source-learn-button.is-busy { opacity: .55; pointer-events: none; }
+    .source-smart-button:hover, .source-smart-button:focus-visible { border-color: #8b5cf6; background: #ede9fe; outline: 3px solid rgba(124, 58, 237, .15); }
+    .source-smart-icon { width: 18px; height: 18px; stroke: currentColor; }
+    .source-smart-button[hidden] { display: none; }
+    .source-smart-tooltip {
+      position: fixed; z-index: 10000; width: min(310px, calc(100vw - 24px));
+      box-sizing: border-box; padding: 9px 11px; border-radius: 9px;
+      color: #fff; background: #27323a; box-shadow: 0 10px 28px rgba(15, 23, 42, .24);
+      font-size: 12px; line-height: 1.55; pointer-events: none;
+    }
+    .status-chip.active { color: #087067; background: #d9f5ed; }
+    .status-chip.warning { color: #92400e; background: #fef3c7; }
+    .status-chip.error { color: #b42318; background: #fee4e2; }
+    .status-chip.neutral { color: #53636c; background: #edf1f2; }
+    .source-empty { display: none; padding: 26px; color: var(--admin-muted); text-align: center; }
+
+    .release-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); gap: 16px; }
+    .release-card { min-width: 0; border: 1px solid var(--admin-line); border-radius: 14px; background: #fff; overflow: hidden; }
+    .release-card h3 { margin: 0; padding: 14px 16px; border-bottom: 1px solid var(--admin-line); font-size: 16px; }
+    .release-body { padding: 14px 16px; }
+    .diff { max-height: 490px; margin: 0; padding: 14px; overflow: auto; border-radius: 10px; color: #d9e9f3; background: #12242c; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+    .version, .lifecycle-item { padding: 12px 0; border-bottom: 1px solid #edf1f2; }
+    .version:last-child, .lifecycle-item:last-child { border-bottom: 0; }
+    .lifecycle-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+    /* 加载等待动画（与 AI 助手历史会话加载一致的气泡呼吸） */
+    .pack-loading { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: rgba(248, 250, 248, .82); backdrop-filter: blur(2px); border-radius: inherit; }
+    .history-load-card { min-width: 280px; padding: 22px 26px; border: 1px solid rgba(29, 127, 104, .3); border-radius: 12px; background: #fff; box-shadow: 0 16px 38px rgba(15, 57, 41, .18); text-align: center; color: #315b46; }
+    .history-load-animation { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
+    .history-load-icon { display: inline-flex; align-items: center; justify-content: center; font-size: 32px; line-height: 1; animation: historyBubbleBreath 1.2s ease-in-out infinite; }
+    .history-load-card strong { display: block; font-size: 15px; }
+    .history-load-card span:last-child { display: block; margin-top: 6px; color: var(--muted, #7c8a83); font-size: 12px; }
+    @keyframes historyBubbleBreath { 0%, 100% { opacity: .15; transform: scale(.88); color: #bccac3; } 50% { opacity: 1; transform: scale(1.12); color: #1d7f68; filter: drop-shadow(0 0 9px rgba(29, 127, 104, .55)); } }
+    /* 操作结果 toast（自动消失，不需点击确定） */
+    .pack-toast { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 90; max-width: min(640px, calc(100vw - 40px)); padding: 11px 20px; border-radius: 10px; background: #123527; color: #e9f5ee; font-size: 13px; line-height: 1.55; box-shadow: 0 12px 32px rgba(10, 40, 28, .35); white-space: pre-line; }
+    .pack-toast.error { background: #7a2222; color: #ffecec; }
+    /* dialog 是浏览器顶层元素：必须显式声明背景与文字色。否则深色皮肤下它仍是默认
+       白底黑字，而内部却用 var() 取到深色值（如 --admin-soft=#12233f），会深底配黑字糊成一片 */
+    dialog { width: min(600px, calc(100vw - 34px)); padding: 0; border: 0; border-radius: 18px; background: var(--admin-panel); color: var(--admin-ink); box-shadow: 0 28px 80px rgba(15, 35, 43, .3); }
+    dialog::backdrop { background: rgba(15, 35, 43, .52); backdrop-filter: blur(2px); }
+    .dialog-body { padding: 23px; }
+    .dialog-body h2 { margin: 0 0 7px; }
+    .dialog-fields { display: grid; gap: 12px; margin-top: 18px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* ── 主题搜索词测试：当场搜一轮 + 聚合进度 ── */
+    #topicTestDialog { width: min(980px, calc(100vw - 34px)); }
+    .topic-test-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .topic-test-head h2 { margin: 0; font-size: 17px; }
+    .topic-test-sub { margin: 6px 0 0; color: var(--admin-muted); font-size: 12.5px; }
+    .topic-test-quota { flex: 0 0 auto; padding: 5px 11px; border: 1px solid var(--admin-line); border-radius: 999px; color: var(--admin-muted); font-size: 12px; white-space: nowrap; }
+    .topic-test-query { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--admin-line); border-radius: 10px; background: var(--admin-soft); font-size: 13px; line-height: 1.6; }
+    .topic-test-query b { color: var(--admin-brand); font-weight: 700; }
+    .topic-test-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; max-height: 46vh; overflow-y: auto; align-items: start; }
+    .topic-test-group { border: 1px solid var(--admin-line); border-radius: 12px; overflow: hidden; }
+    .topic-test-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: var(--admin-soft); color: var(--admin-muted); font-size: 12px; font-weight: 600; }
+    .topic-test-item { display: flex; gap: 9px; padding: 10px 12px; border-top: 1px dashed var(--admin-line); }
+    .topic-test-item:first-child { border-top: 0; }
+    .topic-test-item > input { flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--admin-brand); }
+    .topic-test-item-body { min-width: 0; }
+    .topic-test-item-title { font-size: 13px; font-weight: 600; line-height: 1.45; color: var(--admin-brand); text-decoration: none; cursor: pointer; display: block; }
+    .topic-test-item-title:hover { text-decoration: underline; }
+    .topic-test-item-url { margin-top: 3px; color: var(--admin-muted); font-size: 11.5px; word-break: break-all; }
+    .topic-test-item-summary { margin-top: 5px; color: var(--admin-muted); font-size: 12px; line-height: 1.55; }
+    .topic-test-empty { padding: 13px 12px; color: var(--admin-muted); font-size: 12.5px; }
+    .topic-test-progress { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--admin-line); }
+    .topic-test-progress[hidden] { display: none; }
+    .topic-test-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; color: var(--admin-muted); font-size: 12.5px; }
+    .topic-test-live { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .topic-test-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex: 0 0 auto; animation: topic-test-pulse 1.5s ease-in-out infinite; }
+    .topic-test-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
+    .topic-test-filter-btn { padding: 3px 11px; font-size: 11.5px; border: 1px solid var(--admin-line); border-radius: 999px; background: transparent; color: var(--admin-muted); cursor: pointer; }
+    .topic-test-filter-btn.is-active { background: var(--admin-brand); border-color: var(--admin-brand); color: #06121f; font-weight: 600; }
+    @keyframes topic-test-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    .topic-test-progress-list { display: grid; gap: 7px; max-height: 24vh; overflow-y: auto; }
+    .topic-test-progress-item { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+    .topic-test-progress-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topic-test-badge { flex: 0 0 auto; min-width: 54px; padding: 2px 8px; border-radius: 999px; font-size: 11px; text-align: center; }
+    .topic-test-badge.queued { background: var(--admin-soft); color: var(--admin-muted); }
+    .topic-test-badge.running { background: rgba(37, 99, 235, .14); color: var(--admin-blue); }
+    .topic-test-badge.crawled { background: rgba(15, 118, 110, .16); color: var(--admin-brand); }
+    .topic-test-badge.failed { background: rgba(180, 35, 24, .14); color: var(--admin-danger); }
+    .topic-test-badge.kind-unreachable { background: rgba(180, 83, 9, .16); color: #d97706; }
+    .topic-test-badge.kind-vpn { background: rgba(124, 58, 237, .16); color: #a78bfa; }
+    .topic-test-badge.kind-anchor { background: rgba(180, 35, 24, .14); color: var(--admin-danger); }
+    .topic-test-badge.kind-short { background: rgba(180, 83, 9, .16); color: #d97706; }
+    .topic-test-badge.kind-listing { background: var(--admin-soft); color: var(--admin-muted); }
+    .topic-test-badge.kind-stale { background: var(--admin-soft); color: var(--admin-muted); }
+    .topic-test-badge.kind-other { background: rgba(180, 35, 24, .12); color: var(--admin-danger); }
+    .topic-test-advice { margin-top: 10px; }
+    .topic-test-advice[hidden] { display: none; }
+    .topic-test-advice-item { margin-top: 6px; padding: 9px 11px; border-radius: 9px; background: rgba(15, 118, 110, .08); border: 1px solid rgba(15, 118, 110, .18); color: var(--admin-brand); font-size: 12px; line-height: 1.6; display: flex; flex-direction: column; gap: 7px; }
+    .topic-test-gate-info { background: var(--admin-soft); border-color: var(--admin-line); color: var(--admin-muted); }
+    .topic-test-gate-add { align-self: flex-start; padding: 5px 12px; font-size: 12px; }
+    .topic-test-gate-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .topic-test-toggle { padding: 2px 10px; font-size: 11px; border: 1px solid var(--admin-line); border-radius: 999px; background: transparent; color: var(--admin-muted); cursor: pointer; align-self: flex-start; white-space: nowrap; }
+    .topic-test-toggle:hover { color: var(--admin-brand); border-color: var(--admin-brand); }
+    .topic-test-gate-detail { margin-top: 7px; padding: 8px 10px; border-radius: 8px; background: var(--admin-soft); font-size: 12px; line-height: 1.7; color: var(--admin-muted); }
+    .topic-test-gate-detail-label { margin: 6px 0 3px; font-weight: 600; }
+    .topic-test-gate-detail-label:first-child { margin-top: 0; }
+    .topic-test-gate-words { display: flex; flex-wrap: wrap; gap: 4px; }
+    .topic-test-gate-word { display: inline-block; padding: 2px 9px; border-radius: 6px; background: rgba(255,255,255,.5); color: var(--admin-muted); }
+    body.skin-darkblue .topic-test-gate-word { background: #1b2c4a; }
+    .topic-test-gate-word.is-hit { background: rgba(15, 118, 110, .2); color: var(--admin-brand); font-weight: 700; }
+    body.skin-darkblue .topic-test-gate-word.is-hit { background: rgba(56,189,248,.2); color: #7dd3fc; }
+    .topic-test-gate-missing { margin-top: 8px; padding: 6px 9px; border-radius: 6px; background: rgba(180, 83, 9, .12); color: #d97706; }
+    .topic-test-detail { margin-top: 7px; padding: 8px 10px; border-radius: 8px; background: rgba(180, 35, 24, .05); border: 1px solid rgba(180, 35, 24, .14); font-size: 12px; line-height: 1.7; color: var(--admin-ink); }
+    .topic-test-detail-list { margin: 5px 0 7px 18px; padding: 0; }
+    .topic-test-detail-list li { margin: 2px 0; }
+    .topic-test-detail-cond { color: var(--admin-muted); }
+    .topic-test-detail-words { margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: var(--admin-soft); font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; color: var(--admin-muted); }
+    .topic-test-title-list { margin: 5px 0 0 16px; padding: 0; list-style: disc; }
+    .topic-test-title-list li { margin: 2px 0; }
+    .impact-list { margin: 10px 0; padding: 12px 16px 12px 34px; border-radius: 11px; color: #334155; background: #f5f8f8; line-height: 1.75; }
+    .danger-note { padding: 12px 13px; border: 1px solid #fecaca; border-radius: 11px; color: #991b1b; background: #fef2f2; line-height: 1.65; }
+    .smart-source-context { margin-top: 14px; padding: 11px 12px; border-radius: 11px; color: #334155; background: #f5f7ff; line-height: 1.6; word-break: break-all; }
+    .smart-source-results { display: grid; gap: 9px; max-height: min(460px, 55vh); margin-top: 13px; overflow: auto; }
+    .smart-source-option { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 9px; padding: 11px; border: 1px solid #d7dcef; border-radius: 11px; background: #fff; cursor: pointer; }
+    .smart-source-option:has(input:checked) { border-color: #7c3aed; background: #f7f3ff; box-shadow: 0 0 0 1px #7c3aed inset; }
+    .smart-source-option input { margin-top: 4px; accent-color: #7c3aed; }
+    .smart-source-option strong, .smart-source-option span { display: block; }
+    .smart-source-option strong { color: #25333b; line-height: 1.45; }
+    .smart-source-url { margin-top: 3px; color: #64748b; font-size: 12px; word-break: break-all; }
+    .smart-source-evidence { margin-top: 5px; color: #047857; font-size: 12px; }
+
+    @media (max-width: 1120px) {
+      .admin-page { padding: 20px 18px 38px; }
+      .workspace { grid-template-columns: 238px minmax(0, 1fr); }
+      .editor-heading { display: block; }
+      .editor-actions { justify-content: flex-start; margin-top: 15px; }
+      .release-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 820px) {
+      .admin-page { padding: 16px 12px 30px; }
+      .page-hero { align-items: flex-start; }
+      .page-hero p { display: none; }
+      .workspace { grid-template-columns: 1fr; }
+      .pack-sidebar { position: static; }
+      .pack-grid { display: flex; max-height: none; overflow-x: auto; }
+      .pack-card { flex: 0 0 220px; }
+      .editor-header, .tab-panel { padding-left: 16px; padding-right: 16px; }
+      .switch-window { max-width: none; margin-left: 0; }
+      .form-grid, .keyword-grid, .capability-grid { grid-template-columns: 1fr; }
+      .tab-panel[data-panel="remote"] .form-grid{grid-template-columns:1fr}
+      .keyword-card.wide, .form-field.full { grid-column: auto; }
+      .source-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .source-toolbar { grid-template-columns: 1fr; }
+      .topic-head { display: none; }
+      .topic-row { grid-template-columns: 1fr; }
+      .topic-actions { justify-content: start; }
+      .topic-test-groups { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+      .page-hero { display: block; }
+      .page-hero > .action { width: 100%; margin-top: 14px; }
+      .editor-actions { flex-wrap: wrap; }
+      .editor-actions .action { flex: 1 1 44%; }
+      .source-metrics { grid-template-columns: 1fr 1fr; }
+      .tab-panel { padding-top: 16px; }
+    }
+  </style>
+  <style>
+  /* ── 深蓝大屏：行业包管理页（所有页面统一深蓝皮肤） ── */
+  body.skin-darkblue{
+    --admin-bg:#0a1428; --admin-panel:#0e1d3a; --admin-ink:#e6f0ff;
+    --admin-muted:#93a9cc; --admin-line:rgba(96,165,250,.24); --admin-row-line:rgba(96,165,250,.4);
+    --admin-soft:#12233f; --admin-brand:#38bdf8; --admin-brand-dark:#7dd3fc;
+    --admin-blue:#38bdf8; --admin-warn:#fbbf24; --admin-danger:#f87171;
+    --admin-shadow:0 16px 40px rgba(0,0,0,.45);
+    background:
+      radial-gradient(circle at 15% 10%, rgba(56,189,248,.18), transparent 30%),
+      radial-gradient(circle at 85% 90%, rgba(59,130,246,.15), transparent 34%),
+      linear-gradient(160deg,#0e1d3a 0%,#08101f 55%,#060b1c 100%);
+  }
+  body.skin-darkblue .admin-page{color:var(--admin-ink)}
+  body.skin-darkblue dialog{border:1px solid rgba(96,165,250,.22)}
+  body.skin-darkblue .panel-card,body.skin-darkblue .check-card,body.skin-darkblue .keyword-card,
+  body.skin-darkblue .metric,body.skin-darkblue .source-table-wrap,
+  body.skin-darkblue .release-card,body.skin-darkblue .smart-source-option,body.skin-darkblue .history-load-card{
+    background:#0e1d3a;border-color:rgba(96,165,250,.24);color:var(--admin-ink);box-shadow:none;
+  }
+  body.skin-darkblue input,body.skin-darkblue select,body.skin-darkblue textarea{
+    background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;color:#e6f0ff !important;
+  }
+  body.skin-darkblue .action.secondary,body.skin-darkblue .action.ghost-danger,
+  body.skin-darkblue .icon-button{
+    background:#0e1d3a;color:#dbeafe;border-color:rgba(96,165,250,.28);
+  }
+  /* 描边按钮在深色底上必须换底，否则会变成一整块白 —— 悬停用更高的选择器权重覆盖基础 .action:hover */
+  body.skin-darkblue .action.warning,body.skin-darkblue .action.danger{
+    background:#0e1d3a;border-color:rgba(96,165,250,.28);box-shadow:none;
+  }
+  body.skin-darkblue .action.warning{color:#fbbf24}
+  body.skin-darkblue .action.danger,body.skin-darkblue .action.ghost-danger{color:#f87171}
+  body.skin-darkblue .action.warning:hover{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.5);color:#fcd34d}
+  body.skin-darkblue .action.danger:hover,body.skin-darkblue .action.ghost-danger:hover{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.5);color:#fca5a5}
+  body.skin-darkblue .action.secondary:hover{background:#12233f;border-color:rgba(96,165,250,.55);color:#7dd3fc}
+  body.skin-darkblue .icon-button:hover{background:#12233f;border-color:rgba(96,165,250,.55);color:#7dd3fc}
+  body.skin-darkblue .icon-button.danger:hover{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.5);color:#fca5a5}
+  body.skin-darkblue .tab-button:hover{background:rgba(56,189,248,.1);color:#7dd3fc}
+  /* 主按钮：深色下用「亮蓝底 + 深色字」；原 hover 是浅蓝底配白字，几乎看不清，不构成有效高亮 */
+  body.skin-darkblue .action{color:#06121f}
+  body.skin-darkblue .action:hover{background:#7dd3fc;color:#06121f;box-shadow:0 4px 14px rgba(56,189,248,.3)}
+  body.skin-darkblue .source-toolbar input,body.skin-darkblue .source-toolbar select,
+  body.skin-darkblue .source-row input,body.skin-darkblue .source-row select{
+    background:#0e1d3a;color:#e6f0ff;border-color:rgba(96,165,250,.28);
+  }
+  body.skin-darkblue .history-load-card{color:#b8c9e6;border-color:rgba(96,165,250,.28)}
+  /* 加载遮罩(菜单/标签切换时的白屏) → 深蓝 */
+  body.skin-darkblue .pack-loading{background:rgba(8,16,28,.85) !important}
+  body.skin-darkblue .pack-loading .history-load-card{background:#0e1d3a !important;color:#e6f0ff !important;box-shadow:none}
+  body.skin-darkblue .pack-loading .history-load-card span:last-child{color:#8ea6c8}
+  body.skin-darkblue .page-kicker{color:#7dd3fc}
+  body.skin-darkblue .muted{color:#8ea6c8}
+  body.skin-darkblue .source-table-wrap table{color:var(--admin-ink)}
+  body.skin-darkblue .source-head{background:#12233f !important;color:#dbeafe !important;border-color:rgba(96,165,250,.2) !important}
+  body.skin-darkblue .source-table-wrap{border-color:rgba(96,165,250,.2) !important;background:#0e1d3a !important}
+  body.skin-darkblue .source-table-wrap th,body.skin-darkblue .source-table-wrap td,
+  body.skin-darkblue .source-table-wrap table,body.skin-darkblue .source-table-wrap tr{
+    border-color:rgba(96,165,250,.14) !important;background:transparent}
+  body.skin-darkblue .source-table-wrap tr:nth-child(even){background:rgba(56,189,248,.05) !important}
+  body.skin-darkblue .source-row{background:rgba(13,28,56,.6);border-color:rgba(96,165,250,.18)}
+  /* 行业包卡片深蓝适配 */
+  body.skin-darkblue .pack-card{background:rgba(13,28,56,.72);border-color:rgba(96,165,250,.22)}
+  body.skin-darkblue .pack-card:hover{background:rgba(16,34,66,.85)}
+  body.skin-darkblue .pack-card.selected{border-color:#38bdf8;background:rgba(22,45,86,.95);box-shadow:inset 3px 0 0 0 #38bdf8,0 0 0 1px rgba(56,189,248,.45)}
+  body.skin-darkblue .pack-card h3,body.skin-darkblue .pack-card .pack-name,body.skin-darkblue .pack-card strong{color:#e6f0ff}
+  body.skin-darkblue .pack-card p{color:#a7b8d4}
+  body.skin-darkblue .pack-card .badge.current{background:rgba(56,189,248,.2);color:#7dd3fc}
+  body.skin-darkblue .pack-status.is-live{color:#7dd3fc}
+  body.skin-darkblue .pack-status.is-warn{color:#fbbf24}
+  body.skin-darkblue .pack-status.is-idle{color:#8ea6c8}
+  /* 深蓝：剩余白色刺眼元素（初始化时间卡/输入框/开关窗/表单控件）全部适配 */
+  body.skin-darkblue .switch-window,
+  body.skin-darkblue .impact-list,
+  body.skin-darkblue .danger-note,
+  body.skin-darkblue .smart-source-context,
+  body.skin-darkblue .keyword-note-chip,
+  body.skin-darkblue .weight-chip,
+  body.skin-darkblue .count-badge,
+  body.skin-darkblue .search-box input{
+    background:#0e1d3a !important;border-color:rgba(96,165,250,.24) !important;color:#dbeafe !important;
+  }
+  body.skin-darkblue .switch-window label,
+  body.skin-darkblue .switch-window .field-note,
+  body.skin-darkblue .impact-list{color:#c7d7ee}
+  body.skin-darkblue .form-field input,body.skin-darkblue .form-field textarea,body.skin-darkblue .form-field select,
+  body.skin-darkblue .switch-window input{
+    background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;color:#e6f0ff !important;
+  }
+  body.skin-darkblue .form-field input[readonly]{background:#12233f !important;color:#8ea6c8 !important}
+  body.skin-darkblue .form-field label{color:#dbeafe}
+  body.skin-darkblue .field-note,body.skin-darkblue .input-note,body.skin-darkblue .muted{color:#8ea6c8}
+  /* 深蓝：滚动条适配 */
+  body.skin-darkblue ::-webkit-scrollbar{width:10px;height:10px;background:#0a1428}
+  body.skin-darkblue ::-webkit-scrollbar-thumb{background:#1c3a5e;border-radius:6px}
+  body.skin-darkblue ::-webkit-scrollbar-thumb:hover{background:#27507f}
+  body.skin-darkblue ::-webkit-scrollbar-track{background:#0a1428}
+  /* 深蓝：徽章适配（系统内置/当前使用/草稿/已删除等） */
+  body.skin-darkblue .badge{background:rgba(56,189,248,.16);color:#9ed2f7;border-color:rgba(56,189,248,.2)}
+  body.skin-darkblue .badge.current{background:rgba(56,189,248,.24);color:#7dd3fc}
+  body.skin-darkblue .badge.custom{background:rgba(56,189,248,.16);color:#9ed2f7}
+  body.skin-darkblue .badge.draft{background:rgba(245,158,11,.16);color:#fbbf24}
+  body.skin-darkblue .badge.deleted{background:rgba(239,68,68,.16);color:#fca5a5}
+  </style>
+</head>
+<body>
+<script>
+/* 皮肤跟随：没存过(null) → 默认深蓝；显式选过浅色(dashSkin='') → 保持浅色。
+   必须区分「没存过」与「显式存了空串」，否则选浅色后刷新会弹回深色。 */
+try{
+  var _sk=localStorage.getItem('dashSkin');
+  if(_sk===null||_sk==='darkblue') document.body.classList.add('skin-darkblue');
+}catch(e){ document.body.classList.add('skin-darkblue'); }
+
+/* 换肤控件：本脚本紧跟 <body> 执行，此时按钮尚未解析，getElementById 得到 null，
+   原写法在 if(!btn||!menu) return 处直接退出——事件从未绑定，换肤因此完全失效。
+   现改为 DOM 就绪后再绑定。 */
+document.addEventListener('DOMContentLoaded', function(){
+  var btn=document.getElementById('skinBtn'), menu=document.getElementById('skinMenu');
+  if(!btn||!menu) return;
+  function storedSkin(){ try{ var v=localStorage.getItem('dashSkin'); return v===null?'darkblue':v; }catch(e){ return 'darkblue'; } }
+  function markCurrent(){
+    var now=storedSkin();
+    menu.querySelectorAll('.skin-opt').forEach(function(o){
+      o.classList.toggle('is-current', (o.getAttribute('data-skin')||'')===now);
+    });
+  }
+  btn.addEventListener('click', function(ev){ ev.stopPropagation(); markCurrent(); menu.style.display = (menu.style.display==='none'?'block':'none'); });
+  menu.querySelectorAll('.skin-opt').forEach(function(opt){
+    opt.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var skin=opt.getAttribute('data-skin')||'';
+      try{ localStorage.setItem('dashSkin', skin); }catch(e){}
+      /* 直接用 skin 判定：原写法 (skin||'darkblue') 在选浅色时因空串是 falsy 又回落到 darkblue，
+         点「浅色」反而把深蓝皮肤加上去——换肤永远回不到浅色。 */
+      document.body.classList.toggle('skin-darkblue', skin==='darkblue');
+      markCurrent();
+      menu.style.display='none';
+    });
+  });
+  document.addEventListener('click', function(){ menu.style.display='none'; });
+});
+</script>
+<main class="admin-page">
+  <header class="page-hero">
+    <div>
+      <p class="page-kicker">CONTENT INTELLIGENCE</p>
+      <h1>行业包设置管理</h1>
+      <p>集中维护行业关键词、主题路由、网站与 RSS。每项操作的影响范围与代价，写在对应按钮旁。</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="position:relative">
+        <button class="action secondary" type="button" id="skinBtn" title="切换皮肤">🍥 换肤</button>
+        <a class="action secondary" href="/batch-schedule" style="text-decoration:none;display:inline-flex;align-items:center">批量添加聚合关键词</a>
+        <div id="skinMenu" class="skin-menu">
+          <button type="button" class="skin-opt" data-skin="darkblue">深蓝大屏</button>
+          <button type="button" class="skin-opt" data-skin="">浅色</button>
+        </div>
+      </div>
+      <button class="action" type="button" onclick="openCreateDialog()">＋ 新增行业包</button>
+    </div>
+  </header>
+
+  <section class="workspace">
+    <aside class="pack-sidebar" aria-label="行业包列表">
+      <div class="sidebar-head">
+        <div class="sidebar-title"><h2>行业包</h2><span id="packCount" class="count-badge">0</span></div>
+        <label class="search-box"><span>⌕</span><input id="packSearch" type="search" placeholder="搜索行业名称或 ID" oninput="filterPackCards()"></label>
+      </div>
+      <div id="cards" class="pack-grid"><div class="muted">正在加载行业包…</div></div>
+    </aside>
+
+    <section class="editor-surface">
+      <div id="packLoading" class="pack-loading hidden">
+        <div class="history-load-card">
+          <div class="history-load-animation" aria-hidden="true"><span class="history-load-icon"><i class="fa fa-folder-open"></i></span></div>
+          <strong>正在加载行业包</strong>
+          <span>读取草稿与版本信息中…</span>
+        </div>
+      </div>
+      <!-- 激活行业包：固定居中浮层（带步骤清单+计时+明确成败），不再放在页面底部 -->
+      <style>
+        .switch-overlay{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;background:rgba(8,14,26,.62);backdrop-filter:blur(2px)}
+        .switch-overlay[hidden]{display:none}
+        .switch-overlay-card{width:min(560px,94vw);max-height:86vh;overflow:auto;background:#fff;color:#1f2937;border-radius:14px;padding:22px 24px;box-shadow:0 24px 70px rgba(0,0,0,.45)}
+        body.skin-darkblue .switch-overlay-card{background:#0e1d3a;color:#dbeafe;border:1px solid rgba(96,165,250,.22)}
+        .switch-overlay-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+        .switch-overlay-head i{font-size:20px;color:#1d7f68}
+        body.skin-darkblue .switch-overlay-head i{color:#38bdf8}
+        .switch-overlay-title{font-size:19px;font-weight:800}
+        .switch-overlay-sub{font-size:12px;color:#6b7280;margin-bottom:14px}
+        body.skin-darkblue .switch-overlay-sub{color:#8ea6c8}
+        .switch-step{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed rgba(148,163,184,.25);font-size:14px}
+        .switch-step:last-child{border-bottom:0}
+        .switch-step .mark{width:20px;flex:0 0 auto;text-align:center;color:#9ca3af}
+        .switch-step.is-doing .mark{color:#2563eb}
+        .switch-step.is-done .mark{color:#1d7f68}
+        .switch-step.is-error .mark{color:#dc2626}
+        .switch-step.is-doing .txt{font-weight:700;color:#2563eb}
+        .switch-step .hint{display:block;font-size:12px;color:#9ca3af;margin-top:2px}
+        @keyframes switchBarMove{0%{margin-left:-38%}100%{margin-left:100%}}
+        /* 激活进度条：进行中是不确定态滑动（不知道备份具体耗时）；
+           完成/失败后必须终止这段无限动画并直接停在 100%，否则激活结束后它还会一直滑。 */
+        .switch-bar{display:block;height:4px;margin-top:7px;border-radius:3px;background:rgba(148,163,184,.25);overflow:hidden}
+        .switch-bar-fill{display:block;height:100%;width:38%;border-radius:3px;background:var(--admin-brand);animation:switchBarMove 1.4s ease-in-out infinite}
+        .switch-bar.is-done .switch-bar-fill,
+        .switch-bar.is-error .switch-bar-fill{width:100%;margin-left:0;animation:none}
+        .switch-bar.is-error .switch-bar-fill{background:var(--admin-danger)}
+        body.skin-darkblue .switch-step .hint{color:#8ea6c8}
+        .switch-overlay-foot{margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+        .switch-elapsed{font-size:12px;color:#6b7280}
+        body.skin-darkblue .switch-elapsed{color:#8ea6c8}
+        .switch-result{margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.7;white-space:pre-wrap}
+        .switch-result.ok{background:rgba(29,127,104,.12);color:#0f766e}
+        .switch-result.bad{background:rgba(220,38,38,.12);color:#b91c1c}
+        body.skin-darkblue .switch-result.ok{background:rgba(56,189,248,.16);color:#e6f0ff}
+        body.skin-darkblue .switch-result.bad{background:rgba(248,113,113,.18);color:#fecaca}
+      </style>
+      <div id="switchLoading" class="switch-overlay" hidden>
+        <div class="switch-overlay-card">
+          <div class="switch-overlay-head"><i class="fa fa-exchange"></i><span class="switch-overlay-title" id="switchOverlayTitle">正在激活行业包</span></div>
+          <div class="switch-overlay-sub" id="switchOverlaySub">激活期间请勿关闭页面；下面的步骤会实时显示进展。</div>
+          <div id="switchSteps">
+            <div class="switch-step" data-step="1"><span class="mark"><i class="fa fa-circle-o"></i></span><span class="txt">① 生成激活计划<span class="hint">校验目标版本、比对信源差异、计算计划指纹</span></span></div>
+            <div class="switch-step" data-step="2"><span class="mark"><i class="fa fa-circle-o"></i></span><span class="txt">② 备份数据库并校验完整性<span class="hint">整库快照，通常 60~120 秒；信源无实质变化时会自动跳过</span><span id="switchBar" class="switch-bar"><i class="switch-bar-fill"></i></span></span></div>
+            <div class="switch-step" data-step="3"><span class="mark"><i class="fa fa-circle-o"></i></span><span class="txt">③ 信源落地并建立「信源↔行业包」关联<span class="hint">新增/更新/关联/停用信源，之后该行业包才真正可采集</span></span></div>
+            <div class="switch-step" data-step="4"><span class="mark"><i class="fa fa-circle-o"></i></span><span class="txt">④ 提交初始化聚合任务<span class="hint">按初始化时间窗排队聚合，稍后在任务列表可见</span></span></div>
+          </div>
+          <div id="switchResult" class="switch-result" hidden></div>
+          <div class="switch-overlay-foot">
+            <span class="switch-elapsed" id="switchElapsed">已用时 0 秒</span>
+            <button type="button" class="action" id="switchOverlayClose" onclick="closeSwitchOverlay()" hidden>关闭</button>
+          </div>
+        </div>
+      </div>
+      <div id="packToast" class="pack-toast hidden"></div>
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">⌘</div>
+        <h2>选择一个行业包开始配置</h2>
+        <p>左侧选择行业包后，可维护关键词、主题、信源和发布版本。</p>
+      </div>
+
+      <div id="editor" class="hidden">
+        <header class="editor-header">
+          <div class="editor-heading">
+            <div>
+              <div id="editorMeta" class="editor-meta"></div>
+              <h2 id="title">行业包</h2>
+              <p id="summary"></p>
+            </div>
+            <div class="editor-actions">
+              <button class="action" type="button" onclick="validateDraft()">验证全部配置</button>
+              <button class="action" type="button" onclick="saveDraft()">保存草稿</button>
+              <button class="action" type="button" onclick="publishDraft()">发布新版本</button>
+              <button id="switchButton" class="action hidden" type="button" onclick="switchPack()">激活此行业包</button>
+              <button id="deleteButton" class="action hidden" type="button" onclick="openDeleteDialog()">删除行业包</button>
+            </div>
+            <div id="switchWindow" class="switch-window hidden" aria-label="激活与初始化采集">
+              <p class="field-note"><b>激活此行业包</b>会依次完成：把本包信源落地到运行时并建立「信源↔行业包」关联 → 提交一次初始化采集 → 该包从此真正可采集。<br>
+                影响范围：<b>仅本行业包</b>；其它行业包的采集不受影响。信源有实质变化时会先备份数据库（因此首次激活可能等待较久）。</p>
+              <details class="switch-advanced" style="margin-top:8px">
+                <summary style="cursor:pointer;font-size:12px;color:var(--admin-muted)">初始化范围（可选，默认最近 30 天）</summary>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px">
+                  <label>初始化开始时间<input id="initializationFrom" type="datetime-local"></label>
+                  <label>初始化结束时间<input id="initializationTo" type="datetime-local"></label>
+                </div>
+                <p class="field-note">留空即采集最近 30 天；该范围决定本次初始化会拉取多久的历史资讯。时间按香港时间解释。</p>
+              </details>
+            </div>
+          </div>
+          <div id="status" class="status" aria-live="polite"></div>
+        </header>
+
+        <nav class="tab-bar" role="tablist" aria-label="行业包配置区域">
+          <button class="tab-button active" type="button" role="tab" data-tab="overview" onclick="setTab('overview')">基础设置</button>
+          <button class="tab-button" type="button" role="tab" data-tab="keywords" onclick="setTab('keywords')">关键词门控</button>
+          <button class="tab-button" type="button" role="tab" data-tab="topics" onclick="setTab('topics')">内部主题</button>
+          <button class="tab-button" type="button" role="tab" data-tab="sources" onclick="setTab('sources')">来源管理</button>
+          <button class="tab-button" type="button" role="tab" data-tab="releases" onclick="setTab('releases')">版本与生命周期</button>
+          <button class="tab-button" type="button" role="tab" data-tab="remote" onclick="setTab('remote')">分布式服务设置</button>
+        </nav>
+
+        <section class="tab-panel active" data-panel="overview">
+          <div class="section-head"><div><h3>基础设置</h3><p>定义行业包身份、配置版本和首页能力。</p></div></div>
+          <div class="panel-card">
+            <div class="form-grid">
+              <div class="form-field"><label for="packId">行业包 ID</label><input id="packId" readonly></div>
+              <div class="form-field"><label for="packName">行业名称</label><input id="packName" maxlength="120"></div>
+              <div class="form-field"><label for="packVersion">配置版本</label><input id="packVersion"><p class="field-note">发布新配置时建议提升语义版本。</p></div>
+              <div class="form-field"><label for="defaultMarket">默认市场</label><input id="defaultMarket" maxlength="32"></div>
+              <div class="form-field full"><label for="packTimezone">时区</label><input id="packTimezone" maxlength="64"></div>
+            </div>
+          </div>
+          <div class="panel-card">
+            <div class="section-head"><div><h3>首页能力</h3><p>金融资讯附包由所有主行业共享，行情卡片可独立控制。</p></div></div>
+            <div class="capability-grid">
+              <label class="check-card"><input id="showFinancialNews" type="checkbox"><span><strong>金融行业资讯</strong><br><span class="muted">显示关键词匹配的金融资讯</span></span></label>
+              <label class="check-card"><input id="showMarketCards" type="checkbox"><span><strong>固定大盘卡片</strong><br><span class="muted">显示主要市场指数卡片</span></span></label>
+              <label class="check-card"><input id="showWatchedCards" type="checkbox"><span><strong>关注个股卡片</strong><br><span class="muted">显示关注证券行情卡片</span></span></label>
+              <label class="check-card"><input id="showSpatiotemporalMap" type="checkbox"><span><strong>时空信息图</strong><br><span class="muted">关闭后首页默认打开行业资讯看板</span></span></label>
+              <label class="check-card"><input id="ragflowUploadEnabled" type="checkbox" onchange="updateRagflowPolicyState()"><span><strong>上传聚合文章到知识库</strong><br><span class="muted">非家族办公室行业默认关闭；开启后上传到 News 知识库</span><br><select id="ragflowKnowledgeBase" aria-label="目标知识库"><option value="news">News</option></select></span></label>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="keywords">
+          <div class="section-head"><div><h3>关键词门控</h3><p>来源可信度不能绕过这里的行业准入判断；每行填写一个关键词。</p></div></div>
+          <div class="weight-guide">
+            <b>关键词权重说明</b>
+            <p style="margin:6px 0 0">各组权重：核心 <b>3</b> · 扩展 <b>1</b> · 趋势 <b>2</b> · 事件 <b>2</b> · 负向 <b>-3</b>（负向是扣分）。</p>
+            <ul>
+              <li><b>怎么算</b>：文章得分 = Σ（命中的词 × 该组权重），其中<b>标题里命中</b>的词再 ×1.5。</li>
+              <li><b>准入（能不能入库）</b>：<code>锚点词命中数 × 3 + 负向词命中数 × (-3) ≥ 2</code>，且至少要命中一个<b>锚点词 / 备案机构</b>。没单独配锚点词时，核心+扩展词自动充当锚点。</li>
+              <li><b>分类（趋势 / 事件 / 其他）</b>：<code>趋势词 × 2</code> 对比 <code>事件词 × 2</code>，谁高归谁；都不高归"其他"。</li>
+              <li><b>派发排序（先聚合谁）</b>：候选 quick_score 越高越先被聚合。</li>
+            </ul>
+          </div>
+          <div class="keyword-grid">
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="coreKeywords">核心关键词</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'core')" aria-label="查看说明">?</button></span><span class="weight-chip">默认权重：3</span></div>
+              <textarea id="coreKeywords" aria-describedby="coreKeywordsHelp"></textarea>
+              <div class="keyword-note" id="coreKeywordsHelp" data-keyword-guidance="core"><b>作用：</b>定义行业身份和主要对象<div class="keyword-note-meta"><span class="keyword-note-chip">能否单独证明：可以</span></div></div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="expandedKeywords">扩展关键词</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'expanded')" aria-label="查看说明">?</button></span><span class="weight-chip">默认权重：1</span></div>
+              <textarea id="expandedKeywords" aria-describedby="expandedKeywordsHelp"></textarea>
+              <div class="keyword-note" id="expandedKeywordsHelp" data-keyword-guidance="expanded"><b>作用：</b>补充上下游概念、同义词和业务场景<div class="keyword-note-meta"><span class="keyword-note-chip">能否单独证明属于该行业：可以，但准入权重较低</span></div></div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="trendKeywords">趋势关键词</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'trend')" aria-label="查看说明">?</button></span><span class="weight-chip">默认权重：2</span></div>
+              <textarea id="trendKeywords" aria-describedby="trendKeywordsHelp"></textarea>
+              <div class="keyword-note" id="trendKeywordsHelp" data-keyword-guidance="trend"><b>作用：</b>判断政策、监管、增长、报告等长期变化<div class="keyword-note-meta"><span class="keyword-note-chip">能否单独证明：不可以</span></div></div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="eventKeywords">事件关键词</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'event')" aria-label="查看说明">?</button></span><span class="weight-chip">默认权重：2</span></div>
+              <textarea id="eventKeywords" aria-describedby="eventKeywordsHelp"></textarea>
+              <div class="keyword-note" id="eventKeywordsHelp" data-keyword-guidance="event"><b>作用：</b>判断发布、签约、融资、任命等具体事件<div class="keyword-note-meta"><span class="keyword-note-chip">能否单独证明：不可以</span></div></div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="anchorKeywords">行业锚点词</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'anchor')" aria-label="查看说明">?</button></span><span class="weight-chip">硬门禁</span></div>
+              <textarea id="anchorKeywords" aria-describedby="anchorKeywordsHelp"></textarea>
+              <div class="keyword-note" id="anchorKeywordsHelp"><b>作用：</b>准入硬门槛——文章必须命中其中至少一个才允许入库、分类、进知识库。填行业<b>专有名词</b>（技术名/产品名/标准名/场景名），不要填"发布、报告、合作"这类泛化词，也不要填单字（会误命中）。留空则该行业包<b>没有门禁</b>，什么都会被放进来。</div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="entityKeywords">备案机构</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'entity')" aria-label="查看说明">?</button></span><span class="weight-chip">硬门禁</span></div>
+              <textarea id="entityKeywords" aria-describedby="entityKeywordsHelp"></textarea>
+              <div class="keyword-note" id="entityKeywordsHelp"><b>作用：</b>机构全称或常用简称；命中同样算通过行业门禁，并额外按核心词权重加分。适合"以机构为准"的行业（协会、监管、研究院）。</div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="brandKeywords">重点品牌</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'brand')" aria-label="查看说明">?</button></span><span class="weight-chip">默认权重：—</span></div>
+              <textarea id="brandKeywords" aria-describedby="brandKeywordsHelp"></textarea>
+              <div class="keyword-note" id="brandKeywordsHelp"><b>作用：</b>本行业重点关注的品牌/机构；用于品牌趋势、SERP 品牌新闻搜索、主题命名锚定<div class="keyword-note-meta"><span class="keyword-note-chip">能否单独证明属于该行业：不参与准入，仅作品牌证据</span></div></div>
+            </article>
+            <article class="keyword-card">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="trendTopics">趋势主题</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'trendTopics')" aria-label="查看说明">?</button></span><span class="weight-chip">默认权重：—</span></div>
+              <textarea id="trendTopics" aria-describedby="trendTopicsHelp"></textarea>
+              <div class="keyword-note" id="trendTopicsHelp"><b>作用：</b>趋势分析按这些主题聚合（与「重点品牌」共同决定趋势图的维度）。每行一个，留空则趋势分析不显示主题维度。</div>
+            </article>
+            <article class="keyword-card wide">
+              <div class="keyword-title"><span class="keyword-title-left"><label for="serpapiQueries">搜索发现查询</label><button type="button" class="help-tip" onclick="showKeywordHelp(event,'serpapiQueries')" aria-label="查看说明">?</button></span><span class="weight-chip">搜索引擎·泛查询</span></div>
+              <textarea id="serpapiQueries" aria-describedby="serpapiQueriesHelp"></textarea>
+              <div class="keyword-note" id="serpapiQueriesHelp" data-keyword-guidance="search"><b>作用：</b>告诉搜索引擎主动搜什么；每行是一条完整查询。<div class="keyword-note-meta"><span class="keyword-note-chip">能否单独证明属于该行业：不参与最终分类</span></div><div class="help-rule"><b>打通规则：</b>这里搜到的文章，最终要过上面的<b>核心/扩展关键词 + 行业锚点词/备案机构</b>门禁才入库。所以搜索词里用的实词，门禁里也要有对应词——例如搜"风洞测试"，门禁里就要放"风洞/空气动力学/风阻"，而不是只写"风洞测试技术"这种全称。窄主题的「主题级搜索词」已移到「内部主题」标签页，每个主题里单独配。</div></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="topics">
+          <div class="section-head">
+            <div><h3>内部主题标签</h3><p>文章通过行业门控后，可同时命中多个主题；主题本身不参与行业准入。每个主题可配一条「主题级搜索词」用于窄主题补料。</p></div>
+            <button class="action secondary" type="button" onclick="addTopic()">＋ 添加主题</button>
+          </div>
+          <div class="keyword-note" style="margin:0 0 12px"><div class="help-rule"><b>主题级搜索词打通规则：</b>① 搜索词里的实词，要同步放进「关键词门控 → 核心/扩展关键词」门禁，否则搜到也会被拦掉；② 这里填了搜索词的主题，每天搜索时按日期轮转、每轮取 3 条，留空则该主题只靠信源自然采集。</div></div>
+          <div class="topic-head"><span class="topic-head-help">主题 key<button type="button" class="help-tip" onclick="showKeywordHelp(event,'topicKey')" aria-label="查看说明">?</button></span><span>显示名称</span><span class="topic-head-help">归属关键词<button type="button" class="help-tip" onclick="showKeywordHelp(event,'topicKeywords')" aria-label="查看说明">?</button></span><span class="topic-head-help">发现搜索词<button type="button" class="help-tip" onclick="showKeywordHelp(event,'topicSearchQuery')" aria-label="查看说明">?</button></span><span>操作</span></div>
+          <div id="topics"></div>
+        </section>
+
+        <section class="tab-panel" data-panel="sources">
+          <div class="section-head">
+            <div><h3>来源管理</h3><p class="muted">来源角色决定证据排序，不能绕过行业关键词门控。导入失败、403、目录页或疑似停更的 RSS 默认停用。</p></div>
+          </div>
+          <div class="source-metrics">
+            <div class="metric"><strong id="sourceTotal">0</strong><span>全部来源</span></div>
+            <div class="metric"><strong id="sourceEnabled">0</strong><span>当前启用</span></div>
+            <div class="metric"><strong id="sourceRss">0</strong><span>RSS Feed</span></div>
+            <div class="metric"><strong id="sourceIssues">0</strong><span>需关注</span></div>
+          </div>
+          <div class="source-toolbar">
+            <input id="sourceSearch" type="search" placeholder="搜索来源名称、URL 或导入 ID" oninput="filterSources()">
+            <select id="sourceFilter" onchange="filterSources()">
+              <option value="all">全部状态</option>
+              <option value="enabled">仅已启用</option>
+              <option value="disabled">仅已停用</option>
+              <option value="active">校验有效</option>
+              <option value="issues">校验需关注</option>
+              <option value="manual">手工来源</option>
+            </select>
+            <button class="action secondary" type="button" onclick="addSource()">＋ 添加信源</button>
+          </div>
+          <div class="source-table-wrap">
+            <div class="source-head"><span>名称</span><span>URL</span><span>来源角色</span><span>类型</span><span>频率</span><span>可信度</span><span>启用</span><span>导入校验</span><span>操作</span></div>
+            <div id="sources"></div>
+            <div class="rc-group" style="margin-top:18px">
+              <div class="rc-group-title">聚合调度（仅管理员可设）</div>
+              <p class="muted" style="margin:4px 0 10px">控制该行业包的聚合频率。<b>默认低频</b>：定点聚合、不做持续高频派发。搜索采集完成后、信源同步后、页面手动触发这三类即时聚合不受影响（避免新 URL 积压）。</p>
+              <div class="form-grid">
+                <div class="form-field"><label for="crawlEnabled">启用定时聚合</label><input type="checkbox" id="crawlEnabled" style="width:auto;margin:0"></div>
+                <div class="form-field"><label for="crawlDailyTimes">每天聚合时间点</label><input id="crawlDailyTimes" type="text" placeholder="02:00"><p class="field-hint">格式 HH:MM，多个用逗号分隔</p></div>
+                <div class="form-field"><label for="crawlPollingMinutes">每源轮询间隔（分钟）</label><input id="crawlPollingMinutes" type="number" min="60" max="10080" placeholder="1440"></div>
+                <div class="form-field"><label for="crawlMaxSources">单轮最多信源数</label><input id="crawlMaxSources" type="number" min="1" max="200" placeholder="45"></div>
+                <div class="form-field"><label for="crawlContinuous">允许持续派发（高频）</label><input type="checkbox" id="crawlContinuous" style="width:auto;margin:0"><p class="field-hint">默认关闭。开启后约每分钟派发一次，仅在做实时性调试时使用。</p></div>
+              </div>
+            </div>
+            <div id="sourceEmpty" class="source-empty">没有符合筛选条件的来源。</div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="releases">
+          <div class="section-head"><div><h3>版本与生命周期</h3><p>发布版本不可原地修改；激活前创建并校验 SQLite 备份。切换聚合视图会保留历史文章。</p></div></div>
+          <div class="release-grid">
+            <article class="release-card"><h3>版本差异</h3><div class="release-body"><pre id="diff" class="diff">选择行业包后显示草稿与当前已发布版本的差异。</pre></div></article>
+            <div>
+              <article class="release-card"><h3>已发布版本</h3><div id="versions" class="release-body muted">请选择行业包</div></article>
+              <article class="release-card" style="margin-top:16px"><h3>生命周期记录</h3><div id="lifecycle" class="release-body muted">正在加载…</div></article>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="remote">
+          <div class="section-head"><div><h3>运行配置（分布式服务设置）</h3><p>该行业包独立运行配置：服务器/VPN/LLM/TTS/Embedding/数据库与代理；登录该行业包后生效。未填则回退全局 .env。每个行业包可配置各自的 LLM/VPN/TTS/Embedding，互不影响，多租户可并行。</p></div></div>
+
+          <div class="rc-group"><div class="rc-group-title">① 服务连接</div>
+            <div class="form-grid">
+              <div class="form-field"><label>远端服务器 IP</label><input id="rcServerIp" type="text" placeholder="例如 10.88.0.1"></div>
+              <div class="form-field"><label>Pipeline 端口</label><input id="rcServerPort" type="number" value="11236"></div>
+              <div class="form-field"><label>SSH 地址</label><input id="rcSshHost" type="text" placeholder="例如 10.88.0.1"></div>
+              <div class="form-field"><label>SSH 端口</label><input id="rcSshPort" type="number" value="22"></div>
+              <div class="form-field"><label>SSH 用户名</label><input id="rcSshUser" type="text"></div>
+              <div class="form-field"><label>SSH 口令</label><input id="rcSshPass" type="password"></div>
+            </div>
+          </div>
+
+          <div class="rc-group"><div class="rc-group-title">② VPN 聚合 Pipeline</div>
+            <div class="form-grid">
+              <div class="form-field"><label>Pipeline URL</label><input id="rcVpnUrl" type="text" placeholder="http://10.88.0.1:11236"></div>
+              <div class="form-field"><label>Pipeline Token</label><input id="rcVpnToken" type="password"></div>
+              <div class="form-field"><label>提炼(LLM)</label>
+                <select id="rcVpnEnrich"><option value="">回退全局</option><option value="1">启用</option><option value="0">关闭</option></select></div>
+              <div class="form-field"><label>语音(TTS)</label>
+                <select id="rcVpnTts"><option value="">回退全局</option><option value="1">启用</option><option value="0">关闭</option></select></div>
+            </div>
+          </div>
+
+          <div class="rc-group"><div class="rc-group-title">③ LLM</div>
+            <div class="form-grid">
+              <div class="form-field"><label>LLM Base URL</label><input id="rcLlmUrl" type="text" placeholder="http://<ip>:<port>/v1"></div>
+              <div class="form-field"><label>LLM 模型</label><input id="rcLlmModel" type="text" placeholder="deepseek-v4-flash"></div>
+              <div class="form-field"><label>LLM API Key</label><input id="rcLlmKey" type="password"></div>
+              <div class="form-field"><label>Provider</label>
+                <select id="rcLlmProvider"><option value="">回退全局</option><option value="local">本地</option><option value="ragflow">本地RAG知识库(不接入)</option></select></div>
+              <div class="form-field"><label>本地RAG知识库 App ID（预留，不接入）</label><input id="rcRagflowApp" type="text"></div>
+              <div class="form-field"><label>本地RAG知识库 KB ID（预留，不接入）</label><input id="rcRagflowKb" type="text"></div>
+            </div>
+          </div>
+
+          <div class="rc-group"><div class="rc-group-title">④ TTS 语音</div>
+            <div class="form-grid">
+              <div class="form-field"><label>TTS Base URL</label><input id="rcTtsBase" type="text"></div>
+              <div class="form-field"><label>引擎</label><input id="rcTtsEngine" type="text" placeholder="CosyVoice3"></div>
+              <div class="form-field"><label>音色 voice（可由探查填充）</label><input id="rcTtsVoice" type="text"></div>
+              <div class="form-field"><label>音色 profile</label><input id="rcTtsProfile" type="text" placeholder="male_mandarin_01"></div>
+              <div class="form-field"><label>性别</label>
+                <select id="rcTtsGender"><option value="">回退全局</option><option value="female">女声</option><option value="male">男声</option></select></div>
+              <div class="form-field"><label>口音</label>
+                <select id="rcTtsDialect"><option value="">回退全局</option><option value="mandarin">普通话</option><option value="cantonese">粤语</option></select></div>
+              <div class="form-field"><label>语速</label><input id="rcTtsSpeed" type="number" step="0.05" placeholder="1.0"></div>
+            </div>
+          </div>
+
+          <div class="rc-group"><div class="rc-group-title">⑤ 向量 Embedding</div>
+            <div class="form-grid">
+              <div class="form-field"><label>Embedding Base URL</label><input id="rcEmbedUrl" type="text" placeholder="http://<ip>:9997"></div>
+              <div class="form-field"><label>Embedding 模型</label><input id="rcEmbedModel" type="text" placeholder="bge-m3"></div>
+            </div>
+          </div>
+
+          <div class="rc-group"><div class="rc-group-title">⑥ 详情页功能与自动聚类</div>
+            <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:center">
+              <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:400"><input type="checkbox" id="featReadAloud" style="width:auto;margin:0"> 启用语音 <span style="font-size:11px;color:#b45309;font-weight:600">⚠ 高级功能，需要服务器 TTS 资源支持，当前暂不提供</span></label>
+              <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:400"><input type="checkbox" id="featTranslate" style="width:auto;margin:0"> 启用翻译</label>
+              <span style="display:inline-flex;align-items:center;gap:8px">
+                <span>主题自动聚类(BERTopic)</span>
+                <style>
+                  .bt-switch{display:inline-flex!important;align-items:center;gap:10px;cursor:pointer;user-select:none;position:relative}
+                  .bt-switch input{position:absolute!important;opacity:0!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
+                  .bt-track{width:46px!important;height:24px!important;min-width:46px!important;max-width:46px!important;border-radius:999px;background:rgba(148,163,184,.45);position:relative;transition:background .18s ease;flex:0 0 auto;display:inline-block!important;box-sizing:border-box}
+                  .bt-thumb{position:absolute!important;top:3px!important;left:3px!important;width:18px!important;height:18px!important;border-radius:50%;background:#fff!important;transition:left .18s ease;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+                  .bt-switch input:checked + .bt-track{background:#1d7f68}
+                  .bt-switch input:checked + .bt-track .bt-thumb{left:25px}
+                  .bt-switch input:focus-visible + .bt-track{outline:2px solid #38bdf8;outline-offset:2px}
+                  .bt-state{font-size:13px;font-weight:700;min-width:56px}
+                  .bt-state.is-off{color:#9ca3af}
+                  .bt-state.is-on{color:#1d7f68}
+                  body.skin-darkblue .bt-state.is-off{color:#8ea6c8}
+                  body.skin-darkblue .bt-state.is-on{color:#7dd3fc}
+                </style>
+                <label class="bt-switch">
+                  <input id="rcEmbedEnable" type="checkbox" onchange="embedEnableGuard();syncEmbedSwitch()">
+                  <span class="bt-track"><span class="bt-thumb"></span></span>
+                  <span class="bt-state is-off" id="rcEmbedEnableState">已关闭</span>
+                </label>
+                <span class="field-note">默认关闭。开启后需服务端 INTEL_EMBEDDING_ENABLED=true 且嵌入地址可达；聚类结果写入自动主题，不覆盖原始 fixed_topics。</span>
+              </span>
+            </div>
+          </div>
+          <div class="rc-group"><div class="rc-group-title">⑦ 数据库 / 代理 / 知识库（可选）</div>
+            <div class="form-grid">
+              <div class="form-field"><label>数据库连接（分布式落库）</label><input id="rcDbUrl" type="text" placeholder="postgresql://user:pass@host:5432"></div>
+              <div class="form-field"><label>数据库名</label><input id="rcDbName" type="text" placeholder="collectinfo_xxx"></div>
+              <div class="form-field"><label>HTTP 代理</label><input id="rcProxyHttp" type="text"></div>
+              <div class="form-field"><label>HTTPS 代理</label><input id="rcProxyHttps" type="text"></div>
+              <div class="form-field"><label>Playwright 代理</label><input id="rcPlayProxy" type="text"></div>
+              <div class="form-field"><label>启用</label><input id="rcEnabled" type="checkbox" checked style="margin-top:14px"></div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+            <button class="action primary" onclick="probeRemote()">探查 capabilities</button>
+            <button class="action" onclick="saveRemote()">保存运行配置</button>
+            <button class="action secondary" onclick="if(confirm('将覆盖表单中未保存的修改，恢复到该行业包已保存的配置？')) loadRemoteConfig()">恢复原来配置</button>
+            <span id="remoteMsg" class="muted" style="align-self:center"></span>
+          </div>
+          <div id="remoteProbeResult" class="impact-list" style="margin-top:12px;display:none"></div>
+        </section>
+      </div>
+    </section>
+  </section>
+</main>
+
+<dialog id="switchConfirmDialog">
+  <div class="dialog-body">
+    <h2>确认激活行业包</h2>
+    <div id="switchConfirmBody"></div>
+    <div class="dialog-actions">
+      <button class="action secondary" type="button" onclick="resolveSwitchDialog(false)">取消</button>
+      <button class="action" type="button" onclick="resolveSwitchDialog(true)">确认激活</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="createDialog">
+  <form class="dialog-body" onsubmit="createPack(event)">
+    <h2>新增行业包</h2>
+    <p class="muted">只创建可编辑草稿，不会自动发布、切换或启动聚合。</p>
+    <div class="dialog-fields">
+      <div class="form-field"><label for="newPackId">行业包 ID</label><input id="newPackId" required pattern="[a-z0-9_]+" placeholder="例如 robotics_news"><p class="field-note">仅小写字母、数字和下划线；删除后 ID 不可复用。</p></div>
+      <div class="form-field"><label for="newPackName">行业名称</label><input id="newPackName" required maxlength="120" placeholder="例如 机器人行业"></div>
+      <div class="form-grid"><div class="form-field"><label for="newDefaultMarket">默认市场</label><input id="newDefaultMarket" value="GLOBAL" maxlength="32"></div><div class="form-field"><label for="newTimezone">时区</label><input id="newTimezone" value="Asia/Hong_Kong" maxlength="64"></div></div>
+    </div>
+    <div id="createStatus" class="status"></div>
+    <div class="dialog-actions"><button class="action secondary" type="button" onclick="closeCreateDialog()">取消</button><button id="createSubmit" class="action" type="submit">创建草稿</button></div>
+  </form>
+</dialog>
+<div id="sourceSmartTooltip" class="source-smart-tooltip" role="tooltip" hidden></div>
+
+<dialog id="sourceSmartDialog">
+  <div class="dialog-body">
+    <h2>智能探测替代 URL</h2>
+    <p class="muted">复用信源管理的智能分析能力，从站点栏目及文章采样中寻找与当前行业关键词匹配的目标。只有确认后才会替换草稿中的 URL。</p>
+    <div id="sourceSmartContext" class="smart-source-context"></div>
+    <div id="sourceSmartStatus" class="status"></div>
+    <div id="sourceSmartResults" class="smart-source-results"></div>
+    <div class="dialog-actions">
+      <button class="action secondary" type="button" onclick="closeSourceSmartDialog()">取消</button>
+      <button id="sourceSmartApply" class="action" type="button" onclick="applySourceSmartSuggestion()" disabled>使用选中 URL</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="deleteDialog">
+  <div class="dialog-body">
+    <h2>删除行业包</h2>
+    <div id="deleteImpact"></div>
+    <div class="form-field"><label for="deleteConfirmation">输入行业包 ID 确认</label><input id="deleteConfirmation" autocomplete="off"></div>
+    <div id="deleteStatus" class="status"></div>
+    <div class="dialog-actions"><button class="action secondary" type="button" onclick="closeDeleteDialog()">取消</button><button id="deleteConfirmButton" class="action danger" type="button" onclick="confirmDeletePack()" disabled>确认删除</button></div>
+  </div>
+</dialog>
+
+<dialog id="topicTestDialog" onclose="stopTopicTestPolling()">
+  <div class="dialog-body">
+    <div class="topic-test-head">
+      <div>
+        <h2 id="topicTestTitle">测试主题搜索词</h2>
+        <p class="topic-test-sub">同一组词分别问两个搜索来源，下面两段结果按位置区分；勾选后可直接派发聚合，文章走正式入库链路。</p>
+      </div>
+      <div class="topic-test-quota" id="topicTestQuota"></div>
+    </div>
+    <div class="topic-test-query" id="topicTestQuery"></div>
+    <div class="topic-test-groups" id="topicTestGroups"></div>
+    <div class="topic-test-progress" id="topicTestProgress" hidden>
+      <div class="topic-test-progress-head">
+        <span id="topicTestProgressSummary"></span>
+        <span class="topic-test-live"><span class="topic-test-dot"></span><span id="topicTestProgressHint"></span></span>
+      </div>
+      <div class="topic-test-filter" id="topicTestFilter">
+        <button class="topic-test-filter-btn is-active" data-filter="all" type="button">全部</button>
+        <button class="topic-test-filter-btn" data-filter="queued" type="button">排队</button>
+        <button class="topic-test-filter-btn" data-filter="running" type="button">聚合中</button>
+        <button class="topic-test-filter-btn" data-filter="crawled" type="button">已入库</button>
+        <button class="topic-test-filter-btn" data-filter="failed" type="button">失败</button>
+      </div>
+      <div class="topic-test-progress-list" id="topicTestProgressList"></div>
+      <div class="topic-test-advice" id="topicTestAdvice" hidden></div>
+    </div>
+    <div class="dialog-actions">
+      <button class="action secondary" type="button" onclick="closeTopicTest()">关闭</button>
+      <button class="action" type="button" id="topicTestCrawlBtn" onclick="crawlSelectedTopicResults()">聚合选中</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+let selected = '';
+let active = '';
+let draft = null;
+let revision = 0;
+let packIndex = {};
+let deletePreview = null;
+let authorityProfiles = {};
+let currentTab = 'overview';
+let sourceSmartRow = null;
+let sourceSmartSuggestions = [];
+
+const $ = id => document.getElementById(id);
+const esc = value => { const node = document.createElement('div'); node.textContent = value ?? ''; return node.innerHTML; };
+const lines = value => (Array.isArray(value) ? value : []).join('\n');
+const splitValues = value => String(value || '').split(/\n|,|，/).map(item => item.trim()).filter(Boolean);
+const values = id => splitValues($(id).value);
+
+const KEYWORD_HELP = {
+  core: '<b>核心词（权重 3）</b>：定义"这个行业是干什么的"。文章正文里出现这些词，才算跟本行业沾边，打分也最重。填行业对象、技术名这类实词。',
+  expanded: '<b>扩展词（权重 1）</b>：补充上下游概念、同义词、场景词。正文出现这些词也能过门禁，但分量轻。窄主题（风洞/NVH/ANC 这类）实际会出现的词建议放这里，好让搜到的文章能被放行。',
+  trend: '<b>趋势词</b>：用来判断"发生了什么长期变化"（政策、监管、增长、报告这类）。只负责给文章打"趋势"标签，不能单独证明文章属于本行业。',
+  event: '<b>事件词</b>：用来判断"发生了什么具体事件"（发布、签约、融资、任命这类）。只负责打"事件"标签，不能单独证明文章属于本行业。',
+  anchor: '<b>硬门禁（门票）</b>：填了词之后，文章正文必须命中这里的至少 1 个词，才能入库——这时候光命中「核心词 / 扩展词」就不算数了，核心词、扩展词只变成加分项。留空 = 不设这道门票，改由「核心词 + 扩展词」当门票（正文命中其中任一即可）。填行业专有名词，别填泛词、别填单字。',
+  entity: '<b>硬门禁（门票）· 备案机构</b>：填机构全称或常用简称（比如某车企、某研究院、某协会）。正文里出现这些机构名，也算拿到"门票"、能通过门禁，而且按核心词的权重（3）额外加分。适合"以机构为准"的行业。留空 = 不设机构门禁。',
+  brand: '<b>品牌（不参与准入）</b>：填重点关注的品牌/机构名。只用于品牌趋势分析、品牌新闻搜索，不参与"能不能入库"的判断。',
+  trendTopics: '<b>趋势主题</b>：趋势分析按这些主题分堆展示。留空就不按主题分，只按整体。',
+  serpapiQueries: '<b>搜索词</b>：告诉搜索引擎主动去搜什么，每行写一条完整查询。搜回来的网址还要过上面的"锚点/核心词"门禁才会入库。窄主题的搜索词在「内部主题」标签页里单独配。',
+  topicKeywords: '<b>归属关键词</b>：文章正文聚合后，正文里出现这些词，才归到"这个主题卡"下面。每行一个词。它不主动去搜，只负责把进来的文章分门别类。',
+  topicSearchQuery: '<b>发现搜索词</b>：三个框、每框一个搜索词，搜索引擎拿这三个词（拼成一条查询）主动去搜。每轮搜索只按日期轮转取 3 个主题去搜，主题越多、轮转一圈越慢（12 个主题 = 4 天一轮）。',
+  topicKey: '<b>主题 key</b>：主题的唯一标识，只允许小写字母/数字/下划线（如 <code>nvh_tech</code>），不会给最终用户看。它用来把文章、搜索词、趋势/品牌都挂到这个主题下。发布后尽量别改，改了会导致已归类的文章和搜索词对不上号。',
+};
+
+let _helpPopover = null;
+function showKeywordHelp(ev, key) {
+  const text = KEYWORD_HELP[key] || '暂无说明';
+  if (!_helpPopover) {
+    _helpPopover = document.createElement('div');
+    _helpPopover.className = 'help-popover';
+    document.body.appendChild(_helpPopover);
+    document.addEventListener('click', (e) => {
+      if (!_helpPopover.contains(e.target) && !e.target.closest('.help-tip')) {
+        _helpPopover.style.display = 'none';
+      }
+    });
+  }
+  _helpPopover.innerHTML = text;
+  _helpPopover.style.display = 'block';
+  const r = ev.currentTarget.getBoundingClientRect();
+  const w = 360;
+  _helpPopover.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+  _helpPopover.style.top = (r.bottom + 8) + 'px';
+}
+
+async function api(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) throw Error(data.error || data.message || `请求失败 HTTP ${response.status}`);
+  return data;
+}
+
+function setStatus(message = '', isError = false) {
+  $('status').textContent = message;
+  $('status').classList.toggle('error', Boolean(isError));
+}
+
+function setTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab-button').forEach(button => {
+    const selectedTab = button.dataset.tab === name;
+    button.classList.toggle('active', selectedTab);
+    button.setAttribute('aria-selected', String(selectedTab));
+  });
+  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === name));
+  // 切 tab 后把内容区滚回顶部：否则会停留在上一个 tab 的滚动位置，
+  // 新面板看起来像"空的"（用户以为没加载出来）。
+  try {
+    const surface = document.querySelector('.editor-surface');
+    if (surface && surface.scrollTop) surface.scrollTop = 0;
+    window.scrollTo(0, 0);
+  } catch (_) { /* 滚动失败不影响切换 */ }
+  if (name === 'remote') loadRemoteConfig();
+}
+
+// ── 分布式服务设置 ──
+async function remoteFetch(path, method, body){ var o={method:method||'GET',headers:{'Content-Type':'application/json'}}; if(body) o.body=JSON.stringify(body); var r=await fetch(path,o); var d; try{d=await r.json();}catch(e){d={};} return d; }
+function setMsg(id,t,ok){ var e=document.getElementById(id); if(e){ e.textContent=t; e.style.color=ok?'#0f766e':'#b91c1c'; } }
+async function loadRemoteConfig(){ if(!selected) return; var d=await remoteFetch('/api/pack-remote-config?industry_pack_id='+encodeURIComponent(selected)); if(!d.success)return; var c=d.config||{};
+  var set=function(id,v){var e=document.getElementById(id); if(e) e.value=(v==null?'':v);};
+  set('rcServerIp',c.server_ip); set('rcServerPort',c.server_port||11236);
+  set('rcSshHost',c.ssh_host); set('rcSshPort',c.ssh_port||22); set('rcSshUser',c.ssh_user); set('rcSshPass',c.ssh_password);
+  set('rcVpnUrl',c.vpn_pipeline_url); set('rcVpnToken',c.vpn_pipeline_token); set('rcVpnEnrich',c.vpn_enrich); set('rcVpnTts',c.vpn_tts);
+  set('rcLlmUrl',c.llm_base_url); set('rcLlmModel',c.llm_model); set('rcLlmKey',c.llm_api_key); set('rcLlmProvider',c.llm_provider);
+  set('rcRagflowApp',c.ragflow_app_id); set('rcRagflowKb',c.ragflow_kb_id);
+  set('rcTtsBase',c.tts_base_url); set('rcTtsEngine',c.tts_engine); set('rcTtsVoice',c.tts_voice); set('rcTtsProfile',c.tts_voice_profile);
+  set('rcTtsGender',c.tts_gender); set('rcTtsDialect',c.tts_dialect); set('rcTtsSpeed',c.tts_speed);
+  set('rcEmbedUrl',c.embedding_base_url); set('rcEmbedModel',c.embedding_model);
+  // 详情页功能开关回填（来自运行时配置 settings.features）
+  var _fr=document.getElementById('featReadAloud'),_ft=document.getElementById('featTranslate');
+  /* 朗读是高级功能（需服务器 TTS 资源），暂不提供：勾选需二次确认，
+     确认后提示联系授权管理员，且复选框复位——普通后台操作无法开启 */
+  if(_fr){ _fr.addEventListener('change', function(){
+    if(!this.checked) return;
+    this.checked = false;
+    var ok = confirm('「启用语音」是高级功能，需要服务器 TTS 语音合成资源支持，并会占用服务器算力，当前暂不提供。确认联系授权管理员开启？');
+    if(ok) alert('该功能需由授权管理员开启，请联系授权管理员。');
+  }); }
+  var _ff=(c.settings&&c.settings.features)||c.features||{};
+  if(_fr)_fr.checked=!!_ff.read_aloud; if(_ft)_ft.checked=!!_ff.translate;
+  set('rcDbUrl',c.db_url); set('rcDbName',c.db_name);
+  set('rcProxyHttp',c.proxy_http); set('rcProxyHttps',c.proxy_https); set('rcPlayProxy',c.playwright_proxy);
+  var en=document.getElementById('rcEnabled'); if(en) en.checked=!(c.enabled===false); }
+async function saveRemote(){ if(!selected){ setMsg('remoteMsg','请先选择行业包',false); return; }
+  var g=function(id){var e=document.getElementById(id); return e?e.value:'';}; var ck=document.getElementById('rcEnabled');
+  var d=await remoteFetch('/api/pack-remote-config','POST',{industry_pack_id:selected,read_aloud:!!(document.getElementById('featReadAloud')||{}).checked,translate:!!(document.getElementById('featTranslate')||{}).checked,server_ip:g('rcServerIp'),server_port:g('rcServerPort'),ssh_host:g('rcSshHost'),ssh_port:g('rcSshPort'),ssh_user:g('rcSshUser'),ssh_password:g('rcSshPass'),vpn_pipeline_url:g('rcVpnUrl'),vpn_pipeline_token:g('rcVpnToken'),vpn_enrich:g('rcVpnEnrich'),vpn_tts:g('rcVpnTts'),llm_base_url:g('rcLlmUrl'),llm_model:g('rcLlmModel'),llm_api_key:g('rcLlmKey'),llm_provider:g('rcLlmProvider'),ragflow_app_id:g('rcRagflowApp'),ragflow_kb_id:g('rcRagflowKb'),tts_base_url:g('rcTtsBase'),tts_engine:g('rcTtsEngine'),tts_voice:g('rcTtsVoice'),tts_voice_profile:g('rcTtsProfile'),tts_gender:g('rcTtsGender'),tts_dialect:g('rcTtsDialect'),tts_speed:g('rcTtsSpeed'),embedding_base_url:g('rcEmbedUrl'),embedding_model:g('rcEmbedModel'),db_url:g('rcDbUrl'),db_name:g('rcDbName'),proxy_http:g('rcProxyHttp'),proxy_https:g('rcProxyHttps'),playwright_proxy:g('rcPlayProxy'),enabled:ck?ck.checked:true}); setMsg('remoteMsg', d.success?'已保存':(d.message||'失败'), d.success); }
+async function probeRemote(){ if(!selected) return; setMsg('remoteMsg','探查中…'); var d=await remoteFetch('/api/pack-remote-config/probe?industry_pack_id='+encodeURIComponent(selected)); var p=d.probe||{}; var box=document.getElementById('remoteProbeResult'); box.style.display='block';
+  function voiceMeta(v){v=String(v||'').toLowerCase();return {dialect:(v.indexOf('cantonese')>=0?'cantonese':(v.indexOf('mandarin')>=0?'mandarin':'')),gender:(v.indexOf('female')>=0?'female':(v.indexOf('male')>=0?'male':'')),voice:v};}
+  var fill=function(id,v){var e=document.getElementById(id); if(e && v!=null && v!=='') e.value=v; return (e&&e.value)?e.value:'';};
+  // 1) 用解析后的全变量回填（只填空字段，已有值不动）
+  var r=p.resolved||{};
+  fill('rcServerIp',r.server_ip); fill('rcServerPort',r.server_port);
+  fill('rcSshHost',r.ssh_host); fill('rcSshPort',r.ssh_port); fill('rcSshUser',r.ssh_user); fill('rcSshPass',r.ssh_password);
+  fill('rcVpnUrl',r.vpn_pipeline_url); fill('rcVpnToken',r.vpn_pipeline_token); fill('rcVpnEnrich',r.vpn_enrich); fill('rcVpnTts',r.vpn_tts);
+  fill('rcLlmUrl',r.llm_base_url); fill('rcLlmModel',r.llm_model); fill('rcLlmKey',r.llm_api_key); fill('rcLlmProvider',r.llm_provider);
+  fill('rcTtsBase',r.tts_base_url); fill('rcTtsEngine',r.tts_engine); fill('rcTtsVoice',r.tts_voice); fill('rcTtsProfile',r.tts_voice_profile);
+  fill('rcTtsGender',r.tts_gender); fill('rcTtsDialect',r.tts_dialect); fill('rcTtsSpeed',r.tts_speed);
+  fill('rcEmbedUrl',r.embedding_base_url); fill('rcEmbedModel',r.embedding_model);
+  fill('rcDbUrl',r.db_url); fill('rcDbName',r.db_name);
+  fill('rcProxyHttp',r.proxy_http); fill('rcProxyHttps',r.proxy_https); fill('rcPlayProxy',r.playwright_proxy);
+  // 2) TTS voice：若解析值空，则从 voices 推断一个
+  if(!fill('rcTtsVoice','') && (p.voices||[]).length){
+    var curDialect=document.getElementById('rcTtsDialect').value;
+    var sel=(p.voices||[]).find(function(v){return curDialect && voiceMeta(v).dialect===curDialect;})
+      || (p.voices||[]).find(function(v){return voiceMeta(v).dialect==='mandarin';}) || p.voices[0];
+    var meta=voiceMeta(sel);
+    fill('rcTtsVoice',meta.voice);
+    if(meta.dialect){var de=document.getElementById('rcTtsDialect'); if(de&&!de.value) de.value=meta.dialect;}
+    if(meta.gender){var ge=document.getElementById('rcTtsGender'); if(ge&&!ge.value) ge.value=meta.gender;}
+  }
+  var dot=function(v){return '<span style="color:'+(v?'#22c55e':'#ef4444')+'">'+(v?'●':'●')+'</span>';};
+  box.innerHTML=
+    '<b>VPN Pipeline：</b>'+dot(p.ok)+(p.ok?('正常 v'+(p.version||'')):('不可达 '+(p.error||'')))+'<br>'+
+    '<b>LLM：</b>'+dot(p.ollama!==undefined?p.ollama:p.ok)+(p.llm_models&&p.llm_models.length?('模型 '+p.llm_models.join(',')):'')+'<br>'+
+    '<b>TTS：</b>'+dot(!!p.tts_ok)+(p.tts_ok?('OK，voices '+(p.voices||[]).length):'异常')+'<br>'+
+    '<b>Embedding：</b>'+dot(!!(p.embedding&&p.embedding.ok))+((p.embedding&&p.embedding.base_url)?(p.embedding.base_url):'预留')+((p.embedding&&p.embedding.enabled)?' · <span style="color:#22c55e">【启用】</span>':' · <span style="color:#b45309">【未启用】</span>')+'<br>'+
+    '<b>数据库：</b>'+((p.database&&p.database.mode==='per_pack')
+        ? '<span style="color:#38bdf8">■ 按行业分库模式</span>'+((p.database&&p.database.url)?'（'+p.database.url+'）':'')
+        : '<span style="color:#22c55e">■ 集中部署模式</span>')+
+      ' | 主库位置：'+((p.database&&p.database.location)||'未定')+'<br>'+
+    '<b>备份：</b>'+((p.database&&p.database.periodic)?'<span style="color:#22c55e">有定期备份</span>':'<span style="color:#b45309">无定期备份</span>')+
+      ((p.database&&p.database.backup_path)?('（备份位：'+p.database.backup_path+'）'):'')+'<br>'+
+    '<b>代理：</b>'+dot(!!(p.proxy&&p.proxy.ok))+((p.proxy&&p.proxy.http)?p.proxy.http:'未配置');
+  setMsg('remoteMsg', p.ok?'探查成功（已回填可配置项）':'探查失败/部分失败', p.ok); }
+function syncEmbedSwitch(){
+  var ck=document.getElementById('rcEmbedEnable'), lb=document.getElementById('rcEmbedEnableState');
+  if(!ck||!lb) return;
+  var on = !!ck.checked;
+  lb.textContent = on ? '已开启' : '已关闭';
+  lb.className = 'bt-state ' + (on ? 'is-on' : 'is-off');
+}
+document.addEventListener('DOMContentLoaded', syncEmbedSwitch);
+setTimeout(syncEmbedSwitch, 800); setTimeout(syncEmbedSwitch, 2000);
+function embedEnableGuard(){ var ck=document.getElementById('rcEmbedEnable'); if(!ck) return;
+  if(!ck.checked) return;
+  var url=(document.getElementById('rcEmbedUrl').value||'').trim();
+  if(!url){ alert('当前没有配置 embedding 服务有效地址，无法开启主题自动聚类。请先在「⑤ 向量 Embedding」填有效 Base URL。'); ck.checked=false; return; }
+  if(!/^https?:\/\/.+/.test(url)){ alert('Embedding Base URL 无效，需以 http(s):// 开头。'); ck.checked=false; return; }
+  alert('已请求开启主题自动聚类(BERTopic/Embedding)。注意：需服务端 INTEL_EMBEDDING_ENABLED=true 且该地址可达；开启后 dashboard 主题卡将按聚类重新计算（写入自动主题，不覆盖原始 fixed_topics）。'); }
+
+function authorityOptions(selectedRole) {
+  return Object.entries(authorityProfiles).map(([key, value]) =>
+    `<option value="${esc(key)}" ${key === (selectedRole || 'unclassified') ? 'selected' : ''}>${esc(value.label || key)}（${Number(value.weight || 1)}）</option>`
+  ).join('');
+}
+
+const validationLabels = {
+  active: ['有效', 'active'],
+  disabled_by_default: ['默认停用', 'neutral'],
+  validation_failed: ['校验失败', 'error'],
+  blocked_403: ['访问受限 403', 'error'],
+  inactive_suspected: ['疑似停更', 'warning'],
+  directory_only: ['目录页', 'warning'],
+  manual_review_required: ['需人工处理', 'warning'],
+};
+const smartRepairStatuses = new Set([
+  'validation_failed', 'blocked_403', 'inactive_suspected',
+  'directory_only', 'manual_review_required',
+]);
+const sourceSmartTooltipText = '智能探测会分析当前站点的栏目链接和文章样本，寻找更匹配本行业关键词的替代 URL；建议需人工确认，不会自动启用或发布。';
+
+function hideSourceSmartTooltip() {
+  const tip = $('sourceSmartTooltip');
+  if (tip) tip.hidden = true;
+}
+
+function showSourceSmartTooltip(button) {
+  const tip = $('sourceSmartTooltip');
+  if (!tip || button.hidden) return;
+  tip.textContent = button.dataset.tooltip || sourceSmartTooltipText;
+  tip.hidden = false;
+  const buttonRect = button.getBoundingClientRect();
+  const tipRect = tip.getBoundingClientRect();
+  const left = Math.min(
+    window.innerWidth - tipRect.width - 12,
+    Math.max(12, buttonRect.right - tipRect.width)
+  );
+  const preferredTop = buttonRect.top - tipRect.height - 8;
+  tip.style.left = `${left}px`;
+  tip.style.top = `${preferredTop >= 8 ? preferredTop : buttonRect.bottom + 8}px`;
+}
+
+function bindSourceSmartTooltip(button) {
+  button.addEventListener('mouseenter', () => showSourceSmartTooltip(button));
+  button.addEventListener('mouseleave', hideSourceSmartTooltip);
+  button.addEventListener('focus', () => showSourceSmartTooltip(button));
+  button.addEventListener('blur', hideSourceSmartTooltip);
+}
+
+function setSourceRowValidation(row, status, message = '') {
+  const [label, statusClass] = validationLabels[status] || ['手工来源', 'neutral'];
+  row.dataset.validation = status || 'manual';
+  const validation = row.querySelector('.source-validation');
+  validation.title = message || label;
+  validation.innerHTML = `<span class="status-chip ${statusClass}">${esc(label)}</span>`;
+  const smartButton = row.querySelector('.source-smart-button');
+  if (smartButton) smartButton.hidden = !smartRepairStatuses.has(status);
+}
+
+function sourceRow(source = {}) {
+  const row = document.createElement('div');
+  const status = source.validation_status || '';
+  const [statusLabel, statusClass] = validationLabels[status] || ['手工来源', 'neutral'];
+  row.className = 'source-row';
+  row.dataset.validation = status || 'manual';
+  row.dataset.search = `${source.name || ''} ${source.url || ''} ${source.source_import_id || ''}`.toLocaleLowerCase();
+  row.innerHTML = `
+    <input data-key="name" aria-label="来源名称" placeholder="名称" value="${esc(source.name || '')}">
+    <input data-key="url" aria-label="来源 URL" placeholder="https://example.com/feed" value="${esc(source.url || '')}">
+    <select data-key="source_role" aria-label="来源角色">${authorityOptions(source.source_role)}</select>
+    <select data-key="source_type" aria-label="来源类型"><option value="website">网站</option><option value="list_page">列表页</option><option value="rss">RSS</option></select>
+    <input data-key="polling_interval_minutes" aria-label="聚合频率" type="number" min="5" max="10080" value="${Number(source.polling_interval_minutes || 1440)}">
+    <input data-key="authority_level" aria-label="可信度" type="number" min="1" max="5" value="${Number(source.authority_level || authorityProfiles[source.source_role]?.weight || 1)}">
+    <label class="source-enabled" title="是否启用"><input data-key="is_enabled" aria-label="启用来源" type="checkbox" ${source.is_enabled === false ? '' : 'checked'}></label>
+    <span class="source-validation" title="${esc(source.error || statusLabel)}"><span class="status-chip ${statusClass}">${esc(statusLabel)}</span></span>
+    <div class="source-actions">
+      <button class="icon-button source-learn-button" type="button" aria-label="检查学习" title="检查学习：自动抓取列表页、挑选样例并学习标题/链接提取模板，之后爬取该站自动应用">
+        <i class="fa fa-flask"></i>
+      </button>
+      <button class="icon-button source-smart-button" type="button" aria-label="智能探测替代 URL" aria-describedby="sourceSmartTooltip" title="${sourceSmartTooltipText}" data-tooltip="${sourceSmartTooltipText}" ${smartRepairStatuses.has(status) ? '' : 'hidden'}>
+        <svg class="source-smart-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m15 4 5 5L9 20H4v-5L15 4Z" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M6.5 4.5v-2M5.5 3.5h2M19.5 17.5v-3M18 16h3" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-button danger source-delete-button" type="button" aria-label="删除信源" title="删除">×</button>
+    </div>`;
+  row.querySelector('[data-key="source_type"]').value = source.source_type || 'website';
+  row.querySelector('[data-key="source_role"]').onchange = event => {
+    row.querySelector('[data-key="authority_level"]').value = Number(authorityProfiles[event.target.value]?.weight || 1);
+  };
+  row.querySelector('[data-key="source_type"]').onchange = updateSourceStats;
+  row.querySelector('[data-key="is_enabled"]').onchange = () => { updateSourceStats(); filterSources(); };
+  row.querySelector('[data-key="name"]').oninput = updateSourceSearchIndex;
+  row.querySelector('[data-key="url"]').oninput = updateSourceSearchIndex;
+  const smartButton = row.querySelector('.source-smart-button');
+  bindSourceSmartTooltip(smartButton);
+  smartButton.onclick = () => { hideSourceSmartTooltip(); openSourceSmartRepair(row); };
+  const learnButton = row.querySelector('.source-learn-button');
+  learnButton.onclick = () => learnSourceTemplate(row);
+  row.querySelector('.source-delete-button').onclick = () => { row.remove(); updateSourceStats(); filterSources(); };
+  row.dataset.extra = JSON.stringify(Object.fromEntries(Object.entries(source).filter(([key]) => ![
+    'name', 'url', 'source_role', 'source_type', 'polling_interval_minutes', 'authority_level', 'is_enabled'
+  ].includes(key))));
+  return row;
+}
+
+function updateSourceSearchIndex(event) {
+  const row = event.target.closest('.source-row');
+  const extra = JSON.parse(row.dataset.extra || '{}');
+  row.dataset.search = `${row.querySelector('[data-key="name"]').value} ${row.querySelector('[data-key="url"]').value} ${extra.source_import_id || ''}`.toLocaleLowerCase();
+  filterSources();
+}
+
+function addSource(source = {}) {
+  $('sources').appendChild(sourceRow(source));
+  updateSourceStats();
+  filterSources();
+  var sc=$('sources'); if(sc && sc.lastElementChild){ try{ sc.lastElementChild.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){} }
+}
+
+// ── 阶段4：信源「检查」一键学习（自动抓取→选样例→学模板→存储；爬取时自动应用）──
+async function learnSourceTemplate(row) {
+  const button = row.querySelector('.source-learn-button');
+  const name = row.querySelector('[data-key="name"]').value.trim() || '未命名信源';
+  const url = row.querySelector('[data-key="url"]').value.trim();
+  if (!/^https?:\/\//i.test(url)) {
+    setStatus('检查学习需要有效的 http(s) URL，请先填写来源 URL。');
+    return;
+  }
+  if (button) { button.disabled = true; button.classList.add('is-busy'); }
+  try {
+    const payload = await api('/api/intel/sources/check-learn', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url}),
+    });
+    setStatus(`「${name}」检查学习完成：自动学到 ${payload.sample_count} 条标题/链接模板（标题平均 ${payload.title_avg_len} 字），此后爬取该站将自动应用模型提取。`);
+  } catch (error) {
+    setStatus(`「${name}」检查学习失败：${error.message}`);
+  } finally {
+    if (button) { button.disabled = false; button.classList.remove('is-busy'); }
+  }
+}
+
+function smartSourceKeywords() {
+  const gate = draft?.candidate_gate || {};
+  const candidates = [
+    ...(gate.anchor_keywords || []),
+    ...(gate.entity_keywords || []),
+    ...values('coreKeywords'),
+    ...values('expandedKeywords'),
+  ];
+  const seen = new Set();
+  return candidates.map(value => String(value || '').trim()).filter(value => {
+    const key = value.toLocaleLowerCase();
+    if (!value || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 50);
+}
+
+function closeSourceSmartDialog() {
+  $('sourceSmartDialog').close();
+  sourceSmartRow = null;
+  sourceSmartSuggestions = [];
+}
+
+function renderSourceSmartSuggestions(payload, currentUrl) {
+  sourceSmartSuggestions = (payload.suggestions || []).filter(item => item && item.url);
+  const results = $('sourceSmartResults');
+  if (!sourceSmartSuggestions.length) {
+    results.innerHTML = '<div class="source-empty" style="display:block">未发现可替换栏目。可尝试填写站点首页，或调整行业核心/扩展关键词后再次探测。</div>';
+    $('sourceSmartApply').disabled = true;
+    return;
+  }
+  let preferred = sourceSmartSuggestions.findIndex(item => !item.is_current && String(item.url) !== currentUrl);
+  if (preferred < 0) preferred = 0;
+  results.innerHTML = sourceSmartSuggestions.map((item, index) => {
+    const matched = (item.matched_keywords || []).join('、');
+    const sourceLabel = item.source === 'site_search_verified'
+      ? '站内搜索验证'
+      : (item.source === 'site_search_verified_section' ? '命中文章所在栏目' : '栏目采样');
+    const title = item.link_text || item.title || item.url;
+    return `<label class="smart-source-option">
+      <input type="radio" name="source-smart-choice" value="${index}" ${index === preferred ? 'checked' : ''}>
+      <span>
+        <strong>${esc(title)}${item.is_current ? '（当前 URL）' : ''}</strong>
+        <span class="smart-source-url">${esc(item.url)}</span>
+        <span class="smart-source-evidence">${esc(sourceLabel)} · 命中 ${Number(item.match_count || 0)}/${Number(item.sample_total || 0)}${matched ? ` · ${esc(matched)}` : ''}</span>
+      </span>
+    </label>`;
+  }).join('');
+  results.querySelectorAll('input').forEach(input => {
+    input.onchange = () => { $('sourceSmartApply').disabled = false; };
+  });
+  $('sourceSmartApply').disabled = false;
+}
+
+async function openSourceSmartRepair(row) {
+  sourceSmartRow = row;
+  sourceSmartSuggestions = [];
+  const name = row.querySelector('[data-key="name"]').value.trim() || '未命名信源';
+  const url = row.querySelector('[data-key="url"]').value.trim();
+  const keywords = smartSourceKeywords();
+  $('sourceSmartContext').innerHTML = `<b>${esc(name)}</b><br>${esc(url || '尚未填写 URL')}<br><span class="muted">探测关键词：${esc(keywords.slice(0, 12).join('、') || '无')}</span>`;
+  $('sourceSmartStatus').textContent = '';
+  $('sourceSmartStatus').classList.remove('error');
+  $('sourceSmartResults').innerHTML = '<div class="source-empty" style="display:block">正在聚合站点栏目并采样文章，请稍候…</div>';
+  $('sourceSmartApply').disabled = true;
+  $('sourceSmartDialog').showModal();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    $('sourceSmartStatus').textContent = '当前 URL 必须先具备 http:// 或 https:// 及有效域名，才能从站点进行智能探测。';
+    $('sourceSmartStatus').classList.add('error');
+    $('sourceSmartResults').replaceChildren();
+    return;
+  }
+  if (!keywords.length) {
+    $('sourceSmartStatus').textContent = '当前行业包没有可用于采样验证的核心或扩展关键词。';
+    $('sourceSmartStatus').classList.add('error');
+    $('sourceSmartResults').replaceChildren();
+    return;
+  }
+  try {
+    const payload = await api('/api/schedule-management/smart-url-suggestions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url, keywords: keywords.join(','), max_results: 8}),
+    });
+    $('sourceSmartStatus').textContent = (payload.suggestions || []).length
+      ? `发现 ${(payload.suggestions || []).length} 个候选栏目，最佳采样命中 ${Number(payload.best_match_count || 0)} 篇。`
+      : '探测完成，但没有找到与当前行业关键词匹配的替代栏目。';
+    renderSourceSmartSuggestions(payload, url);
+  } catch (error) {
+    $('sourceSmartStatus').textContent = `智能探测失败：${error.message}`;
+    $('sourceSmartStatus').classList.add('error');
+    $('sourceSmartResults').replaceChildren();
+  }
+}
+
+function applySourceSmartSuggestion() {
+  if (!sourceSmartRow) return;
+  const checked = $('sourceSmartResults').querySelector('input[name="source-smart-choice"]:checked');
+  const suggestion = checked ? sourceSmartSuggestions[Number(checked.value)] : null;
+  if (!suggestion?.url) {
+    $('sourceSmartStatus').textContent = '请先选择一个候选 URL。';
+    $('sourceSmartStatus').classList.add('error');
+    return;
+  }
+  const urlInput = sourceSmartRow.querySelector('[data-key="url"]');
+  if (urlInput.value.trim() === suggestion.url) {
+    $('sourceSmartStatus').textContent = '选中项与当前 URL 相同，请选择其他候选地址。';
+    $('sourceSmartStatus').classList.add('error');
+    return;
+  }
+  const previousUrl = urlInput.value.trim();
+  urlInput.value = suggestion.url;
+  sourceSmartRow.querySelector('[data-key="is_enabled"]').checked = false;
+  const extra = JSON.parse(sourceSmartRow.dataset.extra || '{}');
+  extra.validation_status = 'manual_review_required';
+  extra.error = `智能探测已将 ${previousUrl} 替换为候选 URL；重新校验并确认后再启用`;
+  sourceSmartRow.dataset.extra = JSON.stringify(extra);
+  setSourceRowValidation(sourceSmartRow, extra.validation_status, extra.error);
+  urlInput.dispatchEvent(new Event('input', {bubbles: true}));
+  updateSourceStats();
+  filterSources();
+  setStatus(`已用智能探测候选替换“${sourceSmartRow.querySelector('[data-key="name"]').value.trim()}”的 URL；该信源保持停用并等待人工复核。`);
+  closeSourceSmartDialog();
+}
+
+function filterSources() {
+  const query = String($('sourceSearch')?.value || '').trim().toLocaleLowerCase();
+  const filter = $('sourceFilter')?.value || 'all';
+  let visible = 0;
+  document.querySelectorAll('#sources .source-row').forEach(row => {
+    const enabled = row.querySelector('[data-key="is_enabled"]').checked;
+    const validation = row.dataset.validation || 'manual';
+    const issue = validation !== 'manual' && validation !== 'active';
+    const statusMatch = filter === 'all'
+      || (filter === 'enabled' && enabled)
+      || (filter === 'disabled' && !enabled)
+      || (filter === 'active' && validation === 'active')
+      || (filter === 'issues' && issue)
+      || (filter === 'manual' && validation === 'manual');
+    const show = statusMatch && (!query || row.dataset.search.includes(query));
+    row.classList.toggle('filtered-out', !show);
+    if (show) visible += 1;
+  });
+  if ($('sourceEmpty')) $('sourceEmpty').style.display = visible ? 'none' : 'block';
+}
+
+function updateSourceStats() {
+  const rows = [...document.querySelectorAll('#sources .source-row')];
+  $('sourceTotal').textContent = rows.length;
+  $('sourceEnabled').textContent = rows.filter(row => row.querySelector('[data-key="is_enabled"]').checked).length;
+  $('sourceRss').textContent = rows.filter(row => row.querySelector('[data-key="source_type"]').value === 'rss').length;
+  $('sourceIssues').textContent = rows.filter(row => !['manual', 'active'].includes(row.dataset.validation || 'manual')).length;
+}
+
+function moveTopic(row, direction) {
+  const sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+  if (!sibling) return;
+  if (direction < 0) row.parentNode.insertBefore(row, sibling);
+  else row.parentNode.insertBefore(sibling, row);
+}
+
+function topicRow(topic={}) {
+  const row = document.createElement('div');
+  row.className = 'topic-row';
+  row.innerHTML = `
+    <input data-key="key" pattern="[a-z0-9_]+" maxlength="80" placeholder="例如 nvh_acoustics">
+    <input data-key="name" maxlength="120" placeholder="例如 NVH与声学">
+    <textarea data-key="keywords" placeholder="每行一个主题关键词"></textarea>
+    <div class="topic-search-terms">
+      <input data-key="searchTerm1" maxlength="200" placeholder="搜索词 1（可选）">
+      <input data-key="searchTerm2" maxlength="200" placeholder="搜索词 2（可选）">
+      <input data-key="searchTerm3" maxlength="200" placeholder="搜索词 3（可选）">
+    </div>
+    <div class="topic-actions"><button class="icon-button" type="button" aria-label="测试搜索词" title="测试搜索词：当场搜一轮，可试聚合入库">测</button><button class="icon-button" type="button" aria-label="主题上移" title="上移">↑</button><button class="icon-button" type="button" aria-label="主题下移" title="下移">↓</button><button class="icon-button danger" type="button" aria-label="删除主题" title="删除">×</button></div>`;
+  row.querySelector('[data-key="key"]').value = topic.key || '';
+  row.querySelector('[data-key="name"]').value = topic.name || '';
+  row.querySelector('[data-key="keywords"]').value = lines(topic.keywords);
+  const terms = topic.search_terms || ['', '', ''];
+  row.querySelector('[data-key="searchTerm1"]').value = terms[0] || '';
+  row.querySelector('[data-key="searchTerm2"]').value = terms[1] || '';
+  row.querySelector('[data-key="searchTerm3"]').value = terms[2] || '';
+  row.dataset.extra = JSON.stringify(Object.fromEntries(Object.entries(topic).filter(([key]) => !['key', 'name', 'keywords', 'search_terms', 'search_query'].includes(key))));
+  const buttons = row.querySelectorAll('button');
+  buttons[0].onclick = () => openTopicTest(row);
+  buttons[1].onclick = () => moveTopic(row, -1);
+  buttons[2].onclick = () => moveTopic(row, 1);
+  buttons[3].onclick = () => row.remove();
+  return row;
+}
+
+function nextTopicKey() {
+  // 生成一个当前主题列表里没用过的合法 key（PACK_ID_PATTERN = [a-z0-9_]+）
+  const used = new Set([...$('topics').querySelectorAll('[data-key="key"]')]
+    .map(input => input.value.trim().toLowerCase()).filter(Boolean));
+  let index = 1;
+  while (used.has('topic_' + index)) index += 1;
+  return 'topic_' + index;
+}
+
+function addTopic(topic = {}) {
+  const tq = (draft && draft.topic_search_queries) || {};
+  const raw = topic.search_query || tq[topic.key] || '';
+  const terms = Array.isArray(raw) ? raw : String(raw).split(/\s+/).filter(Boolean);
+  const row = topicRow({ ...topic, search_terms: [terms[0] || '', terms[1] || '', terms[2] || ''] });
+  $('topics').appendChild(row);
+  // 新建主题立即给一个合法且不重复的 key：运营不必自己编，也不会拖到发布/激活时
+  // 才被服务端以 fixed_topics[N].key is invalid or duplicated 这种下标错误拒掉。
+  if (!String(topic.key || '').trim()) {
+    const input = row.querySelector('[data-key="key"]');
+    input.value = nextTopicKey();
+    input.classList.add('key-auto');
+  }
+  return row;
+}
+
+// ── 主题搜索词测试 ──────────────────────────────────────────────
+// 调搜索词不该只能走"存草稿 → 发布新版本 → 等下一轮采集"：这里当场搜一轮看结果，
+// 勾选后直接派发聚合（走与正式采集相同的入库链路），并按批次回读进度。每主题限 5 次。
+let topicTestState = null;
+let topicTestTimer = null;
+let topicTestGateExpanded = false;
+let topicTestAnchorExpanded = false;
+
+const TOPIC_TEST_STATUS = {
+  discovered: ['排队', 'queued'],
+  queued: ['排队', 'queued'],
+  dispatching: ['聚合中', 'running'],
+  crawled: ['已入库', 'crawled'],
+  retry_wait: ['重试中', 'failed'],
+  failed: ['失败', 'failed'],
+  discarded: ['已丢弃', 'failed'],
+};
+
+function stopTopicTestPolling() {
+  if (topicTestTimer) { clearInterval(topicTestTimer); topicTestTimer = null; }
+}
+
+function closeTopicTest() {
+  stopTopicTestPolling();
+  // 关闭测试窗口时清理本次测试派发但未入库的候选（用户要求：测试任务不留残留）
+  const state = topicTestState;
+  if (state && state.scanRunId) {
+    const url = '/api/intel/industry-packs/' + encodeURIComponent(selected) + '/topic-search/cleanup';
+    api(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({scan_run_id: state.scanRunId}),
+    }).catch(() => {});
+  }
+  topicTestState = null;
+  const dialog = $('topicTestDialog');
+  if (dialog && dialog.open) dialog.close();
+}
+
+function topicTestTermsOf(row) {
+  return ['searchTerm1', 'searchTerm2', 'searchTerm3']
+    .map(key => {
+      const input = row.querySelector('[data-key="' + key + '"]');
+      return input ? input.value.trim() : '';
+    })
+    .filter(Boolean);
+}
+
+function topicTestHint(message, isError) {
+  const node = document.createElement('div');
+  node.className = 'topic-test-empty';
+  node.textContent = message;
+  if (isError) node.style.color = 'var(--admin-danger)';
+  return node;
+}
+
+async function openTopicTest(row) {
+  const keyInput = row.querySelector('[data-key="key"]');
+  const nameInput = row.querySelector('[data-key="name"]');
+  const topicKey = (keyInput ? keyInput.value : '').trim();
+  const topicName = (nameInput ? nameInput.value : '').trim();
+  if (!topicKey) { setStatus('这个主题还没有 key，先填一个再测试', true); return; }
+  const terms = topicTestTermsOf(row);
+  if (!terms.length) { setStatus('这个主题还没填搜索词，先填一个再测试', true); return; }
+
+  topicTestState = { topicKey: topicKey, topicName: topicName, terms: terms, query: '', groups: [], scanRunId: 0 };
+  topicTestGateExpanded = false;
+  topicTestAnchorExpanded = false;
+  $('topicTestTitle').textContent = '测试搜索词 · ' + (topicName || topicKey);
+  $('topicTestQuota').textContent = '';
+  $('topicTestQuery').textContent = '搜索词：' + terms.join(' ');
+  $('topicTestGroups').replaceChildren(topicTestHint('正在搜索…', false));
+  $('topicTestProgress').hidden = true;
+  $('topicTestProgressList').replaceChildren();
+  $('topicTestProgressSummary').textContent = '';
+  $('topicTestProgressHint').textContent = '';
+  $('topicTestCrawlBtn').disabled = true;
+  $('topicTestCrawlBtn').textContent = '聚合选中';
+
+  const dialog = $('topicTestDialog');
+  if (!dialog.open) dialog.showModal();
+  await runTopicTestSearch();
+}
+
+async function runTopicTestSearch() {
+  const state = topicTestState;
+  if (!state) return;
+  const url = '/api/intel/industry-packs/' + encodeURIComponent(selected) + '/topic-search/preview';
+  try {
+    const payload = await api(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic_key: state.topicKey, terms: state.terms}),
+    });
+    state.query = payload.query || '';
+    state.groups = Array.isArray(payload.groups) ? payload.groups : [];
+    $('topicTestQuery').textContent = '搜索词：' + state.query;
+    const usage = payload.usage || {};
+    $('topicTestQuota').textContent = '本主题剩余 ' + usage.remaining + ' / ' + usage.limit + ' 次';
+    renderTopicTestGroups();
+  } catch (error) {
+    $('topicTestGroups').replaceChildren(topicTestHint(error.message || '搜索失败', true));
+  }
+}
+
+function renderTopicTestGroups() {
+  const state = topicTestState;
+  const container = $('topicTestGroups');
+  container.replaceChildren();
+  if (!state || !state.groups.length) { container.append(topicTestHint('没有拿到结果', false)); return; }
+  // 跨引擎去重：两个引擎可能搜到同一个 URL，只在先出现的引擎里显示
+  const seenUrls = new Set();
+  state.groups.forEach((group, groupIndex) => {
+    const rawResults = Array.isArray(group.results) ? group.results : [];
+    const kept = [];
+    rawResults.forEach((item, rawIndex) => {
+      const url = item && item.url;
+      if (!url || seenUrls.has(url)) return;
+      seenUrls.add(url);
+      kept.push({item: item, rawIndex: rawIndex});
+    });
+    const box = document.createElement('div');
+    box.className = 'topic-test-group';
+    const head = document.createElement('div');
+    head.className = 'topic-test-group-head';
+    const label = document.createElement('span');
+    // 引擎标识：上段=引擎G、下段=引擎T（缩写，不写全名）
+    const engineTag = groupIndex === 0 ? '【引擎G】' : '【引擎T】';
+    const dupCount = rawResults.length - kept.length;
+    label.textContent = engineTag + ' ' + (kept.length ? '共 ' + kept.length + ' 条结果' : '没有结果')
+      + (dupCount > 0 ? '（去重 ' + dupCount + ' 条）' : '');
+    head.append(label);
+    if (group.error) {
+      const err = document.createElement('span');
+      err.textContent = group.error;
+      err.style.color = 'var(--admin-danger)';
+      head.append(err);
+    }
+    box.append(head);
+    if (!kept.length) {
+      box.append(topicTestHint(group.error ? '这个来源没有返回结果' : '没有结果', false));
+    }
+    kept.forEach(entry => box.append(topicTestResultNode(entry.item, groupIndex, entry.rawIndex)));
+    container.append(box);
+  });
+  updateTopicTestCrawlButton();
+}
+
+function topicTestResultNode(item, groupIndex, itemIndex) {
+  const wrap = document.createElement('div');
+  wrap.className = 'topic-test-item';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = true;
+  checkbox.dataset.group = String(groupIndex);
+  checkbox.dataset.index = String(itemIndex);
+  checkbox.onchange = updateTopicTestCrawlButton;
+  const body = document.createElement('div');
+  body.className = 'topic-test-item-body';
+  // 标题做成链接，新窗口打开
+  const title = document.createElement('a');
+  title.className = 'topic-test-item-title';
+  title.href = item.url || '#';
+  title.target = '_blank';
+  title.rel = 'noopener noreferrer';
+  title.textContent = item.title || item.url || '(无标题)';
+  const link = document.createElement('div');
+  link.className = 'topic-test-item-url';
+  link.textContent = item.url || '';
+  body.append(title, link);
+  if (item.summary) {
+    const summary = document.createElement('div');
+    summary.className = 'topic-test-item-summary';
+    summary.textContent = item.summary;
+    body.append(summary);
+  }
+  // 点击 body（非链接区域）切换勾选，替代原 label 行为；点链接只打开新窗口、不切换勾选
+  body.addEventListener('click', event => {
+    if (event.target.tagName !== 'A') {
+      checkbox.checked = !checkbox.checked;
+      updateTopicTestCrawlButton();
+    }
+  });
+  wrap.append(checkbox, body);
+  return wrap;
+}
+
+function selectedTopicTestItems() {
+  const state = topicTestState;
+  if (!state) return [];
+  const picked = [];
+  $('topicTestGroups').querySelectorAll('input[type="checkbox"]').forEach(box => {
+    if (!box.checked) return;
+    const group = state.groups[Number(box.dataset.group)] || {};
+    const item = (group.results || [])[Number(box.dataset.index)];
+    if (item && item.url) picked.push(item);
+  });
+  return picked;
+}
+
+function updateTopicTestCrawlButton() {
+  const count = selectedTopicTestItems().length;
+  const button = $('topicTestCrawlBtn');
+  if (!button) return;
+  button.disabled = count === 0;
+  button.textContent = count ? '聚合选中（' + count + '）' : '聚合选中';
+}
+
+async function crawlSelectedTopicResults() {
+  const state = topicTestState;
+  if (!state) return;
+  const items = selectedTopicTestItems();
+  if (!items.length) { setStatus('先勾选要聚合的结果', true); return; }
+  const button = $('topicTestCrawlBtn');
+  button.disabled = true;
+  button.textContent = '派发中…';
+  const url = '/api/intel/industry-packs/' + encodeURIComponent(selected) + '/topic-search/crawl';
+  try {
+    const payload = await api(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic_key: state.topicKey, query: state.query, items: items}),
+    });
+    state.scanRunId = payload.scan_run_id || 0;
+    $('topicTestProgress').hidden = false;
+    $('topicTestProgressSummary').textContent =
+      '已派发 ' + payload.dispatched + ' 条' + (payload.skipped ? '，跳过 ' + payload.skipped + ' 条' : '');
+    $('topicTestProgressHint').textContent = '正在聚合…';
+    stopTopicTestPolling();
+    await pollTopicTestProgress();
+    topicTestTimer = setInterval(pollTopicTestProgress, 4000);
+  } catch (error) {
+    setStatus(error.message || '派发失败', true);
+  } finally {
+    updateTopicTestCrawlButton();
+  }
+}
+
+async function pollTopicTestProgress() {
+  const state = topicTestState;
+  if (!state || !state.scanRunId) return;
+  const url = '/api/intel/industry-packs/' + encodeURIComponent(selected)
+    + '/topic-search/crawl-status?scan_run_id=' + state.scanRunId;
+  try {
+    const payload = await api(url, {});
+    renderTopicTestProgress(payload);
+    if (payload.finished) stopTopicTestPolling();
+  } catch (error) {
+    stopTopicTestPolling();
+    $('topicTestProgressHint').textContent = error.message || '进度查询失败';
+  }
+}
+
+// 把候选的原始技术报错翻译成运营能一眼看懂的原因
+// 失败原因细分类（后端已归好桶）：[badge 短标签, badge 样式, 行内说明]
+const TOPIC_TEST_FAIL_KIND = {
+  unreachable: ['连不上', 'kind-unreachable', '连不上目标站（站点不可达/被墙）'],
+  vpn_fail: ['LLM未取回', 'kind-vpn', '已送 LLM服务器分析仍未取回正文，属站点防护较强'],
+  vpn: ['LLM分析', 'kind-vpn', '经 LLM服务器分析，结果待定'],
+  anchor: ['未过门禁', 'kind-anchor', '正文未命中行业锚点词，未进入分类与知识库'],
+  ingest_fail: ['入库失败', 'kind-other', '正文已提取，但文章入库环节失败'],
+  short: ['正文太短', 'kind-short', '正文太短，多为列表页/摘要页'],
+  listing: ['列表页', 'kind-listing', '栏目/列表导航页，非单篇文章'],
+  stale: ['中断', 'kind-stale', '派发中断，未完成'],
+  other: ['失败', 'kind-other', ''],
+};
+
+let topicTestFilter = 'all';
+
+function topicTestStatusGroup(status) {
+  if (status === 'crawled') return 'crawled';
+  if (status === 'dispatching') return 'running';
+  if (status === 'failed' || status === 'discarded' || status === 'retry_wait') return 'failed';
+  if (status === 'queued' || status === 'discovered') return 'queued';
+  return 'other';
+}
+
+function setupTopicTestFilter() {
+  if ($('topicTestFilter').dataset.ready) return;
+  $('topicTestFilter').dataset.ready = '1';
+  $('topicTestFilter').querySelectorAll('.topic-test-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      topicTestFilter = btn.dataset.filter || 'all';
+      $('topicTestFilter').querySelectorAll('.topic-test-filter-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+      if (window._lastTopicTestPayload) renderTopicTestProgress(window._lastTopicTestPayload);
+    });
+  });
+}
+
+function renderTopicTestProgress(payload) {
+  window._lastTopicTestPayload = payload;
+  setupTopicTestFilter();
+  const list = $('topicTestProgressList');
+  list.replaceChildren();
+  const filter = topicTestFilter || 'all';
+  const items = (payload.items || []).filter(item => filter === 'all' || topicTestStatusGroup(item.status) === filter);
+  items.forEach(item => {
+    let meta = TOPIC_TEST_STATUS[item.status] || ['未知', 'queued'];
+    let reason = '';
+    // 失败态：用细分原因替代笼统的"失败"
+    if (item.status === 'failed' || item.status === 'discarded' || item.status === 'retry_wait') {
+      // 从没派发过（attempt_count=0 且无错误）→ 未派发，而非失败
+      if ((item.attempts || 0) === 0 && !item.error) {
+        meta = ['未派发', 'kind-stale'];
+        reason = '派发时未轮到（可能服务重启中断了派发）';
+      } else {
+        const kindMeta = TOPIC_TEST_FAIL_KIND[item.error_kind] || TOPIC_TEST_FAIL_KIND.other;
+        meta = [kindMeta[0], kindMeta[1]];
+        reason = kindMeta[2] || (item.error || '');
+      }
+    }
+    const line = document.createElement('div');
+    line.className = 'topic-test-progress-item';
+    const badge = document.createElement('span');
+    badge.className = 'topic-test-badge ' + meta[1];
+    badge.textContent = meta[0];
+    const text = document.createElement('span');
+    text.className = 'topic-test-progress-text';
+    const label = item.title || item.url || ('候选 #' + item.candidate_id);
+    let lineText = (item.status === 'crawled' && item.article_id)
+      ? label + ' → 文章 #' + item.article_id + (item.topic ? ' · 主题：' + item.topic : '')
+      : label;
+    if (reason) lineText = lineText + ' · ' + reason;
+    text.textContent = lineText;
+    text.title = item.error || lineText;  // tooltip 保留原始技术细节
+    line.append(badge, text);
+    list.append(line);
+  });
+  const timeStr = new Date().toLocaleTimeString('zh-CN', {hour12: false});
+  $('topicTestProgressSummary').textContent = '已入库 ' + payload.crawled + ' / 共 ' + payload.total;
+  let phase;
+  if (payload.finished) {
+    phase = '本轮结束' + (payload.failed ? ' · 失败 ' + payload.failed + ' 条' : '');
+  } else if (payload.running > 0) {
+    phase = 'Worker 正在聚合 ' + payload.running + ' 条';
+  } else if (payload.queued > 0) {
+    phase = '等待 Worker 领取 ' + payload.queued + ' 条';
+  } else {
+    phase = '处理中';
+  }
+  $('topicTestProgressHint').textContent = phase + ' · 刷新于 ' + timeStr;
+  renderTopicTestAdvice(payload);
+}
+
+function renderTopicTestAdvice(payload) {
+  const container = $('topicTestAdvice');
+  if (!container) return;
+  container.replaceChildren();
+  const state = topicTestState;
+  if (!state) return;
+  const items = payload.items || [];
+  if (!items.length) return;
+
+  const crawled = payload.crawled || 0;
+  const total = payload.total || 0;
+  const searchCount = (state.groups || []).reduce((sum, group) => sum + ((group.results || []).length), 0);
+  const termsText = (state.terms || []).join(' / ');
+
+  // 当前准入词表（弱信号=expanded，强信号=core），以及搜索词里不在表内的词
+  const coreWords = (draft && draft.core_keywords) || [];
+  const expandedWords = (draft && draft.expanded_keywords) || [];
+  const gateWords = new Set([...coreWords, ...expandedWords]);
+  const missingTerms = (state.terms || []).filter(term => !gateWords.has(term));
+  const anchorItems = items.filter(item => item.error_kind === 'anchor');
+  const unreachableItems = items.filter(item => item.error_kind === 'unreachable');
+  const vpnItems = items.filter(item => item.error_kind === 'vpn' || item.error_kind === 'vpn_fail');
+  const shortItems = items.filter(item => item.error_kind === 'short');
+  const listingItems = items.filter(item => item.error_kind === 'listing');
+  const ingestFailItems = items.filter(item => item.error_kind === 'ingest_fail');
+  const crawledItems = items.filter(item => item.status === 'crawled');
+
+  // ── 准入词表（可展开看具体词） ──
+  const gateBox = document.createElement('div');
+  gateBox.className = 'topic-test-advice-item topic-test-gate-info';
+  const gateSummary = document.createElement('div');
+  gateSummary.className = 'topic-test-gate-summary';
+  const gateSummaryText = document.createElement('span');
+  gateSummaryText.textContent = '这个行业有 ' + (coreWords.length + expandedWords.length)
+    + ' 个「放行词」（强信号 ' + coreWords.length + ' 个 + 弱信号 ' + expandedWords.length
+    + ' 个）：文章正文要命中其中至少 1 个才会被收录，可在「关键词门控」页增删。'
+    + (missingTerms.length ? '你这次的搜索词「' + missingTerms.join('、') + '」都不在放行词里，搜到的文章大概率会被拦下。' : '');
+  const gateToggle = document.createElement('button');
+  gateToggle.type = 'button';
+  gateToggle.className = 'topic-test-toggle';
+  gateToggle.textContent = '查看词表';
+  gateSummary.append(gateSummaryText, gateToggle);
+  const gateDetail = buildGateDetail(coreWords, expandedWords, state.terms);
+  gateDetail.className = 'topic-test-gate-detail';
+  gateDetail.hidden = !topicTestGateExpanded;
+  gateToggle.textContent = topicTestGateExpanded ? '收起词表' : '查看词表';
+  gateToggle.onclick = () => {
+    topicTestGateExpanded = !topicTestGateExpanded;
+    gateDetail.hidden = !topicTestGateExpanded;
+    gateToggle.textContent = topicTestGateExpanded ? '收起词表' : '查看词表';
+  };
+  gateBox.append(gateSummary, gateDetail);
+  // 只要搜索词不在放行词里，就直接给"一键加入"（不必等候选真的被门控拒绝）
+  if (missingTerms.length) {
+    const gateAddBtn = document.createElement('button');
+    gateAddBtn.type = 'button';
+    gateAddBtn.className = 'action topic-test-gate-add';
+    gateAddBtn.textContent = '一键加入并发布生效（' + missingTerms.length + ' 个词）';
+    gateAddBtn.onclick = () => applyGateTermsAuto(missingTerms);
+    gateBox.append(gateAddBtn);
+  }
+  container.append(gateBox);
+
+  const blocks = [];
+  // 锚点词缺口：只要有未命中的就提示，即使部分已入库也说明词表覆盖不完整
+  if (anchorItems.length > 0) {
+    const gateText = (crawledItems.length > 0)
+      ? '有 ' + anchorItems.length + ' 条因正文未命中行业锚点词被拒绝、另有 ' + crawledItems.length + ' 条入库——准入词表覆盖不完整。'
+      : '搜到 ' + searchCount + ' 条、测试 ' + total + ' 条，有 ' + anchorItems.length
+        + ' 条因正文未命中行业锚点词被拒绝（搜索词能搜到、但正文放行不了）。';
+    const reasonText = buildAnchorReasonText(state.terms, coreWords, expandedWords);
+    blocks.push({
+      text: gateText + ' 搜索词「' + termsText + '」里的实际用词没进准入词表。'
+        + (reasonText ? ' 原因：' + reasonText : ''),
+      items: anchorItems,
+      detailKind: 'anchor',
+    });
+  }
+  if (unreachableItems.length > 0) {
+    blocks.push({ text: unreachableItems.length + ' 条连不上目标站（站点不可达/被墙），这与搜索词无关，换词也没用。', items: unreachableItems });
+  }
+  if (vpnItems.length > 0) {
+    blocks.push({ text: vpnItems.length + ' 条已送 LLM服务器分析，但仍未取回正文，属站点防护较强。', items: vpnItems });
+  }
+  if (shortItems.length > 0) {
+    blocks.push({ text: shortItems.length + ' 条正文太短，多为列表页/摘要页，不适合作为文章收录。', items: shortItems });
+  }
+  if (listingItems.length > 0) {
+    blocks.push({ text: listingItems.length + ' 条是栏目/列表导航页，非单篇文章。', items: listingItems });
+  }
+  if (ingestFailItems.length > 0) {
+    blocks.push({ text: ingestFailItems.length + ' 条正文已提取但入库环节失败，需排查分类/入库链路。', items: ingestFailItems });
+  }
+  if (crawledItems.length > 0) {
+    blocks.push({
+      text: crawledItems.length + ' 条已成功入库'
+        + (anchorItems.length > 0 ? '（其余仍被门禁/聚合挡下，见上方各条）' : '，搜索词和锚点词都是通的。'),
+      items: crawledItems,
+    });
+  }
+  if (!blocks.length) {
+    blocks.push({ text: '聚合仍在进行中，稍候可看到更多结论。' });
+  }
+
+  blocks.forEach(block => {
+    const line = document.createElement('div');
+    line.className = 'topic-test-advice-item';
+    const textNode = document.createElement('span');
+    textNode.textContent = '诊断：' + block.text;
+    line.append(textNode);
+
+    // 具体哪几条：标题截断 + ...（与搜索结果里的条目对应）
+    if (block.items && block.items.length) {
+      const titleList = document.createElement('ul');
+      titleList.className = 'topic-test-title-list';
+      block.items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = truncateTopicTestTitle(item.title || item.url || ('候选 #' + item.candidate_id));
+        titleList.append(li);
+      });
+      line.append(titleList);
+    }
+
+    // 未命中锚点词：可展开看命中条件
+    if (block.detailKind === 'anchor' && block.items && block.items.length) {
+      const detailToggle = document.createElement('button');
+      detailToggle.type = 'button';
+      detailToggle.className = 'topic-test-toggle';
+      detailToggle.textContent = '查看详细';
+      const detail = buildAnchorDetail(block.items, coreWords, expandedWords);
+      detail.hidden = !topicTestAnchorExpanded;
+      detailToggle.textContent = topicTestAnchorExpanded ? '收起' : '查看详细';
+      detailToggle.onclick = () => {
+        topicTestAnchorExpanded = !topicTestAnchorExpanded;
+        detail.hidden = !topicTestAnchorExpanded;
+        detailToggle.textContent = topicTestAnchorExpanded ? '收起' : '查看详细';
+      };
+      line.append(detailToggle, detail);
+    }
+
+    if (block.addTerms && block.addTerms.length) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'action topic-test-gate-add';
+      btn.textContent = '一键加入并发布生效（' + block.addTerms.length + ' 个词）';
+      btn.onclick = () => applyGateTermsAuto(block.addTerms);
+      line.append(btn);
+    }
+    container.append(line);
+  });
+  container.hidden = false;
+}
+
+function truncateTopicTestTitle(text) {
+  const s = String(text || '').trim();
+  return s.length > 34 ? s.slice(0, 34) + '...' : s;
+}
+
+// 分析"搜索词 vs 准入词表"为什么不命中，生成运营能看懂的具体原因
+function buildGateWord(word, hit) {
+  const span = document.createElement('span');
+  span.className = 'topic-test-gate-word' + (hit ? ' is-hit' : '');
+  span.textContent = word;
+  return span;
+}
+
+function buildGateDetail(coreWords, expandedWords, terms) {
+  const box = document.createElement('div');
+  const termSet = new Set(terms || []);
+
+  const strongLabel = document.createElement('div');
+  strongLabel.className = 'topic-test-gate-detail-label';
+  strongLabel.textContent = '强信号（权重 3）：';
+  box.append(strongLabel);
+  const strongWrap = document.createElement('div');
+  strongWrap.className = 'topic-test-gate-words';
+  (coreWords || []).forEach(word => strongWrap.append(buildGateWord(word, termSet.has(word))));
+  box.append(strongWrap);
+
+  const weakLabel = document.createElement('div');
+  weakLabel.className = 'topic-test-gate-detail-label';
+  weakLabel.textContent = '弱信号（权重 1）：';
+  box.append(weakLabel);
+  const weakWrap = document.createElement('div');
+  weakWrap.className = 'topic-test-gate-words';
+  (expandedWords || []).forEach(word => weakWrap.append(buildGateWord(word, termSet.has(word))));
+  box.append(weakWrap);
+
+  // 缺失的搜索词：明确标出"不在表内"，并说明会加到哪
+  const missing = (terms || []).filter(term => !(coreWords || []).includes(term) && !(expandedWords || []).includes(term));
+  if (missing.length) {
+    const missingWrap = document.createElement('div');
+    missingWrap.className = 'topic-test-gate-missing';
+    missingWrap.textContent = '本次搜索词不在表内：' + missing.join('、') + ' —— 点下方「一键加入」会补进弱信号';
+    box.append(missingWrap);
+  }
+  return box;
+}
+
+function buildAnchorReasonText(terms, coreWords, expandedWords) {
+  const anchors = [...coreWords, ...expandedWords];
+  const anchorSet = new Set(anchors);
+  const sentences = [];
+  (terms || []).forEach(term => {
+    // 搜索词本身已经在准入词表里 → 不缺失，跳过（否则会误报"完全没有对应词"）
+    if (anchorSet.has(term)) return;
+    const related = anchors.filter(a => a && (a.includes(term) || term.includes(a)));
+    if (related.length) {
+      related.forEach(anchor => {
+        if (anchor.includes(term)) {
+          sentences.push('准入词表里只有「' + anchor + '」这个完整短语，正文写的是「' + term + '」（不含其余部分），所以不算命中');
+        } else {
+          sentences.push('正文要完整出现「' + anchor + '」才算命中，而「' + term + '」只是部分重叠');
+        }
+      });
+    } else {
+      sentences.push('「' + term + '」在准入词表里完全没有对应词');
+    }
+  });
+  return sentences.length ? sentences.join('；') + '，所以被拒。' : '';
+}
+
+function buildAnchorDetail(anchorItems, coreWords, expandedWords) {
+  const box = document.createElement('div');
+  box.className = 'topic-test-detail';
+  const head = document.createElement('div');
+  head.textContent = '这 ' + anchorItems.length + ' 条未命中：';
+  box.append(head);
+  const list = document.createElement('ul');
+  list.className = 'topic-test-detail-list';
+  anchorItems.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = item.title || item.url || ('候选 #' + item.candidate_id);
+    list.append(li);
+  });
+  box.append(list);
+  const cond = document.createElement('div');
+  cond.className = 'topic-test-detail-cond';
+  cond.textContent = '命中条件：文章正文必须包含下面任一行业锚点词（子串匹配，强信号、弱信号都算）。'
+    + '这 ' + anchorItems.length + ' 条的正文都没出现这些词，所以被拒。';
+  box.append(cond);
+  // 直接列出行业锚点词，并标清配置位置
+  const words = document.createElement('div');
+  words.className = 'topic-test-detail-words';
+  words.textContent = '行业锚点词 · 强信号：' + ((coreWords || []).join('、') || '无')
+    + '\n\n行业锚点词 · 弱信号：' + ((expandedWords || []).join('、') || '无')
+    + '\n\n配置位置：「关键词门控」标签页 → 「核心词 / 扩展词」。';
+  box.append(words);
+  return box;
+}
+
+function addTermsToGate(terms, opts) {
+  const expanded = $('expandedKeywords');
+  if (!expanded) return [];
+  const currentSet = new Set(splitValues(expanded.value));
+  const added = [];
+  (terms || []).forEach(term => {
+    if (!currentSet.has(term)) { currentSet.add(term); added.push(term); }
+  });
+  if (!added.length) {
+    if (!opts || !opts.silent) setStatus('这些词已在准入词表里，无需重复添加', false);
+    return [];
+  }
+  const merged = [...currentSet];
+  expanded.value = merged.join('\n');
+  // 同步内存草稿，保证后续保存草稿时带上新增词
+  if (draft) draft.expanded_keywords = merged;
+  return added;
+}
+
+// 一键把搜索词补进准入词表，并自动走完"保存草稿 → 发布新版本 → 轻量激活"整条链
+async function applyGateTermsAuto(terms) {
+  const added = addTermsToGate(terms, {silent: true});
+  if (!added.length) { setStatus('这些词已在准入词表里，无需重复添加', false); return; }
+  const label = added.join('、');
+  try {
+    setStatus('一键流程：保存草稿…', false);
+    const saved = await api(`/api/intel/industry-packs/${selected}/draft`, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({manifest: collectManifest(), expected_revision: revision}),
+    });
+    renderDraft(saved);
+
+    setStatus('一键流程：发布新版本…', false);
+    const published = await api(`/api/intel/industry-packs/${selected}/draft/publish`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({expected_revision: revision}),
+    });
+    const versionId = Number(published.published && published.published.id);
+    if (!versionId) throw Error('发布结果缺少版本 id');
+
+    setStatus('一键流程：轻量激活…', false);
+    await api(`/api/intel/industry-packs/${selected}/activate-version`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({version_id: versionId}),
+    });
+
+    setStatus(`一键完成：已把「${label}」加入准入词表并发布激活（版本 ${published.published.version_number}）`);
+    await loadCards();
+    await loadLifecycle();
+  } catch (error) {
+    setStatus(`一键加入失败：${error.message}`, true);
+  }
+}
+
+// 主题 key 在提交前就地校正。input 上的 pattern 对 JS 收集的 payload 不生效，
+// 空 key 或重复 key 会一路直达服务端，被拒后只报 fixed_topics[N].key is invalid or duplicated
+// 这种运营读不懂的错（N 还只是行号，不告诉你是哪个主题）。这里补齐、去重并把结果写回输入框，
+// 让运营直接看到实际保存的 key，而不是发布时才失败。
+function normalizeTopicKeys(topics) {
+  const used = new Set();
+  topics.forEach((item, index) => {
+    let base = String(item.key || '').trim().toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!base) base = 'topic_' + (index + 1);
+    let key = base, suffix = 2;
+    while (used.has(key)) { key = base + '_' + suffix; suffix += 1; }
+    used.add(key);
+    if (key !== item.key) {
+      const row = $('topics').children[index];
+      const input = row && row.querySelector('[data-key="key"]');
+      if (input) { input.value = key; input.classList.add('key-auto'); }
+    }
+    item.key = key;
+  });
+  return topics;
+}
+
+function updatePackActions() {
+  const meta = packIndex[selected] || {};
+  $('switchButton').classList.toggle('hidden', selected === active || Boolean(meta.draft_only));
+  $('switchWindow').classList.toggle('hidden', selected === active || Boolean(meta.draft_only));
+  $('deleteButton').classList.toggle('hidden', meta.origin !== 'custom' || selected === active);
+  if (selected !== active && !meta.draft_only) {
+    const end = new Date();
+    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const localValue = value => {
+      const pad = n => String(n).padStart(2, '0');
+      return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+    };
+    $('initializationFrom').value = localValue(start);
+    $('initializationTo').value = localValue(end);
+  }
+}
+
+function updateRagflowPolicyState() {
+  const enabled = $('ragflowUploadEnabled').checked;
+  $('ragflowKnowledgeBase').disabled = !enabled;
+  if (enabled) $('ragflowKnowledgeBase').value = 'news';
+}
+
+function renderDraft(payload) {
+  draft = structuredClone(payload.draft.manifest);
+  revision = Number(payload.draft.revision);
+  $('emptyState').classList.add('hidden');
+  $('editor').classList.remove('hidden');
+  $('packId').value = draft.id || selected;
+  $('packName').value = draft.name || '';
+  $('packVersion').value = draft.pack_version || '';
+  $('defaultMarket').value = draft.default_market || '';
+  $('packTimezone').value = draft.timezone || '';
+  $('coreKeywords').value = lines(draft.core_keywords);
+  $('expandedKeywords').value = lines(draft.expanded_keywords);
+  $('trendKeywords').value = lines(draft.trend_keywords);
+  $('eventKeywords').value = lines(draft.event_keywords);
+  $('serpapiQueries').value = lines(draft.serpapi_queries);
+  $('brandKeywords').value = lines(draft.brands);
+  // 门禁锚点/机构词与趋势主题：此前管理页没有输入框，只能靠改文件，导致绝大多数行业包门禁为空
+  $('anchorKeywords').value = lines((draft.candidate_gate || {}).anchor_keywords);
+  $('entityKeywords').value = lines((draft.candidate_gate || {}).entity_keywords);
+  $('trendTopics').value = lines(draft.trend_topics);
+  // 聚合调度回填（缺省即"低频默认值"）
+  (function () {
+    var c = draft.crawl_schedule || {};
+    var e = document.getElementById('crawlEnabled'), t = document.getElementById('crawlDailyTimes'),
+        p = document.getElementById('crawlPollingMinutes'), m = document.getElementById('crawlMaxSources'),
+        k = document.getElementById('crawlContinuous');
+    if (e) e.checked = c.enabled !== false;
+    if (t) t.value = (c.daily_times && c.daily_times.length ? c.daily_times : ['02:00']).join(', ');
+    if (p) p.value = c.polling_interval_minutes || 1440;
+    if (m) m.value = c.max_sources_per_run || 45;
+    if (k) k.checked = !!c.allow_continuous_dispatch;
+  })();
+  $('topics').replaceChildren();
+  (draft.fixed_topics || []).forEach(addTopic);
+  const capabilities = draft.dashboard_capabilities || {};
+  $('showFinancialNews').checked = Boolean(capabilities.show_financial_news);
+  $('showMarketCards').checked = Boolean(capabilities.show_market_index_cards);
+  $('showWatchedCards').checked = Boolean(capabilities.show_watched_stock_cards);
+  $('showSpatiotemporalMap').checked = capabilities.show_spatiotemporal_map !== false;
+  const ragflowPolicy = draft.ragflow_policy || {
+    upload_crawled_articles: draft.id === 'family_office',
+    knowledge_base_key: 'news',
+  };
+  $('ragflowUploadEnabled').checked = Boolean(ragflowPolicy.upload_crawled_articles);
+  $('ragflowKnowledgeBase').value = ragflowPolicy.knowledge_base_key || 'news';
+  updateRagflowPolicyState();
+  $('sources').replaceChildren();
+  (draft.default_sources || []).forEach(addSource);
+  $('sourceSearch').value = '';
+  $('sourceFilter').value = 'all';
+  updateSourceStats();
+  filterSources();
+  $('diff').textContent = JSON.stringify(payload.diff, null, 2);
+  $('summary').textContent = `草稿修订 ${revision} · 配置版本 ${draft.pack_version} · schema v${draft.schema_version}`;
+  $('editorMeta').innerHTML = [
+    selected === active ? '<span class="badge current">当前使用</span>' : '',
+    `<span class="badge">${packIndex[selected]?.origin === 'custom' ? '自定义' : '系统内置'}</span>`,
+    `<span class="badge">${esc(draft.default_market || 'GLOBAL')}</span>`,
+  ].join('');
+  updatePackActions();
+  setTab(currentTab);
+}
+
+function collectManifest() {
+  const next = structuredClone(draft);
+  next.name = $('packName').value.trim();
+  next.pack_version = $('packVersion').value.trim();
+  next.default_market = $('defaultMarket').value.trim().toUpperCase();
+  next.timezone = $('packTimezone').value.trim();
+  next.core_keywords = values('coreKeywords');
+  next.expanded_keywords = values('expandedKeywords');
+  next.trend_keywords = values('trendKeywords');
+  next.event_keywords = values('eventKeywords');
+  next.serpapi_queries = values('serpapiQueries');
+  next.brands = values('brandKeywords');
+  // 写回 candidate_gate（锚点/机构 = 硬门禁）与趋势主题
+  next.candidate_gate = Object.assign({}, next.candidate_gate || {}, {
+    anchor_keywords: values('anchorKeywords'),
+    entity_keywords: values('entityKeywords'),
+  });
+  next.trend_topics = values('trendTopics');
+  // 聚合调度（仅 admin）：默认低频——定点聚合、不做持续高频派发
+  next.crawl_schedule = {
+    enabled: !!(document.getElementById('crawlEnabled') || {}).checked,
+    daily_times: String((document.getElementById('crawlDailyTimes') || {}).value || '')
+      .split(/[\n,，]+/).map(function (s) { return s.trim(); }).filter(Boolean),
+    polling_interval_minutes: Number((document.getElementById('crawlPollingMinutes') || {}).value) || 1440,
+    max_sources_per_run: Number((document.getElementById('crawlMaxSources') || {}).value) || 45,
+    allow_continuous_dispatch: !!(document.getElementById('crawlContinuous') || {}).checked,
+  };
+  // 主题级搜索词：随每个主题行收集 {topic_key: [词1,词2,词3]}（三个框，空框忽略）
+  next.topic_search_queries = {};
+  next.fixed_topics=[...$('topics').children].map(row => {
+    const item = JSON.parse(row.dataset.extra || '{}');
+    item.key = row.querySelector('[data-key="key"]').value.trim();
+    item.name = row.querySelector('[data-key="name"]').value.trim();
+    item.keywords = splitValues(row.querySelector('[data-key="keywords"]').value);
+    const terms = [
+      row.querySelector('[data-key="searchTerm1"]').value.trim(),
+      row.querySelector('[data-key="searchTerm2"]').value.trim(),
+      row.querySelector('[data-key="searchTerm3"]').value.trim(),
+    ].filter(Boolean);
+    if (item.key && terms.length) next.topic_search_queries[item.key] = terms;
+    return item;
+  });
+  next.fixed_topics = normalizeTopicKeys(next.fixed_topics);
+  if (packIndex[selected]?.origin === 'custom') {
+    (next.capabilities || []).filter(item => item.implementation_status === 'configured').forEach(item => item.name = `${next.name}资讯聚合与分类`);
+    (next.dashboard_categories || []).filter(item => item.implementation_status === 'configured').forEach(item => item.name = `${next.name}行业信息`);
+  }
+  next.dashboard_capabilities = {
+    show_financial_news: $('showFinancialNews').checked,
+    show_market_index_cards: $('showMarketCards').checked,
+    show_watched_stock_cards: $('showWatchedCards').checked,
+    show_spatiotemporal_map: $('showSpatiotemporalMap').checked,
+  };
+  next.ragflow_policy = {
+    upload_crawled_articles: $('ragflowUploadEnabled').checked,
+    knowledge_base_key: $('ragflowKnowledgeBase').value || 'news',
+  };
+  next.default_sources = [...$('sources').children].map(row => {
+    const item = JSON.parse(row.dataset.extra || '{}');
+    row.querySelectorAll('[data-key]').forEach(input => {
+      let value = input.type === 'checkbox' ? input.checked : input.value.trim();
+      if (['polling_interval_minutes', 'authority_level'].includes(input.dataset.key)) value = Number(value);
+      item[input.dataset.key] = value;
+    });
+    return item;
+  });
+  return next;
+}
+
+function showToast(message, isError) {
+  const toast = $('packToast');
+  toast.textContent = message;
+  toast.classList.toggle('error', Boolean(isError));
+  toast.classList.remove('hidden');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.add('hidden'), isError ? 6000 : 4200);
+}
+
+async function selectPack(id) {
+  selected = id;
+  document.querySelectorAll('.pack-card').forEach(card => card.classList.toggle('selected', card.dataset.id === id));
+  $('title').textContent = '正在加载…';
+  setStatus('');
+  $('packLoading').classList.remove('hidden');
+  try {
+    const [payload, versionPayload] = await Promise.all([
+      api(`/api/intel/industry-packs/${id}/draft`),
+      api(`/api/intel/industry-packs/${id}/versions`),
+    ]);
+    renderDraft(payload);
+    $('title').textContent = draft.name + (id === active ? '（当前行业）' : '');
+    $('versions').innerHTML = (versionPayload.versions || []).map(item => `
+      <div class="version"><b>内部版本 ${item.version_number} · ${esc(item.pack_version)}</b><br><span class="muted">schema v${item.schema_version} · ${esc(item.published_at)}<br>${esc(item.content_sha256.slice(0, 16))}…</span></div>`
+    ).join('') || '<span class="muted">尚未发布数据库版本；当前仅有草稿，不能激活。</span>';
+  } catch (error) {
+    $('title').textContent = '加载失败';
+    $('summary').textContent = error.message;
+    setStatus(error.message, true);
+  } finally {
+    $('packLoading').classList.add('hidden');
+  }
+}
+
+async function validateDraft() {
+  try {
+    const payload = await api(`/api/intel/industry-packs/${selected}/draft/validate`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({manifest: collectManifest()}),
+    });
+    $('diff').textContent = JSON.stringify(payload.diff, null, 2);
+    setStatus('验证通过：URL、RSS、依赖、能力和配置范围均有效。');
+  } catch (error) { setStatus(`验证失败：${error.message}`, true); }
+}
+
+async function saveDraft() {
+  try {
+    const payload = await api(`/api/intel/industry-packs/${selected}/draft`, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({manifest: collectManifest(), expected_revision: revision}),
+    });
+    renderDraft(payload);
+    $('title').textContent = draft.name + (selected === active ? '（当前行业）' : '');
+    setStatus(`草稿已保存，当前修订 ${revision}。`);
+    await loadCards();
+  } catch (error) { setStatus(`保存失败：${error.message}`, true); }
+}
+
+async function publishDraft() {
+  if (!confirm('发布后该版本不可原地修改。确认发布当前草稿？')) return;
+  try {
+    const payload = await api(`/api/intel/industry-packs/${selected}/draft/publish`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expected_revision: revision}),
+    });
+    await loadCards();
+    await selectPack(selected);
+    await loadLifecycle();
+    setStatus(`已发布内部版本 ${payload.published.version_number}。`);
+  } catch (error) { setStatus(`发布失败：${error.message}`, true); }
+}
+
+let switchTimer = null, switchStartAt = 0;
+// 进度条状态：'running' 无限滑动 / 'done' 停在 100% / 'error' 停在 100% 并转红
+function setSwitchBarState(state) {
+  const bar = $('switchBar');
+  if (!bar) return;
+  bar.className = 'switch-bar' + (state === 'running' ? '' : ' is-' + state);
+}
+function openSwitchOverlay() {
+  const box = $('switchLoading');
+  box.hidden = false;
+  setSwitchBarState('running');
+  $('switchResult').hidden = true;
+  $('switchResult').className = 'switch-result';
+  $('switchOverlayClose').hidden = true;
+  $('switchOverlayTitle').textContent = '正在激活行业包';
+  document.querySelectorAll('#switchSteps .switch-step').forEach(el => el.className = 'switch-step');
+  switchStartAt = Date.now();
+  if (switchTimer) clearInterval(switchTimer);
+  switchTimer = setInterval(() => {
+    $('switchElapsed').textContent = `已用时 ${Math.round((Date.now() - switchStartAt) / 1000)} 秒`;
+  }, 1000);
+  $('switchElapsed').textContent = '已用时 0 秒';
+}
+// state: 'doing' | 'done' | 'error'
+function setSwitchStep(step, state) {
+  const el = document.querySelector(`#switchSteps .switch-step[data-step="${step}"]`);
+  if (!el) return;
+  el.className = `switch-step is-${state}`;
+  const icon = el.querySelector('.mark i');
+  if (icon) icon.className = state === 'done' ? 'fa fa-check-circle' : (state === 'error' ? 'fa fa-times-circle' : 'fa fa-spinner fa-spin');
+}
+function finishSwitchOverlay(ok, html) {
+  if (switchTimer) { clearInterval(switchTimer); switchTimer = null; }
+  setSwitchBarState(ok ? 'done' : 'error');
+  $('switchElapsed').textContent = `共耗时 ${Math.round((Date.now() - switchStartAt) / 1000)} 秒`;
+  $('switchOverlayTitle').textContent = ok ? '✅ 激活完成' : '❌ 激活失败';
+  $('switchOverlaySub').textContent = ok ? '已生效：后续采集将按新行业包执行，其它行业用户的采集不受影响。' : '未做任何变更，可修正后重试。';
+  document.querySelectorAll('#switchSteps .switch-step').forEach(el => {
+    if (el.classList.contains('is-doing')) setSwitchStep(el.dataset.step, ok ? 'done' : 'error');
+  });
+  const box = $('switchResult');
+  box.hidden = false;
+  box.className = 'switch-result ' + (ok ? 'ok' : 'bad');
+  box.innerHTML = html;
+  $('switchOverlayClose').hidden = false;
+}
+function closeSwitchOverlay() {
+  if (switchTimer) { clearInterval(switchTimer); switchTimer = null; }
+  $('switchLoading').hidden = true;
+}
+// 浮层必须直接挂在 <body> 下：父容器若带 transform/animation/overflow，
+// position:fixed 会退化成相对该父元素定位，浮层就会跑到页面底部、必须滚动才能看到。
+(function relocateSwitchOverlay(){
+  const move = () => {
+    const overlay = document.getElementById('switchLoading');
+    if (overlay && overlay.parentElement !== document.body) document.body.appendChild(overlay);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', move);
+  else move();
+})();
+async function switchPack() {
+  try {
+    const initialization_from = $('initializationFrom').value;
+    const initialization_to = $('initializationTo').value;
+    const windowPayload = {initialization_from, initialization_to};
+    $('switchLoading').hidden = false;
+    openSwitchOverlay();
+    setSwitchStep(1, 'doing');
+    const dry = await api('/api/intel/industry-packs/switch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({industry_pack_id: selected, ...windowPayload})});
+    setSwitchStep(1, 'done');
+    const preview = dry.preview;
+    const counts = preview.source_counts || {};
+    const window = preview.initialization_window || {};
+    // 模态确认（不用 confirm 弹窗）
+    const summaryHtml = `
+      <p>将激活 <b>${esc(preview.target_pack_id)}</b> 的发布版本 #${preview.target_version_id}。</p>
+      <p>初始化采集范围：<b>${esc(window.from || initialization_from)} 至 ${esc(window.to || initialization_to)}</b>（香港时间）。</p>
+      <p>信源变化：新增 ${counts.add_sources || 0}、更新 ${counts.update_sources || 0}、关联 ${counts.upsert_associations || 0}、停用 ${counts.deactivate_associations || 0}。</p>
+      <p class="muted">正式应用前会创建并校验数据库备份；历史文章保持不变。</p>`;
+    const ok = await confirmSwitchDialog(summaryHtml);
+    // 取消：必须关掉浮层并停掉进度条与计时器，否则会留下一个进度条永远在滑动、计时一直走的空浮层
+    if (!ok) { closeSwitchOverlay(); return; }
+    // confirm 复用 dry-run 返回的确定化采集窗口，避免输入框为空时两次请求的窗口不一致
+    const confirmWindow = {initialization_from: window.from || initialization_from, initialization_to: window.to || initialization_to};
+    $('switchLoading').hidden = false;
+    // 后端在这一次请求内完成 ②备份 ③信源落地 ④排队初始化聚合，前端按下述顺序提示当前在做的事
+    setSwitchStep(2, 'doing');
+    const payload = await api('/api/intel/industry-packs/switch', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({industry_pack_id: selected, confirm: true, target_version_id: preview.target_version_id, plan_sha256: preview.plan_sha256, ...confirmWindow})});
+    setSwitchStep(2, 'done'); setSwitchStep(3, 'done'); setSwitchStep(4, 'done');
+    const r = payload.result || {};
+    const sc = (preview.source_counts || {});
+    finishSwitchOverlay(true,
+      `已激活：<b>${esc(preview.target_pack_id)}</b> 发布版本 #${esc(preview.target_version_id)}\n` +
+      `激活记录：${esc(String(r.activation_id || '').slice(0, 12))}\n` +
+      `数据库备份完整性：${esc(r.backup && r.backup.integrity || 'ok')}\n` +
+      `信源变化：新增 ${sc.add_sources || 0} · 更新 ${sc.update_sources || 0} · 关联 ${sc.upsert_associations || 0} · 停用 ${sc.deactivate_associations || 0}\n` +
+      `初始化聚合任务：#${esc(r.initial_scan_job_id || '-')} 已提交，可在任务列表查看进度`);
+    await load();
+  } catch (error) {
+    finishSwitchOverlay(false, `原因：${esc(error.message || '未知错误')}`);
+  }
+}
+
+function confirmSwitchDialog(summaryHtml) {
+  return new Promise(resolve => {
+    const dialog = $('switchConfirmDialog');
+    $('switchConfirmBody').innerHTML = summaryHtml;
+    dialog._resolve = resolve;
+    dialog.showModal();
+  });
+}
+
+function resolveSwitchDialog(ok) {
+  const dialog = $('switchConfirmDialog');
+  dialog.close();
+  if (dialog._resolve) { dialog._resolve(ok); dialog._resolve = null; }
+}
+
+async function rollbackActivation(id) {
+  try {
+    const dry = await api(`/api/intel/industry-packs/activations/${id}/rollback`, {method: 'POST'});
+    const preview = dry.preview;
+    if (!confirm(`将回滚到 ${preview.target_pack_id} 的发布版本 #${preview.target_version_id}。配置将反向对账，历史文章和数据库文件保持不变。确认继续？`)) return;
+    const payload = await api(`/api/intel/industry-packs/activations/${id}/rollback`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirm: true, target_version_id: preview.target_version_id, plan_sha256: preview.plan_sha256})});
+    alert(`回滚完成，新激活记录 ${payload.result.activation_id.slice(0, 12)}。`);
+    await load();
+  } catch (error) { alert(error.message); }
+}
+
+function openCreateDialog() {
+  $('createStatus').textContent = '';
+  $('newPackId').value = '';
+  $('newPackName').value = '';
+  $('newDefaultMarket').value = 'GLOBAL';
+  $('newTimezone').value = 'Asia/Hong_Kong';
+  $('createDialog').showModal();
+  $('newPackId').focus();
+}
+function closeCreateDialog() { $('createDialog').close(); }
+
+async function createPack(event) {
+  event.preventDefault();
+  const button = $('createSubmit');
+  button.disabled = true;
+  $('createStatus').textContent = '正在创建草稿…';
+  try {
+    const payload = await api('/api/intel/industry-packs/custom', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: $('newPackId').value.trim(), name: $('newPackName').value.trim(), default_market: $('newDefaultMarket').value.trim(), timezone: $('newTimezone').value.trim()}),
+    });
+    closeCreateDialog();
+    await loadCards();
+    await selectPack(payload.industry_pack.id);
+    await loadLifecycle();
+  } catch (error) { $('createStatus').textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+function closeDeleteDialog() { $('deleteDialog').close(); deletePreview = null; }
+
+async function openDeleteDialog() {
+  deletePreview = null;
+  $('deleteStatus').textContent = '正在评估删除影响…';
+  $('deleteImpact').replaceChildren();
+  $('deleteConfirmation').value = '';
+  $('deleteConfirmButton').disabled = true;
+  $('deleteDialog').showModal();
+  try {
+    const payload = await api(`/api/intel/industry-packs/${selected}`, {method: 'DELETE'});
+    deletePreview = payload.preview;
+    const preview = deletePreview;
+    const counts = preview.counts || {};
+    const blockers = (preview.blockers || []).map(item => `<li>${esc(item)}</li>`).join('');
+    $('deleteImpact').innerHTML = `<p><b>${esc(preview.name)}（${esc(preview.industry_pack_id)}）</b></p>${blockers ? `<div class="danger-note"><b>当前不能删除：</b><ul>${blockers}</ul></div>` : `<ul class="impact-list"><li>保留 ${Number(counts.published_versions || 0)} 个已发布版本及全部激活记录</li><li>保留 ${Number(counts.classifications || 0)} 条历史分类和 ${Number(counts.reports || 0)} 份报告</li><li>停用 ${Number(counts.source_associations || 0)} 个行业信源关联</li><li>取消 ${Number(counts.pending_jobs || 0)} 个尚未执行的任务</li></ul><div class="danger-note">删除后行业包会从列表和切换入口消失；历史文章不会删除，行业包 ID 不可复用。</div>`}`;
+    $('deleteStatus').textContent = preview.deletable ? '请准确输入行业包 ID 后确认。' : '请先处理以上阻断条件。';
+    $('deleteConfirmation').disabled = !preview.deletable;
+    $('deleteConfirmation').focus();
+    updateDeleteConfirmation();
+  } catch (error) { $('deleteStatus').textContent = `影响评估失败：${error.message}`; }
+}
+
+function updateDeleteConfirmation() {
+  const ready = Boolean(deletePreview?.deletable) && $('deleteConfirmation').value.trim() === deletePreview.confirmation_text;
+  $('deleteConfirmButton').disabled = !ready;
+}
+$('deleteConfirmation').addEventListener('input', updateDeleteConfirmation);
+
+async function confirmDeletePack() {
+  if (!deletePreview?.deletable) return;
+  const button = $('deleteConfirmButton');
+  button.disabled = true;
+  $('deleteStatus').textContent = '正在写入删除审计并停用行业关联…';
+  try {
+    await api(`/api/intel/industry-packs/${selected}`, {method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({confirm: true, plan_sha256: deletePreview.plan_sha256, confirmation_text: $('deleteConfirmation').value.trim()})});
+    closeDeleteDialog();
+    selected = '';
+    draft = null;
+    $('editor').classList.add('hidden');
+    $('emptyState').classList.remove('hidden');
+    await load();
+  } catch (error) { $('deleteStatus').textContent = error.message; updateDeleteConfirmation(); }
+}
+
+function filterPackCards() {
+  const query = String($('packSearch').value || '').trim().toLocaleLowerCase();
+  document.querySelectorAll('.pack-card').forEach(card => card.classList.toggle('hidden', query && !card.dataset.search.includes(query)));
+}
+
+async function loadCards() {
+  const payload = await api('/api/intel/industry-packs/admin');
+  active = payload.default_industry_pack_id;
+  const packs = payload.industry_packs || [];
+  packIndex = Object.fromEntries(packs.map(item => [item.id, item]));
+  $('packCount').textContent = packs.length;
+  $('cards').replaceChildren();
+  [...packs].sort((left, right) => Number(right.id === active) - Number(left.id === active) || left.name.localeCompare(right.name, 'zh-CN')).forEach(item => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'pack-card';
+    card.dataset.id = item.id;
+    card.dataset.search = `${item.id} ${item.name}`.toLocaleLowerCase();
+    const badges = [];
+    if (item.id === active) badges.push('<span class="badge current">当前使用</span>');
+    badges.push(`<span class="badge ${item.origin === 'custom' ? 'custom' : ''}">${item.origin === 'custom' ? '自定义' : '系统内置'}</span>`);
+    if (item.draft_only) badges.push('<span class="badge draft">草稿未发布</span>');
+    // 运行时状态：一眼看出“配好了但在跑”还是“配好了但没落地”
+    const srcCount = Number(item.source_count || 0);
+    const users = Number(item.bound_users || 0);
+    let statusLine = '';
+    if (item.draft_only) {
+      statusLine = '<span class="pack-status is-idle">尚未发布，暂不可激活</span>';
+    } else if (!srcCount) {
+      statusLine = '<span class="pack-status is-warn">⚠ 未激活 · 信源尚未落地，当前不会采集</span>';
+    } else {
+      const scanned = item.last_scan_at ? String(item.last_scan_at).replace('T', ' ').slice(5, 16) : '未扫描';
+      statusLine = `<span class="pack-status is-live">● 采集中 · ${srcCount} 信源 · ${users} 用户 · 最近扫描 ${esc(scanned)}</span>`;
+    }
+    if (!srcCount && users) statusLine += `<span class="pack-status is-warn"> · 已绑定 ${users} 个用户</span>`;
+    card.innerHTML = `<span class="pack-badges">${badges.join('')}</span><h3>${esc(item.name)}</h3><p>${esc(item.id)}<br>${item.draft_only ? '尚未发布' : `版本 ${esc(item.pack_version)}`} · ${esc(item.default_market || '未设置')}</p>${statusLine}`;
+    card.addEventListener('click', () => selectPack(item.id));
+    $('cards').appendChild(card);
+  });
+  filterPackCards();
+  if (selected && packIndex[selected]) document.querySelector(`.pack-card[data-id="${selected}"]`)?.classList.add('selected');
+  updatePackActions();
+}
+
+function lifecycleMarkup(payload) {
+  const entries = [];
+  (payload.activations || []).forEach(item => entries.push({kind: 'activation', time: item.created_at, item}));
+  (payload.lifecycle_events || []).forEach(item => entries.push({kind: item.event_type, time: item.created_at, item}));
+  entries.sort((left, right) => String(right.time).localeCompare(String(left.time)));
+  if (!entries.length) return '<p class="muted">暂无生命周期记录</p>';
+  return entries.map(entry => {
+    const item = entry.item;
+    if (entry.kind === 'deleted') {
+      const impact = item.details?.impact || {};
+      return `<div class="lifecycle-item"><div class="lifecycle-head"><b>${esc(item.pack_name || item.industry_pack_id)}</b><span class="badge deleted">已删除</span></div><span class="muted">${esc(item.created_at)} · 操作者 ${esc(item.actor || '未记录')}<br>保留版本 ${Number(impact.published_versions || 0)}、历史分类 ${Number(impact.classifications || 0)}；删除审计 #${Number(item.id)}</span></div>`;
+    }
+    if (entry.kind === 'created') return `<div class="lifecycle-item"><div class="lifecycle-head"><b>${esc(item.pack_name || item.industry_pack_id)}</b><span class="badge custom">已新增</span></div><span class="muted">${esc(item.created_at)} · 操作者 ${esc(item.actor || '未记录')} · 自定义草稿</span></div>`;
+    return `<div class="lifecycle-item"><div class="lifecycle-head"><b>${esc(item.target_pack_id)} · 发布版本 #${item.target_version_id}</b><span class="badge ${item.is_current ? 'current' : ''}">${item.is_current ? '当前激活' : esc(item.status)}</span></div><span class="muted">${esc(item.created_at)}<br>备份 ${Number(item.backup_size || 0).toLocaleString()} bytes · ${esc(item.backup_integrity || '未记录')}</span>${item.is_current && item.previous_version_id ? `<br><button class="action warning" type="button" onclick="rollbackActivation('${esc(item.id)}')">回滚到上一发布版本</button>` : ''}</div>`;
+  }).join('');
+}
+
+async function loadLifecycle() {
+  const payload = await api('/api/intel/industry-packs/activations');
+  $('lifecycle').innerHTML = lifecycleMarkup(payload);
+}
+
+async function load() {
+  try {
+    const authority = await api('/api/intel/source-authority-profiles');
+    authorityProfiles = authority.profiles || {};
+    await Promise.all([loadCards(), loadLifecycle()]);
+  } catch (error) { $('cards').innerHTML = `<div class="muted">加载失败：${esc(error.message)}</div>`; }
+}
+
+load();
+</script>
+</body>
+</html>

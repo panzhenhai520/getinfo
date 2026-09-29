@@ -1,0 +1,71 @@
+{
+  "check_version": "index-market-research-graph-v1",
+  "checked_at_utc": "2026-08-01T12:11:43Z",
+  "static": {
+    "graph_path": "index_market_research_graph.py",
+    "graph_version": "index-market-research-graph-v1",
+    "checkpoint_schema_version": "index-market-research-checkpoint-v1",
+    "required_role_count": 13,
+    "required_roles": [
+      "aggressive_risk_analyst",
+      "bear_researcher",
+      "breadth_liquidity_analyst",
+      "bull_researcher",
+      "conservative_risk_analyst",
+      "constituents_rotation_analyst",
+      "index_identity_analyst",
+      "index_technical_analyst",
+      "macro_policy_analyst",
+      "market_strategy_analyst",
+      "neutral_risk_analyst",
+      "portfolio_manager",
+      "research_manager"
+    ],
+    "original_downstream_roles": [
+      "aggressive_risk_analyst",
+      "bear_researcher",
+      "bull_researcher",
+      "conservative_risk_analyst",
+      "neutral_risk_analyst",
+      "portfolio_manager",
+      "research_manager"
+    ],
+    "company_only_tools": [],
+    "upstream_dataflow_imports": [],
+    "upstream_or_extra_checkpoint_imports": [],
+    "direct_model_or_http_imports": [],
+    "order_write_paths": 0
+  },
+  "runtime": {
+    "executed": true,
+    "tradingagents_version": "0.3.1",
+    "target": "000001.SH",
+    "compiler": "上海证券交易所",
+    "market_status": "open",
+    "source_snapshot_id": 1,
+    "checkpoint_interruption_stage": "bear_researcher:1",
+    "checkpoint_completed_roles_before_resume": 6,
+    "complete_role_count": 13,
+    "saved_section_count": 15,
+    "final_recommendation": "Hold",
+    "report_status": "degraded_unverified",
+    "evidence_coverage": 0.5,
+    "component_contribution_coverage": 0.0,
+    "broker_calls": 14,
+    "provider_fixture_calls": 8,
+    "network_calls": 0,
+    "orders_created": 0
+  },
+  "acceptance": {
+    "project_data_llm_clock_and_database_only": true,
+    "sse_szse_hsi_index_templates_tested": true,
+    "original_downstream_debate_and_risk_roles_preserved": true,
+    "company_only_tools_excluded": true,
+    "market_status_constituent_date_coverage_and_latency_present": true,
+    "json_checkpoint_resume_passed": true,
+    "output_is_unverified_market_research_opinion": true,
+    "no_index_order_execution_path": true,
+    "runtime_complete_graph_passed": true,
+    "passed": true
+  }
+}

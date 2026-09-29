@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {"provider_id": "reddit", "status": "hard_disabled", "reason": "authorization_and_terms_not_approved"},
+    {"provider_id": "stocktwits", "status": "hard_disabled", "reason": "authorization_and_terms_not_approved"}
+  ],
+  "rule": "These providers have no runtime factory and cannot be selected or used as fallback."
+}

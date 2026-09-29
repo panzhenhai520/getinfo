@@ -1,0 +1,106 @@
+{
+  "acceptance": "passed",
+  "acceptance_version": "financial-latest-gray1-v1",
+  "accepted_at": "2026-08-03T18:44:18+08:00",
+  "stage": "information_needs_only",
+  "authorization": {
+    "operator_authorized_progression": true,
+    "source": "current_user_instruction"
+  },
+  "configuration": {
+    "FINANCIAL_INTELLIGENCE_ENABLED": true,
+    "FINANCIAL_INFORMATION_NEEDS_ENABLED": true,
+    "FINANCIAL_INSTRUMENT_DISCOVERY_ENABLED": false,
+    "FINANCIAL_INSTRUMENT_AUTO_PROMOTION_ENABLED": false,
+    "FINANCIAL_LATEST_NEWS_ENABLED": false,
+    "FINANCIAL_LATEST_BUNDLE_ENABLED": false
+  },
+  "candidate_image": {
+    "tag": "collectinfo:financial-latest-gray1-r2-20260803",
+    "digest": "sha256:6fcb7b919ac5627d053a86210cd1eba1bd143bceb698bb16960015cdedc3c6e5",
+    "dockerfile_includes_latest_information_gate": true,
+    "dockerfile_includes_release_readiness_gate": true
+  },
+  "isolated_canary": {
+    "container": "firecrawl-financial-latest-gray1",
+    "listen": "127.0.0.1:8004",
+    "production_data_mounted": false,
+    "database": "container_tmpfs",
+    "health_status": "ok",
+    "observation_seconds_at_least": 120,
+    "restart_count": 0,
+    "oom_killed": false,
+    "post_ready_error_count": 0,
+    "running_tasks": 0
+  },
+  "verification": {
+    "latest_information_tests": {
+      "passed": 53,
+      "failed": 0,
+      "network_calls_observed": 0
+    },
+    "full_regression_tests": {
+      "passed": 596,
+      "failed": 0
+    },
+    "candidate_container_release_gate": {
+      "passed": true,
+      "latest_information_tests": 53,
+      "network_policy": "none",
+      "network_calls_observed": 0
+    },
+    "known_instrument_smoke": {
+      "question": "浦发银行股票最新信息",
+      "canonical_symbol": "600000.SH",
+      "information_needs": [
+        "quote",
+        "news"
+      ],
+      "quote_status": "planned",
+      "news_reason_codes": [
+        "latest_news_disabled"
+      ],
+      "bundle_reason_codes": [
+        "latest_bundle_disabled"
+      ]
+    },
+    "unknown_instrument_smoke": {
+      "question": "SpaceX 股票最新信息",
+      "discovery_enabled": false,
+      "candidate_rows_written": 0
+    },
+    "route_metric_samples_at_least": 1
+  },
+  "production_main": {
+    "configuration_staged": true,
+    "process_reloaded": false,
+    "traffic_switched": false,
+    "production_data_touched": false,
+    "active_unrelated_tasks_observed": 2,
+    "defer_reason": "active_unrelated_crawl_tasks_preserved",
+    "health_status": "ok"
+  },
+  "rollback": {
+    "database_restore_required": false,
+    "database_records_must_be_preserved": true,
+    "actions": [
+      "stop_the_isolated_canary",
+      "set_FINANCIAL_INFORMATION_NEEDS_ENABLED_false_before_main_reload"
+    ]
+  },
+  "next_gate": {
+    "stage": "candidate_discovery_without_auto_promotion",
+    "automatic_progression_allowed_now": false,
+    "requirements": [
+      "reload_main_only_after_active_unrelated_tasks_reach_zero",
+      "observe_information_needs_metrics_on_main_traffic",
+      "confirm_no_material_false_route_regression"
+    ]
+  },
+  "boundaries": {
+    "live_provider_smoke_executed": false,
+    "candidate_auto_promotion_executed": false,
+    "real_order_execution": false,
+    "destructive_database_action_executed": false
+  }
+}

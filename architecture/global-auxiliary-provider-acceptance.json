@@ -1,0 +1,127 @@
+{
+  "generated_at": "2026-08-01T08:06:14.735Z",
+  "live_acceptance": {
+    "enabled_provider_ids": [
+      "polymarket"
+    ],
+    "reason": "",
+    "requested": true,
+    "results": {
+      "polymarket": {
+        "checked_at": "2026-08-01T08:06:14.735Z",
+        "error_type": null,
+        "provider_id": "polymarket",
+        "read_only": true,
+        "record_count": 1,
+        "status": "healthy_public_read_only"
+      }
+    },
+    "skipped": false
+  },
+  "offline_acceptance": {
+    "checks": {
+      "all_default_disabled": true,
+      "all_have_daily_budget": true,
+      "all_have_fallback_rank": true,
+      "all_have_license_profile": true,
+      "all_profiles_registered": true,
+      "sdk_packages_exact_and_hashed": true,
+      "unauthorized_social_sources_hard_disabled": true
+    },
+    "passed": true,
+    "policy": {
+      "hard_disabled": [
+        "reddit",
+        "stocktwits"
+      ],
+      "providers": {
+        "akshare_cn": {
+          "capabilities": [
+            "quote",
+            "bar",
+            "constituent",
+            "fundamental",
+            "macro"
+          ],
+          "daily_call_budget": 1000,
+          "default_enabled": false,
+          "fallback_rank": 20,
+          "license_profile": "akshare_mit_wrapper_upstream_terms"
+        },
+        "alpha_vantage": {
+          "capabilities": [
+            "quote",
+            "bar"
+          ],
+          "daily_call_budget": 25,
+          "default_enabled": false,
+          "fallback_rank": 30,
+          "license_profile": "alpha_vantage_service_terms_entitlement_aware"
+        },
+        "easyquotation": {
+          "capabilities": [
+            "quote"
+          ],
+          "daily_call_budget": 100,
+          "default_enabled": false,
+          "fallback_rank": 95,
+          "license_profile": "easyquotation_mit_wrapper_upstream_terms"
+        },
+        "fred": {
+          "capabilities": [
+            "macro"
+          ],
+          "daily_call_budget": 500,
+          "default_enabled": false,
+          "fallback_rank": 10,
+          "license_profile": "fred_api_terms_series_rights_apply"
+        },
+        "official_evidence": {
+          "capabilities": [
+            "news"
+          ],
+          "daily_call_budget": 1000,
+          "default_enabled": false,
+          "fallback_rank": 5,
+          "license_profile": "official_document_evidence_source_terms"
+        },
+        "polymarket": {
+          "capabilities": [
+            "macro"
+          ],
+          "daily_call_budget": 300,
+          "default_enabled": false,
+          "fallback_rank": 90,
+          "license_profile": "polymarket_public_read_only_expectation_not_fact"
+        },
+        "tushare_cn": {
+          "capabilities": [
+            "quote",
+            "bar",
+            "constituent",
+            "fundamental",
+            "news"
+          ],
+          "daily_call_budget": 1000,
+          "default_enabled": false,
+          "fallback_rank": 10,
+          "license_profile": "tushare_bsd_sdk_service_entitlements_apply"
+        },
+        "yahoo": {
+          "capabilities": [
+            "quote",
+            "bar"
+          ],
+          "daily_call_budget": 250,
+          "default_enabled": false,
+          "fallback_rank": 40,
+          "license_profile": "yfinance_apache_wrapper_yahoo_personal_research_terms"
+        }
+      }
+    }
+  },
+  "passed": true,
+  "report_version": "global-auxiliary-providers-v1",
+  "secrets_included": false,
+  "unhealthy_enabled_providers": {}
+}

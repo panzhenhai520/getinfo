@@ -1,0 +1,52 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "live_ragflow_calls": 0,
+    "model_calls": 0,
+    "real_order_calls": 0,
+    "tests_run": 8
+  },
+  "scenarios": {
+    "admin_permission_enforced": true,
+    "changed_decision_creates_version": true,
+    "controlled_opinion_publication": true,
+    "duplicate_save_idempotent": true,
+    "invalid_conflict_key_rejected": true,
+    "kb_second_confirmation_required": true,
+    "legacy_row_migrated": true,
+    "new_report_stales_old_decision": true,
+    "original_evidence_immutable": true,
+    "reject_all_publishes_nothing": true,
+    "source_session_omission_detected": true
+  },
+  "static": {
+    "admin_only": true,
+    "direct_network_or_model_imports": [],
+    "existing_decision_table_extended": "chat_conflict_decisions",
+    "explicit_kb_confirmation": true,
+    "financial_decisions": [
+      "keep_newer_verified",
+      "keep_historical",
+      "both_opinions",
+      "reject_all"
+    ],
+    "immutable_version_fields": [
+      "decision_version",
+      "conflict_payload_sha256",
+      "report_versions_json",
+      "decided_by"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "raw_review_answer_to_rag": false,
+    "report_update_stales_old_decision": true,
+    "schema_version": "financial-conflict-adjudication-v1",
+    "source_evidence_mutated": false,
+    "unverified_rating_as_fact": false
+  },
+  "task": "3.12"
+}

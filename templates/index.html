@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ platform_name }}</title>
+  <link href="/static/css/tailwind.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/fontawesome.css">
+  <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+  <script src="/static/js/json-formatter.umd.min.js"></script>
+  <script src="/static/js/law_firms_urls.js"></script>
+  <script src="/static/js/article-selector.js"></script>
+  <style>
+    .card-shadow {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .gradient-bg {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    }
+
+    .progress-bar {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: progress 1.5s ease-in-out infinite;
+    }
+
+    .table-hover tbody tr:hover {
+      background-color: #f9fafb;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      overflow: auto;
+      padding: 24px 12px;
+      box-sizing: border-box;
+    }
+
+    .modal-content {
+      background-color: #fff;
+      margin: 0 auto;
+      padding: 0;
+      border-radius: 0.5rem;
+      width: min(96vw, 800px);
+      max-width: 800px;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    @media (max-width: 640px) {
+      .modal {
+        padding: 12px;
+      }
+      .modal-header,
+      .modal-body,
+      .modal-footer {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+      .modal-footer {
+        flex-direction: column-reverse;
+      }
+      .modal-footer button {
+        width: 100%;
+      }
+    }
+
+    .json-container {
+      background-color: #f8fafc;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .json-key {
+      color: #0f172a;
+      font-weight: bold;
+    }
+
+    .json-string {
+      color: #059669;
+    }
+
+    .json-number {
+      color: #2563eb;
+    }
+
+    .json-boolean {
+      color: #7c3aed;
+    }
+
+    /* Primary颜色定义 - 蓝色主题 */
+    .bg-primary {
+      background-color: #3b82f6 !important;
+      /* blue-500 */
+    }
+
+    .bg-primary\/90 {
+      background-color: rgba(59, 130, 246, 0.9) !important;
+    }
+
+    .hover\:bg-primary\/90:hover {
+      background-color: rgba(59, 130, 246, 0.9) !important;
+    }
+
+    .text-primary {
+      color: #3b82f6 !important;
+      /* blue-500 */
+    }
+
+    .hover\:text-primary:hover {
+      color: #3b82f6 !important;
+    }
+
+    .hover\:text-primary\/80:hover {
+      color: rgba(59, 130, 246, 0.8) !important;
+    }
+
+    .text-dark {
+      color: #1f2937 !important;
+      /* gray-800 */
+    }
+
+    .border-primary {
+      border-color: #3b82f6 !important;
+    }
+
+    .focus\:ring-primary:focus {
+      --tw-ring-color: #3b82f6 !important;
+    }
+
+    .focus\:border-primary:focus {
+      border-color: #3b82f6 !important;
+    }
+
+    .crawl-modal-panel {
+      width: min(96vw, 56rem);
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .field-hint {
+      color: #6b7280;
+      font-size: 0.75rem;
+      line-height: 1.25rem;
+    }
+
+    .strategy-summary {
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .strategy-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .strategy-details[open] .strategy-chevron {
+      transform: rotate(180deg);
+    }
+
+    .strategy-chevron {
+      transition: transform 0.2s ease;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50">
+  <!-- 顶部导航栏 -->{% include "_dashboard_nav.html" %}
+
+
+  <!-- 主内容区 -->
+  <main class="container mx-auto px-4 py-8">
+
+
+    <!-- 控制台区域 -->
+    <section id="crawlerConsole" class="mb-5">
+      <div class="bg-white rounded-lg p-3 card-shadow">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-2.5">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-1.5 rounded-lg shadow-sm">
+              <i class="fa fa-terminal text-white text-base"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-dark leading-tight">控制台</h3>
+              <p class="text-xs text-gray-500 mt-0.5 leading-tight">点击"开始聚合"配置并启动智能聚合任务</p>
+            </div>
+          </div>
+          <button id="openCrawlModalBtn"
+            class="bg-primary hover:bg-primary/90 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center shadow-md hover:shadow-lg">
+            <i class="fa fa-play mr-1.5 text-xs"></i> 开始聚合
+          </button>
+        </div>
+
+        <!-- 状态显示 -->
+        <div id="crawlStatus" class="mt-2.5 hidden">
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <i class="fa fa-info-circle text-blue-500 text-sm"></i>
+              </div>
+              <div class="ml-2">
+                <p class="text-xs text-blue-700">
+                  聚合任务已提交，正在处理中...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 进度条 -->
+        <div id="progressContainer" class="mt-2.5 hidden">
+          <div class="flex justify-between text-xs text-gray-600 mb-1">
+            <span class="font-medium">聚合进度</span>
+            <span id="progressPercent" class="font-semibold">0%</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-1.5 progress-bar">
+            <div id="progressBar" class="bg-primary h-1.5 rounded-full transition-all duration-300" style="width: 0%">
+            </div>
+          </div>
+        </div>
+
+        <!-- 聚合日志 -->
+        <div id="crawlLogsContainer" class="mt-2.5 hidden">
+          <div class="flex justify-between items-center mb-1.5">
+            <h4 class="text-xs font-semibold text-gray-800">聚合日志</h4>
+            <button id="clearLogsBtn" class="text-xs text-gray-500 hover:text-gray-700 transition-colors">
+              <i class="fa fa-trash mr-1"></i> 清空日志
+            </button>
+          </div>
+          <div id="crawlLogs"
+            class="bg-gray-50 border border-gray-200 rounded-lg p-2.5 h-48 overflow-y-auto font-mono text-xs">
+            <div class="text-gray-500">等待聚合开始...</div>
+          </div>
+          <div class="mt-1.5 text-right">
+            <label class="mr-3 text-xs text-gray-600 inline-flex items-center gap-1">
+              <input id="autoRefreshLogsToggle" type="checkbox" class="mr-1 rounded">
+              自动刷新日志
+            </label>
+            <button id="loadMoreLogsBtn"
+              class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2.5 py-1 rounded-md text-xs font-medium transition-colors">
+              加载更多
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sourceScanTasks" class="mb-5">
+      <div class="bg-white rounded-lg p-4 card-shadow">
+        <div class="mb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"><div><h3 class="text-base font-bold flex items-center text-dark"><i class="fa fa-radar text-primary mr-2 text-lg"></i>信源扫描任务</h3><p class="mt-1 text-xs text-gray-500">行业信源的实际扫描状态；每天香港时间 08:30 自动执行。</p></div><button id="refreshConsoleSourceTasksBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center shadow-sm"><i class="fa fa-refresh mr-1.5"></i>刷新</button></div>
+        <div class="overflow-x-auto rounded-lg border border-gray-200"><table class="min-w-full divide-y divide-gray-200 table-hover text-xs"><thead class="bg-gray-50"><tr><th class="px-3 py-2 text-left font-medium text-gray-500">信源中文名 / URL</th><th class="px-3 py-2 text-left font-medium text-gray-500">浏览器聚合</th><th class="px-3 py-2 text-left font-medium text-gray-500">上次扫描</th><th class="px-3 py-2 text-left font-medium text-gray-500">下次扫描</th><th class="px-3 py-2 text-center font-medium text-gray-500">发现</th><th class="px-3 py-2 text-center font-medium text-gray-500">入库</th><th class="px-3 py-2 text-left font-medium text-gray-500">知识库</th><th class="px-3 py-2 text-left font-medium text-gray-500">状态 / 失败原因</th></tr></thead><tbody id="consoleSourceTasksTableBody" class="bg-white divide-y divide-gray-200"><tr><td colspan="8" class="px-4 py-6 text-center text-gray-500">正在加载信源扫描任务…</td></tr></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- 当前采集任务 -->
+    <section id="results" class="mb-5">
+      <div class="bg-white rounded-lg p-4 card-shadow">
+        <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h3 class="text-base font-bold flex items-center text-dark">
+            <i class="fa fa-database text-primary mr-2 text-lg"></i> 当前采集任务
+          </h3>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="refreshResultsBtn"
+              class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center shadow-sm">
+              <i class="fa fa-refresh mr-1.5 text-xs"></i> 刷新
+            </button>
+            <button id="clearAllTasksBtn"
+              class="bg-red-50 border border-red-300 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center shadow-sm">
+              <i class="fa fa-trash mr-1.5 text-xs"></i> 清空所有任务
+            </button>
+
+            <div class="text-xs text-gray-500 ml-1 whitespace-nowrap">
+              当前任务: <span id="currentTaskId">无</span>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+          <span class="font-medium text-gray-600">状态:</span>
+          <span class="inline-flex items-center gap-1"><i class="fa fa-spinner text-blue-600"></i>运行中</span>
+          <span class="inline-flex items-center gap-1"><i class="fa fa-check-circle text-emerald-600"></i>已完成</span>
+          <span class="inline-flex items-center gap-1"><i class="fa fa-ban text-gray-500"></i>已取消</span>
+          <span class="inline-flex items-center gap-1"><i class="fa fa-exclamation-circle text-red-600"></i>失败</span>
+          <span class="inline-flex items-center gap-1"><i class="fa fa-hourglass-half text-amber-600"></i>等待中</span>
+        </div>
+
+        <div id="crawlResults" class="overflow-x-auto rounded-lg border border-gray-200">
+          <table class="min-w-full divide-y divide-gray-200 table-hover">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># / 任务名称</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">网站名称</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">目标URL</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">执行时间</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">重复设置</th>
+                <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" title="当前任务生命周期状态">状态</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">关键词</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">文章提取</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody" class="bg-white divide-y divide-gray-200">
+              <tr>
+                <td colspan="9" class="px-4 py-6 text-center text-gray-500">
+                  <div class="flex flex-col items-center justify-center py-4">
+                    <i class="fa fa-inbox text-2xl text-gray-300 mb-2"></i>
+                    <p class="text-gray-500 text-sm">暂无当前采集任务</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="mt-3 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
+          <div class="text-xs text-gray-600">
+            显示第 <span id="taskPageStart">0</span> - <span id="taskPageEnd">0</span> 条，共 <span id="totalTasks">0</span> 条
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="prevTaskPageBtn"
+              class="px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              <i class="fa fa-chevron-left mr-1"></i> 上一页
+            </button>
+            <div class="flex items-center gap-1" id="taskPageNumbers"></div>
+            <button id="nextTaskPageBtn"
+              class="px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              下一页 <i class="fa fa-chevron-right ml-1"></i>
+            </button>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <label class="text-xs text-gray-600">每页：</label>
+            <select id="taskPageSizeSelect"
+              class="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-primary focus:border-primary bg-white">
+              <option value="10" selected>10条</option>
+              <option value="20">20条</option>
+              <option value="50">50条</option>
+              <option value="100">100条</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 聚合配置模态框 -->
+  <div id="crawlConfigModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50 hidden flex items-start justify-center p-3 sm:p-6">
+    <div class="relative mx-auto p-4 sm:p-6 border shadow-lg rounded-lg bg-white crawl-modal-panel">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">
+          <i class="fa fa-cog text-primary mr-2"></i> 配置聚合任务
+        </h3>
+        <button id="closeCrawlConfigModal" class="text-gray-400 hover:text-gray-600">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+
+      <!-- URL选择区域 -->
+      <div class="mb-6">
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="text-md font-semibold text-gray-800">选择要聚合的URL</h4>
+          <div class="flex items-center gap-2">
+            <button id="refreshCrawlUrlsBtn"
+              class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center shadow-sm">
+              <i class="fa fa-refresh mr-1.5 text-xs"></i> 刷新
+            </button>
+            <a href="/url-management"
+              class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center shadow-sm">
+              <i class="fa fa-plus mr-1.5 text-xs"></i> 添加URL
+            </a>
+          </div>
+        </div>
+
+        <!-- 自定义URL输入区域 -->
+        <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+          <h5 class="text-sm font-medium text-gray-800 mb-2">自定义URL输入</h5>
+          <div class="flex gap-2">
+            <input type="text" id="customUrlInput"
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              placeholder="输入要聚合的URL，例如：https://www.junhe.com/news">
+            <button id="addCustomUrlBtn"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+              <i class="fa fa-plus mr-1"></i> 添加
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">支持直接输入任何有效的URL进行聚合</p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">从URL管理中选择要聚合的URL（可多选）</label>
+          <div class="mb-3">
+            <div class="relative">
+              <input type="text" id="urlSearchInput"
+                class="w-full px-3 py-2 pl-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                placeholder="搜索URL或名称...">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i class="fa fa-search text-gray-400"></i>
+              </div>
+            </div>
+          </div>
+          <div id="crawlUrlsList" class="border border-gray-200 rounded-md p-3 bg-white max-h-60 overflow-y-auto">
+            <div class="text-center text-gray-500 py-4">
+              <i class="fa fa-spinner fa-spin text-2xl text-gray-300 mb-2"></i>
+              <p class="text-sm">正在加载URL列表...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex justify-between items-center">
+          <div class="text-sm text-gray-500">
+            已选择 <span id="selectedCrawlUrlsCount">0</span> 个URL
+          </div>
+          <div class="flex gap-2">
+            <button id="selectAllUrlsBtn" class="text-sm text-primary hover:text-primary/80">全选</button>
+            <button id="clearSelectionBtn" class="text-sm text-gray-500 hover:text-gray-700">清空选择</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 聚合参数设置 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">发现深度</label>
+          <select id="crawlDepth"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+            <option value="1">浅层聚合</option>
+            <option value="2" selected>标准聚合</option>
+            <option value="3">深度聚合</option>
+            <option value="4">深入聚合</option>
+            <option value="5">全面聚合</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">聚合模式</label>
+          <select id="crawlMode"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+            <option value="article_crawl" selected>通用文章聚合（Playwright）</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">文章上限</label>
+          <input type="number" id="pageLimit"
+            class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+            value="50" min="1" max="1000">
+        </div>
+      </div>
+
+      <!-- 知识库选择 -->
+      <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          <i class="fa fa-database text-green-600 mr-1"></i>目标知识库（必选）
+        </label>
+        <div class="flex gap-2">
+          <select id="targetKbId"
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+            <option value="">正在加载知识库列表...</option>
+          </select>
+          <button type="button" id="refreshKbBtn"
+            class="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            <i class="fa fa-refresh mr-1"></i>刷新
+          </button>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">选择聚合的文章要保存到哪个知识库</p>
+      </div>
+
+      <!-- 关键词过滤 -->
+      <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          <i class="fa fa-filter text-yellow-600 mr-1"></i>关键词过滤（可选）
+        </label>
+        <input type="text" id="keywords" class="w-full px-3 py-2 border border-gray-300 rounded-md"
+          placeholder="英伟达,NVIDIA,GPU">
+        <p class="mt-1 text-xs text-gray-500">多个关键词用逗号分隔，只保存包含关键词的文章</p>
+      </div>
+
+      <!-- 日期限制 -->
+      <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          <i class="fa fa-calendar text-purple-600 mr-1"></i>日期限制（可选）
+        </label>
+        <div class="flex items-center gap-2 mb-2">
+          <input type="number" id="daysLimit" value="7" min="0" max="365"
+            class="w-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-center"
+            placeholder="天数">
+          <span class="text-sm text-gray-600">天</span>
+          <span class="text-xs text-gray-400 ml-2">（0 = 不限制）</span>
+        </div>
+        <div class="flex flex-wrap gap-1">
+          <button type="button" onclick="document.getElementById('daysLimit').value='0'" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded">不限制</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='1'" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded">1天</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='3'" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded">3天</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='7'" class="px-2 py-1 text-xs bg-blue-200 hover:bg-blue-300 rounded font-medium">7天</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='14'" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded">14天</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='30'" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded">30天</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='60'" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded">60天</button>
+          <button type="button" onclick="document.getElementById('daysLimit').value='90'" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded">90天</button>
+        </div>
+        <p class="mt-2 text-xs text-gray-500">只聚合指定天数内发布的文章，超过日期的文章将被跳过</p>
+      </div>
+
+      <!-- 新文章聚合策略配置 -->
+      <details class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-md strategy-details">
+        <summary class="strategy-summary flex items-center justify-between gap-3">
+          <span class="text-sm font-medium text-gray-800">
+            <i class="fa fa-magic text-gray-600 mr-1"></i>自动识别设置
+          </span>
+          <span class="flex items-center gap-2 text-xs text-gray-500">
+            <span>系统自动识别栏目、链接、日期、分页</span>
+            <span id="proxyRuntimeStatus">代理状态读取中...</span>
+            <i class="fa fa-chevron-down strategy-chevron"></i>
+          </span>
+        </summary>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" onclick="applyCrawlStrategyPreset('recommended')" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded">推荐</button>
+          <button type="button" onclick="applyCrawlStrategyPreset('stable')" class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">更稳</button>
+          <button type="button" onclick="applyCrawlStrategyPreset('fast')" class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">更快</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">页面等待(ms)</label>
+            <input type="number" id="waitForMs" value="8000" min="1000" max="60000" step="500"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" title="等待动态内容渲染，8000约等于8秒">
+            <p class="field-hint">动态网站可调大</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">最多翻页</label>
+            <input type="number" id="maxPages" value="30" min="1" max="1000"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" title="栏目页最多向后翻多少页">
+            <p class="field-hint">按日期范围聚合时不按页数截断文章</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">空页停止</label>
+            <input type="number" id="maxEmptyPages" value="5" min="1" max="50"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" title="连续多少页没有新文章后停止">
+            <p class="field-hint">防止无限翻页</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">详情重试</label>
+            <input type="number" id="detailMaxRetries" value="2" min="1" max="5"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" title="正文提取失败时重试次数">
+            <p class="field-hint">网络不稳可调大</p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-3 text-sm text-gray-700">
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="dateRangePriority" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            日期范围优先
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="candidateDatePrefilter" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            候选日期预过滤
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="networkJsonEnabled" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            聚合接口文章
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="supplementalEnabled" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            补充发现
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="supplementalFeeds" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            RSS/Atom
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="supplementalSitemaps" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            Sitemap
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="supplementalStructured" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            结构化数据
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="supplementalStaticPagination" class="rounded border-gray-300 text-primary focus:ring-primary" checked>
+            静态分页
+          </label>
+          <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded">
+            <input type="checkbox" id="proxyEnabled" class="rounded border-gray-300 text-primary focus:ring-primary">
+            使用代理
+          </label>
+        </div>
+      </details>
+
+      <!-- 模态框底部按钮 -->
+      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <button id="cancelCrawlConfig"
+          class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+          取消
+        </button>
+        <button id="startCrawlBtn"
+          class="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+          <i class="fa fa-play mr-2"></i> 开始聚合
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务结果模态框 -->
+  <div id="taskResultModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="text-lg font-bold text-dark">
+          <i class="fa fa-file-code-o text-primary mr-2"></i> 任务结果
+        </h3>
+        <button id="closeTaskResultModal" class="text-gray-500 hover:text-gray-700">
+          <i class="fa fa-times text-xl"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="taskResultContent">
+          <!-- 任务结果内容将在这里动态加载 -->
+          <div class="flex justify-center items-center h-64">
+            <div class="text-center">
+              <i class="fa fa-spinner fa-spin text-3xl text-primary mb-3"></i>
+              <p class="text-gray-600">正在加载任务结果...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="copyJsonBtn"
+          class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+          <i class="fa fa-copy mr-1.5"></i> 复制JSON
+        </button>
+        <button id="downloadJsonBtn"
+          class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+          <i class="fa fa-download mr-1.5"></i> 下载JSON
+        </button>
+        <button id="closeTaskResultModal2"
+          class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+          关闭
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script>
+    // 移动端菜单切换
+    document.getElementById('menuBtn').addEventListener('click', function () {
+      const mobileMenu = document.getElementById('mobileMenu');
+      mobileMenu.classList.toggle('hidden');
+    });
+
+    // 分页变量（刷新后恢复上次页码）
+    let allTasks = [];
+    let currentTaskPage = parseInt(sessionStorage.getItem('console_task_page') || '1');
+    let taskPageSize = 10;
+
+    // 聚合配置模态框控制
+    const openCrawlModalBtn = document.getElementById('openCrawlModalBtn');
+    const crawlConfigModal = document.getElementById('crawlConfigModal');
+    const closeCrawlConfigModal = document.getElementById('closeCrawlConfigModal');
+    const cancelCrawlConfig = document.getElementById('cancelCrawlConfig');
+
+    if (openCrawlModalBtn) {
+      openCrawlModalBtn.addEventListener('click', function () {
+        crawlConfigModal.classList.remove('hidden');
+        loadCrawlUrls(); // 加载URL列表
+        loadKnowledgeBases(); // 加载知识库列表
+        loadCrawlRuntimeConfig(); // 加载当前聚合策略默认值
+      });
+    }
+
+    if (closeCrawlConfigModal) {
+      closeCrawlConfigModal.addEventListener('click', function () {
+        crawlConfigModal.classList.add('hidden');
+      });
+    }
+
+    if (cancelCrawlConfig) {
+      cancelCrawlConfig.addEventListener('click', function () {
+        crawlConfigModal.classList.add('hidden');
+      });
+    }
+
+    // 点击模态框外部关闭
+    window.addEventListener('click', function (event) {
+      if (event.target === crawlConfigModal) {
+        crawlConfigModal.classList.add('hidden');
+      }
+    });
+
+    // DOM元素
+    const crawlDepth = document.getElementById('crawlDepth');
+    const crawlMode = document.getElementById('crawlMode');
+    const pageLimit = document.getElementById('pageLimit');
+    const startCrawlBtn = document.getElementById('startCrawlBtn');
+    const crawlStatus = document.getElementById('crawlStatus');
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const crawlLogs = document.getElementById('crawlLogs');
+    const refreshResultsBtn = document.getElementById('refreshResultsBtn');
+    const resultsTableBody = document.getElementById('resultsTableBody');
+    const refreshCrawlUrlsBtn = document.getElementById('refreshCrawlUrlsBtn');
+    const selectedCrawlUrlsCount = document.getElementById('selectedCrawlUrlsCount');
+    const clearLogsBtn = document.getElementById('clearLogsBtn');
+
+    // 模态框相关元素
+    const taskResultModal = document.getElementById('taskResultModal');
+    const closeTaskResultModal = document.getElementById('closeTaskResultModal');
+    const closeTaskResultModal2 = document.getElementById('closeTaskResultModal2');
+    const copyJsonBtn = document.getElementById('copyJsonBtn');
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+    const taskResultContent = document.getElementById('taskResultContent');
+
+    // 当前聚合任务ID
+    let currentTaskId = null;
+    let statusCheckInterval = null;
+    let allCrawlUrls = []; // 存储所有聚合URL数据，用于搜索
+    let allCrawlCategories = []; // 存储所有分类数据
+    let crawlRuntimeConfig = null;
+
+    function getChecked(id) {
+      const el = document.getElementById(id);
+      return !!(el && el.checked);
+    }
+
+    function setChecked(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!value;
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el && value !== undefined && value !== null) el.value = value;
+    }
+
+    function applyCrawlStrategyPreset(preset) {
+      const presets = {
+        recommended: { wait_for_ms: 8000, max_pages: 30, max_empty_pages: 5, detail_max_retries: 2 },
+        stable: { wait_for_ms: 12000, max_pages: 80, max_empty_pages: 8, detail_max_retries: 3 },
+        fast: { wait_for_ms: 4000, max_pages: 15, max_empty_pages: 3, detail_max_retries: 1 }
+      };
+      const values = presets[preset] || presets.recommended;
+      setInputValue('waitForMs', values.wait_for_ms);
+      setInputValue('maxPages', values.max_pages);
+      setInputValue('maxEmptyPages', values.max_empty_pages);
+      setInputValue('detailMaxRetries', values.detail_max_retries);
+      setChecked('dateRangePriority', true);
+      setChecked('networkJsonEnabled', true);
+      setChecked('supplementalEnabled', true);
+      setChecked('supplementalFeeds', true);
+      setChecked('supplementalSitemaps', true);
+      setChecked('supplementalStructured', true);
+      setChecked('supplementalStaticPagination', true);
+      const proxyCheckbox = document.getElementById('proxyEnabled');
+      if (proxyCheckbox && proxyCheckbox.disabled) {
+        proxyCheckbox.checked = false;
+      }
+    }
+
+    function parseNumberInput(id, fallback, minValue, maxValue) {
+      const el = document.getElementById(id);
+      let value = parseInt(el ? el.value : fallback, 10);
+      if (!Number.isFinite(value)) value = fallback;
+      if (minValue !== undefined) value = Math.max(minValue, value);
+      if (maxValue !== undefined) value = Math.min(maxValue, value);
+      return value;
+    }
+
+    function getCrawlOptionsFromForm() {
+      return {
+        wait_for_ms: parseNumberInput('waitForMs', 8000, 1000, 60000),
+        max_pages: parseNumberInput('maxPages', 30, 1, 1000),
+        max_empty_pages: parseNumberInput('maxEmptyPages', 5, 1, 50),
+        detail_max_retries: parseNumberInput('detailMaxRetries', 2, 1, 5),
+        date_range_priority: getChecked('dateRangePriority'),
+        candidate_date_prefilter: getChecked('candidateDatePrefilter'),
+        network_json_enabled: getChecked('networkJsonEnabled'),
+        supplemental_enabled: getChecked('supplementalEnabled'),
+        supplemental_html: getChecked('supplementalEnabled'),
+        supplemental_attributes: getChecked('supplementalEnabled'),
+        supplemental_structured: getChecked('supplementalStructured'),
+        supplemental_scripts: getChecked('supplementalStructured'),
+        supplemental_static_pagination: getChecked('supplementalStaticPagination'),
+        supplemental_feeds: getChecked('supplementalFeeds'),
+        supplemental_sitemaps: getChecked('supplementalSitemaps'),
+        proxy_enabled: getChecked('proxyEnabled')
+      };
+    }
+
+    function applyCrawlRuntimeConfig(data) {
+      crawlRuntimeConfig = data || {};
+      const defaults = crawlRuntimeConfig.defaults || {};
+      setInputValue('waitForMs', defaults.wait_for_ms || 8000);
+      setInputValue('maxPages', defaults.max_pages || 30);
+      setInputValue('maxEmptyPages', defaults.max_empty_pages || 5);
+      setInputValue('detailMaxRetries', defaults.detail_max_retries || 2);
+      setChecked('dateRangePriority', defaults.date_range_priority !== false);
+      setChecked('candidateDatePrefilter', !!defaults.candidate_date_prefilter);
+      setChecked('networkJsonEnabled', defaults.network_json_enabled !== false);
+      setChecked('supplementalEnabled', defaults.supplemental_enabled !== false);
+      setChecked('supplementalFeeds', defaults.supplemental_feeds !== false);
+      setChecked('supplementalSitemaps', defaults.supplemental_sitemaps !== false);
+      setChecked('supplementalStructured', defaults.supplemental_structured !== false);
+      setChecked('supplementalStaticPagination', defaults.supplemental_static_pagination !== false);
+
+      const proxy = crawlRuntimeConfig.proxy || {};
+      const proxyCheckbox = document.getElementById('proxyEnabled');
+      const proxyStatus = document.getElementById('proxyRuntimeStatus');
+      if (proxyCheckbox) {
+        proxyCheckbox.checked = !!defaults.proxy_enabled && !!proxy.configured;
+        proxyCheckbox.disabled = !proxy.configured;
+      }
+      if (proxyStatus) {
+        proxyStatus.textContent = proxy.configured
+          ? (proxy.enabled ? '代理已配置，默认启用' : '代理已配置，默认关闭')
+          : '代理未配置';
+      }
+    }
+
+    function loadCrawlRuntimeConfig() {
+      return fetch('/api/crawl-runtime-config')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) applyCrawlRuntimeConfig(data);
+        })
+        .catch(error => {
+          console.error('加载聚合运行配置失败:', error);
+          const proxyStatus = document.getElementById('proxyRuntimeStatus');
+          if (proxyStatus) proxyStatus.textContent = '配置读取失败';
+        });
+    }
+
+    // 加载控制台URL列表
+    function loadCrawlUrls() {
+      const crawlUrlsList = document.getElementById('crawlUrlsList');
+
+      // 显示加载状态
+      crawlUrlsList.innerHTML = `<div class="text-center text-gray-500 py-4">
+                    <i class="fa fa-spinner fa-spin text-2xl text-gray-300 mb-2"></i>
+                    <p class="text-sm">正在加载URL列表...</p>
+                </div>`;
+
+      // 先加载分类
+      fetch('/api/categories')
+        .then(r => r.json())
+        .then(catData => {
+          if (catData.success) {
+            allCrawlCategories = catData.categories || [];
+          }
+
+          // 然后加载URL
+          return fetch('/api/urls?page=1&page_size=10000');
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.urls && data.urls.length > 0) {
+            // 存储所有URL数据到全局变量
+            allCrawlUrls = data.urls;
+            renderCrawlUrlsList(allCrawlUrls, '');
+          } else {
+            // 如果API中没有URL，则使用law_firms_urls.js中的数据
+            if (typeof lawFirmsAndOrganizations !== 'undefined') {
+              // 将law_firms_urls.js中的数据转换为API格式
+              const formattedUrls = lawFirmsAndOrganizations.map((item, index) => ({
+                id: index + 1,
+                url: item.url,
+                name: item.name,
+                description: item.note || '',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }));
+              // 存储所有URL数据到全局变量
+              allCrawlUrls = formattedUrls;
+              renderCrawlUrlsList(allCrawlUrls, '');
+            } else {
+              allCrawlUrls = [];
+              crawlUrlsList.innerHTML = `<div class="text-center text-gray-500 py-4">
+                                <i class="fa fa-link text-2xl text-gray-300 mb-2"></i>
+                                <p class="text-sm">暂无URL，请<a href="/url-management" class="text-primary hover:underline">添加要聚合的链接</a></p>
+                            </div>`;
+            }
+          }
+        })
+        .catch(error => {
+          console.error('获取URL列表失败:', error);
+          // 如果API请求失败，尝试使用law_firms_urls.js中的数据
+          if (typeof lawFirmsAndOrganizations !== 'undefined') {
+            const formattedUrls = lawFirmsAndOrganizations.map((item, index) => ({
+              id: index + 1,
+              url: item.url,
+              name: item.name,
+              description: item.note || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }));
+            // 存储所有URL数据到全局变量
+            allCrawlUrls = formattedUrls;
+            renderCrawlUrlsList(allCrawlUrls, '');
+          } else {
+            allCrawlUrls = [];
+            crawlUrlsList.innerHTML = `<div class="text-center text-gray-500 py-4">
+                        <i class="fa fa-exclamation-triangle text-2xl text-gray-300 mb-2"></i>
+                        <p class="text-sm">加载URL列表失败，请重试</p>
+                    </div>`;
+          }
+        });
+    }
+
+    // 渲染控制台URL列表（多选框形式，按分类显示）
+    function renderCrawlUrlsList(urls, searchTerm) {
+      const crawlUrlsList = document.getElementById('crawlUrlsList');
+
+      // 过滤URL（只显示非子URL）
+      let filteredUrls = urls.filter(u => !u.parent_id);
+      if (searchTerm) {
+        filteredUrls = filteredUrls.filter(u =>
+          (u.name && u.name.toLowerCase().includes(searchTerm)) ||
+          u.url.toLowerCase().includes(searchTerm)
+        );
+      }
+
+      if (filteredUrls.length === 0) {
+        crawlUrlsList.innerHTML = `<div class="text-center text-gray-500 py-4">
+                    <i class="fa fa-${searchTerm ? 'search' : 'link'} text-2xl text-gray-300 mb-2"></i>
+                    <p class="text-sm">${searchTerm ? '没有找到匹配的URL' : '暂无URL，请<a href="/url-management" class="text-primary hover:underline">添加要聚合的链接</a>'}</p>
+                </div>`;
+        return;
+      }
+
+      // 按分类组织URL
+      const urlsByCategory = {};
+      allCrawlCategories.forEach(cat => {
+        urlsByCategory[cat.id] = [];
+      });
+      urlsByCategory['uncategorized'] = [];
+
+      filteredUrls.forEach(url => {
+        if (url.category_id && urlsByCategory[url.category_id]) {
+          urlsByCategory[url.category_id].push(url);
+        } else {
+          urlsByCategory['uncategorized'].push(url);
+        }
+      });
+
+      let html = '';
+
+      // 渲染分类
+      allCrawlCategories.forEach(category => {
+        const urls = urlsByCategory[category.id] || [];
+        if (urls.length > 0) {
+          html += `
+                        <div class="category-block mb-2">
+                            <div class="px-3 py-2 bg-blue-50 text-sm font-semibold text-blue-900 rounded-t">
+                                <i class="fa fa-folder mr-2"></i>${category.name} (${urls.length})
+                            </div>
+                            <div class="border border-t-0 border-gray-200 rounded-b">
+                                ${urls.map(url => `
+                                    <div class="flex items-center p-2 hover:bg-gray-50 border-t first:border-t-0 border-gray-100">
+                                        <input type="checkbox" id="url-${url.id}" class="crawl-url-checkbox mr-3 rounded border-gray-300 text-primary focus:ring-primary" data-url-id="${url.id}" data-url="${url.url}">
+                                        <label for="url-${url.id}" class="flex-1 cursor-pointer">
+                                            <div class="text-sm font-medium text-gray-900">${url.name || url.url}</div>
+                                            <div class="text-xs text-gray-500 truncate">${url.url}</div>
+                                        </label>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+        }
+      });
+
+      // 渲染无分类的URL
+      if (urlsByCategory['uncategorized'].length > 0) {
+        html += `
+                    <div class="category-block mb-2">
+                        <div class="px-3 py-2 bg-gray-50 text-sm font-semibold text-gray-700 rounded-t">
+                            <i class="fa fa-folder-open mr-2"></i>无分类 (${urlsByCategory['uncategorized'].length})
+                        </div>
+                        <div class="border border-t-0 border-gray-200 rounded-b">
+                            ${urlsByCategory['uncategorized'].map(url => `
+                                <div class="flex items-center p-2 hover:bg-gray-50 border-t first:border-t-0 border-gray-100">
+                                    <input type="checkbox" id="url-${url.id}" class="crawl-url-checkbox mr-3 rounded border-gray-300 text-primary focus:ring-primary" data-url-id="${url.id}" data-url="${url.url}">
+                                    <label for="url-${url.id}" class="flex-1 cursor-pointer">
+                                        <div class="text-sm font-medium text-gray-900">${url.name || url.url}</div>
+                                        <div class="text-xs text-gray-500 truncate">${url.url}</div>
+                                    </label>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+      }
+
+      crawlUrlsList.innerHTML = html;
+
+      // 添加复选框事件监听
+      document.querySelectorAll('.crawl-url-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCrawlUrlsCount);
+      });
+
+      // 更新选中计数
+      updateSelectedCrawlUrlsCount();
+    }
+
+    // 更新选中的聚合URL计数
+    function updateSelectedCrawlUrlsCount() {
+      const checkboxes = document.querySelectorAll('.crawl-url-checkbox');
+      const checkedCount = document.querySelectorAll('.crawl-url-checkbox:checked').length;
+      selectedCrawlUrlsCount.textContent = checkedCount;
+    }
+
+    // 刷新聚合URL列表
+    refreshCrawlUrlsBtn.addEventListener('click', function () {
+      loadCrawlUrls();
+    });
+
+    // 全选URL
+    document.getElementById('selectAllUrlsBtn').addEventListener('click', function () {
+      document.querySelectorAll('.crawl-url-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+      });
+      updateSelectedCrawlUrlsCount();
+    });
+
+    // 清空选择
+    document.getElementById('clearSelectionBtn').addEventListener('click', function () {
+      document.querySelectorAll('.crawl-url-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+      });
+      updateSelectedCrawlUrlsCount();
+    });
+
+    // URL搜索功能
+    const urlSearchInput = document.getElementById('urlSearchInput');
+    urlSearchInput.addEventListener('input', function () {
+      const searchTerm = this.value.toLowerCase().trim();
+      // 直接传递搜索词给渲染函数，让它处理过滤和分类显示
+      renderCrawlUrlsList(allCrawlUrls, searchTerm);
+    });
+
+    // 自定义URL添加按钮事件监听
+    const addCustomUrlBtn = document.getElementById('addCustomUrlBtn');
+    const customUrlInput = document.getElementById('customUrlInput');
+
+    addCustomUrlBtn.addEventListener('click', function () {
+      const customUrl = customUrlInput.value.trim();
+
+      if (!customUrl) {
+        showMessage('请输入有效的URL', 'error');
+        return;
+      }
+
+      // 简单的URL验证
+      try {
+        new URL(customUrl);
+      } catch (e) {
+        showMessage('请输入有效的URL格式', 'error');
+        return;
+      }
+
+      // 将自定义URL添加到选中列表
+      const customUrlItem = {
+        url: customUrl,
+        name: `自定义URL: ${customUrl}`,
+        description: '用户自定义输入的URL'
+      };
+
+      // 添加到URL列表并自动选中
+      allCrawlUrls.unshift(customUrlItem);
+      renderCrawlUrlsList(allCrawlUrls);
+
+      // 自动选中新添加的URL
+      const newCheckbox = document.querySelector(`input[data-url="${customUrl}"]`);
+      if (newCheckbox) {
+        newCheckbox.checked = true;
+        updateSelectedCrawlUrlsCount();
+      }
+
+      // 清空输入框
+      customUrlInput.value = '';
+      showMessage('自定义URL已添加', 'success');
+    });
+
+    // 自定义URL输入框回车事件
+    customUrlInput.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        addCustomUrlBtn.click();
+      }
+    });
+
+    // 加载知识库列表
+    function loadKnowledgeBases(callback) {
+      const kbSelect = document.getElementById('targetKbId');
+      if (!kbSelect) return;
+
+      const currentValue = kbSelect.value;
+      kbSelect.innerHTML = '<option value="">正在加载...</option>';
+
+      fetch('/api/schedule-management/ragflow/datasets')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.datasets) {
+            kbSelect.innerHTML = '<option value="">请选择知识库</option>';
+            data.datasets.forEach(kb => {
+              const option = document.createElement('option');
+              option.value = kb.id;
+              option.textContent = kb.name || kb.dataset_name || kb.id;
+              kbSelect.appendChild(option);
+            });
+            // 恢复之前选中的值
+            if (currentValue) {
+              kbSelect.value = currentValue;
+            }
+          } else {
+            kbSelect.innerHTML = '<option value="">加载失败，请刷新重试</option>';
+          }
+        })
+        .catch(error => {
+          console.error('加载知识库列表失败:', error);
+          kbSelect.innerHTML = '<option value="">加载失败，请刷新重试</option>';
+        })
+        .finally(() => {
+          if (typeof callback === 'function') {
+            callback();
+          }
+        });
+    }
+
+    // 刷新知识库按钮事件
+    const refreshKbBtn = document.getElementById('refreshKbBtn');
+    if (refreshKbBtn) {
+      refreshKbBtn.addEventListener('click', function () {
+        const originalHtml = refreshKbBtn.innerHTML;
+        refreshKbBtn.disabled = true;
+        refreshKbBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i>刷新中';
+        loadKnowledgeBases(() => {
+          refreshKbBtn.disabled = false;
+          refreshKbBtn.innerHTML = originalHtml;
+        });
+      });
+    }
+
+    // 开始聚合按钮事件监听
+    startCrawlBtn.addEventListener('click', async function () {
+      // 获取选中的URL
+      const selectedUrls = [];
+      document.querySelectorAll('.crawl-url-checkbox:checked').forEach(checkbox => {
+        selectedUrls.push(checkbox.dataset.url);
+      });
+
+      // 检查是否选择了URL
+      if (selectedUrls.length === 0) {
+        showMessage('请至少选择一个URL进行聚合', 'error');
+        return;
+      }
+
+      // 检查是否选择了知识库
+      const kbId = document.getElementById('targetKbId').value;
+      if (!kbId) {
+        showMessage('请选择目标知识库', 'error');
+        return;
+      }
+
+      // 获取聚合参数
+      const depth = crawlDepth.value;
+      const mode = crawlMode.value;
+      const limit = pageLimit.value;
+      const keywords = document.getElementById('keywords').value;
+      const daysLimit = document.getElementById('daysLimit').value;
+      const crawlOptions = getCrawlOptionsFromForm();
+
+      // 禁用按钮，防止重复提交
+      startCrawlBtn.disabled = true;
+      startCrawlBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i> 提交中...';
+
+      const parsedDaysLimitRaw = parseInt(daysLimit, 10);
+      const parsedDaysLimit = Number.isFinite(parsedDaysLimitRaw) ? Math.max(0, parsedDaysLimitRaw) : 7;
+      const postJson = async (endpoint, payload) => {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.message || data.error || '创建聚合任务失败');
+        }
+        return data;
+      };
+
+      try {
+        let data;
+        if (mode === 'article_crawl') {
+          const results = await Promise.all(selectedUrls.map(url => postJson('/api/start-article-crawl', {
+            url: url,
+            depth: depth,
+            limit: limit,
+            incremental: false,
+            keywords: keywords,
+            kb_id: kbId,
+            days_limit: parsedDaysLimit,
+            crawl_options: crawlOptions
+          })));
+          const taskIds = results.flatMap(result => result.task_ids || []);
+          data = { success: taskIds.length > 0, task_ids: taskIds };
+        } else {
+          data = await postJson('/api/start-crawl', {
+            urls: selectedUrls,
+            depth: depth,
+            mode: mode,
+            limit: limit,
+            incremental: false,
+            keywords: keywords,
+            kb_id: kbId,
+            days_limit: parsedDaysLimit,
+            crawl_options: crawlOptions
+          });
+        }
+
+        if (data.success && data.task_ids && data.task_ids.length > 0) {
+          if (crawlConfigModal) {
+            crawlConfigModal.classList.add('hidden');
+          }
+
+          currentTaskId = data.task_ids[0];
+          document.getElementById('currentTaskId').textContent = currentTaskId;
+
+          showCrawlStatus();
+
+          addCrawlLog(`已创建 ${data.task_ids.length} 个聚合任务`);
+          addCrawlLog('目标URL: ' + selectedUrls.join(', '));
+          addCrawlLog('任务ID: ' + data.task_ids.join(', '));
+
+          startStatusCheck();
+          loadCrawlResults();
+
+          showMessage(`已成功创建 ${data.task_ids.length} 个聚合任务！`, 'success');
+        } else {
+          throw new Error('创建聚合任务失败');
+        }
+      } catch (error) {
+        console.error('创建聚合任务失败:', error);
+        showMessage('创建聚合任务失败: ' + error.message, 'error');
+      } finally {
+        startCrawlBtn.disabled = false;
+        startCrawlBtn.innerHTML = '<i class="fa fa-play mr-2"></i> 开始聚合';
+      }
+    });
+
+    // 显示聚合状态区域
+    function showCrawlStatus() {
+      crawlStatus.classList.remove('hidden');
+      document.getElementById('progressContainer').classList.remove('hidden');
+      document.getElementById('crawlLogsContainer').classList.remove('hidden');
+    }
+
+    // 开始状态检查
+    function startStatusCheck() {
+      // 清除之前的定时器
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+      }
+
+      // 立即检查一次
+      checkCrawlStatus();
+
+      // 设置定时检查
+      statusCheckInterval = setInterval(checkCrawlStatus, 2000);
+    }
+
+    // 检查聚合状态
+    function checkCrawlStatus() {
+      // 如果没有当前任务ID，尝试从任务列表获取最新的任务
+      if (!currentTaskId) {
+        // 获取最新的任务列表
+        fetch('/api/crawl-results')
+          .then(response => response.json())
+          .then(data => {
+            if (data.success && data.results && data.results.length > 0) {
+              // 找到最新的未完成任务
+              const latestTask = data.results.find(task =>
+                !['completed', 'error', 'failed', 'cancelled'].includes(task.status)
+              );
+              if (latestTask) {
+                currentTaskId = latestTask.task_id;
+                document.getElementById('currentTaskId').textContent = currentTaskId;
+                // 递归调用检查状态
+                checkCrawlStatus();
+              }
+            }
+          })
+          .catch(error => {
+            console.error('获取任务列表失败:', error);
+          });
+        return;
+      }
+
+      fetch('/api/crawl-status?task_id=' + currentTaskId)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('HTTP error! status: ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.success) {
+            // 更新进度条 - 使用平滑过渡效果
+            if (data.progress !== undefined) {
+              // 使用CSS过渡效果使进度条变化更平滑
+              progressBar.style.transition = 'width 0.5s ease-in-out';
+              progressBar.style.width = data.progress + '%';
+              progressPercent.textContent = data.progress + '%';
+            }
+
+            updateCrawlStatus(data.status, data);
+
+            // 如果任务完成，立即进行智能提取
+            if (data.status === 'completed') {
+              showMessage(`任务 ${currentTaskId} 已完成！正在自动进行智能提取并入库...`, 'success');
+              // 立即对当前完成的任务进行智能提取（自动检查数据库去重）
+              autoSmartExtractAfterCrawl(currentTaskId);
+            }
+
+            // 如果任务完成或失败，检查是否还有其他任务在进行中
+            if (['completed', 'error', 'failed', 'cancelled'].includes(data.status)) {
+              // 获取所有任务状态
+              fetch('/api/crawl-results')
+                .then(response => response.json())
+                .then(allTasksData => {
+                  const allTasks = allTasksData.results;
+
+                  // 检查是否所有任务都已完成
+                  const allCompleted = allTasks.every(task =>
+                    ['completed', 'error', 'failed', 'cancelled'].includes(task.status)
+                  );
+
+                  if (allCompleted) {
+                    // 所有任务都完成，停止检查
+                    clearInterval(statusCheckInterval);
+                    statusCheckInterval = null;
+
+                    // 清空当前任务ID，避免检查已完成的任务
+                    currentTaskId = null;
+                    document.getElementById('currentTaskId').textContent = '已完成';
+
+                    // 显示任务完成消息
+                    const completedCount = allTasks.filter(task => task.status === 'completed').length;
+                    const failedCount = allTasks.filter(task => task.status === 'error' || task.status === 'failed').length;
+
+                    if (failedCount === 0) {
+                      showMessage(`所有${completedCount}个聚合任务已完成！正在自动进行智能提取并入库...`, 'success');
+                      // 自动对所有完成的任务进行智能提取（自动检查数据库去重）
+                      autoSmartExtractAllCompletedTasks(allTasks);
+                    } else {
+                      showMessage(`${completedCount}个任务已完成，${failedCount}个任务失败。正在对完成的任务进行智能提取并入库...`, 'warning');
+                      // 只对完成的任务进行智能提取（自动检查数据库去重）
+                      const completedTasks = allTasks.filter(task => task.status === 'completed');
+                      if (completedTasks.length > 0) {
+                        autoSmartExtractAllCompletedTasks(completedTasks);
+                      }
+                    }
+
+                    // 自动下载已完成的任务
+                    autoDownloadCompletedTasks();
+
+                    // 取消所有URL的勾选
+                    document.querySelectorAll('.crawl-url-checkbox:checked').forEach(checkbox => {
+                      checkbox.checked = false;
+                    });
+                    updateSelectedCrawlUrlsCount();
+
+                    // 清除搜索框内容
+                    document.getElementById('urlSearchInput').value = '';
+
+                    // 重置控制台UI到最开始的状态
+                    resetCrawlUI();
+
+                    // 刷新并重新显示完整的URL列表
+                    loadCrawlUrls();
+
+                    // 最后刷新结果列表，确保不会影响控制台状态
+                    setTimeout(() => {
+                      loadCrawlResults();
+                      // 再次确保控制台状态正确
+                      resetCrawlUI();
+                    }, 100);
+                  } else {
+                    // 还有任务在进行中，继续检查下一个任务
+                    const nextTask = allTasks.find(task =>
+                      !['completed', 'error', 'failed', 'cancelled'].includes(task.status)
+                    );
+
+                    if (nextTask) {
+                      currentTaskId = nextTask.task_id;
+                      document.getElementById('currentTaskId').textContent = currentTaskId;
+                      addCrawlLog(`继续检查任务: ${currentTaskId}`);
+                    } else {
+                      // 没有找到下一个任务，也停止检查
+                      clearInterval(statusCheckInterval);
+                      statusCheckInterval = null;
+                    }
+                  }
+                })
+                .catch(error => {
+                  console.error('获取所有任务状态失败:', error);
+                  // 获取任务状态失败，也停止检查，避免无限循环
+                  clearInterval(statusCheckInterval);
+                  statusCheckInterval = null;
+                });
+            }
+          }
+        })
+        .catch(error => {
+          console.error('检查聚合状态失败:', error);
+        });
+    }
+
+    // 重置聚合UI
+    function resetCrawlUI() {
+      // 重置进度条
+      progressBar.style.width = '0%';
+      progressPercent.textContent = '0%';
+
+      // 重置当前任务ID
+      currentTaskId = null;
+      document.getElementById('currentTaskId').textContent = '无';
+
+      // 隐藏聚合状态区域
+      crawlStatus.classList.add('hidden');
+      document.getElementById('progressContainer').classList.add('hidden');
+      document.getElementById('crawlLogsContainer').classList.add('hidden');
+
+      // 重置日志
+      crawlLogs.innerHTML = '<div class="text-gray-500">等待聚合开始...</div>';
+    }
+
+    // 更新聚合状态
+    function updateCrawlStatus(status, statusResult) {
+      // 直接使用从后端获取的进度值，不再重新计算
+      // 这样可以确保前后端进度显示一致
+
+      // 添加日志（只对当前任务添加日志）
+      if (status === 'pending') {
+        addCrawlLog(`任务 ${currentTaskId} 已提交，等待处理...`);
+      } else if (status === 'processing' || status === 'running' || status === 'scraping') {
+        // 根据状态添加更详细的日志
+        if (statusResult && statusResult.status) {
+          let statusText = '';
+          switch (statusResult.status) {
+            case 'queued':
+              statusText = '排队中';
+              break;
+            case 'crawling':
+              statusText = '正在聚合链接';
+              break;
+            case 'scraping':
+              statusText = '正在提取内容';
+              break;
+            case 'processing':
+              statusText = '正在处理结果';
+              break;
+            default:
+              statusText = '正在处理';
+          }
+          addCrawlLog(`任务 ${currentTaskId} ${statusText}...`);
+        } else {
+          addCrawlLog(`任务 ${currentTaskId} 正在处理...`);
+        }
+      } else if (status === 'completed') {
+        addCrawlLog(`任务 ${currentTaskId} 已完成！`);
+        // 确保进度显示为100%
+        progressBar.style.width = '100%';
+        progressPercent.textContent = '100%';
+      } else if (status === 'cancelled') {
+        addCrawlLog(`任务 ${currentTaskId} 已取消`);
+      } else if (status === 'error' || status === 'failed') {
+        addCrawlLog(`任务 ${currentTaskId} 失败！`);
+      }
+    }
+
+    // 添加聚合日志
+    function addCrawlLog(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      const logEntry = document.createElement('div');
+      logEntry.className = 'mb-1';
+      logEntry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> ${message}`;
+
+      // 如果是第一条日志，清除占位文本
+      if (crawlLogs.querySelector('.text-gray-500')) {
+        crawlLogs.innerHTML = '';
+      }
+
+      crawlLogs.appendChild(logEntry);
+      crawlLogs.scrollTop = crawlLogs.scrollHeight;
+    }
+
+    // 清空日志
+    clearLogsBtn.addEventListener('click', function () {
+      crawlLogs.innerHTML = '<div class="text-gray-500">等待聚合开始...</div>';
+    });
+
+    // 日志分页加载
+    let logOffset = 0;
+    const logPageSize = 100;
+    const loadMoreLogsBtn = document.getElementById('loadMoreLogsBtn');
+    if (loadMoreLogsBtn) {
+      loadMoreLogsBtn.addEventListener('click', function () {
+        if (!currentTaskId) {
+          showMessage('没有当前任务', 'warning');
+          return;
+        }
+        fetch(`/api/task-logs?task_id=${encodeURIComponent(currentTaskId)}&offset=${logOffset}&limit=${logPageSize}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              if (logOffset === 0) crawlLogs.innerHTML = '';
+              (data.logs || []).forEach(line => {
+                const d = document.createElement('div');
+                d.className = 'mb-1';
+                d.textContent = line;
+                crawlLogs.appendChild(d);
+              });
+              logOffset += (data.logs || []).length;
+              if ((data.logs || []).length === 0) {
+                showMessage('没有更多日志', 'info');
+              }
+              crawlLogs.scrollTop = crawlLogs.scrollHeight;
+            } else {
+              showMessage('加载日志失败: ' + (data.message || '未知错误'), 'error');
+            }
+          })
+          .catch(err => showMessage('加载日志失败: ' + err.message, 'error'));
+      });
+    }
+
+    // 指数退避自动刷新日志
+    const autoRefreshLogsToggle = document.getElementById('autoRefreshLogsToggle');
+    let logsPollDelay = 1000; // 初始1s
+    const logsPollDelayMax = 15000; // 最大15s
+    let logsPollTimer = null;
+
+    function scheduleLogsPoll() {
+      clearTimeout(logsPollTimer);
+      if (!autoRefreshLogsToggle || !autoRefreshLogsToggle.checked) return;
+      logsPollTimer = setTimeout(async () => {
+        try {
+          if (!currentTaskId) return scheduleLogsPoll();
+          const resp = await fetch(`/api/task-logs?task_id=${encodeURIComponent(currentTaskId)}&offset=${logOffset}&limit=${logPageSize}`);
+          const data = await resp.json();
+          if (data.success) {
+            if (logOffset === 0 && (data.logs || []).length > 0) crawlLogs.innerHTML = '';
+            (data.logs || []).forEach(line => {
+              const d = document.createElement('div');
+              d.className = 'mb-1';
+              d.textContent = line;
+              crawlLogs.appendChild(d);
+            });
+            const got = (data.logs || []).length;
+            logOffset += got;
+            if (got > 0) {
+              logsPollDelay = 1000; // 收到数据，降回最快
+              crawlLogs.scrollTop = crawlLogs.scrollHeight;
+            } else {
+              logsPollDelay = Math.min(logsPollDelay * 2, logsPollDelayMax);
+            }
+          } else {
+            logsPollDelay = Math.min(logsPollDelay * 2, logsPollDelayMax);
+          }
+        } catch (_) {
+          logsPollDelay = Math.min(logsPollDelay * 2, logsPollDelayMax);
+        }
+        scheduleLogsPoll();
+      }, logsPollDelay);
+    }
+
+    if (autoRefreshLogsToggle) {
+      autoRefreshLogsToggle.addEventListener('change', function () {
+        logOffset = 0; // 切换开关时重置偏移
+        if (autoRefreshLogsToggle.checked) {
+          scheduleLogsPoll();
+        } else {
+          clearTimeout(logsPollTimer);
+        }
+      });
+    }
+
+    // 加载当前聚合任务
+    function loadCrawlResults() {
+      // 获取所有聚合任务
+      fetch('/api/crawl-results')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('HTTP error! status: ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          allTasks = data.results || [];
+          renderTasksWithPagination();
+          document.getElementById('currentTaskId').textContent = allTasks.length > 0 ? `${allTasks.length}个任务` : '无';
+        })
+        .catch(error => {
+          console.error(`获取聚合任务失败: ${error}`);
+          resultsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="9" class="px-4 py-6 text-center text-gray-500">
+                                <div class="flex flex-col items-center justify-center py-4">
+                                    <i class="fa fa-exclamation-triangle text-2xl text-red-300 mb-2"></i>
+                                    <p class="text-gray-500 text-sm">获取聚合任务失败: ${error.message}</p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+          document.getElementById('currentTaskId').textContent = '错误';
+        });
+    }
+
+    function escapeConsoleSourceTaskHtml(value) {
+      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    function formatConsoleSourceTaskTime(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? escapeConsoleSourceTaskHtml(value) : date.toLocaleString('zh-CN', { timeZone: 'Asia/Hong_Kong', hour12: false });
+    }
+    function loadConsoleSourceScanTasks() {
+      const body = document.getElementById('consoleSourceTasksTableBody');
+      if (!body) return;
+      const activeIndustryPackId = {{ active_industry_pack.id|tojson }};
+      fetch('/api/intel/source-tasks?industry_pack_id=' + encodeURIComponent(activeIndustryPackId) + '&per_page=500')
+        .then(response => response.ok ? response.json() : Promise.reject(new Error('HTTP ' + response.status)))
+        .then(data => {
+          const tasks = data.source_tasks || [];
+          if (!data.success || !tasks.length) { body.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-500">暂无已注册的行业信源</td></tr>'; return; }
+          body.innerHTML = tasks.map(task => {
+            const status = task.scan_status || 'not_scanned';
+            const label = { completed:'已完成', partial:'部分完成', running:'扫描中', failed:'失败', rate_limited:'受限', skipped:'跳过', not_scanned:'未扫描' }[status] || status;
+            const style = ['failed','rate_limited'].includes(status) ? 'text-red-700' : (status === 'completed' ? 'text-emerald-700' : 'text-amber-700');
+            const reason = task.failure_reason ? `<div class="mt-1 text-red-600 break-all">${escapeConsoleSourceTaskHtml(task.failure_reason)}</div>` : '';
+            const kb = (task.knowledge_base_ids || []).map(escapeConsoleSourceTaskHtml).join('<br>') || '—';
+            return `<tr><td class="px-3 py-2 min-w-64"><div class="font-medium text-gray-900">${escapeConsoleSourceTaskHtml(task.source_name || '未命名信源')}</div><div class="mt-1 text-gray-500 break-all">${escapeConsoleSourceTaskHtml(task.source_url)}</div></td><td class="px-3 py-2 whitespace-nowrap">${task.browser_fetch_enabled ? '<span class="text-indigo-700">已启用</span>' : '<span class="text-gray-500">轻量请求</span>'}</td><td class="px-3 py-2 whitespace-nowrap text-gray-600">${formatConsoleSourceTaskTime(task.last_scan_at)}</td><td class="px-3 py-2 whitespace-nowrap text-gray-600">${formatConsoleSourceTaskTime(task.next_scan_at)}</td><td class="px-3 py-2 text-center">${Number(task.discovered_count || 0)}</td><td class="px-3 py-2 text-center">${Number(task.ingested_count || 0)}</td><td class="px-3 py-2 text-gray-600 break-all">${kb}</td><td class="px-3 py-2 min-w-44"><div class="font-medium ${style}">${label}</div>${reason}</td></tr>`;
+          }).join('');
+        }).catch(error => { body.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center text-red-600">加载信源扫描任务失败：${escapeConsoleSourceTaskHtml(error.message)}</td></tr>`; });
+    }
+
+    // 带分页的任务渲染
+    function renderTasksWithPagination() {
+      const totalPages = Math.ceil(allTasks.length / taskPageSize);
+      if (currentTaskPage > totalPages && totalPages > 0) {
+        currentTaskPage = totalPages;
+      }
+      sessionStorage.setItem('console_task_page', currentTaskPage);
+
+      const start = (currentTaskPage - 1) * taskPageSize;
+      const end = Math.min(start + taskPageSize, allTasks.length);
+      const pageTasks = allTasks.slice(start, end);
+
+      renderCurrentTask(pageTasks);
+      updateTaskPagination(allTasks.length, totalPages);
+    }
+
+    // 更新任务分页控件
+    function updateTaskPagination(totalItems, totalPages) {
+      const start = totalItems === 0 ? 0 : (currentTaskPage - 1) * taskPageSize + 1;
+      const end = Math.min(currentTaskPage * taskPageSize, totalItems);
+
+      document.getElementById('taskPageStart').textContent = start;
+      document.getElementById('taskPageEnd').textContent = end;
+      document.getElementById('totalTasks').textContent = totalItems;
+
+      const prevBtn = document.getElementById('prevTaskPageBtn');
+      const nextBtn = document.getElementById('nextTaskPageBtn');
+
+      if (prevBtn) {
+        prevBtn.disabled = currentTaskPage <= 1;
+      }
+
+      if (nextBtn) {
+        nextBtn.disabled = currentTaskPage >= totalPages || totalPages === 0;
+      }
+
+      // 生成页码按钮
+      const pageNumbers = document.getElementById('taskPageNumbers');
+      if (pageNumbers) {
+        pageNumbers.innerHTML = '';
+
+        if (totalPages <= 7) {
+          for (let i = 1; i <= totalPages; i++) {
+            pageNumbers.appendChild(createTaskPageButton(i));
+          }
+        } else {
+          pageNumbers.appendChild(createTaskPageButton(1));
+
+          if (currentTaskPage > 3) {
+            pageNumbers.appendChild(createTaskEllipsis());
+          }
+
+          const startPage = Math.max(2, currentTaskPage - 1);
+          const endPage = Math.min(totalPages - 1, currentTaskPage + 1);
+
+          for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.appendChild(createTaskPageButton(i));
+          }
+
+          if (currentTaskPage < totalPages - 2) {
+            pageNumbers.appendChild(createTaskEllipsis());
+          }
+
+          pageNumbers.appendChild(createTaskPageButton(totalPages));
+        }
+      }
+    }
+
+    // 创建任务页码按钮
+    function createTaskPageButton(pageNum) {
+      const button = document.createElement('button');
+      button.textContent = pageNum;
+      button.className = `px-2.5 py-1 border rounded text-xs font-medium transition-colors ${pageNum === currentTaskPage
+        ? 'bg-primary text-white border-primary'
+        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+        }`;
+      button.addEventListener('click', function () {
+        currentTaskPage = pageNum;
+        renderTasksWithPagination();
+      });
+      return button;
+    }
+
+    // 创建任务省略号
+    function createTaskEllipsis() {
+      const span = document.createElement('span');
+      span.textContent = '...';
+      span.className = 'px-1.5 text-gray-400 text-xs';
+      return span;
+    }
+
+    // 渲染当前任务表格
+    function renderCurrentTask(tasks) {
+      const tbody = document.getElementById('resultsTableBody');
+      if (!tasks || tasks.length === 0) {
+        tbody.innerHTML = `<tr>
+                        <td colspan="9" class="px-4 py-6 text-center text-gray-500">
+                            <div class="flex flex-col items-center justify-center py-4">
+                                <i class="fa fa-inbox text-2xl text-gray-300 mb-2"></i>
+                                <p class="text-gray-500 text-sm">暂无当前采集任务</p>
+                            </div>
+                        </td>
+                    </tr>`;
+        return;
+      }
+
+      const rowStartNumber = (currentTaskPage - 1) * taskPageSize;
+      tbody.innerHTML = '';
+      tasks.forEach((task, index) => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50 cursor-pointer';
+
+        // 获取任务名称（优先使用task_name，其次schedule_name，最后使用任务ID前8位）
+        // 注意：需要检查是否为空字符串
+        let taskName = task.task_name || task.schedule_name || '';
+        if (!taskName || taskName.trim() === '') {
+          // 如果task_id以schedule_开头，尝试提取更有意义的名称
+          if (task.task_id && task.task_id.startsWith('schedule_')) {
+            // 从URL中提取域名作为任务名称
+            if (task.url) {
+              try {
+                const urlObj = new URL(task.url);
+                taskName = urlObj.hostname.replace('www.', '');
+              } catch (e) {
+                taskName = task.task_id.substring(0, 16);
+              }
+            } else {
+              taskName = task.task_id.substring(0, 16);
+            }
+          } else {
+            taskName = task.task_id ? task.task_id.substring(0, 8) : '未知任务';
+          }
+        }
+
+        // 获取执行时间和重复设置（兼容后端格式化字段与原始调度字段）
+        const executionTime = task.schedule_execution_time || formatConsoleScheduleTime(task.schedule_time) || '-';
+        const repeatSetting = task.schedule_repeat || formatConsoleRepeatSetting(task) || '-';
+
+        const taskKeywords = renderTaskKeywords(task.keywords);
+
+        // 转义任务ID中的特殊字符，防止HTML注入和语法错误
+        const escapedTaskId = JSON.stringify(task.task_id);
+        const escapedTaskIdForHtml = task.task_id.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        const statusIcon = renderTaskStatusIcon(task.status, escapedTaskIdForHtml);
+        const scheduleId = task.schedule_id || getScheduleIdFromTaskId(task.task_id);
+        const extractedContentUrl = `/task-extracted-content/${encodeURIComponent(task.task_id)}`;
+        const viewExtractedContentLink = `
+                            <a href="${extractedContentUrl}" class="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-900 rounded hover:bg-blue-50" title="查看已获取内容" aria-label="查看已获取内容">
+                                <i class="fa fa-eye"></i>
+                            </a>
+                        `;
+
+        row.innerHTML = `<td class="px-3 py-1.5 text-sm text-gray-900">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-gray-100 text-gray-600 text-xs font-semibold flex-shrink-0">${rowStartNumber + index + 1}</span>
+                            ${scheduleId ? '<i class="fa fa-clock-o text-blue-500 mr-1" title="任务调度"></i>' : ''}
+                            <button type="button" onclick="openTaskDetails('${escapedTaskIdForHtml}')" class="text-left text-blue-700 hover:text-blue-900 hover:underline font-medium truncate max-w-[140px]" title="${escapeTaskHtml(taskName)}">${escapeTaskHtml(taskName)}</button>
+                        </div>
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-gray-700 max-w-[110px] truncate" title="${escapeTaskHtml(task.url_display_name || '')}">
+                        ${task.url_display_name ? `<span class="font-medium text-blue-700">${escapeTaskHtml(task.url_display_name)}</span>` : '<span class="text-gray-300">-</span>'}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-gray-900 max-w-xs truncate" title="${task.url || '-'}">
+                        ${task.url || '-'}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-gray-900 whitespace-nowrap">
+                        ${executionTime}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-gray-900 whitespace-nowrap">
+                        ${repeatSetting}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-center">
+                        ${statusIcon}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-gray-900 whitespace-nowrap">
+                        ${task.created_at ? formatDate(task.created_at) : '-'}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm text-gray-900">
+                        ${taskKeywords}
+                    </td>
+                    <td class="px-3 py-1.5 text-sm font-medium">
+                        <div class="flex items-center gap-1">
+                            ${!['completed', 'error', 'failed', 'cancelled'].includes(task.status) ? `
+                                <button onclick="cancelTask('${escapedTaskIdForHtml}')" class="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:text-red-900 rounded hover:bg-red-50" title="取消任务" aria-label="取消任务">
+                                    <i class="fa fa-ban"></i>
+                                </button>
+                            ` : ''}
+                            ${(['error', 'failed', 'cancelled'].includes(task.status)) ? `
+                                <button onclick="retryTask('${escapedTaskIdForHtml}')" class="inline-flex items-center justify-center w-8 h-8 text-amber-600 hover:text-amber-900 rounded hover:bg-amber-50" title="重试任务" aria-label="重试任务">
+                                    <i class="fa fa-refresh"></i>
+                                </button>
+                            ` : ''}
+                            <button onclick="deleteTaskResult('${escapedTaskIdForHtml}')" class="inline-flex items-center justify-center w-8 h-8 text-red-600 hover:text-red-900 rounded hover:bg-red-50" title="删除" aria-label="删除">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="px-3 py-1.5 text-sm font-medium">
+                        <div class="flex flex-wrap items-center gap-2">
+                            ${task.status !== 'completed' ? '<span class="inline-flex items-center justify-center w-8 h-8 text-gray-300" title="等待完成"><i class="fa fa-hourglass-half"></i></span>' : ''}
+                            ${viewExtractedContentLink}
+                        </div>
+                    </td>`;
+        row.addEventListener('click', function(event) {
+          if (event.target.closest('button, a, input, select, textarea')) return;
+          openTaskDetails(task.task_id);
+        });
+        tbody.appendChild(row);
+      });
+    }
+
+    function formatConsoleScheduleTime(scheduleTime) {
+      if (!scheduleTime) return '';
+      const parts = String(scheduleTime).split(':');
+      if (parts.length >= 2) {
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+      }
+      return String(scheduleTime);
+    }
+
+    function splitScheduleNumbers(value) {
+      if (!value) return [];
+      if (Array.isArray(value)) return value.map(Number).filter(Number.isFinite);
+      return String(value)
+        .split(/[,，\s]+/)
+        .map(item => Number(item))
+        .filter(Number.isFinite);
+    }
+
+    function formatConsoleRepeatSetting(task) {
+      const repeat = String(task.schedule_type || task.repeat || '').toLowerCase();
+      if (!repeat) return '';
+      if (repeat === 'once') return '仅执行一次';
+      if (repeat === 'hourly') return '每小时';
+      if (repeat === 'daily') return '每天';
+      if (repeat === 'weekly') {
+        const names = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const labels = splitScheduleNumbers(task.schedule_weekdays)
+          .filter(day => day >= 0 && day <= 6)
+          .map(day => names[day]);
+        return labels.length ? `每周（${labels.join(', ')}）` : '每周';
+      }
+      if (repeat === 'monthly') {
+        const days = splitScheduleNumbers(task.schedule_monthdays)
+          .filter(day => day >= 1 && day <= 31);
+        return days.length ? `每月（${days.join(', ')}日）` : '每月';
+      }
+      return repeat;
+    }
+
+    function getScheduleIdFromTaskId(taskId) {
+      const match = String(taskId || '').match(/^schedule_(\d+)_/);
+      return match ? match[1] : '';
+    }
+
+    function renderTaskStatusIcon(status, escapedTaskIdForHtml) {
+      const normalized = String(status || '').toLowerCase();
+      const map = {
+        pending: { icon: 'fa-hourglass-half', className: 'bg-amber-50 text-amber-700 border-amber-200', label: '等待中' },
+        processing: { icon: 'fa-spinner fa-spin', className: 'bg-blue-50 text-blue-700 border-blue-200', label: '运行中' },
+        running: { icon: 'fa-spinner fa-spin', className: 'bg-blue-50 text-blue-700 border-blue-200', label: '运行中' },
+        completed: { icon: 'fa-check-circle', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: '已完成' },
+        cancelled: { icon: 'fa-ban', className: 'bg-gray-50 text-gray-600 border-gray-200', label: '已取消' },
+        failed: { icon: 'fa-exclamation-circle', className: 'bg-red-50 text-red-700 border-red-200', label: '失败', retry: true },
+        error: { icon: 'fa-exclamation-circle', className: 'bg-red-50 text-red-700 border-red-200', label: '失败', retry: true }
+      };
+      const item = map[normalized] || { icon: 'fa-question-circle', className: 'bg-gray-50 text-gray-600 border-gray-200', label: status || '未知' };
+      if (item.retry) {
+        return `<button type="button" onclick="retryTask('${escapedTaskIdForHtml}')" class="inline-flex items-center justify-center gap-1 min-w-10 h-8 px-2 rounded-full border ${item.className} hover:bg-red-100" title="失败，点击重试" aria-label="失败，点击重试">
+          <i class="fa ${item.icon}" aria-hidden="true"></i>
+          <i class="fa fa-refresh" aria-hidden="true"></i>
+          <span class="sr-only">${item.label}</span>
+        </button>`;
+      }
+      return `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full border ${item.className}" title="${item.label}">
+          <i class="fa ${item.icon}" aria-hidden="true"></i>
+          <span class="sr-only">${item.label}</span>
+      </span>`;
+    }
+
+    function escapeTaskHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderTaskKeywords(value) {
+      const keywords = String(value || '')
+        .split(/[,，;；、\s]+/)
+        .map(item => item.trim())
+        .filter(Boolean);
+      if (keywords.length === 0) {
+        return '<span class="text-gray-400 text-xs">无关键词</span>';
+      }
+      const shown = keywords.slice(0, 2);
+      const extra = keywords.length - shown.length;
+      return `<div class="flex flex-wrap gap-1" title="${escapeTaskHtml(keywords.join(', '))}">
+        ${shown.map(keyword => `<span class="px-1.5 py-0 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-medium max-w-[90px] truncate">${escapeTaskHtml(keyword)}</span>`).join('')}
+        ${extra > 0 ? `<span class="px-1.5 py-0 rounded-full bg-gray-50 text-gray-500 border border-gray-200 text-xs">+${extra}</span>` : ''}
+      </div>`;
+    }
+
+    function openTaskDetails(taskId) {
+      const task = (allTasks || []).find(item => String(item.task_id) === String(taskId)) || {};
+      const scheduleId = task.schedule_id || getScheduleIdFromTaskId(taskId);
+      if (scheduleId) {
+        window.location.href = `/schedule-management?edit_schedule_id=${encodeURIComponent(scheduleId)}&return_to=console`;
+        return;
+      }
+      window.open(`/api/app/task/${encodeURIComponent(taskId)}`, '_blank');
+    }
+
+    // 查看任务结果
+    function viewTaskResult(taskId) {
+      // 显示模态框
+      taskResultModal.style.display = 'block';
+
+      // 重置模态框内容
+      taskResultContent.innerHTML = `<div class="flex justify-center items-center h-64">
+                <div class="text-center">
+                    <i class="fa fa-spinner fa-spin text-3xl text-primary mb-3"></i>
+                    <p class="text-gray-600">正在加载任务结果...</p>
+                </div>
+            </div>`;
+
+      // 获取任务结果
+      fetch(`/api/tasks/${taskId}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('HTTP error! status: ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.task) {
+            renderTaskResult(data.task);
+          } else {
+            throw new Error('任务不存在');
+          }
+        })
+        .catch(error => {
+          console.error(`获取任务结果失败: ${error}`);
+          taskResultContent.innerHTML = `<div class="text-center py-8">
+                        <i class="fa fa-exclamation-triangle text-3xl text-red-500 mb-3"></i>
+                        <p class="text-gray-600">获取任务结果失败: ${error.message}</p>
+                    </div>`;
+        });
+    }
+
+    // 渲染任务结果
+    function renderTaskResult(result) {
+      let scheduleInfoHtml = '';
+      if (result.schedule_name) {
+        scheduleInfoHtml = `<div>
+                                    <p class="text-sm text-gray-500">任务调度</p>
+                                    <p class="font-medium">${result.schedule_name}</p>
+                                  </div>`;
+      }
+
+      let completedInfoHtml = '';
+      if (result.completed_at) {
+        completedInfoHtml = `<div>
+                                    <p class="text-sm text-gray-500">完成时间</p>
+                                    <p class="font-medium">${formatDate(result.completed_at)}</p>
+                                  </div>`;
+      }
+
+      let html = `<div class="mb-6">
+                          <h4 class="text-lg font-semibold text-gray-800 mb-3">任务信息</h4>
+                          <div class="bg-gray-50 rounded-lg p-4">
+                              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                      <p class="text-sm text-gray-500">任务ID</p>
+                                      <p class="font-medium">${result.id}</p>
+                                  </div>
+                                  <div>
+                                      <p class="text-sm text-gray-500">状态</p>
+                                      <p class="font-medium">${result.status}</p>
+                                  </div>
+                                  <div>
+                                      <p class="text-sm text-gray-500">目标URL</p>
+                                      <p class="font-medium break-all">${result.url}</p>
+                                  </div>
+                                  <div>
+                                      <p class="text-sm text-gray-500">创建时间</p>
+                                      <p class="font-medium">${formatDate(result.created_at)}</p>
+                                  </div>
+                                  ${scheduleInfoHtml}
+                                  ${completedInfoHtml}
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <div>
+                          <h4 class="text-lg font-semibold text-gray-800 mb-3">原始数据</h4>
+                          <div class="json-container" id="jsonResultContainer">
+                              <!-- JSON数据将在这里格式化显示 -->
+                          </div>
+                      </div>`;
+
+      taskResultContent.innerHTML = html;
+
+      // 格式化并显示JSON数据
+      try {
+        const jsonData = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
+        const formattedJson = JSON.stringify(jsonData, null, 2);
+
+        // 使用简单的JSON格式化
+        const jsonContainer = document.getElementById('jsonResultContainer');
+        jsonContainer.innerHTML = `<pre>${formatJson(formattedJson)}</pre>`;
+      } catch (e) {
+        document.getElementById('jsonResultContainer').innerHTML =
+          `<pre class="text-red-500">JSON解析错误: ${e.message}</pre>`;
+      }
+    }
+
+    // 简单的JSON格式化函数
+    function formatJson(json) {
+      return json
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // 下载TXT结果
+    function downloadTxtResult(taskId) {
+      // 切换下拉菜单显示状态
+      const menu = document.getElementById(`downloadMenu_${taskId}`);
+      if (menu) {
+        menu.classList.toggle('hidden');
+
+        // 点击其他地方时隐藏菜单
+        document.addEventListener('click', function (event) {
+          const escapedTaskId = JSON.stringify(taskId);
+          if (!event.target.closest(`#downloadMenu_${taskId}`) && !event.target.closest(`button[onclick="downloadTxtResult(${escapedTaskId})"]`)) {
+            menu.classList.add('hidden');
+          }
+        });
+      } else {
+        // 如果没有菜单，直接下载原始内容
+        window.location.href = '/api/download-txt?task_id=' + encodeURIComponent(taskId) + '&clean=false';
+      }
+    }
+
+    // 批量下载所有文章TXT
+    function downloadAllArticlesTxt(taskId) {
+      // 显示加载提示
+      showMessage('正在生成下载文件，请稍候...', 'info');
+
+      // 使用fetch下载，以便更好地处理错误
+      fetch('/api/download-all-articles-txt?task_id=' + encodeURIComponent(taskId) + '&clean=false')
+        .then(response => {
+          if (!response.ok) {
+            // 尝试解析JSON错误消息
+            return response.json().then(data => {
+              throw new Error(data.message || '下载失败');
+            }).catch(() => {
+              throw new Error('下载失败：HTTP ' + response.status);
+            });
+          }
+          // 从响应头获取文件名
+          const contentDisposition = response.headers.get('Content-Disposition');
+          let filename = `articles_${taskId}.zip`; // 默认文件名
+
+          if (contentDisposition) {
+            console.log('Content-Disposition:', contentDisposition);
+
+            // 支持RFC 5987格式: filename*=UTF-8''encoded_filename
+            const rfc5987Match = /filename\*=UTF-8''([^;\n]+)/.exec(contentDisposition);
+            if (rfc5987Match) {
+              filename = decodeURIComponent(rfc5987Match[1]);
+              console.log('使用RFC 5987格式文件名:', filename);
+            } else {
+              // 标准格式: filename="filename" 或 filename=filename
+              const standardMatch = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+              if (standardMatch && standardMatch[1]) {
+                filename = standardMatch[1].replace(/['"]/g, '');
+                filename = decodeURIComponent(filename);
+                console.log('使用标准格式文件名:', filename);
+              }
+            }
+          }
+
+          return response.blob().then(blob => ({ blob, filename }));
+        })
+        .then(({ blob, filename }) => {
+          // 创建下载链接
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+
+          document.body.appendChild(a);
+          a.click();
+
+          // 清理
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+
+          showMessage('下载成功！', 'success');
+        })
+        .catch(error => {
+          console.error('下载失败:', error);
+          showMessage('下载失败: ' + error.message, 'error');
+        });
+    }
+
+    // 提取文章链接
+    function extractArticleLinks(taskId) {
+      // 切换下拉菜单显示状态
+      const menu = document.getElementById(`extractMenu_${taskId}`);
+      if (menu) {
+        menu.classList.toggle('hidden');
+
+        // 点击其他地方时隐藏菜单
+        document.addEventListener('click', function (event) {
+          const escapedTaskId = JSON.stringify(taskId);
+          if (!event.target.closest(`#extractMenu_${taskId}`) && !event.target.closest(`button[onclick="extractArticleLinks(${escapedTaskId})"]`)) {
+            menu.classList.add('hidden');
+          }
+        });
+      } else {
+        // 如果没有菜单，直接提取链接
+        extractArticleLinksFromTask(taskId, false);
+      }
+    }
+
+    // 从任务中提取文章链接
+    function extractArticleLinksFromTask(taskId, cleanContent) {
+      // 显示加载提示
+      showMessage('正在提取文章链接，请稍候...', 'info');
+
+      // 先调用简化API提取链接
+      fetch('/api/extract-links-only', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_id: taskId
+        })
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.success) {
+            showMessage(`成功提取到 ${data.total_links} 个文章链接`, 'success');
+
+            // 创建链接列表显示
+            let linksText = `找到 ${data.total_links} 个文章链接：\n`;
+
+            data.links.slice(0, 10).forEach((link, index) => {
+              linksText += `${index + 1}. ${link.title}\n`;
+            });
+
+            if (data.total_links > 10) {
+              linksText += `... 还有 ${data.total_links - 10} 个链接`;
+            }
+
+            // 显示链接预览
+            showMessage(linksText, 'info');
+
+            // 如果用户需要下载，可以在这里添加下载功能
+            if (confirm('是否要下载这些文章链接的ZIP文件？')) {
+              // 调用完整的下载API
+              return fetch('/api/extract-articles-from-task', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  task_id: taskId,
+                  clean_content: cleanContent
+                })
+              });
+            } else {
+              return Promise.resolve(null);
+            }
+          } else {
+            throw new Error(data.error || '提取链接失败');
+          }
+        })
+        .then(response => {
+          if (response && response.ok) {
+            return response.blob();
+          } else if (response) {
+            throw new Error(`HTTP错误: ${response.status}`);
+          }
+          return null;
+        })
+        .then(blob => {
+          if (blob) {
+            // 创建下载链接
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `article_links_${taskId}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            showMessage('文章链接提取完成！', 'success');
+          }
+          // 如果blob为null，说明用户选择不下载，不需要做任何操作
+        })
+        .catch(error => {
+          console.error('提取文章链接失败:', error);
+          showMessage('提取文章链接失败: ' + error.message, 'error');
+        });
+    }
+
+    // 智能提取文章内容
+    function smartExtractArticles(taskId, cleanContent) {
+      // 显示加载提示
+      showMessage('正在智能提取文章内容，请稍候...', 'info');
+
+      // 调用智能提取API
+      fetch('/api/smart-extract-articles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_id: taskId,
+          clean_content: cleanContent,
+          return_json: false  // 明确要求返回ZIP文件
+        })
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status}`);
+          }
+          // 从响应头获取建议的文件名
+          const suggestedFilename = response.headers.get('X-Suggested-Filename') ||
+            `smart_articles_${taskId}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.zip`;
+
+          return response.blob().then(blob => ({ blob, filename: suggestedFilename }));
+        })
+        .then(({ blob, filename }) => {
+          // 创建下载链接
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+
+          showMessage('下载完成！已下载文章内容', 'success');
+        })
+        .catch(error => {
+          console.error('智能提取失败:', error);
+          showMessage('智能提取失败: ' + error.message, 'error');
+        });
+    }
+
+    // 增量聚合任务
+    function incrementalCrawlTask(taskId, cleanContent) {
+      // 显示加载提示
+      showMessage('正在增量聚合文章内容，请稍候...', 'info');
+
+      // 调用增量聚合API
+      fetch('/api/incremental-crawl-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          task_id: taskId,
+          clean_content: cleanContent,
+          max_articles: 99999  // 不限制
+        })
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP错误: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.success) {
+            const stats = data.stats;
+            const message = `增量聚合完成！\n` +
+              `总链接数: ${stats.total_links}\n` +
+              `新文章: ${stats.new_articles_count} 篇\n` +
+              `跳过文章: ${stats.skipped_articles_count} 篇\n` +
+              `处理成功: ${stats.processed_count} 篇`;
+
+            showMessage(message, 'success');
+
+            // 如果有新文章，显示详细信息
+            if (data.new_articles && data.new_articles.length > 0) {
+              let articlesInfo = '新文章列表:\n';
+              data.new_articles.slice(0, 5).forEach((article, index) => {
+                articlesInfo += `${index + 1}. ${article.title}\n`;
+              });
+              if (data.new_articles.length > 5) {
+                articlesInfo += `... 还有 ${data.new_articles.length - 5} 篇文章`;
+              }
+              showMessage(articlesInfo, 'info');
+            }
+          } else {
+            throw new Error(data.message || '增量聚合失败');
+          }
+        })
+        .catch(error => {
+          console.error('增量聚合失败:', error);
+          showMessage('增量聚合失败: ' + error.message, 'error');
+        });
+    }
+
+    // 自动下载已完成的任务
+    function autoDownloadCompletedTasks() {
+      fetch('/api/auto-download-completed')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            console.log('自动下载成功:', data);
+            addCrawlLog(`已自动下载 ${data.files ? data.files.length : 0} 个任务结果到 auto_downloads 文件夹`);
+            showMessage(`已自动下载 ${data.files ? data.files.length : 0} 个任务结果`, 'success');
+          } else {
+            console.log('自动下载失败:', data);
+            addCrawlLog(`自动下载失败: ${data.message}`);
+          }
+        })
+        .catch(error => {
+          console.error('自动下载失败:', error);
+          addCrawlLog(`自动下载失败: ${error.message}`);
+        });
+    }
+
+    // 删除任务结果
+    function deleteTaskResult(taskId) {
+      if (!confirm('确定要删除这个任务吗？')) {
+        return;
+      }
+
+      console.log('准备删除任务:', taskId);
+
+      fetch('/api/delete-result?task_id=' + encodeURIComponent(taskId), {
+        method: 'DELETE'
+      })
+        .then(response => {
+          console.log('删除响应状态:', response.status);
+          if (!response.ok) {
+            throw new Error('HTTP error! status: ' + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log('删除响应数据:', data);
+          if (data.success) {
+            alert('删除成功！');
+            // 强制刷新页面
+            window.location.reload();
+          } else {
+            alert('删除失败: ' + (data.message || '未知错误'));
+          }
+        })
+        .catch(error => {
+          console.error('删除任务结果失败:', error);
+          alert('删除失败: ' + error.message);
+        });
+    }
+
+    // 取消任务
+    function cancelTask(taskId) {
+      fetch('/api/cancel-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            const task = allTasks.find(item => item.task_id === taskId);
+            if (task) {
+              task.status = data.status || 'cancelled';
+              task.error_message = data.message || '任务已取消';
+              renderTasksWithPagination();
+            }
+            loadCrawlResults();
+            showMessage(data.message || '任务已取消', 'success');
+          } else {
+            loadCrawlResults();
+            showMessage('取消失败: ' + (data.message || '未知错误'), 'error');
+          }
+        })
+        .catch(err => showMessage('取消失败: ' + err.message, 'error'));
+    }
+
+    // 重试任务
+    function retryTask(taskId) {
+      const originalTask = (allTasks || []).find(task => String(task.task_id) === String(taskId)) || {};
+      const fallback = {
+        url: originalTask.url || originalTask.target_url || '',
+        task_name: originalTask.task_name || originalTask.schedule_name || '',
+        limit: originalTask.limit || originalTask.page_limit || 50,
+        keywords: originalTask.keywords || '',
+        kb_id: originalTask.kb_id || originalTask.ragflow_kb_id || '',
+        days_limit: originalTask.days_limit || 7,
+        crawl_options: originalTask.crawl_options || {}
+      };
+      fetch('/api/retry-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_id: taskId, fallback })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            showMessage(data.message || '已重试原任务', 'success');
+            loadCrawlResults();
+          } else {
+            showMessage('重试失败: ' + (data.message || '未知错误'), 'error');
+          }
+        })
+        .catch(err => showMessage('重试失败: ' + err.message, 'error'));
+    }
+
+    // 刷新结果列表
+    refreshResultsBtn.addEventListener('click', function () {
+      loadCrawlResults();
+    });
+
+    // 清空所有任务
+    document.getElementById('clearAllTasksBtn').addEventListener('click', function () {
+      if (!confirm('确定要清空所有聚合任务吗？此操作不可恢复！')) {
+        return;
+      }
+
+      fetch('/api/clear-results', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            showMessage('所有任务已清空', 'success');
+            // 重置UI
+            resetCrawlUI();
+            // 刷新任务列表
+            loadCrawlResults();
+          } else {
+            showMessage('清空任务失败: ' + (data.message || '未知错误'), 'error');
+          }
+        })
+        .catch(error => {
+          console.error('清空任务失败:', error);
+          showMessage('清空任务失败: ' + error.message, 'error');
+        });
+    });
+
+    // 关闭任务结果模态框
+    closeTaskResultModal.addEventListener('click', function () {
+      taskResultModal.style.display = 'none';
+    });
+
+    closeTaskResultModal2.addEventListener('click', function () {
+      taskResultModal.style.display = 'none';
+    });
+
+    // 点击模态框外部关闭
+    window.addEventListener('click', function (event) {
+      if (event.target === taskResultModal) {
+        taskResultModal.style.display = 'none';
+      }
+    });
+
+    // 复制JSON
+    copyJsonBtn.addEventListener('click', function () {
+      const jsonText = document.querySelector('#jsonResultContainer pre').textContent;
+      navigator.clipboard.writeText(jsonText)
+        .then(() => {
+          // 显示复制成功提示
+          const originalText = this.innerHTML;
+          this.innerHTML = '<i class="fa fa-check mr-1.5"></i> 已复制';
+          setTimeout(() => {
+            this.innerHTML = originalText;
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('复制失败:', err);
+          alert('复制失败，请手动选择并复制');
+        });
+    });
+
+    // 下载JSON
+    downloadJsonBtn.addEventListener('click', function () {
+      const jsonText = document.querySelector('#jsonResultContainer pre').textContent;
+      const blob = new Blob([jsonText], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'task-result-' + (currentTaskId || 'data') + '.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // 已移除所有聚合结果相关函数（查看、下载、删除等）
+
+    // 自动智能提取所有完成的任务
+    function autoSmartExtractAllCompletedTasks(completedTasks) {
+      console.log('开始自动智能提取，任务数量:', completedTasks.length);
+
+      completedTasks.forEach((task, index) => {
+        // 延迟执行，避免同时处理太多任务
+        setTimeout(() => {
+          autoSmartExtractAfterCrawl(task.task_id);
+        }, index * 2000); // 每个任务间隔2秒
+      });
+    }
+
+    // 聚合完成后自动进行智能提取（自动检查数据库去重）
+    function autoSmartExtractAfterCrawl(taskId) {
+      console.log('自动智能提取任务:', taskId);
+
+      // 调用智能提取API（后端会自动检查数据库并跳过已存在的文章）
+      fetch('/api/smart-extract-articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_id: taskId,
+          clean_content: true,
+          return_json: true  // 自动提取时返回JSON，不下载文件
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const stats = data.stats;
+            const message = stats.skipped_count > 0
+              ? `任务 ${taskId} 智能提取并入库完成：新增 ${stats.success_count} 篇，跳过 ${stats.skipped_count} 篇（已存在）`
+              : `任务 ${taskId} 智能提取并入库完成：新增 ${stats.success_count} 篇`;
+            showMessage(message, 'success');
+            console.log('智能提取结果:', stats);
+
+            // 刷新任务列表
+            loadCrawlResults();
+          } else {
+            console.error('智能提取失败:', data.message || data.error);
+            showMessage(`任务 ${taskId} 智能提取失败: ${data.message || data.error}`, 'error');
+          }
+        })
+        .catch(error => {
+          console.error('智能提取请求失败:', error);
+          showMessage(`任务 ${taskId} 智能提取请求失败`, 'error');
+        });
+    }
+
+    // 已移除 initArticleManagementEvents 函数
+
+    // 页面初始化
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () {
+        // 加载聚合URL列表
+        loadCrawlUrls();
+        loadCrawlRuntimeConfig();
+
+        // 加载当前聚合任务
+        loadCrawlResults();
+        loadConsoleSourceScanTasks();
+
+        // 初始化聚合状态区域为隐藏状态
+        crawlStatus.classList.add('hidden');
+        document.getElementById('progressContainer').classList.add('hidden');
+        document.getElementById('crawlLogsContainer').classList.add('hidden');
+
+        // 启动任务列表自动刷新（每10秒刷新一次）
+        setInterval(loadCrawlResults, 10000);
+        setInterval(loadConsoleSourceScanTasks, 30000);
+        const refreshConsoleSourceTasksBtn = document.getElementById('refreshConsoleSourceTasksBtn');
+        if (refreshConsoleSourceTasksBtn) refreshConsoleSourceTasksBtn.addEventListener('click', loadConsoleSourceScanTasks);
+
+        // 分页按钮事件
+        const prevTaskPageBtn = document.getElementById('prevTaskPageBtn');
+        const nextTaskPageBtn = document.getElementById('nextTaskPageBtn');
+        const taskPageSizeSelect = document.getElementById('taskPageSizeSelect');
+
+        if (prevTaskPageBtn) {
+          prevTaskPageBtn.addEventListener('click', function () {
+            if (currentTaskPage > 1) {
+              currentTaskPage--;
+              renderTasksWithPagination();
+            }
+          });
+        }
+
+        if (nextTaskPageBtn) {
+          nextTaskPageBtn.addEventListener('click', function () {
+            const totalPages = Math.ceil(allTasks.length / taskPageSize);
+            if (currentTaskPage < totalPages) {
+              currentTaskPage++;
+              renderTasksWithPagination();
+            }
+          });
+        }
+
+        if (taskPageSizeSelect) {
+          taskPageSizeSelect.addEventListener('change', function () {
+            taskPageSize = parseInt(this.value);
+            currentTaskPage = 1;
+            renderTasksWithPagination();
+          });
+        }
+      });
+    } else {
+      // DOM already loaded, execute directly
+      // 加载聚合URL列表
+      loadCrawlUrls();
+      loadCrawlRuntimeConfig();
+
+      // 加载当前聚合任务
+      loadCrawlResults();
+      loadConsoleSourceScanTasks();
+
+      // 初始化聚合状态区域为隐藏状态
+      crawlStatus.classList.add('hidden');
+      document.getElementById('progressContainer').classList.add('hidden');
+      document.getElementById('crawlLogsContainer').classList.add('hidden');
+
+      // 启动任务列表自动刷新（每10秒刷新一次）
+      setInterval(loadCrawlResults, 10000);
+      setInterval(loadConsoleSourceScanTasks, 30000);
+      const refreshConsoleSourceTasksBtn = document.getElementById('refreshConsoleSourceTasksBtn');
+      if (refreshConsoleSourceTasksBtn) refreshConsoleSourceTasksBtn.addEventListener('click', loadConsoleSourceScanTasks);
+    }
+
+    // 显示消息提示
+    function showMessage(message, type) {
+      // 创建消息元素
+      const messageElement = document.createElement('div');
+      messageElement.className = 'fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg z-50';
+
+      // 根据类型设置样式
+      if (type === 'success') {
+        messageElement.className += ' bg-green-100 text-green-800 border border-green-200';
+        messageElement.innerHTML = '<div class="flex items-center"><i class="fa fa-check-circle mr-2"></i> ' + message + '</div>';
+      } else if (type === 'error') {
+        messageElement.className += ' bg-red-100 text-red-800 border border-red-200';
+        messageElement.innerHTML = '<div class="flex items-center"><i class="fa fa-exclamation-circle mr-2"></i> ' + message + '</div>';
+      } else {
+        messageElement.className += ' bg-blue-100 text-blue-800 border border-blue-200';
+        messageElement.innerHTML = '<div class="flex items-center"><i class="fa fa-info-circle mr-2"></i> ' + message + '</div>';
+      }
+
+      // 添加到页面
+      document.body.appendChild(messageElement);
+
+      // 3秒后移除消息
+      setTimeout(() => {
+        messageElement.remove();
+      }, 3000);
+    }
+
+    // 格式化日期
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+
+      // 处理数据库返回的本地时间格式: "2025-11-03 02:43:49"
+      // 直接按本地时间解析，不做时区转换
+      if (dateString.includes(' ') && !dateString.includes('T')) {
+        // 格式: "YYYY-MM-DD HH:mm:ss"
+        // 直接返回，不做任何转换
+        return dateString;
+      }
+
+      // 其他格式使用默认解析
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString; // 如果无法解析，返回原始字符串
+      }
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'Asia/Shanghai' // 指定时区为北京时间
+      });
+    }
+  </script>
+</body>
+
+</html>

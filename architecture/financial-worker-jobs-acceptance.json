@@ -1,0 +1,46 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "cancellation_propagated": true,
+    "completed_handler_count": 5,
+    "dedupe_rejections": 5,
+    "executed": true,
+    "expired_lease_recovered": true,
+    "heartbeat_calls": 2,
+    "network_calls": 0,
+    "poison_job_terminal": true,
+    "registered_handler_count": 5,
+    "rss_job_completed_after_financial_failure": true,
+    "stale_owner_fenced": true
+  },
+  "static": {
+    "cancellation": true,
+    "claimed_batch_heartbeat": true,
+    "direct_queue_model_or_provider_imports": [],
+    "existing_queue_table": "intel_jobs",
+    "existing_worker": "intel_worker.py",
+    "handler_count": 5,
+    "job_types": [
+      "financial_snapshot",
+      "financial_research",
+      "financial_verify",
+      "market_overview",
+      "paper_backtest"
+    ],
+    "lease_heartbeat": true,
+    "lease_owner_fencing": true
+  },
+  "task": "2.22",
+  "topology": {
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "new_databases": [],
+    "new_ports": [],
+    "new_queues": [],
+    "new_services": []
+  }
+}

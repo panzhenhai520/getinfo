@@ -1,0 +1,82 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "existing_market_clock_reused": true,
+    "existing_sqlite_reused": true,
+    "investment_opinion_verified": false,
+    "new_database": false,
+    "new_model_client": false,
+    "real_order_execution": false,
+    "value_conflict_decided": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 8,
+    "verdict_status_count": 5
+  },
+  "scenarios": {
+    "after_close_last_valid_observation": true,
+    "changed_verdict_appends_version": true,
+    "financial_restatement": true,
+    "future_evidence_rejected": true,
+    "historical_request": true,
+    "identical_decision_is_idempotent": true,
+    "index_rebalance_validity_end": true,
+    "intraday_price": true,
+    "macro_revision": true,
+    "newer_quote_keeps_old_quote_historical": true,
+    "non_fact_rejected": true,
+    "post_request_evidence_rejected": true,
+    "split": true
+  },
+  "static": {
+    "checks": {
+      "all_required_statuses": true,
+      "claim_status_updated": true,
+      "closed_market_carry_is_explicit_and_bounded": true,
+      "closed_schema": true,
+      "corporate_action_compared": true,
+      "effective_interval_compared": true,
+      "financial_and_macro_revision_compared": true,
+      "future_evidence_rejected": true,
+      "index_rebalance_compared": true,
+      "market_session_compared": true,
+      "no_direct_model_or_network_client": true,
+      "observed_and_fetched_compared": true,
+      "post_request_evidence_rejected": true,
+      "server_time_authoritative": true,
+      "versioned_existing_verdict_table_reused": true
+    },
+    "direct_model_or_network_imports": [],
+    "existing_tables": [
+      "financial_claims",
+      "financial_claim_evidence",
+      "financial_verdicts",
+      "financial_data_snapshots"
+    ],
+    "judge_version": "financial-temporal-judge-v1",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-temporal-verdict-v1",
+    "statuses": [
+      "verified_current",
+      "verified_historical",
+      "superseded",
+      "stale",
+      "insufficient_evidence"
+    ]
+  },
+  "task": "4.2",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 408,
+    "offline_build_network": "none",
+    "offline_image": "sha256:5603e101e654e58666c038344ab605716c56d8ac714d87f399ac850e0f324b89",
+    "related_regression_tests": 49
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "acceptance": {
+    "all_current_changes_have_disposition": true,
+    "no_unknown_worktree_files": true,
+    "sample_hashes_readable": true
+  },
+  "branch": "agent/financial-tradingagents-integration",
+  "cached_diff_stat": "",
+  "captured_at_utc": "2026-07-31T16:35:46Z",
+  "diff_stat": "",
+  "head": "b17a17cc1459998158714b8c03f585fa2e0b2b8c",
+  "manifest_version": "baseline-worktree-v1",
+  "output_artifact_excluded_from_status": [
+    "baseline/worktree-manifest.json"
+  ],
+  "repository_root": "/home/timebot/app",
+  "runtime_exclusions": [
+    ".env (secret configuration)",
+    "data/ and crawler_articles.db (mutable runtime database/artifacts)",
+    "auth_storage/ (sessions and authentication state)",
+    "crawl_results/ and crawl_logs/ (runtime outputs)",
+    "backups/ (separate recovery lifecycle)",
+    "virtual environments, caches, editor and OS files from .gitignore"
+  ],
+  "sample_hashes": [
+    {
+      "path": "intel_tts.py",
+      "sha256": "83ec53ba75da341a6166046db1da9bbde9434458b38bdefccbf952b26e74ed06"
+    },
+    {
+      "path": "resume-side-by-side-246.cmd",
+      "sha256": "8de1a3daecf5fa295955ad1fcaac660a18c9f0b77ae0df193289fa9ddc0f045b"
+    },
+    {
+      "path": "tools/probe-ragflow-official-source-246.cmd",
+      "sha256": "e8dfe271dbbfe8c4e3cae49f1cbae73c9c9486726c60fef4cde7d2684338a87d"
+    },
+    {
+      "path": "intel_database.py",
+      "sha256": "bae70cd310ec43e636a2d231f9e3211267ac809d82326f2f437978aed8951647"
+    },
+    {
+      "path": "日志系统使用说明.md",
+      "sha256": "24d22213bbb99ebecd60f1cd1e4465d739c0317560c9c628778bbeaba6a29d25"
+    },
+    {
+      "path": "templates/newspaper3k.html",
+      "sha256": "68149bda21772ac74ca3d2894e3349516663c6e01a18da405c48b42c4ab45ce5"
+    },
+    {
+      "path": "check_disk_space.sh",
+      "sha256": "a4fe573c40f7edb2975bad52ecaabd7994df050bfed97428d6849cf545ef30e3"
+    },
+    {
+      "path": "apply-new-minio-health-246.cmd",
+      "sha256": "068cac8f991b63552ecf25d706944f0471a838d83496d5dae6224bb467ac5075"
+    },
+    {
+      "path": "intel_http.py",
+      "sha256": "62d5b84a799d16699e8680f5482e530917f2b23a4265d1eb6b2e40e5082e65ad"
+    },
+    {
+      "path": "intel_contracts.py",
+      "sha256": "0bc96de282a3341b3cce437056c6fb991fc09c4fe9bd2561ec758ace4e6ff630"
+    },
+    {
+      "path": "tools/probe-ragflow-8014-model-schema.cmd",
+      "sha256": "b7d10f1505b75857e9c090a73f40ecbdda5d6d8dcff7cc75acd79f3c7445ae72"
+    },
+    {
+      "path": "static/img/ai/gemini.svg",
+      "sha256": "147b64b183daad84440103815845150903f6175357419b0ccf2e5a6b622e62fa"
+    }
+  ],
+  "sample_strategy": "lowest SHA-256 rank of HEAD + NUL + tracked path",
+  "status_counts": {
+    "deleted": 0,
+    "modified": 0,
+    "renamed": 0,
+    "total": 0,
+    "untracked": 0
+  },
+  "status_entries": [],
+  "tracked_file_count": 329,
+  "tracked_scope": "all Git-tracked files at the recorded HEAD",
+  "worktree_clean": true
+}

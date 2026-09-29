@@ -1,0 +1,98 @@
+{
+  "acceptance": "passed",
+  "acceptance_version": "financial-latest-gray4-v1",
+  "accepted_at": "2026-08-03T19:17:37+08:00",
+  "stage": "quote_only",
+  "scope": "loopback_isolated_canary_with_explicit_live_provider_smoke",
+  "configuration": {
+    "AKSHARE_CN_ENABLED": true,
+    "TUSHARE_CN_ENABLED": false,
+    "YAHOO_FINANCE_ENABLED": false,
+    "ALPHA_VANTAGE_ENABLED": false,
+    "EASYQUOTATION_ENABLED": false,
+    "FINANCIAL_LATEST_NEWS_ENABLED": false,
+    "FINANCIAL_LATEST_BUNDLE_ENABLED": false
+  },
+  "candidate_image": {
+    "tag": "collectinfo:financial-latest-gray2-20260803",
+    "digest": "sha256:6a98886fbd9d53ee3b31fd8a7a4e2358c95766a5d7f0475b97aca1affabbaa8e",
+    "build_gates_passed": true
+  },
+  "provider_live_smoke": {
+    "explicit_live_flag": true,
+    "production_database_used": false,
+    "provider_id": "akshare_cn",
+    "provider_access_tier": "free_no_api_key",
+    "provider_health": "healthy",
+    "sdk_version": "1.18.72",
+    "target_count": 3,
+    "persisted_snapshot_count": 3,
+    "identity_time_source_checks_passed": true
+  },
+  "isolated_canary": {
+    "container": "firecrawl-financial-latest-gray4",
+    "listen": "127.0.0.1:8007",
+    "production_data_mounted": false,
+    "database": "container_tmpfs",
+    "health_status": "ok",
+    "observation_seconds_at_least": 60,
+    "restart_count": 0,
+    "oom_killed": false,
+    "post_ready_error_count": 0
+  },
+  "orchestrator_smoke": {
+    "question": "平安银行最新股价",
+    "information_needs": [
+      "quote"
+    ],
+    "canonical_symbol": "000001.SZ",
+    "planned_status": "planned",
+    "completed_status": "stale",
+    "answer_allowed": true,
+    "numeric_claims_allowed": true,
+    "actual_provider_id": "akshare_cn",
+    "source_url_present": true,
+    "evidence_time_not_future": true,
+    "market_closed_and_non_realtime_explicit": true,
+    "first_snapshot_count": 1,
+    "repeat_snapshot_count": 1,
+    "repeat_refresh_status": "not_started",
+    "repeat_refresh_reason": "market_not_active",
+    "article_rows": 0,
+    "candidate_rows": 0
+  },
+  "test_evidence_reused_from_same_immutable_image": {
+    "latest_information_tests": 54,
+    "full_regression_tests": 597,
+    "release_gate": "passed"
+  },
+  "production_main": {
+    "configuration_stage": "information_needs_only",
+    "process_reloaded": false,
+    "traffic_switched": false,
+    "production_data_touched": false,
+    "active_unrelated_tasks_observed": 2
+  },
+  "rollback": {
+    "database_restore_required": false,
+    "actions": [
+      "stop_the_gray4_isolated_canary",
+      "keep_live_quote_providers_disabled_for_latest_main_rollout"
+    ]
+  },
+  "next_gate": {
+    "stage": "news_only",
+    "production_progression_allowed": false,
+    "production_requirements": [
+      "main_information_needs_observation_completed",
+      "no_active_unrelated_tasks_during_reload"
+    ]
+  },
+  "boundaries": {
+    "news_execution_executed": false,
+    "bundle_execution_executed": false,
+    "real_order_execution": false,
+    "production_database_modified": false,
+    "destructive_database_action_executed": false
+  }
+}

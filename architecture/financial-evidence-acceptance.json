@@ -1,0 +1,42 @@
+{
+  "acceptance_version": "financial-evidence-fusion-v1",
+  "stage": "2.13",
+  "status": "passed",
+  "implementation": {
+    "resolver": "financial_evidence.EvidenceResolver",
+    "association_table": "financial_research_evidence",
+    "original_article_store": "articles",
+    "original_snapshot_store": "financial_data_snapshots",
+    "content_or_payload_copied_to_association": false
+  },
+  "evidence_contract": {
+    "article_numbers_can_substitute_for_market_snapshot": false,
+    "market_snapshots_can_substitute_for_original_announcement": false,
+    "canonical_url_deduplication": true,
+    "multi_instrument_document_links": true,
+    "run_scope_expansion_is_rejected": true,
+    "server_time_bounded": true,
+    "pipeline_failures_are_isolated": true,
+    "failed_pipeline_keeps_last_valid_associations": true
+  },
+  "focused_acceptance": {
+    "command": "python3 -m unittest tests.test_financial_evidence tests.test_financial_schema -v",
+    "tests_run": 13,
+    "passed": true
+  },
+  "full_regression": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests_run": 201,
+    "passed": true
+  },
+  "baseline_recovery": {
+    "command": "python3 tools/verify_baseline_recovery.py",
+    "passed": true,
+    "database_integrity_passed": true,
+    "host_application_smoke_passed": true
+  },
+  "static_checks": {
+    "compileall_passed": true,
+    "git_diff_check_passed": true
+  }
+}

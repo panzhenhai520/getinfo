@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全部动态 - {{ platform_name }}</title>
+<link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css">
+<style>
+/* 去掉左右保留的边距：整页铺满 */
+.dynamics-wrap{width:100%;padding:0 8px}
+.dynamics-title{font-size:20px;font-weight:800;color:#111827;margin-bottom:6px}
+.dynamics-meta{font-size:12px;color:#6b7280;margin-bottom:14px}
+/* 左右两列布局 */
+.dyn-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+/* 窄屏自动变一列 */
+@media (max-width: 767px){
+  .dyn-grid{grid-template-columns:1fr}
+}
+.dyn-item{display:flex;gap:12px;padding:16px 14px;border:1px solid #eef1f4;border-radius:8px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.dyn-item:hover{border-color:#0f766e;box-shadow:0 4px 14px rgba(15,118,110,.12)}
+.dyn-item .tl-dot{width:11px;height:11px;border-radius:50%;background:#0f766e;margin-top:5px;flex-shrink:0}
+.dyn-item .tl-body{flex:1;min-width:0}
+.dyn-item .tl-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.dyn-item .tl-time{font-size:12px;color:#0f766e;font-weight:700}
+.dyn-item .tl-topic{font-size:12px;background:#e6f2ef;color:#0f766e;padding:2px 8px;border-radius:4px}
+.dyn-item .tl-title{font-size:14px;color:#111827;line-height:1.5;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dyn-item .tl-src{font-size:12px;color:#9ca3af}
+.dyn-item:hover .tl-title{color:#0f766e}
+/* 翻页 */
+.dyn-pagination{display:flex;gap:8px;align-items:center;justify-content:center;margin:18px 0 10px}
+.dyn-pagination button{min-width:56px;padding:7px 14px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#111827;font-size:13px;cursor:pointer;transition:border-color .15s,color .15s}
+.dyn-pagination button:hover:not(:disabled){border-color:#0f766e;color:#0f766e}
+.dyn-pagination button:disabled{opacity:.45;cursor:not-allowed}
+.dyn-pagination .dyn-page-info{font-size:13px;color:#4b5563}
+</style>
+<script src="/static/js/marked.min.js"></script>
+</head>
+<body data-industry-pack-id="{{ active_industry_pack_id|default('') }}" data-industry-name="{{ active_industry_name|default('') }}">
+{% include '_dashboard_nav.html' %}
+<main class="w-full px-2 py-6">
+  <div class="dynamics-wrap">
+    <h1 class="dynamics-title">全部动态</h1>
+    <div class="dynamics-meta">按聚合时间倒序的全部资讯动态，点击进入文章详情。</div>
+    <div id="dynamicsList"><div class="text-gray-400 text-sm">加载中…</div></div>
+    <div class="dyn-pagination" id="dynPagination"></div>
+  </div>
+</main>
+<script>
+var pack=document.body.getAttribute('data-industry-pack-id')||window.__intelIndustryPackId||'';
+var dynPage=1, dynTotal=1, dynTotalCount=0, dynPerPage=20;
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function loadDyn(page){
+  dynPage=page;
+  fetch('/api/intel/timeline?industry_pack_id='+encodeURIComponent(pack)+'&per_page='+dynPerPage+'&page='+page,{cache:'no-store'}).then(r=>r.json()).then(d=>{
+    var ev=d.events||[]; var box=document.getElementById('dynamicsList');
+    dynTotal=d.total_pages||1; dynTotalCount=d.total||0;
+    if(!ev.length){box.innerHTML='<div class="text-gray-400">暂无动态</div>'; return;}
+    box.innerHTML='<div class="dyn-grid">'+ev.map(function(e){return '<div class="dyn-item" data-id="'+e.id+'"><span class="tl-dot"></span><div class="tl-body"><div class="tl-row"><span class="tl-time">'+esc(e.time||'')+'</span>'+(e.topic?'<span class="tl-topic">'+esc(e.topic)+'</span>':'')+'</div><div class="tl-title">'+esc(e.title)+'</div><div class="tl-src">来源：'+esc(e.domain||'-')+'</div></div></div>';}).join('')+'</div>';
+    box.querySelectorAll('.dyn-item').forEach(function(it){it.addEventListener('click',function(){ if(typeof window.viewArticle==='function'){ window.viewArticle(it.dataset.id);} else { location.href='/article-management?article_id='+it.dataset.id; } });});
+    renderPagination();
+  }).catch(function(){document.getElementById('dynamicsList').innerHTML='<div class="text-gray-400">加载失败</div>';});
+}
+function renderPagination(){
+  var pg=document.getElementById('dynPagination');
+  pg.innerHTML='<button id="dynPrev" '+(dynPage<=1?'disabled':'')+'>&laquo; 上一页</button>'+
+    '<span class="dyn-page-info">第 '+dynPage+' / '+Math.max(1,dynTotal)+' 页 · 共 '+ (window.dynTotalCount||'') +' 条</span>'+
+    '<button id="dynNext" '+(dynPage>=dynTotal?'disabled':'')+'>下一页 &raquo;</button>';
+  document.getElementById('dynPrev').addEventListener('click',function(){ if(dynPage>1){loadDyn(dynPage-1);} });
+  document.getElementById('dynNext').addEventListener('click',function(){ if(dynPage<dynTotal){loadDyn(dynPage+1);} });
+}
+loadDyn(1);
+</script>
+
+<style>
+/* 文章详情弹窗（原地打开，深蓝皮肤由导航 override 提供） */
+.article-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:flex-start;justify-content:center;padding:28px 12px;background:rgba(0,0,0,.55)}
+.article-modal.active{display:flex}
+.article-modal-content{width:min(1560px,96vw);max-height:92vh;display:flex;flex-direction:column;position:relative;border-radius:8px;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.article-modal-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid #e5e7eb}
+.article-modal-close{width:34px;height:34px;border:0;border-radius:6px;background:#f3f4f6;color:#64748b;cursor:pointer;font-size:18px}
+.article-modal-body{flex:1;min-height:0;overflow-y:auto;padding:12px 16px}
+.article-meta{display:flex;flex-wrap:wrap;gap:3px 14px;margin-bottom:10px;font-size:12px}
+.article-meta-item{display:inline-flex;align-items:baseline;gap:4px;padding:0;border:0;background:transparent;margin:0}
+.article-meta-item.full{display:block;width:100%;margin:0 0 2px}
+.article-meta-label{font-weight:600;color:#9ca3af;width:auto;flex-shrink:0;font-size:11px;white-space:nowrap}
+.article-meta-value{color:#374151;flex:1;word-break:break-all;font-size:12px}
+.article-content-display{border:1px solid #e5e7eb;border-radius:8px;padding:14px;color:#374151;font-size:14px;line-height:1.75}
+/* 阶段1：正文统一 Markdown 渲染样式 */
+.article-content-display h1,.article-content-display h2,.article-content-display h3,.article-content-display h4{color:#111827;line-height:1.4;margin:18px 0 10px}
+.article-content-display h1{font-size:22px}.article-content-display h2{font-size:19px}.article-content-display h3{font-size:16px}.article-content-display h4{font-size:14px}
+.article-content-display p{margin:0 0 12px}
+.article-content-display ul,.article-content-display ol{padding-left:22px;margin:0 0 12px}
+.article-content-display li{margin:4px 0}
+.article-content-display blockquote{margin:10px 0;padding:6px 12px;border-left:3px solid #cbd5d1;background:#f6faf8;color:#475569}
+.article-content-display pre{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:10px;overflow:auto}
+.article-content-display code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px}
+.article-content-display pre code{background:transparent;padding:0}
+.article-content-display table{border-collapse:collapse;margin:10px 0;max-width:100%}
+.article-content-display th,.article-content-display td{border:1px solid #e5e7eb;padding:6px 10px;font-size:12px;text-align:left}
+.article-content-display th{background:#f1f5f9}
+.article-content-display img{max-width:100%;height:auto}
+.article-content-display a{color:#0f766e;word-break:break-all}
+.kw-hl{background:#fde68a;color:#78350f;padding:0 2px;border-radius:3px}
+.keyword-badge-content{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;background:rgba(29,127,104,.10);color:#12674f;border:1px solid rgba(29,127,104,.28)}
+.keyword-empty{color:#9ca3af;font-size:11px}
+</style>
+<div id="articleModal" class="article-modal" aria-label="文章详情" role="dialog" aria-modal="true">
+  <div class="article-modal-content">
+    <div class="article-modal-header" style="position:absolute;top:8px;right:10px;background:transparent;border:0;padding:0;z-index:6;justify-content:flex-end">
+      <button onclick="closeArticleModal()" class="article-modal-close" aria-label="关闭"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="article-modal-body">
+      <div class="article-meta">
+        <div class="article-meta-item full" style="display:block;margin:0 0 8px"><div class="article-meta-value" id="modalTitle" style="font-size:20px;font-weight:800;color:#111827;line-height:1.35">-</div></div>
+        <div class="article-meta-item"><div class="article-meta-label"><i class="fa fa-link"></i> URL</div><div class="article-meta-value"><a id="modalUrl" href="#" target="_blank" rel="noopener">-</a></div></div>
+        <div class="article-meta-item"><div class="article-meta-label"><i class="fa fa-calendar"></i> 发布日期</div><div class="article-meta-value" id="modalDate">-</div></div>
+        <div class="article-meta-item"><div class="article-meta-label"><i class="fa fa-globe"></i> 来源</div><div class="article-meta-value" id="modalDomain">-</div></div>
+        <div class="article-meta-item"><div class="article-meta-label"><i class="fa fa-tag"></i> 匹配关键词</div><div class="article-meta-value" id="modalKeywords">-</div></div>
+      </div>
+      <div id="modalContent" class="article-content-display">正在加载...</div>
+    </div>
+    <div class="article-modal-header" style="justify-content:flex-end;border-top:1px solid #e5e7eb;border-bottom:0">
+      <button type="button" onclick="quoteSelectionToMiniChat(event)" style="border:0;border-radius:6px;padding:7px 14px;background:#1d7f68;color:#fff;cursor:pointer;font-size:13px;font-weight:600" title="将选中的文章内容引用到AI助手"><i class="fa fa-quote-left"></i> 引用到AI助手</button>
+      <button onclick="closeArticleModal()" style="border:0;border-radius:6px;padding:7px 14px;background:#4b5563;color:#fff;cursor:pointer;font-size:13px;font-weight:600"><i class="fa fa-times"></i> 关闭</button>
+    </div>
+  </div>
+</div>
+<script>
+function escArticle(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function kwText(kw){ var arr=[]; if(!kw) return arr;
+  if(Array.isArray(kw)){ kw.forEach(function(x){ if(x&&typeof x==='object') x=x.keyword||x.name||''; if(x) arr.push(String(x)); }); return Array.from(new Set(arr)); }
+  if(typeof kw==='object'){ (kw.title_keywords||[]).concat(kw.content_keywords||[]).concat(kw.all_keywords||[]).forEach(function(x){ if(x&&typeof x==='object') x=x.keyword||''; if(x) arr.push(String(x)); }); return Array.from(new Set(arr)); }
+  var raw=String(kw); if(raw.startsWith('{')||raw.startsWith('[')){ try{ return kwText(JSON.parse(raw)); }catch(e){} }
+  raw.split(/[,，;；]+/).forEach(function(k){ k=String(k||'').replace(/^\[[标文]\]/,'').trim(); if(k) arr.push(k); });
+  return Array.from(new Set(arr));
+}
+function highlightKw(text, keywords){ if(!keywords||!text) return text; var list=kwText(keywords).sort(function(a,b){return b.length-a.length;}); if(!list.length) return text;
+  var result=text; list.forEach(function(k){ try{ var re=new RegExp('('+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'); result=result.replace(re,'<mark class="kw-hl">$1</mark>'); }catch(e){} }); return result; }
+// 阶段1：正文统一 Markdown 渲染（marked 渲染 + 关键词 <mark> 高亮，跳过标签不破坏结构）
+function renderMdContent(text, keywords){ text=String(text||'').replace(/\r/g,''); var list=kwText(keywords).sort(function(a,b){return b.length-a.length;}); var html=null;
+  if(typeof marked!=='undefined'){ try{ marked.setOptions({breaks:true,gfm:true,sanitize:false}); html=marked.parse(text); }catch(e){ html=null; } }
+  if(!html) return highlightKw(escArticle(text),keywords);
+  html=html.replace(/\shref=["'](?:javascript|vbscript|data):[^"']*["']/gi,' href="#"').replace(/\son\w+\s*=\s*["'][^"']*["']/gi,'');
+  if(!list.length) return html;
+  var pattern=list.map(function(k){return k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}).join('|');
+  return String(html).split(/(<[^>]+>)/).map(function(seg,i){ if(i%2) return seg; try{ return seg.replace(new RegExp('('+pattern+')','gi'),'<mark class="kw-hl">$1</mark>'); }catch(e){ return seg; } }).join('');
+}
+function closeArticleModal(){ var m=document.getElementById('articleModal'); if(m) m.classList.remove('active'); }
+// 阶段3：无正文条目的「在线转换阅读」（失败静默降级为原文链接）
+function injectDynamicConvertButton(st){
+  var mc=document.getElementById('modalContent'); if(!mc) return;
+  var bar=document.createElement('div'); bar.className='dynamic-convert-bar';
+  bar.innerHTML='<p style="margin:0 0 10px;color:#6b7280;font-size:13px">该动态暂无正文摘要。</p>';
+  var btn=document.createElement('button'); btn.type='button'; btn.id='dynamicConvertBtn';
+  btn.style.cssText='border:0;border-radius:6px;padding:7px 14px;background:#1d7f68;color:#fff;cursor:pointer;font-size:13px;font-weight:600';
+  btn.textContent='在线转换阅读';
+  btn.onclick=function(){ convertDynamicRead(st,btn); };
+  bar.appendChild(btn);
+  var link=document.createElement('a'); link.href=st.url; link.target='_blank'; link.rel='noopener';
+  link.style.cssText='margin-left:10px;font-size:13px;color:#1d7f68'; link.textContent='打开原文链接';
+  bar.appendChild(link);
+  mc.parentNode.insertBefore(bar,mc);
+}
+function convertDynamicRead(st,btn){
+  if(btn){ btn.disabled=true; btn.textContent='转换中…'; }
+  fetch('/api/intel/articles/'+encodeURIComponent(st.id)+'/convert-read',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(!d.success) throw new Error(d.message||d.error||'转换失败');
+    var mc=document.getElementById('modalContent');
+    if(mc) mc.innerHTML=renderMdContent(d.markdown, st.kws);
+    var bar=document.querySelector('.dynamic-convert-bar'); if(bar) bar.remove();
+  }).catch(function(e){
+    if(btn){ btn.disabled=false; btn.textContent='转换失败，点此重试'; }
+  });
+}
+window.closeArticleModal=closeArticleModal;
+window.viewArticle=function(id){
+  var modal=document.getElementById('articleModal'); if(!modal) return;
+  modal.classList.add('active');
+  document.getElementById('modalTitle').textContent='加载中...';
+  document.getElementById('modalContent').textContent='正在加载文章内容...';
+  fetch('/article-management/api/article/'+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){
+    if(!d.success) throw new Error(d.error||'加载失败');
+    var a=d.article||{}, kws=a.matched_keywords||a.classification_keywords||[], t=a.title||'无标题';
+    document.getElementById('modalTitle').innerHTML=highlightKw(escArticle(t),kws);
+    document.getElementById('modalUrl').href=a.url||'#'; document.getElementById('modalUrl').textContent=a.url||'-';
+    document.getElementById('modalDate').textContent=a.publish_date||'';
+    var dom=String(a.domain||'-').replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
+    document.getElementById('modalDomain').textContent=dom;
+    var kc=document.getElementById('modalKeywords'); var kwsArr=kwText(kws);
+    kc.innerHTML=kwsArr.length? kwsArr.map(function(k){return '<span class="keyword-badge-content">'+escArticle(k)+'</span>';}).join('') : '<span class="keyword-empty">无</span>';
+    var content=String(a.content||a.summary||a.trend_summary||'').replace(/\n{3,}/g,'\n\n');
+    var displayContent=(a.content_markdown&&String(a.content_markdown).trim())?String(a.content_markdown):content;
+    // 阶段3：无正文条目 → 优先用转换缓存 Markdown；仍无缓存 → 「在线转换阅读」按钮 + 原文链接兜底
+    var dynamicState=null;
+    if(content.trim().length<20){
+      if(a.dynamic_markdown){ displayContent=String(a.dynamic_markdown); }
+      else if(String(a.url||'').startsWith('http')){ dynamicState={id:Number(a.id||id),url:String(a.url),kws:kws}; }
+    }
+    if(!displayContent) displayContent='暂无内容';
+    document.getElementById('modalContent').innerHTML=renderMdContent(displayContent,kws);
+    if(dynamicState) injectDynamicConvertButton(dynamicState);
+  }).catch(function(e){ document.getElementById('modalTitle').textContent='加载失败'; document.getElementById('modalContent').textContent=(e&&e.message)||'加载文章失败，请重试'; });
+};
+</script>
+{% include '_chat_mini.html' %}
+</body>
+</html>

@@ -1,0 +1,72 @@
+FireCrawl 使用说明
+==================
+
+## 安装步骤
+
+1. 上传项目压缩包到服务器
+
+2. 解压到项目目录
+   cd /www/wwwroot
+   tar -xzf firecrawl.tar.gz
+   cd firecrawlapp20250928
+
+3. 运行安装脚本
+   chmod +x setup.sh
+   sudo bash setup.sh
+
+4. 完成！访问 http://你的服务器IP:8003
+
+## 服务管理
+
+启动服务:
+  sudo systemctl start firecrawl
+
+停止服务:
+  sudo systemctl stop firecrawl
+
+重启服务:
+  sudo systemctl restart firecrawl
+
+查看状态:
+  sudo systemctl status firecrawl
+
+查看日志:
+  tail -f /var/log/firecrawl.log
+
+## 配置修改
+
+编辑配置文件:
+  nano .env
+
+修改后重启服务:
+  sudo systemctl restart firecrawl
+
+## 端口配置
+
+默认端口: 8003
+在.env文件中修改: FLASK_PORT=8003
+
+## 代理配置
+
+如需使用代理访问外网:
+1. 编辑 .env
+2. 设置 PROXY_ENABLED=true
+3. 配置 PROXY_HTTP 和 PROXY_HTTPS
+4. 重启服务
+
+## 默认账号
+
+首次启动且数据库中没有管理员时，会按 .env 中的配置创建管理员:
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=请在交付前设置强密码
+
+首次登录后请修改密码！
+
+## 故障排查
+
+如果服务无法启动:
+1. 查看错误日志: tail -n 50 /var/log/firecrawl-error.log
+2. 检查端口占用: netstat -tlnp | grep 8003
+3. 检查配置文件: cat .env
+4. 重新运行安装: sudo bash setup.sh
+

@@ -1,0 +1,81 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "execution_mode": "paper",
+    "existing_sqlite_reused": true,
+    "existing_worker_reused": true,
+    "fund_nav_interpolation": false,
+    "implicit_fx": false,
+    "new_database": false,
+    "new_model_client": false,
+    "persisted_snapshot_only": true,
+    "point_in_time": true,
+    "real_order_execution": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 40
+  },
+  "scenarios": {
+    "capability_gate": true,
+    "constituent_change": true,
+    "deterministic_idempotent_replay": true,
+    "fund_low_frequency_nav": true,
+    "future_bar_injection": true,
+    "late_revision_publication": true,
+    "mixed_currency_rejection": true,
+    "snapshot_cutoff_and_hash": true,
+    "split_and_dividend": true,
+    "strategy_cost_seed_and_benchmark_pinning": true,
+    "suspension": true,
+    "unknown_constituent_observation_time": true,
+    "worker_execution": true
+  },
+  "static": {
+    "backtest_version": "financial-point-in-time-backtest-v1",
+    "checks": {
+      "corporate_actions_without_adjustment_double_count": true,
+      "cost_and_slippage_pinned": true,
+      "currency_fail_closed": true,
+      "existing_backtest_tables_reused": true,
+      "existing_worker_runner_extended": true,
+      "fund_nav_without_interpolation": true,
+      "idempotent_and_transactional": true,
+      "no_network_provider_model_or_broker_client": true,
+      "paper_only_no_real_order": true,
+      "persisted_snapshot_hash_and_cutoff": true,
+      "point_in_time_bar_gate": true,
+      "point_in_time_constituent_gate": true,
+      "strategy_and_data_version_pinned": true,
+      "suspension_blocks_execution": true
+    },
+    "direct_prohibited_imports": [],
+    "existing_job_type": "paper_backtest",
+    "existing_tables": [
+      "backtest_runs",
+      "backtest_trades",
+      "financial_data_snapshots",
+      "financial_instruments",
+      "financial_universes",
+      "financial_universe_members"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": []
+  },
+  "task": "5.3",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 475,
+    "offline_build": {
+      "base_image": "collectinfo:financial-paper-trading-acceptance",
+      "image_digest": "sha256:aa3b6dde6db6aaeda46a3734830aedd1ca172bf241e83febccdc6a29907b0228",
+      "network": "none"
+    },
+    "related_regression_tests": 40
+  }
+}

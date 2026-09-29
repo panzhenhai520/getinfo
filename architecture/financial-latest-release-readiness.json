@@ -1,0 +1,172 @@
+{
+  "acceptance": "passed",
+  "acceptance_version": "financial-latest-release-readiness-v1",
+  "boundaries": {
+    "database_restore_executed": false,
+    "feature_flag_rollback_only": true,
+    "historical_rows_preserved": true,
+    "live_provider_smoke_executed": false,
+    "read_only_observability": true
+  },
+  "latest_information_gate": {
+    "acceptance": "passed",
+    "acceptance_version": "financial-latest-information-v1",
+    "boundaries": {
+      "future_records_are_rejected": true,
+      "legacy_sse_contract_is_preserved": true,
+      "news_document_numbers_are_not_quotes": true,
+      "partial_channel_results_are_preserved": true,
+      "quote_and_news_are_separate_evidence_channels": true,
+      "real_order_execution": false,
+      "unverified_targets_and_total_failure_do_not_use_general_model": true
+    },
+    "runtime": {
+      "errors": 0,
+      "executed": true,
+      "failures": 0,
+      "generic_model_fallback_asserted_zero": true,
+      "network_calls_observed": 0,
+      "network_policy": "fixture_only",
+      "suites": [
+        "tests.test_financial_information_needs",
+        "tests.test_financial_latest_time",
+        "tests.test_financial_instrument_discovery",
+        "tests.test_financial_news_query",
+        "tests.test_financial_latest_bundle",
+        "tests.test_financial_latest_bundle_sse",
+        "tests.test_financial_spacex_latest_e2e",
+        "tests.test_financial_latest_information_e2e",
+        "tests.test_financial_latest_observability",
+        "tests.test_financial_sse"
+      ],
+      "tests_run": 57
+    },
+    "static": {
+      "checks": {
+        "all_p4_fixture_cases_present": true,
+        "all_p5_golden_cases_present": true,
+        "all_required_test_files_present": true,
+        "child_feature_switches_present": true,
+        "closed_bundle_schema_present": true,
+        "default_orchestrator_uses_live_financial_settings": true,
+        "fixture_network_policy_is_offline": true,
+        "golden_hash_is_fixed": true,
+        "golden_network_policy_is_none": true,
+        "golden_repeats_at_least_three_times": true,
+        "independent_channel_timeouts_present": true,
+        "latest_observability_is_wired_to_existing_health": true,
+        "news_refresh_is_injected_not_direct_web_search": true,
+        "parallel_channel_executor_present": true,
+        "unresolved_target_fails_closed": true
+      },
+      "direct_network_or_model_imports": [],
+      "fixture": "tests/fixtures/financial_latest_bundle/scenarios.json",
+      "fixture_case_count": 14,
+      "fixture_sha256": "becefcf9d714576b1042b47cf6603c51b7e810f33919cc67f36d317d1797c8fb",
+      "golden": "tests/fixtures/financial_latest_information_golden.json",
+      "golden_answer_sha256": "7051de5e46523b9f4313ae781cf2f0a3ee55c6c8cff41f4455330b00d907e562",
+      "golden_repeat_runs": 3,
+      "golden_sha256": "9dc1fe3ce2f3e4503c53a9543d55a55feba11b692dae956cf4bd51c9d15c6ad9",
+      "new_ports": [],
+      "new_services": []
+    },
+    "task": "latest-information-stages-1-through-5"
+  },
+  "migration_rehearsal": {
+    "checks": {
+      "integrity_ok": true,
+      "legal_data_preserved": true,
+      "protected_row_counts_stable": true,
+      "schema_hash_stable": true
+    },
+    "passed": true,
+    "protected_row_counts": {
+      "articles": 1,
+      "chat_financial_routes": 0,
+      "financial_data_snapshots": 0,
+      "financial_instrument_candidates": 0,
+      "financial_instruments": 19
+    },
+    "schema_sha256": "19c8195a8e22340151714101a49a135afae8215d99753237fcdd8a4ed67b6ffe"
+  },
+  "network_policy": "none",
+  "rollback_rehearsal": {
+    "checks": {
+      "all_child_switches_declared": true,
+      "all_core_metrics_declared": true,
+      "rollback_preserves_database": true,
+      "rollout_sequence_is_ordered": true
+    },
+    "child_switches": [
+      "FINANCIAL_INFORMATION_NEEDS_ENABLED",
+      "FINANCIAL_INSTRUMENT_DISCOVERY_ENABLED",
+      "FINANCIAL_INSTRUMENT_AUTO_PROMOTION_ENABLED",
+      "FINANCIAL_LATEST_NEWS_ENABLED",
+      "FINANCIAL_LATEST_BUNDLE_ENABLED"
+    ],
+    "destructive_database_action_executed": false,
+    "fault_decisions": {
+      "llm_failure": {
+        "action": "rollback_feature_flag_and_keep_verified_facts",
+        "allowed": true,
+        "database_action": "preserve_current_database",
+        "database_restore_allowed": false,
+        "fault_type": "llm_failure",
+        "preserve_new_legal_data": true,
+        "reason": "non_destructive_recovery",
+        "requires_explicit_approval": false,
+        "rpo": "zero_database_rows_lost",
+        "rto_target": "provider_or_llm_degrade",
+        "version": "financial-recovery-v1"
+      },
+      "provider_failure": {
+        "action": "rollback_feature_flag_and_use_verified_cache",
+        "allowed": true,
+        "database_action": "preserve_current_database",
+        "database_restore_allowed": false,
+        "fault_type": "provider_failure",
+        "preserve_new_legal_data": true,
+        "reason": "non_destructive_recovery",
+        "requires_explicit_approval": false,
+        "rpo": "zero_database_rows_lost",
+        "rto_target": "provider_or_llm_degrade",
+        "version": "financial-recovery-v1"
+      },
+      "schema_interruption": {
+        "action": "capture_incident_copy_then_resume_additive_migration",
+        "allowed": true,
+        "database_action": "preserve_current_database",
+        "database_restore_allowed": false,
+        "fault_type": "schema_interruption",
+        "preserve_new_legal_data": true,
+        "reason": "non_destructive_recovery",
+        "requires_explicit_approval": false,
+        "rpo": "zero_database_rows_lost",
+        "rto_target": "schema_resume",
+        "version": "financial-recovery-v1"
+      }
+    },
+    "passed": true,
+    "protected_tables": [
+      "financial_instrument_candidates",
+      "financial_instruments",
+      "financial_data_snapshots",
+      "articles",
+      "chat_financial_routes"
+    ]
+  },
+  "rollout": {
+    "next_action": "explicit_operator_authorization_required",
+    "production_authorization": "not_granted",
+    "production_changes_executed": false,
+    "sequence": [
+      "information_needs_only",
+      "candidate_discovery_without_auto_promotion",
+      "internal_auto_promotion",
+      "quote_only",
+      "news_only",
+      "quote_and_news_bundle"
+    ]
+  },
+  "task": "latest-information-offline-release-readiness"
+}

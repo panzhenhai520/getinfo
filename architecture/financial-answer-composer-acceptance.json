@@ -1,0 +1,76 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "existing_sqlite_reused": true,
+    "existing_sse_reused": true,
+    "new_database": false,
+    "new_model_client": false,
+    "only_adjudicated_claim_facts": true,
+    "real_order_execution": false,
+    "saved_reports_are_research_opinion": true,
+    "unverified_numbers_never_output_as_fact": true
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 9
+  },
+  "scenarios": {
+    "authenticated_snapshot_projection": true,
+    "chinese_relative_time_uses_server_resolution": true,
+    "clickable_fact_trace": true,
+    "missing_price_not_fabricated": true,
+    "multiple_markets": true,
+    "partial_or_unverified_evidence": true,
+    "rating_confidence_and_as_of_preserved": true,
+    "risk_and_counter_evidence": true,
+    "same_sse_stream": true,
+    "stale_report_with_new_snapshot": true,
+    "verified_fact_and_saved_research": true,
+    "verified_fact_only": true
+  },
+  "static": {
+    "checks": {
+      "clickable_citation_required": true,
+      "closed_schema": true,
+      "conflict_judge_gate_required": true,
+      "disclaimer_present": true,
+      "existing_verdict_and_report_tables_reused": true,
+      "fixed_public_sections": true,
+      "no_direct_model_or_network_client": true,
+      "report_fields_not_rewritten": true,
+      "same_sse_chunk_path": true,
+      "saved_terminal_report_required": true,
+      "server_time_authoritative": true,
+      "snapshot_trace_is_authenticated": true,
+      "stale_report_vs_new_snapshot_explicit": true,
+      "verified_fact_statuses_only": true
+    },
+    "citation_endpoint": "GET /api/financial/snapshots/{id}",
+    "composer_version": "financial-answer-composer-v1",
+    "direct_model_or_network_imports": [],
+    "existing_endpoint": "POST /api/chat/send",
+    "existing_tables": [
+      "financial_claims",
+      "financial_claim_evidence",
+      "financial_verdicts",
+      "financial_final_reports",
+      "financial_data_snapshots"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-answer-v1"
+  },
+  "task": "4.4",
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 427,
+    "offline_build_network": "none",
+    "offline_image": "sha256:3828f10db115d6134d7591193d9206cd898780c7af9c85aac028ff05d0d1f92b",
+    "related_regression_tests": 99
+  }
+}

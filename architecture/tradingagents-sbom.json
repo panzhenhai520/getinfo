@@ -1,0 +1,782 @@
+{
+  "bom_format": "CollectInfo-SPDX-summary",
+  "schema_version": "1.0",
+  "generated_at_utc": "2026-08-01T09:57:00Z",
+  "component": "TradingAgents embedded dependency closure",
+  "source_commit": "01477f9afb7a47b849ed4c9259d3a9a4738d9fda",
+  "dependency_lock": {
+    "path": "requirements-tradingagents.lock",
+    "sha256": "e550ce18c19d83dce7cbf3ec777d0899bd566f785a111914432a424e06cfb6e4"
+  },
+  "package_count": 109,
+  "packages": [
+    {
+      "name": "aiohappyeyeballs",
+      "version": "2.7.1",
+      "direct": false,
+      "license": "PSF-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "aiohttp",
+      "version": "3.14.3",
+      "direct": false,
+      "license": "Apache-2.0 AND MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "aiosignal",
+      "version": "1.4.0",
+      "direct": false,
+      "license": "Apache 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "aiosqlite",
+      "version": "0.22.1",
+      "direct": false,
+      "license": "License :: OSI Approved :: MIT License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "annotated-doc",
+      "version": "0.0.5",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "annotated-types",
+      "version": "0.8.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "anthropic",
+      "version": "0.120.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "anyio",
+      "version": "4.14.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "async-timeout",
+      "version": "4.0.3",
+      "direct": false,
+      "license": "Apache 2",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "backtrader",
+      "version": "1.9.78.123",
+      "direct": true,
+      "license": "GPL-3.0-or-later",
+      "license_evidence": "distribution metadata and classifier"
+    },
+    {
+      "name": "beautifulsoup4",
+      "version": "4.12.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "direct": false,
+      "license": "MPL-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.0",
+      "direct": false,
+      "license": "MIT-0",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.4.9",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.0",
+      "direct": false,
+      "license": "Apache-2.0 OR BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "cssselect",
+      "version": "1.5.0",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "curl-cffi",
+      "version": "0.15.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "distro",
+      "version": "1.9.0",
+      "direct": false,
+      "license": "Apache License, Version 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "docstring-parser",
+      "version": "0.18.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "exceptiongroup",
+      "version": "1.3.1",
+      "direct": false,
+      "license": "License :: OSI Approved :: MIT License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "filetype",
+      "version": "1.2.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "frozenlist",
+      "version": "1.8.0",
+      "direct": false,
+      "license": "Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "google-auth",
+      "version": "2.56.2",
+      "direct": false,
+      "license": "Apache 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "google-genai",
+      "version": "2.16.0",
+      "direct": false,
+      "license": "Apache-2.0",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "greenlet",
+      "version": "3.0.1",
+      "direct": false,
+      "license": "MIT License",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "h11",
+      "version": "0.16.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "httpcore",
+      "version": "1.0.9",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "httpx",
+      "version": "0.28.1",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "httpx-sse",
+      "version": "0.4.3",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "idna",
+      "version": "3.18",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "jiter",
+      "version": "0.16.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "jmespath",
+      "version": "1.1.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "jsonpatch",
+      "version": "1.33",
+      "direct": false,
+      "license": "Modified BSD License",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "jsonpointer",
+      "version": "3.1.1",
+      "direct": false,
+      "license": "Modified BSD License",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-anthropic",
+      "version": "1.5.3",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-classic",
+      "version": "1.0.8",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-community",
+      "version": "0.4.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-core",
+      "version": "1.5.3",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-experimental",
+      "version": "0.4.2",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-google-genai",
+      "version": "4.3.2",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-openai",
+      "version": "1.4.1",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-protocol",
+      "version": "0.0.18",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langchain-text-splitters",
+      "version": "1.1.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "langgraph",
+      "version": "1.2.10",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "langgraph-checkpoint",
+      "version": "4.1.1",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "langgraph-checkpoint-sqlite",
+      "version": "3.1.1",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "langgraph-prebuilt",
+      "version": "1.1.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "langgraph-sdk",
+      "version": "0.4.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "langsmith",
+      "version": "0.10.15",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "lxml",
+      "version": "5.4.0",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "markdown-it-py",
+      "version": "4.2.0",
+      "direct": false,
+      "license": "License :: OSI Approved :: MIT License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "mdurl",
+      "version": "0.1.2",
+      "direct": false,
+      "license": "License :: OSI Approved :: MIT License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "multidict",
+      "version": "6.7.1",
+      "direct": false,
+      "license": "Apache License 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "multitasking",
+      "version": "0.0.13",
+      "direct": false,
+      "license": "Apache",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "numpy",
+      "version": "2.2.6",
+      "direct": false,
+      "license": "License :: OSI Approved :: BSD License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "openai",
+      "version": "2.52.0",
+      "direct": false,
+      "license": "Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "orjson",
+      "version": "3.11.9",
+      "direct": false,
+      "license": "MPL-2.0 AND (Apache-2.0 OR MIT)",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "ormsgpack",
+      "version": "1.12.2",
+      "direct": false,
+      "license": "Apache-2.0 OR MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "packaging",
+      "version": "26.2",
+      "direct": false,
+      "license": "Apache-2.0 OR BSD-2-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "pandas",
+      "version": "2.3.3",
+      "direct": true,
+      "license": "License :: OSI Approved :: BSD License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "parsel",
+      "version": "1.11.0",
+      "direct": true,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "peewee",
+      "version": "4.3.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "official upstream LICENSE"
+    },
+    {
+      "name": "platformdirs",
+      "version": "4.11.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "prompt-toolkit",
+      "version": "3.0.53",
+      "direct": false,
+      "license": "License :: OSI Approved :: BSD License",
+      "license_evidence": "Troves license classifier"
+    },
+    {
+      "name": "propcache",
+      "version": "0.5.2",
+      "direct": false,
+      "license": "Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "protobuf",
+      "version": "7.35.1",
+      "direct": false,
+      "license": "3-Clause BSD License",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "pyasn1",
+      "version": "0.6.4",
+      "direct": false,
+      "license": "BSD-2-Clause",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "pyasn1-modules",
+      "version": "0.4.2",
+      "direct": false,
+      "license": "BSD",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.0",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "pydantic",
+      "version": "2.13.4",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "pydantic-core",
+      "version": "2.46.4",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "pydantic-settings",
+      "version": "2.14.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "pygments",
+      "version": "2.20.0",
+      "direct": false,
+      "license": "BSD-2-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.8.2",
+      "direct": false,
+      "license": "Dual License",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "python-dotenv",
+      "version": "1.2.2",
+      "direct": true,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "pytz",
+      "version": "2025.2",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.3",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "questionary",
+      "version": "2.1.1",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "redis",
+      "version": "6.2.0",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "regex",
+      "version": "2026.7.19",
+      "direct": false,
+      "license": "Apache-2.0 AND CNRI-Python",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "requests",
+      "version": "2.32.5",
+      "direct": true,
+      "license": "Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "requests-toolbelt",
+      "version": "1.0.0",
+      "direct": false,
+      "license": "Apache 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "rich",
+      "version": "15.0.0",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "setuptools",
+      "version": "83.0.0",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "shellingham",
+      "version": "1.5.4",
+      "direct": false,
+      "license": "ISC License",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "sniffio",
+      "version": "1.3.1",
+      "direct": false,
+      "license": "MIT OR Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "soupsieve",
+      "version": "2.9.1",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "sqlalchemy",
+      "version": "2.0.51",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "sqlite-vec",
+      "version": "0.1.9",
+      "direct": false,
+      "license": "MIT License, Apache License, Version 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "stockstats",
+      "version": "0.6.8",
+      "direct": true,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "tenacity",
+      "version": "9.1.4",
+      "direct": false,
+      "license": "Apache 2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "tiktoken",
+      "version": "0.13.0",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "official upstream LICENSE"
+    },
+    {
+      "name": "tqdm",
+      "version": "4.70.0",
+      "direct": true,
+      "license": "MPL-2.0 AND MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "tradingagents",
+      "version": "0.3.1",
+      "direct": true,
+      "license": "Apache-2.0",
+      "license_evidence": "vendored upstream LICENSE"
+    },
+    {
+      "name": "typer",
+      "version": "0.27.0",
+      "direct": true,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "direct": true,
+      "license": "PSF-2.0",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "typing-inspection",
+      "version": "0.4.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.3",
+      "direct": false,
+      "license": "Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "urllib3",
+      "version": "1.26.18",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "uuid-utils",
+      "version": "0.17.0",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "w3lib",
+      "version": "2.4.1",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "wcwidth",
+      "version": "0.8.2",
+      "direct": false,
+      "license": "MIT",
+      "license_evidence": "License-Expression metadata"
+    },
+    {
+      "name": "websockets",
+      "version": "15.0.1",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "xxhash",
+      "version": "3.8.1",
+      "direct": false,
+      "license": "BSD-2-Clause",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "yarl",
+      "version": "1.24.5",
+      "direct": false,
+      "license": "Apache-2.0",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "yfinance",
+      "version": "1.5.1",
+      "direct": true,
+      "license": "Apache",
+      "license_evidence": "License metadata"
+    },
+    {
+      "name": "zstandard",
+      "version": "0.25.0",
+      "direct": false,
+      "license": "BSD-3-Clause",
+      "license_evidence": "License-Expression metadata"
+    }
+  ],
+  "license_boundary": {
+    "upstream_framework": "Apache-2.0",
+    "copyleft_dependency": "backtrader@1.9.78.123 is GPL-3.0-or-later",
+    "redistribution_review_required": true
+  }
+}

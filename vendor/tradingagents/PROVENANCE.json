@@ -1,0 +1,45 @@
+{
+  "schema_version": "collectinfo-v1",
+  "component": {
+    "name": "TradingAgents",
+    "python_distribution": "tradingagents",
+    "version": "0.3.1",
+    "license": "Apache-2.0"
+  },
+  "upstream": {
+    "repository": "https://github.com/TauricResearch/TradingAgents",
+    "release": "https://github.com/TauricResearch/TradingAgents/releases/tag/v0.3.1",
+    "tag": "v0.3.1",
+    "tag_object": "5a3d1b51d339202d03c4b57c1a1012f69376495f",
+    "commit": "01477f9afb7a47b849ed4c9259d3a9a4738d9fda",
+    "tag_signature": {
+      "type": "ssh-ed25519",
+      "principal": "yijia-xiao@outlook.com",
+      "fingerprint": "SHA256:N2/PlRlO8HTKzfBov/54/rsLLLI5BdBxvGWN1MUnhfU",
+      "verified": true,
+      "verification_command": "git -c gpg.ssh.allowedSignersFile=<reviewed-file> verify-tag --raw v0.3.1"
+    }
+  },
+  "vendored_source": {
+    "path": "vendor/tradingagents/TradingAgents-0.3.1-01477f9.tar.gz",
+    "download_url": "https://github.com/TauricResearch/TradingAgents/archive/01477f9afb7a47b849ed4c9259d3a9a4738d9fda.tar.gz",
+    "sha256": "e5b1886d4d61ed7bd79da8294b3d7802408dc262c51fe1544ac317cc43f6566e",
+    "archive_root": "TradingAgents-01477f9afb7a47b849ed4c9259d3a9a4738d9fda/",
+    "runtime_download_required": false
+  },
+  "reviewed_files": {
+    "pyproject.toml_sha256": "cc11a95766eec8d73c9626cf6bea9647a7a5c0293e3a50cfe57418b1356bed70",
+    "LICENSE_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "integration_policy": {
+    "install_phase": "docker_build",
+    "runtime_git_clone": false,
+    "upstream_cli_enabled": false,
+    "upstream_web_service_enabled": false,
+    "upstream_ollama_service_enabled": false,
+    "upstream_redis_service_enabled": false,
+    "upstream_database_service_enabled": false,
+    "upgrades_require_migration_review": true
+  },
+  "reviewed_at_utc": "2026-08-01T09:26:07Z"
+}

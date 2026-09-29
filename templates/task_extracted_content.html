@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>查看已获取 - {{ platform_name }}</title>
+  <link href="/static/css/tailwind.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/fontawesome.css">
+  <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+  <style>
+    .card-shadow { box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08); }
+    .text-primary { color: #3B82F6 !important; }
+    .bg-primary { background-color: #3B82F6; }
+    .content-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+      min-height: 220px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .content-card:hover {
+      border-color: #93c5fd;
+      box-shadow: 0 10px 18px rgba(15, 23, 42, 0.1);
+      transform: translateY(-1px);
+    }
+    .keyword-mark {
+      background: #fef08a;
+      color: #713f12;
+      border-radius: 3px;
+      padding: 0 2px;
+      font-weight: 700;
+    }
+    .keyword-pill {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(15, 23, 42, 0.55);
+      display: none;
+      padding: 20px;
+    }
+    .modal-backdrop.show {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .full-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.75;
+    }
+    .summary-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 28px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 4px 8px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    .summary-chip strong {
+      color: #111827;
+      font-weight: 600;
+    }
+    .compact-icon-btn {
+      min-height: 28px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .filter-input-wrap {
+      position: relative;
+      min-width: min(100%, 260px);
+      flex: 1 1 280px;
+      max-width: 420px;
+    }
+    .filter-input-wrap > i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 12px;
+    }
+    .filter-input {
+      width: 100%;
+      min-height: 30px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 5px 34px 5px 28px;
+      color: #111827;
+      font-size: 12px;
+      outline: none;
+      background: #fff;
+    }
+    .filter-input:focus {
+      border-color: #3B82F6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.12);
+    }
+    .clear-filter-btn {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      color: #94a3b8;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .clear-filter-btn:hover {
+      color: #475569;
+      background: #f1f5f9;
+    }
+    .clear-filter-btn.show {
+      display: flex;
+    }
+    .article-detail-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .article-detail-body {
+      padding: 18px 20px 20px;
+      overflow-y: auto;
+      flex: 1;
+      background: #f8fafc;
+    }
+    .article-title-display {
+      color: #111827;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.45;
+      margin-right: 20px;
+    }
+    .article-url-display {
+      display: block;
+      margin-top: 8px;
+      color: #2563eb;
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+    .article-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 14px 0;
+    }
+    .article-meta-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #fff;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+    .article-meta-label {
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .article-meta-value {
+      color: #111827;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .article-content-panel {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+    @media (max-width: 768px) {
+      .article-meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .article-detail-header,
+      .article-detail-body {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">{% include "_dashboard_nav.html" %}
+
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <section class="mb-5">
+      <div class="bg-white rounded-lg px-3 py-2 card-shadow border border-gray-200">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-2 min-w-0 mr-auto">
+            <span class="text-xs font-semibold tracking-wide text-gray-400">查看已获取</span>
+            <span id="pageTitle" class="text-sm font-semibold text-gray-800 truncate max-w-[220px] sm:max-w-[320px] lg:max-w-[420px]">任务提取内容</span>
+            <span id="taskMeta" class="hidden lg:inline text-xs text-gray-400 truncate max-w-[420px]">Task ID: {{ task_id }}</span>
+          </div>
+          <span class="summary-chip">任务文章数 <strong id="totalCount">-</strong></span>
+          <span class="summary-chip">含关键词片段 <strong id="matchedCount">-</strong></span>
+          <span class="summary-chip max-w-full sm:max-w-[260px] overflow-hidden">
+            <span>任务关键词</span>
+            <strong id="taskKeywords" class="truncate">-</strong>
+          </span>
+          <div class="filter-input-wrap">
+            <i class="fa fa-search"></i>
+            <input id="cardFilterInput" class="filter-input" type="search" placeholder="搜索标题、URL、关键词或正文">
+            <button id="clearFilterBtn" class="clear-filter-btn" type="button" title="清空筛选">
+              <i class="fa fa-times"></i>
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="refreshBtn" class="compact-icon-btn bg-white border border-gray-300 hover:bg-gray-50 text-gray-600 transition-colors">
+              <i class="fa fa-refresh"></i>刷新
+            </button>
+            <a href="/" class="compact-icon-btn bg-primary hover:bg-blue-600 text-white transition-colors">
+              <i class="fa fa-arrow-left"></i>返回任务列表
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div id="loadingState" class="bg-white rounded-lg p-8 border border-gray-200 text-center text-gray-500">
+        <i class="fa fa-spinner fa-spin text-2xl mb-3"></i>
+        <p>正在加载已提取内容...</p>
+      </div>
+      <div id="emptyState" class="hidden bg-white rounded-lg p-8 border border-gray-200 text-center text-gray-500">
+        <i class="fa fa-search text-3xl text-gray-300 mb-3"></i>
+        <p class="font-medium text-gray-700">暂无匹配关键词的提取内容</p>
+        <p class="text-sm mt-1">该任务可能尚未入库文章，或文章中没有命中任务关键词。</p>
+      </div>
+      <div id="filterEmptyState" class="hidden bg-white rounded-lg p-8 border border-gray-200 text-center text-gray-500">
+        <i class="fa fa-filter text-3xl text-gray-300 mb-3"></i>
+        <p class="font-medium text-gray-700">没有符合筛选条件的卡片</p>
+        <p class="text-sm mt-1">请尝试更短的关键词，或清空筛选。</p>
+      </div>
+      <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+
+  <div id="articleModal" class="modal-backdrop">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div class="article-detail-header">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 id="modalTitle" class="article-title-display"></h2>
+            <a id="modalUrl" href="#" target="_blank" rel="noopener" class="article-url-display"></a>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button type="button" onclick="quoteSelectionToMiniChat(event)" class="text-sm px-3 py-1.5 rounded bg-teal-600 text-white hover:bg-teal-700" title="将选中的文章内容引用到AI助手"><i class="fa fa-quote-left"></i> 引用到AI助手</button>
+            <button id="closeModalBtn" class="text-gray-400 hover:text-gray-700 text-xl leading-none" title="关闭">
+            <i class="fa fa-times"></i>
+          </button>
+          </div>
+        </div>
+      </div>
+      <div class="article-detail-body">
+        <div class="article-meta-grid">
+          <div class="article-meta-item">
+            <div class="article-meta-label">域名</div>
+            <div id="modalDomain" class="article-meta-value">-</div>
+          </div>
+          <div class="article-meta-item">
+            <div class="article-meta-label">发布日期</div>
+            <div id="modalPublishDate" class="article-meta-value">-</div>
+          </div>
+          <div class="article-meta-item">
+            <div class="article-meta-label">获取时间</div>
+            <div id="modalCreatedAt" class="article-meta-value">-</div>
+          </div>
+          <div class="article-meta-item">
+            <div class="article-meta-label">正文长度</div>
+            <div id="modalContentLength" class="article-meta-value">-</div>
+          </div>
+        </div>
+        <div id="modalKeywords" class="flex flex-wrap gap-1.5 mb-3"></div>
+        <div id="modalContent" class="article-content-panel full-text text-sm text-gray-800"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const taskId = {{ task_id | tojson }};
+    const cardsGrid = document.getElementById('cardsGrid');
+    const loadingState = document.getElementById('loadingState');
+    const emptyState = document.getElementById('emptyState');
+    const articleModal = document.getElementById('articleModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalUrl = document.getElementById('modalUrl');
+    const modalContent = document.getElementById('modalContent');
+    const modalDomain = document.getElementById('modalDomain');
+    const modalPublishDate = document.getElementById('modalPublishDate');
+    const modalCreatedAt = document.getElementById('modalCreatedAt');
+    const modalContentLength = document.getElementById('modalContentLength');
+    const modalKeywords = document.getElementById('modalKeywords');
+    const cardFilterInput = document.getElementById('cardFilterInput');
+    const clearFilterBtn = document.getElementById('clearFilterBtn');
+    const filterEmptyState = document.getElementById('filterEmptyState');
+    let loadedArticles = [];
+    let visibleArticles = [];
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeRegExp(value) {
+      return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function highlightText(value, keywords) {
+      let escaped = escapeHtml(value);
+      const sorted = [...(keywords || [])].filter(Boolean).sort((a, b) => b.length - a.length);
+      sorted.forEach(keyword => {
+        const regex = new RegExp(`(${escapeRegExp(escapeHtml(keyword))})`, 'gi');
+        escaped = escaped.replace(regex, '<mark class="keyword-mark">$1</mark>');
+      });
+      return escaped;
+    }
+
+    function formatDate(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString();
+    }
+
+    function openArticle(index) {
+      const article = visibleArticles[index];
+      if (!article) return;
+      modalTitle.innerHTML = highlightText(article.title, article.matched_keywords);
+      modalUrl.textContent = article.url || '';
+      modalUrl.href = article.url || '#';
+      modalDomain.textContent = article.domain || '-';
+      modalPublishDate.textContent = article.publish_date || '-';
+      modalCreatedAt.textContent = formatDate(article.created_at);
+      modalContentLength.textContent = `${Number(article.content_length || (article.content || '').length).toLocaleString()} 字符`;
+      modalKeywords.innerHTML = (article.matched_keywords || []).map(keyword =>
+        `<span class="keyword-pill">${escapeHtml(keyword)}</span>`
+      ).join('') || '<span class="text-xs text-gray-400">无关键词</span>';
+      modalContent.innerHTML = highlightText(article.content || '暂无正文内容', article.matched_keywords);
+      articleModal.classList.add('show');
+    }
+
+    function closeModal() {
+      articleModal.classList.remove('show');
+    }
+
+    function renderCards(articles) {
+      cardsGrid.innerHTML = '';
+      visibleArticles = articles || [];
+
+      if (!visibleArticles.length) {
+        return;
+      }
+
+      visibleArticles.forEach((article, index) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'content-card text-left p-4 flex flex-col gap-3';
+        card.addEventListener('click', () => openArticle(index));
+
+        const keywordHtml = (article.matched_keywords || []).map(keyword =>
+          `<span class="keyword-pill">${escapeHtml(keyword)}</span>`
+        ).join('');
+
+        const snippetsHtml = (article.snippets || []).map(snippet =>
+          `<p class="text-sm text-gray-700 leading-relaxed">${highlightText(snippet, article.matched_keywords)}</p>`
+        ).join('');
+
+        card.innerHTML = `
+          <div class="flex-1">
+            <h3 class="font-bold text-gray-900 leading-snug mb-2">${highlightText(article.title, article.matched_keywords)}</h3>
+            <div class="text-xs text-gray-500 mb-3 break-all">${escapeHtml(article.domain || article.url || '-')}</div>
+            <div class="space-y-2">${snippetsHtml}</div>
+          </div>
+          <div class="pt-3 border-t border-gray-100">
+            <div class="flex flex-wrap gap-1.5 mb-2">${keywordHtml || '<span class="text-xs text-gray-400">无关键词</span>'}</div>
+            <div class="flex items-center justify-between text-xs text-gray-500">
+              <span>${escapeHtml(formatDate(article.created_at))}</span>
+              <span>${Number(article.content_length || 0).toLocaleString()} 字符</span>
+            </div>
+          </div>
+        `;
+        cardsGrid.appendChild(card);
+      });
+    }
+
+    function articleMatchesQuery(article, query) {
+      if (!query) return true;
+      const haystack = [
+        article.title,
+        article.url,
+        article.domain,
+        article.publish_date,
+        article.created_at,
+        (article.matched_keywords || []).join(' '),
+        (article.snippets || []).join(' '),
+        article.content
+      ].join(' ').toLowerCase();
+
+      return query.split(/\s+/).filter(Boolean).every(term => haystack.includes(term));
+    }
+
+    function applyCardFilter() {
+      const query = cardFilterInput.value.trim().toLowerCase();
+      clearFilterBtn.classList.toggle('show', Boolean(query));
+      const filtered = loadedArticles.filter(article => articleMatchesQuery(article, query));
+
+      emptyState.classList.toggle('hidden', loadedArticles.length > 0);
+      filterEmptyState.classList.toggle('hidden', filtered.length > 0 || loadedArticles.length === 0);
+      document.getElementById('matchedCount').textContent = filtered.length || 0;
+      renderCards(filtered);
+    }
+
+    async function loadContent() {
+      loadingState.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      filterEmptyState.classList.add('hidden');
+      cardsGrid.innerHTML = '';
+
+      try {
+        const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/extracted-content?per_page=300`);
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.message || '加载失败');
+        }
+
+        const task = data.task || {};
+        document.getElementById('pageTitle').textContent = task.task_name || '任务提取内容';
+        document.getElementById('taskMeta').textContent = `Task ID: ${taskId}${task.target_url ? ' · ' + task.target_url : ''}`;
+        document.getElementById('totalCount').textContent = data.total || 0;
+        document.getElementById('taskKeywords').textContent = task.keywords || '-';
+        loadedArticles = data.articles || [];
+        applyCardFilter();
+      } catch (error) {
+        emptyState.classList.remove('hidden');
+        filterEmptyState.classList.add('hidden');
+        emptyState.innerHTML = `
+          <i class="fa fa-exclamation-circle text-3xl text-red-300 mb-3"></i>
+          <p class="font-medium text-gray-700">加载失败</p>
+          <p class="text-sm mt-1">${escapeHtml(error.message)}</p>
+        `;
+      } finally {
+        loadingState.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', loadContent);
+    cardFilterInput.addEventListener('input', applyCardFilter);
+    clearFilterBtn.addEventListener('click', () => {
+      cardFilterInput.value = '';
+      applyCardFilter();
+      cardFilterInput.focus();
+    });
+    document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+    articleModal.addEventListener('click', event => {
+      if (event.target === articleModal) closeModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeModal();
+    });
+
+    loadContent();
+  </script>
+{% include "_chat_mini.html" %}
+</body>
+</html>

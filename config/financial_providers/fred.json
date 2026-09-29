@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "provider_id": "fred",
+  "display_name": "FRED / ALFRED 宏观数据",
+  "access_tier": "free_registered_api_key",
+  "default_enabled": false,
+  "license_profile": "fred_api_terms_series_rights_apply",
+  "provider_type": "https_api",
+  "priority": 20,
+  "daily_call_budget": 500,
+  "fallback_rank": 10,
+  "api_base_url": "https://api.stlouisfed.org/fred",
+  "documentation_url": "https://fred.stlouisfed.org/docs/api/fred/",
+  "token_url": "https://fredaccount.stlouisfed.org/apikeys",
+  "terms_url": "https://fred.stlouisfed.org/docs/api/terms_of_use.html",
+  "attribution_text": "This product uses the FRED API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.",
+  "terms_note": "FRED API 需要免费注册 Key；各序列可能受第三方权利约束。历史问答必须固定 ALFRED 实时期或 vintage，避免使用后来修订值。",
+  "sla": "none_limits_may_change",
+  "capabilities": ["macro"],
+  "logical_endpoints": {"observations": ["series/observations"], "vintages": ["series/vintagedates"]}
+}

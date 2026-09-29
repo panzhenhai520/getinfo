@@ -1,0 +1,182 @@
+{
+  "id": "short_video_news",
+  "name": "短视频资讯",
+  "schema_version": 3,
+  "pack_version": "2.0.0",
+  "enabled": true,
+  "default_market": "GLOBAL",
+  "timezone": "Asia/Hong_Kong",
+  "pack_kind": "primary",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "short_video_content_intelligence",
+      "name": "短视频资讯聚合与分类",
+      "enabled": true,
+      "implementation_status": "existing"
+    }
+  ],
+  "dashboard_categories": [
+    {
+      "key": "short_video_intelligence",
+      "name": "短视频行业信息",
+      "enabled": true,
+      "implementation_status": "existing"
+    }
+  ],
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": false,
+    "show_watched_stock_cards": false,
+    "show_spatiotemporal_map": true
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": false,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "短视频",
+    "直播电商",
+    "内容平台",
+    "创作者经济",
+    "TikTok",
+    "抖音",
+    "快手",
+    "YouTube Shorts",
+    "Instagram Reels",
+    "小红书",
+    "MCN",
+    "算法推荐"
+  ],
+  "expanded_keywords": [
+    "直播",
+    "视频平台",
+    "内容创作",
+    "达人"
+  ],
+  "trend_keywords": [
+    "平台监管",
+    "商业化",
+    "广告收入",
+    "创作者生态",
+    "电商闭环",
+    "内容治理",
+    "推荐算法",
+    "海外扩张",
+    "用户增长",
+    "短剧出海",
+    "AI内容生成",
+    "平台监管政策",
+    "直播电商GMV",
+    "达人生态",
+    "算法分发",
+    "版权合规",
+    "MCN重组",
+    "本地生活",
+    "短视频广告",
+    "出海本地化",
+    "内容质量治理",
+    "兴趣电商",
+    "带货主播",
+    "短视频商业变现"
+  ],
+  "event_keywords": [
+    "上线",
+    "封禁",
+    "处罚",
+    "收购",
+    "合作",
+    "发布",
+    "改版",
+    "裁员",
+    "签约",
+    "直播"
+  ],
+  "negative_keywords": [
+    "短视频下载器广告",
+    "刷量服务"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 2,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ]
+  },
+  "serpapi_queries": [
+    "short video platform news",
+    "TikTok ecommerce news",
+    "creator economy short video",
+    "site:newsroom.tiktok.com TikTok",
+    "site:socialmediatoday.com short video"
+  ],
+  "default_sources": [
+    {
+      "name": "TikTok Newsroom",
+      "url": "https://newsroom.tiktok.com/",
+      "source_type": "list_page",
+      "authority_level": 5
+    },
+    {
+      "name": "抖音",
+      "url": "https://www.douyin.com/",
+      "source_type": "website",
+      "authority_level": 5
+    },
+    {
+      "name": "Social Media Today",
+      "url": "https://www.socialmediatoday.com/",
+      "source_type": "website",
+      "authority_level": 3
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "platform_policy",
+      "name": "平台监管",
+      "keywords": [
+        "平台监管",
+        "处罚",
+        "封禁"
+      ]
+    },
+    {
+      "key": "creator_economy",
+      "name": "创作者生态",
+      "keywords": [
+        "创作者经济",
+        "创作者生态",
+        "MCN"
+      ]
+    },
+    {
+      "key": "commerce",
+      "name": "直播电商",
+      "keywords": [
+        "直播电商",
+        "电商闭环",
+        "直播"
+      ]
+    },
+    {
+      "key": "global_expansion",
+      "name": "海外扩张",
+      "keywords": [
+        "海外扩张",
+        "TikTok"
+      ]
+    }
+  ]
+}

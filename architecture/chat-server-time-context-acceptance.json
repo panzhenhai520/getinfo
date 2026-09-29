@@ -1,0 +1,35 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "model_does_not_compute_relative_time": true,
+    "ordinary_sse_unchanged": true,
+    "server_clock_captured_once": true,
+    "user_timezone_is_hint_only": true
+  },
+  "runtime": {
+    "cross_midnight_inheritance": true,
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "frozen_clock": true,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 7
+  },
+  "static": {
+    "client_clock_override_paths": 0,
+    "clock_source": "application_server",
+    "context_version": "chat-server-time-v1",
+    "direct_model_or_network_imports": [],
+    "new_ports": [],
+    "new_services": [],
+    "persistence_table": "chat_financial_routes",
+    "relative_expressions": [
+      "today",
+      "yesterday",
+      "this_week",
+      "now"
+    ]
+  },
+  "task": "3.2"
+}

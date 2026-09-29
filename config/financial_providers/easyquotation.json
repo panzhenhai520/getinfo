@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "provider_id": "easyquotation",
+  "display_name": "easyquotation 轻量行情故障回退",
+  "package_version": "0.7.7",
+  "package_wheel_sha256": "92b88cd05fc9ea6a08dbf48a0d6f2aa60092163aa64c8e0c5bc523db30b73a01",
+  "access_tier": "free_unofficial_upstream",
+  "default_enabled": false,
+  "license_profile": "easyquotation_mit_wrapper_upstream_terms",
+  "provider_type": "sdk_adapter",
+  "priority": 95,
+  "daily_call_budget": 100,
+  "fallback_rank": 95,
+  "package_url": "https://pypi.org/project/easyquotation/",
+  "documentation_url": "https://github.com/shidenggui/easyquotation",
+  "terms_url": "https://github.com/shidenggui/easyquotation",
+  "attribution_text": "Data normalized through easyquotation; Sina/Tencent upstream terms apply.",
+  "terms_note": "仅作 AKShare/Tushare/Yahoo 失败后的显式轻量回退；包装器许可不等于上游行情再分发许可。",
+  "sla": "none",
+  "capabilities": ["quote"],
+  "logical_endpoints": {"quote": ["tencent", "hkquote"]}
+}

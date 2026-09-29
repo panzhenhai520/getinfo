@@ -1,0 +1,65 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "ambiguous_registry_candidate_not_selected": true,
+    "classifier_does_not_answer": true,
+    "feature_off_does_not_initialize_or_call_classifier": true,
+    "legacy_sse_route_unchanged": true,
+    "low_confidence_does_not_force_financial_route": true,
+    "server_as_of_cannot_be_overridden_by_llm": true
+  },
+  "labeled_set": {
+    "counts": {
+      "fn": 0,
+      "fp": 0,
+      "tn": 30,
+      "tp": 30
+    },
+    "dataset_id": "financial-intent-human-review-v1",
+    "examples": 60,
+    "non_financial_false_route_rate": 0.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "review_status": "approved",
+    "thresholds": {
+      "non_financial_false_route_rate": 0.03,
+      "precision": 0.95,
+      "recall": 0.95
+    }
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "live_model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 11
+  },
+  "static": {
+    "decision_layers": [
+      "rules",
+      "InstrumentRegistry",
+      "SharedLLMBroker_tiebreak"
+    ],
+    "direct_model_or_network_imports": [],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "required_attributes": [
+      "is_financial",
+      "intent",
+      "asset_type",
+      "candidates",
+      "market",
+      "currency",
+      "universe",
+      "as_of",
+      "freshness",
+      "needs_clarification",
+      "needs_full_research",
+      "confidence"
+    ],
+    "schema": "financial-intent-v1"
+  },
+  "task": "3.3"
+}

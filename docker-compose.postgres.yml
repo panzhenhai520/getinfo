@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: collectinfo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: collectinfo
+      POSTGRES_USER: collectinfo
+      POSTGRES_PASSWORD: collectinfo_pg_2026
+      TZ: Asia/Shanghai
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collectinfo -d collectinfo"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "3"
+
+volumes:
+  postgres_data:

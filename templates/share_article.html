@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="{% if article %}{{ article.title }}{% else %}文章不存在{% endif %}">
+<meta property="og:title" content="{% if article %}{{ article.title }}{% else %}文章不存在{% endif %}">
+<meta property="og:description" content="{% if article %}{{ article.title }} — {{ share_brand or platform_name }}{% else %}资讯情报分享{% endif %}">
+{# 分享卡片配图：优先文章所属行业包的租户 Logo；未配置时用平台 Logo；再未配置用默认雷达小 Logo（绝对地址，微信卡片才认） #}
+{% set _og_logo = share_logo or platform_logo %}
+{% set _proto = request.headers.get('X-Forwarded-Proto', 'https') %}
+<meta property="og:image" content="{% if _og_logo %}{{ _proto }}://{{ request.host }}{{ _og_logo if _og_logo.startswith('/') else '/' + _og_logo }}{% else %}{{ _proto }}://{{ request.host }}/static/img/logo-share.png{% endif %}">
+<title>{% if article %}{{ article.title }} - 资讯分享{% else %}文章不存在{% endif %}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+       background: #f7faf7; color: #17201d; min-height: 100vh; display: flex; flex-direction: column; }
+.wrap { max-width: 720px; width: 100%; margin: 0 auto; padding: 22px 16px 0; flex: 1; }
+.brand { font-size: 13px; color: #0f766e; font-weight: 800; margin-bottom: 14px; letter-spacing: .5px; }
+h1 { font-size: 22px; line-height: 1.45; margin-bottom: 12px; }
+.meta { font-size: 12px; color: #6b7280; margin-bottom: 18px; display: flex; flex-wrap: wrap; gap: 12px; }
+.meta a { color: #0f766e; text-decoration: none; word-break: break-all; }
+.content { font-size: 15px; line-height: 1.9; white-space: pre-wrap; word-break: break-word; padding-bottom: 30px; }
+.notfound { text-align: center; color: #6b7280; padding: 60px 0; }
+/* 微信内置浏览器：顶部引导右上角菜单分享 */
+.wx-tip { display: none; position: sticky; top: 0; z-index: 10; padding: 10px 14px;
+         background: #07c160; color: #fff; font-size: 13px; text-align: center; }
+.wx-tip.show { display: block; }
+/* 二维码分享区：长按保存图片发微信群/朋友圈 */
+.share-box { margin: 18px 0; padding: 14px; border: 1px dashed #cbd5d1; border-radius: 10px;
+            background: #fff; text-align: center; }
+.share-box .qr { width: 168px; height: 168px; display: block; margin: 8px auto; }
+.share-box p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
+.share-box .share-action { margin-top: 10px; padding: 9px 18px; border: 0; border-radius: 8px;
+    background: #07c160; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+.share-box .share-action:active { background: #06a853; }
+.cta { position: sticky; bottom: 0; background: #0f766e; color: #fff; text-align: center;
+       padding: 14px 16px; font-size: 15px; font-weight: 700; text-decoration: none; display: block;
+       box-shadow: 0 -6px 18px rgba(15,118,110,.18); }
+.cta:hover { background: #0a5f52; }
+.cta small { display: block; font-size: 11px; font-weight: 400; opacity: .85; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="wx-tip" id="wxTip">微信内浏览：点击右上角「···」→ 发送给朋友 / 分享到朋友圈</div>
+<div class="wrap">
+  {% if article %}
+  <div class="brand">{{ share_brand or platform_name }} · 资讯分享</div>
+  <h1>{{ article.title }}</h1>
+  <div class="meta">
+    <span>来源：{{ article.domain or '-' }}</span>
+    <span>时间：{{ article.publish_date or '未知' }}</span>
+    {% if article.url %}<a href="{{ article.url }}" target="_blank" rel="noopener">查看原文 ↗</a>{% endif %}
+  </div>
+  <div class="share-box">
+    <strong style="font-size:14px;color:#17201d">把本文分享到微信群 / 朋友圈</strong>
+    <img class="qr" src="/share/article/{{ article.id }}/qr.png" alt="分享二维码">
+    <p>长按上方二维码保存图片，即可在微信中以图片形式转发给群或发布朋友圈；<br>好友扫码也可直接打开本文。</p>
+    <button class="share-action" id="shareAction" type="button">一键唤起分享</button>
+  </div>
+  {# 手动发文的内容是编辑者排版好的 HTML，需按 HTML 渲染；爬虫文章是纯文本，保持转义显示 #}
+  <div class="content">{% if article.source_method == 'manual' %}{{ article.content|safe }}{% else %}{{ article.content or '暂无内容' }}{% endif %}</div>
+  {% else %}
+  <div class="notfound">文章不存在或已下线</div>
+  {% endif %}
+</div>
+<a class="cta" href="/login">点击获取更多趋势类文章<small>注册账号即可查看您所在行业的最新资讯动态</small></a>
+<script>
+// 微信内置浏览器 → 顶部引导右上角菜单分享（Web 页面无法自动直发朋友圈/群，这是微信生态限制）
+(function () {
+    if (/MicroMessenger/i.test(navigator.userAgent || '')) {
+        document.getElementById('wxTip').classList.add('show');
+    }
+})();
+// 系统分享面板（HTTPS 环境可用）：一键唤起后选择微信好友/朋友圈，比复制粘贴少几步
+document.getElementById('shareAction')?.addEventListener('click', async function () {
+    if (!navigator.share) {
+        try {
+            await navigator.clipboard.writeText(location.href);
+            this.textContent = '链接已复制，去微信粘贴发送';
+        } catch (e) {
+            window.prompt('复制以下链接，打开微信粘贴发送：', location.href);
+        }
+        return;
+    }
+    try {
+        await navigator.share({ title: document.title, url: location.href });
+    } catch (e) {
+        if (e && e.name === 'AbortError') return;   // 用户取消，不算失败
+        try {
+            await navigator.clipboard.writeText(location.href);
+            this.textContent = '链接已复制，去微信粘贴发送';
+        } catch (e2) {
+            window.prompt('复制以下链接，打开微信粘贴发送：', location.href);
+        }
+    }
+});
+</script>
+</body>
+</html>

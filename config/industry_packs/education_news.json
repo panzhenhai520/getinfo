@@ -1,0 +1,500 @@
+{
+  "id": "education_news",
+  "name": "教育行业资讯",
+  "schema_version": 3,
+  "pack_version": "2.0.3",
+  "enabled": true,
+  "default_market": "GLOBAL",
+  "timezone": "Asia/Hong_Kong",
+  "pack_kind": "primary",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "education_content_intelligence",
+      "name": "教育资讯聚合与分类",
+      "enabled": true,
+      "implementation_status": "existing"
+    },
+    {
+      "key": "education_policy_tracker",
+      "name": "教育政策与课程变化追踪",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    },
+    {
+      "key": "institution_benchmarking",
+      "name": "院校与专业对比",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    },
+    {
+      "key": "admissions_calendar",
+      "name": "招生考试日历与提醒",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    }
+  ],
+  "dashboard_categories": [
+    {
+      "key": "education_policy_calendar",
+      "name": "教育政策与招生日历",
+      "enabled": false,
+      "implementation_status": "schema_example"
+    }
+  ],
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": false,
+    "show_watched_stock_cards": false,
+    "show_spatiotemporal_map": false
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": false,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "教育",
+    "高等教育",
+    "基础教育",
+    "职业教育",
+    "在线教育",
+    "教育科技",
+    "EdTech",
+    "AI 教育",
+    "招生",
+    "课程改革",
+    "考试",
+    "学校",
+    "大学",
+    "双减",
+    "义务教育",
+    "学前教育",
+    "民办教育",
+    "教育数字化",
+    "智慧教育",
+    "学习机",
+    "考研",
+    "留学",
+    "教育大模型",
+    "课外培训"
+  ],
+  "expanded_keywords": [
+    "教学",
+    "教师",
+    "学生",
+    "校园",
+    "培训",
+    "教培机构",
+    "素质教育",
+    "课后服务",
+    "教师资格",
+    "中考",
+    "高考",
+    "职业教育培训",
+    "教育信息化"
+  ],
+  "trend_keywords": [
+    "教育政策",
+    "课程改革",
+    "AI 教学",
+    "国际学校",
+    "留学趋势",
+    "职业培训",
+    "教育公平",
+    "招生变化",
+    "财政投入",
+    "AI助教",
+    "智慧校园",
+    "教育大模型",
+    "教育数字化",
+    "高校学科调整",
+    "职业教育",
+    "在线教育市场",
+    "教育经费投入",
+    "留学生政策",
+    "研究生扩招",
+    "双减配套",
+    "教育科技融资",
+    "教师队伍建设",
+    "民办教育",
+    "产教融合",
+    "课后服务",
+    "老年教育",
+    "终身学习",
+    "教育新基建",
+    "AI 辅导",
+    "智能学习硬件"
+  ],
+  "event_keywords": [
+    "发布",
+    "招生",
+    "合作",
+    "融资",
+    "收购",
+    "任命",
+    "开设",
+    "关闭",
+    "处罚",
+    "排名"
+  ],
+  "negative_keywords": [
+    "培训广告",
+    "招生广告",
+    "招聘",
+    "兼职",
+    "求职",
+    "优惠",
+    "促销"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 2,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ]
+  },
+  "serpapi_queries": [
+    "education technology news",
+    "AI education policy",
+    "higher education news",
+    "site:moe.gov.cn 教育 政策",
+    "site:edsurge.com AI education",
+    "教育 政策 改革 新闻",
+    "双减 校外培训 监管",
+    "AI 教育 大模型 应用",
+    "留学 国际学校 动态",
+    "职业教育 产教融合 融资"
+  ],
+  "default_sources": [
+    {
+      "name": "教育部",
+      "url": "https://www.moe.gov.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.moe.gov.cn"
+    },
+    {
+      "name": "中国教育报",
+      "url": "https://www.jyb.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 4,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.jyb.cn"
+    },
+    {
+      "name": "中国教育在线",
+      "url": "https://www.eol.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.eol.cn"
+    },
+    {
+      "name": "联合国教科文组织（教育）",
+      "url": "https://www.unesco.org/en/education",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.unesco.org"
+    },
+    {
+      "name": "美国教育部",
+      "url": "https://www.ed.gov",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "official_rule"
+      ],
+      "publisher_key": "www.ed.gov"
+    },
+    {
+      "name": "芥末堆",
+      "url": "https://www.jiemodui.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.jiemodui.com"
+    },
+    {
+      "name": "多知网",
+      "url": "https://www.duozhi.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.duozhi.com"
+    },
+    {
+      "name": "鲸媒体",
+      "url": "https://www.jingmeiti.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.jingmeiti.com"
+    },
+    {
+      "name": "蓝鲸教育",
+      "url": "https://www.lanjinger.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.lanjinger.com"
+    },
+    {
+      "name": "黑板洞察",
+      "url": "https://www.heibandongcha.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.heibandongcha.com"
+    },
+    {
+      "name": "新浪教育",
+      "url": "https://edu.sina.com.cn",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "edu.sina.com.cn"
+    },
+    {
+      "name": "腾讯教育",
+      "url": "https://edu.qq.com",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "edu.qq.com"
+    },
+    {
+      "name": "EdSurge",
+      "url": "https://www.edsurge.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.edsurge.com"
+    },
+    {
+      "name": "Education Week",
+      "url": "https://www.edweek.org/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.edweek.org"
+    },
+    {
+      "name": "Inside Higher Ed",
+      "url": "https://www.insidehighered.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.insidehighered.com"
+    },
+    {
+      "name": "Times Higher Education",
+      "url": "https://www.timeshighereducation.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.timeshighereducation.com"
+    },
+    {
+      "name": "The Chronicle of Higher Education",
+      "url": "https://www.chronicle.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.chronicle.com"
+    },
+    {
+      "name": "Tech & Learning",
+      "url": "https://www.techlearning.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.techlearning.com"
+    },
+    {
+      "name": "EdTech Magazine",
+      "url": "https://edtechmagazine.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "edtechmagazine.com"
+    },
+    {
+      "name": "eSchool News",
+      "url": "https://www.eschoolnews.com/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.eschoolnews.com"
+    },
+    {
+      "name": "Edutopia",
+      "url": "https://www.edutopia.org/",
+      "source_type": "website",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "publisher_key": "www.edutopia.org"
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "education_policy",
+      "name": "教育政策",
+      "keywords": [
+        "教育政策",
+        "财政投入",
+        "处罚"
+      ]
+    },
+    {
+      "key": "ai_teaching",
+      "name": "AI 教学",
+      "keywords": [
+        "AI 教育",
+        "AI 教学",
+        "教育科技"
+      ]
+    },
+    {
+      "key": "admissions",
+      "name": "招生变化",
+      "keywords": [
+        "招生",
+        "招生变化",
+        "考试"
+      ]
+    },
+    {
+      "key": "higher_education",
+      "name": "高等教育",
+      "keywords": [
+        "高等教育",
+        "大学",
+        "留学趋势"
+      ]
+    }
+  ],
+  "brands": [
+    "新东方",
+    "好未来",
+    "作业帮",
+    "猿辅导",
+    "网易有道",
+    "高途",
+    "中公教育",
+    "粉笔",
+    "豆神教育",
+    "火花思维",
+    "掌门教育",
+    "科大讯飞",
+    "希沃",
+    "鸿合科技",
+    "ClassIn",
+    "松鼠Ai",
+    "学而思",
+    "VIPKID",
+    "51Talk"
+  ],
+  "trend_topics": [
+    "AI教育",
+    "教育政策",
+    "高等教育改革",
+    "职业教育",
+    "国际教育"
+  ]
+}

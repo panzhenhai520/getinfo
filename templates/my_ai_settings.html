@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>我的 AI 助手</title>
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+  <link rel="stylesheet" href="/static/css/fontawesome.css">
+  <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+  
+  <style>
+    body.skin-darkblue{background:linear-gradient(160deg,#0e1d3a 0%,#08101f 55%,#060b1c 100%)}
+    .page-wrap{max-width:860px;margin:26px auto;padding:0 20px}
+    .card{background:#fff;border:1px solid var(--dashboard-line);border-radius:14px;padding:20px 22px;margin-bottom:16px}
+    body.skin-darkblue .card{background:rgba(13,28,56,.82)}
+    .h{font-size:16px;font-weight:800;margin-bottom:4px}
+    .d{font-size:13px;color:#6b7280;margin-bottom:14px}
+    body.skin-darkblue .d,body.skin-darkblue .muted{color:#8ea6c8}
+    .row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--dashboard-line)}
+    .row:last-child{border-bottom:0}
+    .mname{flex:minmax(120px,150px);font-weight:700;font-size:14px}
+    .key-input{flex:1;border:0;border-bottom:1px solid var(--dashboard-line);background:transparent;padding:3px 2px;font-size:13px;color:inherit}
+    .key-input:focus{outline:none;border-bottom:2px solid #38bdf8}
+    body.skin-darkblue .key-input{border-bottom-color:rgba(96,165,250,.4)}
+    .has-badge{font-size:11px;padding:1px 7px;border-radius:4px;background:#dcfce7;color:#166534;white-space:nowrap}
+    body.skin-darkblue .has-badge{background:rgba(34,197,94,.18);color:#4ade80}
+    .no-badge{font-size:11px;padding:1px 7px;border-radius:4px;background:#e5e7eb;color:#6b7280;white-space:nowrap}
+    body.skin-darkblue .no-badge{background:rgba(148,163,184,.16);color:#9ca3af}
+    .save{width:100%;margin-top:14px;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+    .save:hover{background:#1d4ed8}
+    #status{font-size:13px;margin-top:10px}
+  </style>
+</head>
+<body>
+{% include '_dashboard_nav.html' %}
+<div class="page-wrap">
+  <div class="card">
+    <div class="h">我的 AI 助手</div>
+    <div class="d">配置你自己的聊天模型 API Key 与代理；仅对你本人生效，不会影响其他用户（用户级隔离）。</div>
+    <div id="adminHint" style="display:none;background:rgba(245,158,11,.14);color:#b45309;border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:13px">当前以<b>管理员</b>登录，管理员不能保存用户级设置。请以<b>行业包用户</b>（如 rhkj/mlkj）登录后再保存。</div>
+    <div id="modelRows">加载中…</div>
+    <div style="margin-top:16px;border-top:1px dashed var(--dashboard-line);padding-top:14px">
+      <div class="h" style="font-size:14px">本地 LLM 配置</div>
+      <div class="d" style="margin-bottom:10px">选提供商 + 填接入点，点"探索模型"拉取可选模型。</div>
+      <div class="row" style="flex-wrap:wrap">
+        <div class="mname" style="flex:0 0 90px">提供商</div>
+        <select id="llmProvider" class="key-input" style="max-width:180px" onchange="autofillLlmUrl()">
+          <option value="">未选择</option>
+          <option value="ollama">Ollama（本机）</option>
+          <option value="openai">OpenAI 兼容</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="vpn">VPN 服务器 LLM</option>
+        </select>
+        <div class="mname" style="flex:0 0 90px">接入点 URL</div>
+        <input id="llmBaseUrl" class="key-input" placeholder="http://127.0.0.1:11434 或 http://host:8000/v1">
+      </div>
+      <div class="row">
+        <div class="mname" style="flex:0 0 90px">模型</div>
+        <select id="llmModel" class="key-input"><option value="">（先探索或手动填写）</option></select>
+        <button type="button" class="btn2" style="border:1px solid var(--dashboard-line);border-radius:8px;padding:6px 12px;cursor:pointer;background:transparent" onclick="exploreModels()">探索模型</button>
+        <button type="button" class="btn2" style="border:1px solid var(--dashboard-line);border-radius:8px;padding:6px 12px;cursor:pointer;background:transparent" onclick="testConnect()">测试连通性</button>
+        <input id="llmModelManual" class="key-input" placeholder="或手动填写模型名">
+      </div>
+      <div class="row">
+        <div class="mname" style="flex:0 0 90px">超时（秒）</div>
+        <input id="llmTimeout" class="key-input" type="number" min="0" style="max-width:140px" placeholder="默认120，留空用默认">
+        <span class="muted" style="font-size:12px">首字等待超时；VPN 大模型较慢可调大（如 300）</span>
+      </div>
+      <div id="exploreStatus" style="font-size:12px;color:#8ea6c8;margin-top:6px"></div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="muted" style="font-size:13px;margin-bottom:6px">代理（梯子）地址：留空不代理 / 例如 http://127.0.0.1:10808</div>
+      <input id="proxyInput" class="key-input" style="width:100%" placeholder="http://127.0.0.1:10808">
+    </div>
+    <button class="save" id="saveBtn" onclick="saveAi()">保存 AI 助手设置</button>
+    <div id="status"></div>
+  </div>
+</div>
+<script>
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+async function get(){var r=await fetch('/api/chat/my-ai-settings',{cache:'no-store'});var d=await r.json();return d;}
+async function put(body){var r=await fetch('/api/chat/my-ai-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});var d=await r.json();return d;}
+function setStatus(t,ok){var e=document.getElementById('status');if(e){e.textContent=t;e.style.color=ok?'#0f766e':'#b91c1c';}}
+function autofillLlmUrl(){
+  var pv=document.getElementById('llmProvider').value;
+  var bu=document.getElementById('llmBaseUrl');
+  var map={'ollama':'http://127.0.0.1:11434','openrouter':'https://openrouter.ai/api','openai':'http://127.0.0.1:8000/v1','vpn':'http://10.88.0.1:11434'};
+  if(bu && map[pv]) bu.value=map[pv];
+}
+async function load(){
+  var d=await get();
+  if(!d.success||(d.models&&Object.keys(d.models).length===0)){document.getElementById('modelRows').innerHTML='<div class="muted">暂无可用模型（或请先以行业包用户登录）。</div>';return;}
+  var hint=document.getElementById('adminHint');
+  if(hint) hint.style.display = (d.user_id?'none':'block');
+  var rows=[];
+  Object.keys(d.models).forEach(function(mid){
+    var m=d.models[mid];
+    rows.push('<div class="row"><div class="mname">'+esc(m.name)+'</div>'+
+      '<input class="key-input" data-model="'+esc(mid)+'" placeholder="'+ (m.has_key?'已配置，输入新值覆盖':'输入 API Key') +'">'+
+      '<span class="'+(m.has_key?'has-badge':'no-badge')+'">'+(m.has_key?'已配置':'未配置')+'</span></div>');
+  });
+  document.getElementById('modelRows').innerHTML=rows.join('');
+  if(d.proxy) document.getElementById('proxyInput').value=(d.proxy.proxy_http||'');
+  var ll=d.local_llm||{};
+  var pv=document.getElementById('llmProvider'); if(pv) pv.value=ll.provider||'';
+  var bu=document.getElementById('llmBaseUrl'); if(bu) bu.value=ll.base_url||'';
+  var lm=document.getElementById('llmModel');
+  if(lm && ll.model){ var o=document.createElement('option'); o.value=ll.model; o.textContent=ll.model; lm.appendChild(o); lm.value=ll.model; }
+  if(document.getElementById('llmModelManual')) document.getElementById('llmModelManual').value=ll.model||'';
+  if(document.getElementById('llmTimeout')) document.getElementById('llmTimeout').value=(ll.timeout||'');
+}
+async function exploreModels(){
+  var pv=document.getElementById('llmProvider').value;
+  if(pv==='vpn') pv='ollama';
+  var bu=document.getElementById('llmBaseUrl').value.trim();
+  var st=document.getElementById('exploreStatus');
+  if(!pv){ st.textContent='请先选择提供商'; return; }
+  if(!bu){ st.textContent='请先填写接入点 URL'; return; }
+  st.textContent='探测中…';
+  try{
+    var keyEl=document.querySelector('.key-input[data-model="openrouter"]');
+    var ak=keyEl?keyEl.value.trim():'';
+    var r=await fetch('/api/chat/explore-models?provider='+encodeURIComponent(pv)+'&base_url='+encodeURIComponent(bu)+'&api_key='+encodeURIComponent(ak),{cache:'no-store'});
+    var d=await r.json();
+    if(!d.success){ st.textContent=d.message||'探测失败'; return; }
+    var lm=document.getElementById('llmModel'); lm.innerHTML='';
+    (d.models||[]).forEach(function(m){ var o=document.createElement('option'); o.value=m; o.textContent=m; lm.appendChild(o); });
+    if(d.models&&d.models.length){ lm.value=d.models[0]; document.getElementById('llmModelManual').value=''; st.textContent='发现 '+d.models.length+' 个模型'; }
+    else st.textContent='未发现模型（可手动填写）';
+  }catch(e){ st.textContent='探测失败：'+e.message; }
+}
+async function testConnect(){
+  var pv=document.getElementById('llmProvider').value;
+  if(pv==='vpn') pv='ollama';
+  var bu=document.getElementById('llmBaseUrl').value.trim();
+  var st=document.getElementById('exploreStatus');
+  if(!pv){ st.textContent='请先选择提供商'; return; }
+  if(!bu){ st.textContent='请先填写接入点 URL'; return; }
+  st.textContent='测试连接中…';
+  try{
+    var keyEl=document.querySelector('.key-input[data-model="openrouter"]');
+    var ak=keyEl?keyEl.value.trim():'';
+    var r=await fetch('/api/chat/explore-models?provider='+encodeURIComponent(pv)+'&base_url='+encodeURIComponent(bu)+'&api_key='+encodeURIComponent(ak),{cache:'no-store'});
+    var d=await r.json();
+    st.textContent = d.success ? ('✅ 连接成功，可用模型 '+((d.models||[]).length)+' 个') : ('❌ 连接失败：'+(d.message||''));
+    st.style.color = d.success ? '#22c55e' : '#ef4444';
+  }catch(e){ st.textContent='❌ 连接失败：'+e.message; st.style.color='#ef4444'; }
+}
+async function saveAi(){
+  var btn=document.getElementById('saveBtn'); if(btn)btn.disabled=true;
+  try{
+    var keys={};
+    document.querySelectorAll('.key-input[data-model]').forEach(function(inp){ if(inp.value.trim()) keys[inp.dataset.model]=inp.value.trim(); });
+    var proxy=document.getElementById('proxyInput').value.trim();
+    var lm=document.getElementById('llmModel').value || document.getElementById('llmModelManual').value.trim();
+    var timeout=parseInt(document.getElementById('llmTimeout').value||'0',10)||0;
+    var r=await put({keys:keys,proxy_http:proxy,llm_provider:document.getElementById('llmProvider').value,llm_base_url:document.getElementById('llmBaseUrl').value.trim(),llm_model:lm,llm_timeout:timeout});
+    if(r.success){ setStatus('✅ 保存成功（仅对你生效）',true); alert('保存成功'); }
+    else { var msg=(r.message||'未知错误'); if(String(msg).indexOf('包用户')>=0||String(msg).indexOf('登录')>=0) msg='请先以行业包用户登录后再保存（管理员不能保存用户级设置）'; setStatus('❌ '+msg,false); alert(msg); }
+  }catch(e){ setStatus('❌ 保存失败：'+e.message,false); alert('保存失败：'+e.message); }
+  if(btn)btn.disabled=false;
+  setTimeout(load,900);
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "provider_id": "yahoo",
+  "display_name": "Yahoo Finance / yfinance 研究行情",
+  "package_version": "1.5.1",
+  "package_wheel_sha256": "a5c9cfc1b9c990f217b643e4fb92444e023cc02b2bacdea9c1fb472509fdfe22",
+  "access_tier": "public_personal_research_only",
+  "default_enabled": false,
+  "license_profile": "yfinance_apache_wrapper_yahoo_personal_research_terms",
+  "provider_type": "sdk_adapter",
+  "priority": 70,
+  "daily_call_budget": 250,
+  "fallback_rank": 40,
+  "package_url": "https://pypi.org/project/yfinance/",
+  "documentation_url": "https://ranaroussi.github.io/yfinance/",
+  "terms_url": "https://legal.yahoo.com/us/en/yahoo/terms/product-atos/apiforydn/index.html",
+  "attribution_text": "Data accessed through yfinance from Yahoo Finance; personal research restrictions apply.",
+  "terms_note": "yfinance 是非官方开源包装器；Yahoo 数据仅限个人研究用途。A 股结果只能作为研究级回退，不能标记为交易所级实时事实。",
+  "sla": "none",
+  "capabilities": ["quote", "bar"],
+  "logical_endpoints": {"quote": ["download"], "bars": ["download"]}
+}

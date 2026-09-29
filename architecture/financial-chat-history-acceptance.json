@@ -1,0 +1,46 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "tests_run": 7
+  },
+  "scenarios": {
+    "existing_artifact_migration": true,
+    "financial_route_time_and_target_replay": true,
+    "legacy_financial_client_match": true,
+    "ordinary_history_unchanged": true,
+    "save_failure_rolls_back_answer": true,
+    "session_delete_preserves_shared_evidence": true,
+    "snapshot_and_report_version_replay": true
+  },
+  "static": {
+    "answer_fk": "chat_financial_artifacts.chat_history_id",
+    "direct_model_or_network_imports": [],
+    "existing_artifact_table": "chat_financial_artifacts",
+    "existing_history_table": "chat_history",
+    "existing_route_table": "chat_financial_routes",
+    "frontend": {
+      "article_management.html": {
+        "captures_route_key": true,
+        "saves_route_key": true,
+        "sends_session_id": true
+      },
+      "mapindex.html": {
+        "captures_route_key": true,
+        "saves_route_key": true,
+        "sends_session_id": true
+      }
+    },
+    "large_report_json_copied": false,
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-chat-audit-v1",
+    "shared_evidence_delete_cascade": false,
+    "transaction": "chat_history_insert_plus_financial_reference_attach"
+  },
+  "task": "3.9"
+}

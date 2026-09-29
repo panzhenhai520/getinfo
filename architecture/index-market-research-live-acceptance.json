@@ -1,0 +1,141 @@
+{
+  "checked_at_utc": "2026-08-01T12:12:48Z",
+  "llm_mode": "deterministic_broker_fixture",
+  "network_requested": true,
+  "passed": true,
+  "report_version": "index-market-research-live-v1",
+  "secrets_included": false,
+  "targets": [
+    {
+      "broker_calls": 13,
+      "canonical_symbol": "000001.SH",
+      "compiler": "上海证券交易所",
+      "component_contribution_coverage": 0.0,
+      "constituent_as_of": null,
+      "data_latency_seconds": 0.865,
+      "display_name": "上证综合指数",
+      "evidence_coverage": 0.375,
+      "execution_allowed": false,
+      "market_status": "closed",
+      "order_target": null,
+      "passed": true,
+      "preflight_error_codes": {
+        "breadth": "temporarily_unavailable",
+        "constituents": "temporarily_unavailable",
+        "identity": "",
+        "liquidity": "",
+        "macro": "permission_denied",
+        "market_history": "",
+        "news": "",
+        "sector_rotation": "temporarily_unavailable",
+        "verified_market": ""
+      },
+      "preflight_statuses": {
+        "breadth": "unavailable",
+        "constituents": "unavailable",
+        "identity": "complete",
+        "liquidity": "completed",
+        "macro": "unavailable",
+        "market_history": "fetched",
+        "news": "unavailable",
+        "sector_rotation": "unavailable",
+        "verified_market": "completed"
+      },
+      "providers": [
+        "akshare_cn",
+        "tradingagents_cn_derived",
+        "yahoo"
+      ],
+      "recommendation": "Hold",
+      "report_status": "degraded_unverified",
+      "section_count": 15
+    },
+    {
+      "broker_calls": 13,
+      "canonical_symbol": "399001.SZ",
+      "compiler": "深圳证券交易所",
+      "component_contribution_coverage": 0.0,
+      "constituent_as_of": null,
+      "data_latency_seconds": 0.865,
+      "display_name": "深证成份指数",
+      "evidence_coverage": 0.375,
+      "execution_allowed": false,
+      "market_status": "closed",
+      "order_target": null,
+      "passed": true,
+      "preflight_error_codes": {
+        "breadth": "temporarily_unavailable",
+        "constituents": "temporarily_unavailable",
+        "identity": "",
+        "liquidity": "",
+        "macro": "permission_denied",
+        "market_history": "",
+        "news": "",
+        "sector_rotation": "temporarily_unavailable",
+        "verified_market": ""
+      },
+      "preflight_statuses": {
+        "breadth": "unavailable",
+        "constituents": "unavailable",
+        "identity": "complete",
+        "liquidity": "completed",
+        "macro": "unavailable",
+        "market_history": "fetched",
+        "news": "unavailable",
+        "sector_rotation": "unavailable",
+        "verified_market": "completed"
+      },
+      "providers": [
+        "akshare_cn",
+        "tradingagents_cn_derived",
+        "yahoo"
+      ],
+      "recommendation": "Hold",
+      "report_status": "degraded_unverified",
+      "section_count": 15
+    },
+    {
+      "broker_calls": 13,
+      "canonical_symbol": "HSI.HK",
+      "compiler": "恒生指数有限公司",
+      "component_contribution_coverage": 0.0,
+      "constituent_as_of": null,
+      "data_latency_seconds": 101028.865,
+      "display_name": "恒生指数",
+      "evidence_coverage": 0.375,
+      "execution_allowed": false,
+      "market_status": "closed",
+      "order_target": null,
+      "passed": true,
+      "preflight_error_codes": {
+        "breadth": "no_authorized_provider_for_market",
+        "constituents": "no_authorized_provider_for_market",
+        "identity": "",
+        "liquidity": "",
+        "macro": "permission_denied",
+        "market_history": "",
+        "news": "",
+        "sector_rotation": "no_authorized_provider_for_market",
+        "verified_market": ""
+      },
+      "preflight_statuses": {
+        "breadth": "unavailable",
+        "constituents": "unavailable",
+        "identity": "complete",
+        "liquidity": "completed",
+        "macro": "unavailable",
+        "market_history": "fetched",
+        "news": "unavailable",
+        "sector_rotation": "unavailable",
+        "verified_market": "completed"
+      },
+      "providers": [
+        "tradingagents_cn_derived",
+        "yahoo"
+      ],
+      "recommendation": "Hold",
+      "report_status": "degraded_unverified",
+      "section_count": 15
+    }
+  ]
+}

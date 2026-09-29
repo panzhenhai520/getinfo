@@ -1,0 +1,50 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 11
+  },
+  "scenarios": {
+    "all_switch_combinations": true,
+    "dashboard_and_feed_consistent": true,
+    "direct_report_url_fail_closed": true,
+    "effective_pack_required": true,
+    "history_preserved": true,
+    "non_admin_projection": true,
+    "queued_and_new_jobs_skip_after_close": true,
+    "running_job_finishes_safely": true,
+    "worker_and_research_creation_consistent": true
+  },
+  "static": {
+    "capabilities_endpoint": "GET /api/intel/financial/capabilities",
+    "direct_model_or_network_imports": [],
+    "menu_capabilities": {
+      "backtesting": "策略回测",
+      "financial_zone": "金融专区",
+      "simulation": "模拟交易",
+      "tradingagents_reports": "TradingAgents 报告"
+    },
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "running_task_policy": "finish_claimed_skip_queued_and_new_preserve_history",
+    "schema_version": "financial-feature-gate-v1",
+    "server_gates": [
+      "effective industry-pack graph",
+      "FINANCIAL_INTELLIGENCE_ENABLED",
+      "TRADING_AGENTS_ENABLED",
+      "TRADING_SIMULATION_ENABLED"
+    ]
+  },
+  "task": "3.15",
+  "verification": {
+    "frontend_javascript_syntax": "passed",
+    "full_regression_tests": 389,
+    "full_regression_repeated_clean_process": true,
+    "offline_image": "sha256:5e1321e403755e496d9858920e04f3dee20f8a595951687c6aa29332874e973d"
+  }
+}

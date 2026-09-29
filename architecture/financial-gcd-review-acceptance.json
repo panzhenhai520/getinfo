@@ -1,0 +1,51 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 8
+  },
+  "scenarios": {
+    "cross_instrument_snapshot_blocked": true,
+    "currency_isolated": true,
+    "different_as_of_not_conflicted": true,
+    "material_same_instant_conflict_retained": true,
+    "mixed_non_financial_history_preserved": true,
+    "old_report_and_new_price_labeled": true,
+    "same_day_overlapping_duplicate_merged": true,
+    "split_adjustment_isolated": true,
+    "stale_latest_snapshot_labeled": true
+  },
+  "static": {
+    "claim_fields": [
+      "instrument_id",
+      "metric",
+      "value",
+      "currency",
+      "period",
+      "as_of",
+      "evidence"
+    ],
+    "clock_source": "application_server_utc",
+    "conflict_silent_selection": false,
+    "direct_model_or_network_imports": [],
+    "existing_operation": "POST /mapindex/api/chat/operations operation_type=gcd",
+    "legacy_cleanup_first": true,
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-gcd-review-v1",
+    "source_sessions_immutable": true,
+    "statuses": [
+      "verified_current",
+      "historical",
+      "stale",
+      "conflicted"
+    ],
+    "validity_interval_merge": true
+  },
+  "task": "3.10"
+}

@@ -1,0 +1,51 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "complete_tradingagents_research_started": false,
+    "does_not_generate_unverified_values": true,
+    "does_not_reduce_whole_market_to_one_index": true,
+    "does_not_select_a_stock": true,
+    "legacy_sse_event_types": [
+      "status",
+      "chunk",
+      "done"
+    ]
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "full_research_jobs_created": 0,
+    "model_calls_before_snapshot_report": 0,
+    "network_calls": 0,
+    "tests_run": 6
+  },
+  "scenarios": {
+    "exchange_holidays_are_independent": true,
+    "explicit_index_takes_precedence": true,
+    "missing_ticker_never_blocks_broad_market": true,
+    "partial_coverage_is_disclosed": true,
+    "persisted_snapshots_precede_answer": true,
+    "post_close_settlement_is_explicit": true,
+    "simplified_traditional_oral_mapping": true,
+    "stale_snapshot_cannot_be_laundered_by_current_report": true
+  },
+  "static": {
+    "direct_network_or_model_imports": [],
+    "existing_database": "crawler_articles.db",
+    "existing_queue": "intel_jobs",
+    "existing_worker": "intel_worker.py",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema": "financial-chat-market-scope-v1",
+    "standard_universes": [
+      "CN_XSHG_MARKET",
+      "CN_XSHE_MARKET",
+      "CN_A_MARKET",
+      "HK_MARKET",
+      "DEFAULT_MARKET_PULSE"
+    ]
+  },
+  "task": "3.5"
+}

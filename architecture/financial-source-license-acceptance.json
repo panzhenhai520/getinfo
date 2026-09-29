@@ -1,0 +1,69 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "license_profile_is_not_legal_advice": true,
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "open_source_sdk_license_is_not_data_rights": true,
+    "production_requires_explicit_approval": true,
+    "redistribution_implicitly_allowed": false,
+    "test_authorization_is_not_production_authorization": true
+  },
+  "inventory": {
+    "configured_provider_endpoints": 45,
+    "exact_rss_endpoints": 5,
+    "license_profiles": 13,
+    "production_forbidden_sources": [
+      "akshare_cn",
+      "easyquotation",
+      "yahoo"
+    ],
+    "providers": 8,
+    "review_due_on": "2027-02-01",
+    "rss_sources": 5
+  },
+  "paid_source_responsibility": {
+    "alpha_vantage": {
+      "billing_owner_role": "finance_operations",
+      "cost_type": "freemium_or_paid_market_data_entitlement",
+      "credential_owner_role": "market_data_operations"
+    },
+    "tushare_cn": {
+      "billing_owner_role": "finance_operations",
+      "cost_type": "account_points_or_paid_endpoint_entitlement",
+      "credential_owner_role": "market_data_operations"
+    }
+  },
+  "runtime": {
+    "errors": 0,
+    "failures": 0,
+    "network_calls": 0,
+    "secrets_included": false,
+    "tests_run": 22
+  },
+  "static": {
+    "configured_endpoints_match_implementations": true,
+    "expired_authorization_disabled": true,
+    "missing_profile_disabled_in_production": true,
+    "paid_sources_have_billing_and_token_responsibility": true,
+    "production_requires_explicit_approval": true,
+    "provider_and_rss_profile_ids_unique": true
+  },
+  "verification": {
+    "architecture_gate": "passed",
+    "browser_regression": "not_run_no_ui_change",
+    "full_regression_tests": 515,
+    "offline_build": {
+      "base_image": "collectinfo:financial-stage5-gate-acceptance",
+      "base_image_digest": "sha256:27f0c1dca46fcd5bbc9ea0d7feb3c775ab9dd52e446b5218938d78f059a36d28",
+      "full_regression_tests": 515,
+      "image": "collectinfo:financial-source-license-acceptance",
+      "image_digest": "sha256:a9024020ee3b6581a4f49f780ea5ad43e79022033c71695af5f7ee30ef72dcc6",
+      "network": "none",
+      "related_regression_tests": 22
+    },
+    "related_regression_tests": 22
+  },
+  "task": "6.1"
+}

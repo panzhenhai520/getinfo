@@ -1,0 +1,93 @@
+{
+  "acceptance": "passed",
+  "acceptance_version": "financial-latest-gray3-v1",
+  "accepted_at": "2026-08-03T19:14:08+08:00",
+  "stage": "internal_auto_promotion",
+  "scope": "loopback_isolated_canary_only",
+  "configuration": {
+    "FINANCIAL_INTELLIGENCE_ENABLED": true,
+    "FINANCIAL_INFORMATION_NEEDS_ENABLED": true,
+    "FINANCIAL_INSTRUMENT_DISCOVERY_ENABLED": true,
+    "FINANCIAL_INSTRUMENT_AUTO_PROMOTION_ENABLED": true,
+    "FINANCIAL_LATEST_NEWS_ENABLED": false,
+    "FINANCIAL_LATEST_BUNDLE_ENABLED": false
+  },
+  "candidate_image": {
+    "tag": "collectinfo:financial-latest-gray2-20260803",
+    "digest": "sha256:6a98886fbd9d53ee3b31fd8a7a4e2358c95766a5d7f0475b97aca1affabbaa8e",
+    "build_gates_passed": true
+  },
+  "isolated_canary": {
+    "container": "firecrawl-financial-latest-gray3",
+    "listen": "127.0.0.1:8006",
+    "production_data_mounted": false,
+    "database": "container_tmpfs",
+    "health_status": "ok",
+    "observation_seconds_at_least": 60,
+    "restart_count": 0,
+    "oom_killed": false,
+    "post_ready_error_count": 0
+  },
+  "verification": {
+    "first_request": {
+      "initial_discovery_status": "planned",
+      "activation_status": "promoted",
+      "target_status_after_promotion": "resolved",
+      "canonical_symbol": "SPCX.US",
+      "quote_status": "planned",
+      "news_reason_codes": [
+        "latest_news_disabled"
+      ],
+      "bundle_reason_codes": [
+        "latest_bundle_disabled"
+      ]
+    },
+    "second_request": {
+      "target_status": "resolved",
+      "discovery_status": "skipped"
+    },
+    "persistence": {
+      "spcx_candidate_rows": 1,
+      "spcx_formal_instrument_rows": 1,
+      "candidate_linked_to_formal_instrument": true,
+      "financial_data_snapshot_rows": 0,
+      "article_rows": 0
+    },
+    "test_evidence_reused_from_same_immutable_image": {
+      "latest_information_tests": 54,
+      "full_regression_tests": 597,
+      "release_gate": "passed",
+      "network_policy": "none"
+    }
+  },
+  "production_main": {
+    "configuration_stage": "information_needs_only",
+    "process_reloaded": false,
+    "traffic_switched": false,
+    "production_data_touched": false,
+    "active_unrelated_tasks_observed": 2
+  },
+  "rollback": {
+    "database_restore_required": false,
+    "actions": [
+      "stop_the_gray3_isolated_canary",
+      "keep_FINANCIAL_INSTRUMENT_AUTO_PROMOTION_ENABLED_false_on_main"
+    ]
+  },
+  "next_gate": {
+    "stage": "quote_only",
+    "requires_explicit_live_provider_smoke": true,
+    "production_progression_allowed": false,
+    "production_requirements": [
+      "main_information_needs_observation_completed",
+      "no_active_unrelated_tasks_during_reload"
+    ]
+  },
+  "boundaries": {
+    "live_provider_smoke_executed": false,
+    "quote_execution_executed": false,
+    "news_execution_executed": false,
+    "real_order_execution": false,
+    "destructive_database_action_executed": false
+  }
+}

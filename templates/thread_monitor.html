@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>线程监控 - {{ platform_name }}</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg,#2563eb 0%,#7c3aed 100%); }
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px; }
+        .badge-running  { background:#dbeafe; color:#1d4ed8; }
+        .badge-completed{ background:#d1fae5; color:#065f46; }
+        .badge-failed   { background:#fee2e2; color:#991b1b; }
+        .badge-pending  { background:#fef3c7; color:#92400e; }
+        .badge { display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600; }
+        #tooltip {
+            position:fixed; z-index:9999; pointer-events:none;
+            background:rgba(17,24,39,.92); color:#f9fafb;
+            padding:8px 12px; border-radius:8px; font-size:12px;
+            line-height:1.6; max-width:220px; display:none;
+            box-shadow:0 4px 16px rgba(0,0,0,.3);
+        }
+        .concurrency-input { width:64px; border:1px solid #d1d5db; border-radius:6px; padding:4px 8px; font-size:14px; text-align:center; }
+        .btn-save { background:#2563eb; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; }
+        .btn-save:hover { background:#1d4ed8; }
+        .btn-refresh { background:#f3f4f6; color:#374151; border:1px solid #d1d5db; border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; }
+        .btn-refresh:hover { background:#e5e7eb; }
+        .stat-card { background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:12px 16px; text-align:center; }
+        .stat-val { font-size:24px; font-weight:700; color:#1e293b; }
+        .stat-lbl { font-size:12px; color:#64748b; margin-top:2px; }
+        /* 缩放按钮 */
+        .zoom-btn {
+            padding:4px 10px; border:1px solid #d1d5db; border-radius:5px;
+            font-size:12px; cursor:pointer; background:#fff; color:#374151;
+            transition:all .15s;
+        }
+        .zoom-btn:hover { background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; }
+        .zoom-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+        .operations-grid { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px; }
+        .operation-card { border:1px solid #dbe5e1;border-radius:10px;padding:14px 16px;background:#fff;min-height:112px; }
+        .operation-card h3 { margin:0 0 8px;font-size:13px;color:#475569;font-weight:700; }
+        .operation-card .value { font-size:21px;font-weight:800;color:#1e293b;line-height:1.2; }
+        .operation-card .detail { margin-top:7px;font-size:12px;line-height:1.55;color:#64748b; }
+        .operation-card.good { border-color:#99f6e4;background:#f0fdfa; }.operation-card.good .value{color:#0f766e}
+        .operation-card.warn { border-color:#fde68a;background:#fffbeb; }.operation-card.warn .value{color:#b45309}
+        .monitor-explainer { margin:0 0 18px;padding:13px 16px;border-left:4px solid #2563eb;border-radius:0 8px 8px 0;background:#eff6ff;color:#334155;font-size:13px;line-height:1.75; }
+        @media(max-width:900px){.operations-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}@media(max-width:560px){.operations-grid{grid-template-columns:1fr;}}
+        /* ── 深蓝色皮肤适配 ── */
+        body.skin-darkblue{background:linear-gradient(160deg,#0e1d3a 0%,#08101f 55%,#060b1c 100%) !important;}
+        body.skin-darkblue .card{background:rgba(13,28,56,.82);border-color:rgba(96,165,250,.22);}
+        body.skin-darkblue .stat-card,body.skin-darkblue .operation-card{background:rgba(13,28,56,.82);border-color:rgba(96,165,250,.22);}
+        body.skin-darkblue .stat-val,body.skin-darkblue .operation-card .value{color:#e6f0ff;}
+        body.skin-darkblue .operation-card h3{color:#c7d6ec;}
+        body.skin-darkblue .stat-lbl,body.skin-darkblue .operation-card .detail{color:#94a7c6;}
+        body.skin-darkblue .operation-card.good{border-color:rgba(52,211,153,.4);background:#10281f;}
+        body.skin-darkblue .operation-card.good .value{color:#4ade80;}
+        body.skin-darkblue .operation-card.warn{border-color:rgba(251,191,36,.4);background:#2b2310;}
+        body.skin-darkblue .operation-card.warn .value{color:#fbbf24;}
+        body.skin-darkblue .badge-running{background:rgba(59,130,246,.22);color:#93c5fd;}
+        body.skin-darkblue .badge-completed{background:rgba(16,185,129,.22);color:#6ee7b7;}
+        body.skin-darkblue .badge-failed{background:rgba(239,68,68,.22);color:#fca5a5;}
+        body.skin-darkblue .badge-pending{background:rgba(251,191,36,.22);color:#fcd34d;}
+        body.skin-darkblue .btn-refresh{background:#12233f;color:#dbeafe;border:1px solid rgba(96,165,250,.28);}
+        body.skin-darkblue .btn-refresh:hover{background:rgba(56,189,248,.16);}
+        body.skin-darkblue .zoom-btn{background:#12233f;color:#dbeafe;border:1px solid rgba(96,165,250,.28);}
+        body.skin-darkblue .zoom-btn:hover{background:rgba(56,189,248,.16);border-color:#93c5fd;color:#93c5fd;}
+        body.skin-darkblue .monitor-explainer{background:rgba(37,99,235,.14);color:#dbeafe;border-left-color:#3b82f6;}
+        body.skin-darkblue .concurrency-input{background:#0e1d3a;color:#e6f0ff;border-color:rgba(96,165,250,.28);}
+        body.skin-darkblue .concurrency-pill{background:#0e1d3a !important;border-color:rgba(96,165,250,.28) !important;}
+        /* 内联浅色文字（!important 覆盖 style） */
+        body.skin-darkblue #engTitle,body.skin-darkblue h2.text-gray-800{color:#e6f0ff !important;}
+        body.skin-darkblue #engReason,body.skin-darkblue #engMetrics,body.skin-darkblue #clockDisplay,
+        body.skin-darkblue #nextRefresh,body.skin-darkblue #runningList,body.skin-darkblue #pendingList,
+        body.skin-darkblue #chartEmpty{color:#a7b8d4 !important;}
+        body.skin-darkblue .text-gray-500{color:#94a7c6 !important;}
+        body.skin-darkblue div[style*="color:#374151"],body.skin-darkblue span[style*="color:#374151"]{color:#c7d6ec !important;}
+        body.skin-darkblue span[style*="color:#6b7280"],body.skin-darkblue #runningList td,body.skin-darkblue #runningList th{color:#a7b8d4 !important;}
+        body.skin-darkblue #engTriggerResult{color:#4ade80 !important;}
+        /* SVG 甘特图文字 */
+        body.skin-darkblue #ganttSvg text{fill:#94a7c6;}
+        /* 运行中任务表格行分隔线深蓝 */
+        body.skin-darkblue #runningList tr{border-bottom-color:rgba(96,165,250,.14) !important;}
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- 导航 -->{% include "_dashboard_nav.html" %}
+
+
+<div id="tooltip"></div>
+
+<main class="container mx-auto px-4 py-6 max-w-7xl">
+
+    <!-- 标题栏 -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">线程监控</h2>
+            <p class="text-gray-500 text-sm mt-1">分开查看传统聚合并发、信源扫描/入库链路与 Web 后台线程。</p>
+        </div>
+        <div class="flex items-center gap-3 flex-wrap">
+            <!-- 并发数设置 -->
+            <div class="concurrency-pill" style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:6px 12px;">
+                <i class="fa fa-sliders-h text-blue-500 text-sm"></i>
+                <span style="font-size:13px;color:#374151;font-weight:500;">并发线程数</span>
+                <input id="concInput" type="number" min="1" max="32" class="concurrency-input" value="4">
+                <button class="btn-save" onclick="saveConcurrent()">保存</button>
+            </div>
+            <!-- 刷新 -->
+            <button class="btn-refresh" onclick="fetchAndRender()">
+                <i class="fa fa-sync-alt mr-1"></i>刷新
+            </button>
+            <span id="clockDisplay" style="font-size:13px;color:#6b7280;font-family:monospace;"></span>
+            <span id="nextRefresh" style="font-size:12px;color:#9ca3af;"></span>
+        </div>
+    </div>
+
+    <!-- 引擎权威状态横幅（与首页红绿灯同源，红=未工作 / 绿=正常工作）+ 手动触发 -->
+    <div class="card" style="margin-bottom:20px;padding:16px 20px;border-left:5px solid #ef4444;" id="engineBanner">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;">
+            <div style="display:flex;align-items:center;gap:14px;min-width:260px;">
+                <span id="engLight" style="width:16px;height:16px;border-radius:50%;background:#ef4444;box-shadow:0 0 8px currentColor;"></span>
+                <div>
+                    <div id="engTitle" style="font-size:16px;font-weight:700;color:#111827;">聚合引擎：读取中…</div>
+                    <div id="engReason" style="font-size:12px;color:#6b7280;margin-top:3px;">正在读取状态…</div>
+                </div>
+            </div>
+            <div id="engMetrics" style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#334155;">—</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn-refresh" onclick="manualTrigger('auto')" id="engTriggerBtn" style="background:#2563eb;color:#fff;border-color:#2563eb;font-weight:600;">
+                    <i class="fa fa-play mr-1"></i>立即触发一轮聚合
+                </button>
+                <span id="engTriggerResult" style="font-size:12px;color:#0f766e;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div id="statsRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div class="stat-card"><div class="stat-val" id="sRunning">-</div><div class="stat-lbl">传统聚合运行中</div></div>
+        <div class="stat-card"><div class="stat-val" id="sSlots">-</div><div class="stat-lbl">传统聚合空闲槽位</div></div>
+        <div class="stat-card"><div class="stat-val" id="sCompleted">-</div><div class="stat-lbl">今日传统任务完成</div></div>
+        <div class="stat-card"><div class="stat-val" id="sPending">-</div><div class="stat-lbl">传统任务待触发</div></div>
+    </div>
+
+    <div class="monitor-explainer"><b>怎么看：</b>上方四项和下方甘特图只对应“传统任务调度”。信源扫描是另一条自动链路：信源到期扫描 → 候选链接 → 正文聚合 → 分类入库。请以以下四张状态卡判断平台整体是否正常。</div>
+    <div class="operations-grid">
+        <div class="operation-card" id="opsWebCard"><h3><i class="fa fa-server mr-1"></i>Web 后台线程</h3><div class="value" id="opsWebThreads">—</div><div class="detail" id="opsWebDetail">正在读取…</div></div>
+        <div class="operation-card" id="opsLegacyCard"><h3><i class="fa fa-clock-o mr-1"></i>传统聚合调度</h3><div class="value" id="opsLegacy">—</div><div class="detail" id="opsLegacyDetail">正在读取…</div></div>
+        <div class="operation-card" id="opsSourceCard"><h3><i class="fa fa-radar mr-1"></i>信源扫描覆盖</h3><div class="value" id="opsSource">—</div><div class="detail" id="opsSourceDetail">正在读取…</div></div>
+        <div class="operation-card" id="opsWorkerCard"><h3><i class="fa fa-cogs mr-1"></i>信源 Worker 心跳</h3><div class="value" id="opsWorker">—</div><div class="detail" id="opsWorkerDetail">正在读取…</div></div>
+        <div class="operation-card" id="opsPipelineCard"><h3><i class="fa fa-network-wired mr-1"></i>远端 VPN Pipeline</h3><div class="value" id="opsPipeline">—</div><div class="detail" id="opsPipelineDetail">正在读取…</div></div>
+        <div class="operation-card good"><h3><i class="fa fa-download mr-1"></i>今日聚合</h3><div class="value" id="opsTodayCrawled">—</div><div class="detail">以今日首次聚合并保留的文章计数。</div></div>
+        <div class="operation-card good"><h3><i class="fa fa-database mr-1"></i>今日入库（News）</h3><div class="value" id="opsTodayNewsParsed">—</div><div class="detail">仅计入已同步 News 知识库且已解析的文章。</div></div>
+    </div>
+
+    <!-- 图例 + 缩放控件 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <span style="font-size:13px;color:#374151;font-weight:500;">图例：</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#3b82f6;border-radius:3px;display:inline-block;"></span>运行中</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#10b981;border-radius:3px;display:inline-block;"></span>已完成</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#ef4444;border-radius:3px;display:inline-block;"></span>失败/超时</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#374151;"><span style="width:16px;height:12px;background:#f59e0b;border-radius:3px;display:inline-block;"></span>待触发</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#ef4444;"><span style="width:2px;height:16px;background:#ef4444;display:inline-block;border-radius:1px;"></span>当前时刻</span>
+        </div>
+        <!-- 缩放控件 -->
+        <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:#6b7280;">缩放：</span>
+            <button class="zoom-btn active" onclick="setZoom(0)" id="z0">全天</button>
+            <button class="zoom-btn" onclick="setZoom(1)" id="z1">±6h</button>
+            <button class="zoom-btn" onclick="setZoom(2)" id="z2">±2h</button>
+            <button class="zoom-btn" onclick="setZoom(3)" id="z3">±30分钟</button>
+        </div>
+    </div>
+
+    <!-- 甘特图 -->
+    <div class="card" style="padding:16px;overflow-x:auto;">
+        <div id="chartWrap" style="min-width:800px;position:relative;">
+            <svg id="ganttSvg" style="width:100%;display:block;"></svg>
+        </div>
+        <div id="chartEmpty" style="text-align:center;padding:40px;color:#9ca3af;display:none;">
+            <i class="fa fa-chart-bar text-2xl mb-2"></i><br>暂无任务数据
+        </div>
+    </div>
+
+    <!-- 运行中任务明细 -->
+    <div class="card mt-4" id="runningSection">
+        <h3 style="font-size:15px;font-weight:600;color:#374151;margin-bottom:12px;">
+            <i class="fa fa-spinner fa-spin text-blue-500 mr-2"></i>运行中的任务
+        </h3>
+        <div id="runningList" style="font-size:13px;color:#6b7280;">加载中…</div>
+    </div>
+
+    <!-- 待触发任务 -->
+    <div class="card mt-4" id="pendingSection">
+        <h3 style="font-size:15px;font-weight:600;color:#374151;margin-bottom:12px;">
+            <i class="fa fa-clock text-yellow-500 mr-2"></i>今日待触发任务
+        </h3>
+        <div id="pendingList" style="font-size:13px;color:#6b7280;">加载中…</div>
+    </div>
+
+</main>
+
+<script>
+// ── 状态 ──
+let lastData = null;
+let refreshTimer = null;
+let countdown = 30;
+let zoomLevel = 0; // 0=全天 1=±6h 2=±2h 3=±30min
+const ML = 90, MR = 20, MT = 38, LANE_H = 46, BAR_H = 28, PENDING_ZONE = 64;
+
+// 各缩放级别的半窗口宽度（分钟）
+const ZOOM_WINDOWS = [720, 360, 120, 30]; // 半窗口，全天=720=12h（显示0-1440实际用full flag）
+const ZOOM_FULL = [true, false, false, false];
+
+// 工具
+function hhmm(minutes) {
+    const h = Math.floor(minutes / 60) % 24;
+    const m = Math.floor(minutes % 60);
+    return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+function fmtDur(min) {
+    if (min < 1) return '<1分钟';
+    if (min < 60) return Math.round(min) + '分钟';
+    return Math.floor(min/60) + 'h' + Math.round(min%60) + 'm';
+}
+function xmlEsc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 缩放控件
+function setZoom(level) {
+    zoomLevel = level;
+    [0,1,2,3].forEach(i => {
+        document.getElementById('z'+i).classList.toggle('active', i === level);
+    });
+    if (lastData) renderChart(lastData);
+}
+
+// 时钟
+function updateClock() {
+    const now = new Date();
+    document.getElementById('clockDisplay').textContent =
+        now.toLocaleTimeString('zh-CN',{hour12:false});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// 倒计时
+function tickRefresh() {
+    countdown--;
+    document.getElementById('nextRefresh').textContent = `${countdown}s 后自动刷新`;
+    if (countdown <= 0) { countdown = 30; fetchAndRender(); }
+}
+setInterval(tickRefresh, 1000);
+
+// 获取数据
+async function fetchAndRender() {
+    countdown = 30;
+    try {
+        const res = await fetch('/api/thread-monitor/status');
+        const data = await res.json();
+        if (!data.success) return;
+        lastData = data;
+        document.getElementById('concInput').value = data.max_concurrent;
+        updateStats(data);
+        updateOperations(data);
+        renderEngine(data);
+        renderChart(data);
+        renderRunning(data);
+        renderPending(data);
+    } catch(e) {
+        console.error('fetch error', e);
+    }
+}
+
+// 统计卡片
+function updateStats(d) {
+    document.getElementById('sRunning').textContent   = d.running_tasks.length;
+    document.getElementById('sSlots').textContent     = Math.max(0, d.max_concurrent - d.running_tasks.length);
+    document.getElementById('sCompleted').textContent = d.completed_today.length;
+    document.getElementById('sPending').textContent   = d.pending_tasks.length;
+}
+
+function fmtHeartbeat(value) {
+    return value ? String(value).replace('T',' ').replace('Z',' UTC') : '暂未产生';
+}
+function updateOperations(d) {
+    const p=d.platform||{};
+    document.getElementById('opsWebThreads').textContent=(p.web_thread_count||0)+' 个';
+    document.getElementById('opsWebDetail').textContent=(p.web_threads||[]).join('、')||'未读取到线程名称';
+    document.getElementById('opsLegacy').textContent=(p.legacy_active_tasks||0)+' 条已启用';
+    document.getElementById('opsLegacyDetail').textContent='并发上限 '+d.max_concurrent+'；当前运行 '+d.running_tasks.length+'，待触发 '+d.pending_tasks.length;
+    document.getElementById('opsSource').textContent=(p.source_enabled_count||0)+' 个信源';
+    document.getElementById('opsSourceDetail').textContent='已扫描记录 '+(p.source_scanned_count||0)+'；队列 '+(p.source_queue_count||0)+'，运行 '+(p.source_running_count||0)+'，重试 '+(p.source_retry_count||0);
+    document.getElementById('opsTodayCrawled').textContent=Number(p.today_crawled_articles||0);
+    document.getElementById('opsTodayNewsParsed').textContent=Number(p.today_news_parsed_articles||0);
+    const heartbeat=p.worker_last_heartbeat||'';
+    document.getElementById('opsWorker').textContent=heartbeat?'有心跳':'待首次心跳';
+    document.getElementById('opsWorkerDetail').textContent='最近处理：'+fmtHeartbeat(heartbeat)+(p.worker_last_scan?'；最近信源扫描：'+fmtHeartbeat(p.worker_last_scan):'')+(p.worker_last_error?'；提示：'+p.worker_last_error:'');
+    const rp=d.remote_pipeline||{};
+    document.getElementById('opsPipeline').textContent=rp.ok?('v'+(rp.version||'')):'不可达';
+    document.getElementById('opsPipelineDetail').textContent=rp.ok?('版本 '+rp.version+' · TTS '+(rp.tts_ok?'OK':'缺')+' · 支持 '+(rp.crawl4ai?'crawl4ai':'')+' · '+(rp.voices||[]).length+' voices'):(rp.error||'VPN隧道未连通');
+    document.getElementById('opsLegacyCard').classList.toggle('good',(p.legacy_active_tasks||0)>0);
+    document.getElementById('opsSourceCard').classList.toggle('good',(p.source_enabled_count||0)>0);
+    document.getElementById('opsWorkerCard').classList.toggle('good',Boolean(heartbeat)&&!p.worker_last_error);
+    document.getElementById('opsWorkerCard').classList.toggle('warn',Boolean(p.worker_last_error));
+}
+
+// ── 甘特图渲染（含缩放支持）──
+function renderChart(data) {
+    const svg = document.getElementById('ganttSvg');
+    const wrap = document.getElementById('chartWrap');
+    const W = wrap.clientWidth || 900;
+    const lanes = data.max_concurrent;
+    const chartW = W - ML - MR;
+    const chartH = MT + lanes * LANE_H + PENDING_ZONE + 10;
+
+    svg.setAttribute('width', W);
+    svg.setAttribute('height', chartH);
+    svg.setAttribute('viewBox', `0 0 ${W} ${chartH}`);
+
+    // 确定时间窗口
+    const nowMin = data.now_minutes;
+    let winStart, winEnd;
+    if (ZOOM_FULL[zoomLevel]) {
+        winStart = 0; winEnd = 1440;
+    } else {
+        const half = ZOOM_WINDOWS[zoomLevel];
+        winStart = Math.max(0, nowMin - half);
+        winEnd = Math.min(1440, nowMin + half);
+        // 修正边界：若靠近0或1440，平移窗口
+        if (winStart === 0) winEnd = Math.min(1440, half * 2);
+        if (winEnd === 1440) winStart = Math.max(0, 1440 - half * 2);
+    }
+    const winSpan = winEnd - winStart;
+
+    // 每分钟对应的像素数
+    const xOf = m => ML + ((Math.max(winStart, Math.min(winEnd, m)) - winStart) / winSpan) * chartW;
+
+    // 合并所有任务
+    const allTasks = [
+        ...data.completed_today.map(t => ({...t})),
+        ...data.running_tasks.map(t => ({...t, completed_minutes: t.now_minutes}))
+    ].sort((a,b) => a.started_minutes - b.started_minutes);
+
+    // 贪心分配车道
+    const laneEnds = new Array(lanes).fill(0);
+    const assignedLane = allTasks.map(task => {
+        let best = 0, minEnd = Infinity;
+        for (let i = 0; i < lanes; i++) {
+            if (laneEnds[i] <= task.started_minutes + 1 && laneEnds[i] < minEnd) {
+                minEnd = laneEnds[i]; best = i;
+            }
+        }
+        if (minEnd === Infinity) best = laneEnds.indexOf(Math.min(...laneEnds));
+        laneEnds[best] = task.completed_minutes || task.now_minutes;
+        return best;
+    });
+
+    const nowX = xOf(nowMin);
+    const dk = document.body.classList.contains('skin-darkblue');
+    let s = '';
+    s += `<rect width="${W}" height="${chartH}" fill="${dk?'rgba(10,22,44,.55)':'#fff'}"/>`;
+
+    // 车道背景 + 标签
+    for (let i = 0; i < lanes; i++) {
+        const y = MT + i * LANE_H;
+        s += `<rect x="${ML}" y="${y}" width="${chartW}" height="${LANE_H}" fill="${i%2===0?(dk?'rgba(56,189,248,.06)':'#fafafa'):(dk?'rgba(56,189,248,.02)':'#fff')}"/>`;
+        s += `<text x="${ML-8}" y="${y+LANE_H/2+5}" text-anchor="end" font-size="12" fill="${dk?'#94a7c6':'#6b7280'}" font-weight="500">T${i+1}</text>`;
+        s += `<line x1="${ML}" y1="${y+LANE_H}" x2="${ML+chartW}" y2="${y+LANE_H}" stroke="${dk?'rgba(96,165,250,.14)':'#f0f0f0'}" stroke-width="1"/>`;
+    }
+
+    // 根据缩放级别选择时间刻度间隔
+    let majorStep, minorStep, labelFmt;
+    if (ZOOM_FULL[zoomLevel]) {
+        majorStep = 60; minorStep = 15; labelFmt = m => String(Math.floor(m/60)).padStart(2,'0');
+    } else if (zoomLevel === 1) { // ±6h → 每30分钟主刻度，每10分钟次刻度
+        majorStep = 30; minorStep = 10; labelFmt = m => hhmm(m);
+    } else if (zoomLevel === 2) { // ±2h → 每15分钟主刻度，每5分钟次刻度
+        majorStep = 15; minorStep = 5; labelFmt = m => hhmm(m);
+    } else { // ±30min → 每5分钟主刻度，每1分钟次刻度
+        majorStep = 5; minorStep = 1; labelFmt = m => hhmm(m);
+    }
+
+    // 主刻度
+    for (let m = Math.ceil(winStart / majorStep) * majorStep; m <= winEnd; m += majorStep) {
+        const x = xOf(m);
+        const isSixth = ZOOM_FULL[zoomLevel] ? (m % 360 === 0) : false;
+        s += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+lanes*LANE_H}" stroke="${isSixth?'#e5e7eb':'#f3f4f6'}" stroke-width="${isSixth?1.5:1}"/>`;
+        s += `<text x="${x}" y="${MT-6}" text-anchor="middle" font-size="${isSixth?11:9}" fill="${dk?(isSixth?'#94a7c6':'#7d8fae'):(isSixth?'#6b7280':'#9ca3af')}">${labelFmt(m)}</text>`;
+    }
+    // 次刻度
+    for (let m = Math.ceil(winStart / minorStep) * minorStep; m <= winEnd; m += minorStep) {
+        if (m % majorStep === 0) continue;
+        const x = xOf(m);
+        s += `<line x1="${x}" y1="${MT}" x2="${x}" y2="${MT+8}" stroke="#e5e7eb" stroke-width="0.5"/>`;
+    }
+
+    // 任务条
+    allTasks.forEach((task, idx) => {
+        const lane = assignedLane[idx];
+        const tStart = task.started_minutes;
+        const tEnd = task.completed_minutes || task.now_minutes;
+        // 完全在窗口外则跳过
+        if (tEnd < winStart || tStart > winEnd) return;
+        const x1 = xOf(Math.max(tStart, winStart));
+        const x2 = xOf(Math.min(tEnd, winEnd));
+        const bw = Math.max(x2 - x1, 3);
+        const y = MT + lane * LANE_H + (LANE_H - BAR_H) / 2;
+        const color = task.type === 'running' ? '#3b82f6'
+                    : task.status === 'completed' ? '#10b981'
+                    : (task.status === 'failed' || task.status === 'timeout') ? '#ef4444'
+                    : '#6b7280';
+        const opacity = task.type === 'running' ? '1' : '0.82';
+        const tip = `${xmlEsc(task.display_name||task.task_name)}&#10;开始: ${hhmm(task.started_minutes)}&#10;时长: ${fmtDur(task.duration_minutes||(task.now_minutes-task.started_minutes))}${task.articles_found?'&#10;文章: '+task.articles_found:''}`;
+
+        s += `<rect x="${x1}" y="${y}" width="${bw}" height="${BAR_H}" rx="4" fill="${color}" opacity="${opacity}" data-tip="${tip}" class="gantt-bar" style="cursor:pointer"/>`;
+        if (bw > 52) {
+            const nm = task.display_name || task.task_name || '';
+            const lbl = nm.length > 9 ? nm.slice(0,9)+'…' : nm;
+            s += `<text x="${x1+6}" y="${y+BAR_H/2+4}" font-size="11" fill="white" font-weight="500" pointer-events="none">${xmlEsc(lbl)}</text>`;
+        }
+        if (task.type === 'running') {
+            s += `<rect x="${x1+bw-5}" y="${y}" width="5" height="${BAR_H}" rx="2" fill="white" opacity="0.35">
+                <animate attributeName="opacity" values="0.35;0.75;0.35" dur="1.4s" repeatCount="indefinite"/>
+            </rect>`;
+        }
+    });
+
+    // 边框
+    s += `<rect x="${ML}" y="${MT}" width="${chartW}" height="${lanes*LANE_H}" fill="none" stroke="${dk?'rgba(96,165,250,.25)':'#d1d5db'}" stroke-width="1" rx="2"/>`;
+
+    // 待触发区域
+    const pzY = MT + lanes * LANE_H + 4;
+    s += `<text x="${ML-8}" y="${pzY+18}" text-anchor="end" font-size="11" fill="#f59e0b" font-weight="600">待执行</text>`;
+    s += `<line x1="${ML}" y1="${pzY}" x2="${ML+chartW}" y2="${pzY}" stroke="#fef3c7" stroke-width="1.5"/>`;
+
+    const ptLabels = {};
+    data.pending_tasks.forEach(pt => {
+        if (pt.next_minutes < winStart || pt.next_minutes > winEnd) return;
+        const x = xOf(pt.next_minutes);
+        const key = Math.round(x);
+        ptLabels[key] = (ptLabels[key]||0) + 1;
+        const offset = (ptLabels[key]-1) * 14;
+        const dy = pzY + 12 + offset;
+        const sz = 6;
+        const tip2 = `${xmlEsc(pt.display_name)}&#10;计划触发: ${pt.next_run_display}`;
+        s += `<polygon points="${x},${dy} ${x+sz},${dy+sz} ${x},${dy+2*sz} ${x-sz},${dy+sz}" fill="#f59e0b" style="cursor:pointer" data-tip="${tip2}" class="gantt-bar"/>`;
+        s += `<text x="${x}" y="${dy+2*sz+11}" text-anchor="middle" font-size="9" fill="#d97706">${pt.next_run_display}</text>`;
+    });
+
+    // 当前时刻线（仅在窗口内显示）
+    if (nowMin >= winStart && nowMin <= winEnd) {
+        s += `<line x1="${nowX}" y1="${MT-14}" x2="${nowX}" y2="${pzY+PENDING_ZONE-10}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3"/>`;
+        s += `<rect x="${nowX-22}" y="${MT-28}" width="44" height="16" rx="4" fill="#ef4444"/>`;
+        s += `<text x="${nowX}" y="${MT-17}" text-anchor="middle" font-size="10" fill="white" font-weight="700">${xmlEsc(data.current_time_display)}</text>`;
+    }
+
+    // 缩放时显示窗口范围提示
+    if (!ZOOM_FULL[zoomLevel]) {
+        const rangeLabel = `${hhmm(winStart)} — ${hhmm(winEnd)}`;
+        s += `<text x="${ML + chartW/2}" y="${MT-6}" text-anchor="middle" font-size="10" fill="${dk?'#94a7c6':'#9ca3af'}">${rangeLabel}</text>`;
+    }
+
+    svg.innerHTML = s;
+
+    svg.querySelectorAll('.gantt-bar').forEach(el => {
+        el.addEventListener('mousemove', e => showTip(e, el.dataset.tip));
+        el.addEventListener('mouseleave', hideTip);
+    });
+
+    document.getElementById('chartEmpty').style.display = allTasks.length === 0 ? '' : 'none';
+}
+
+// Tooltip
+const tipEl = document.getElementById('tooltip');
+function showTip(e, text) {
+    if (!text) return;
+    tipEl.innerHTML = text.replace(/&#10;/g,'<br>');
+    tipEl.style.display = 'block';
+    tipEl.style.left = (e.clientX + 14) + 'px';
+    tipEl.style.top  = (e.clientY - 10) + 'px';
+}
+function hideTip() { tipEl.style.display = 'none'; }
+document.addEventListener('mousemove', e => {
+    if (tipEl.style.display !== 'none') {
+        tipEl.style.left = (e.clientX + 14) + 'px';
+        tipEl.style.top  = (e.clientY - 10) + 'px';
+    }
+});
+
+// 运行中明细
+function renderRunning(data) {
+    const el = document.getElementById('runningList');
+    const p = (data.engine && data.engine.pipeline) || {};
+    let html = '<table style="width:100%;border-collapse:collapse;">';
+    html += '<tr style="border-bottom:1px solid #f0f0f0;"><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">网站/任务</th><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">域名</th><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">开始时间</th><th style="text-align:left;padding:6px 8px;color:#6b7280;font-weight:500;">已运行</th><th style="text-align:center;padding:6px 8px;color:#6b7280;font-weight:500;">状态</th></tr>';
+    data.running_tasks.forEach(t => {
+        html += `<tr style="border-bottom:1px solid #f9fafb;">
+            <td style="padding:7px 8px;font-weight:500;color:#1f2937;">${escH(t.display_name)}</td>
+            <td style="padding:7px 8px;color:#6b7280;font-size:12px;">${escH(t.domain)}</td>
+            <td style="padding:7px 8px;color:#6b7280;font-size:12px;">${hhmm(t.started_minutes)}</td>
+            <td style="padding:7px 8px;color:#6b7280;font-size:12px;">${fmtDur(t.duration_minutes)}</td>
+            <td style="padding:7px 8px;text-align:center;"><span class="badge badge-running"><i class="fa fa-circle" style="font-size:6px;"></i> 运行中</span></td>
+        </tr>`;
+    });
+    if (data.running_tasks.length === 0) {
+        // 传统调度空闲时，用权威引擎数据补齐，避免“当前没有任务”与其正在工作相矛盾
+        if ((p.running_jobs||0) > 0) {
+            html += `<tr style="border-bottom:1px solid #f9fafb;">
+                <td style="padding:7px 8px;font-weight:500;color:#1f2937;">信源 Worker（intel_jobs）</td>
+                <td style="padding:7px 8px;color:#6b7280;font-size:12px;">自动链路</td>
+                <td style="padding:7px 8px;color:#6b7280;font-size:12px;">—</td>
+                <td style="padding:7px 8px;color:#6b7280;font-size:12px;">—</td>
+                <td style="padding:7px 8px;text-align:center;"><span class="badge badge-running"><i class="fa fa-circle" style="font-size:6px;"></i> ${p.running_jobs} 任务运行中</span></td>
+            </tr>`;
+        } else {
+            html += `<tr><td colspan="5" style="padding:7px 8px;color:#9ca3af;">传统调度当前空闲${data.engine && data.engine.active ? '；引擎正常（见上方横幅）' : '；引擎待机'}</td></tr>`;
+        }
+    }
+    html += '</table>';
+    el.innerHTML = html;
+}
+
+// 待触发明细
+function renderPending(data) {
+    const el = document.getElementById('pendingList');
+    const p = (data.engine && data.engine.pipeline) || {};
+    const dk = document.body.classList.contains('skin-darkblue');
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+    data.pending_tasks.forEach(pt => {
+        html += `<div style="background:${dk?'#2b2310':'#fffbeb'};border:1px solid ${dk?'#b45309':'#fde68a'};border-radius:8px;padding:6px 12px;font-size:12px;">
+            <span style="font-weight:600;color:${dk?'#fcd34d':'#92400e'};">${pt.next_run_display}</span>
+            <span style="color:${dk?'#a7b8d4':'#6b7280'};margin-left:6px;">${escH(pt.display_name)}</span>
+        </div>`;
+    });
+    // 候选队列是等待聚合的真实“今日待触发”工作，优先展示
+    if ((p.candidate_queued||0) > 0) {
+        const src = p.candidate_queued>0 ? `候选队列 ${p.candidate_queued} 条待聚合` : '';
+        html += `<div style="background:${dk?'#3a2d10':'#fef3c7'};border:1px solid ${dk?'#b45309':'#fbbf24'};border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:${dk?'#fbbf24':'#b45309'};">
+            <i class="fa fa-download mr-1"></i>${src}（自动派发，或点击上方“立即触发”）</div>`;
+    }
+    const found = (data.engine && data.engine.results && data.engine.results.recent_articles) || [];
+    if (found.length) {
+        html += `<div style="background:${dk?'#10281f':'#f0fdfa'};border:1px solid ${dk?'#0f766e':'#5eead4'};border-radius:8px;padding:6px 12px;font-size:12px;color:${dk?'#6ee7b7':'#0f766e'};max-width:100%;">
+            最新入库：${found.map(a=>`#${a.id} ${escH(a.title)}`).join('；')}</div>`;
+    }
+    if (data.pending_tasks.length === 0 && (p.candidate_queued||0) === 0) {
+        html = `<span style="color:${dk?'#a7b8d4':'#9ca3af'};">今日无定时触发；信源自动链路将按各自频率扫描（见下方“信源扫描覆盖”）。</span>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── 引擎权威状态横幅 ──
+function renderEngine(d) {
+    const e = d.engine || {};
+    const banner = document.getElementById('engineBanner');
+    const light = document.getElementById('engLight');
+    const title = document.getElementById('engTitle');
+    const reason = document.getElementById('engReason');
+    const metrics = document.getElementById('engMetrics');
+    if (!banner) return;
+    const active = !!e.active;
+    const state = e.state || (active ? 'working' : 'idle');
+    light.style.background = active ? '#16a34a' : (state === 'stalled' ? '#f97316' : '#ef4444');
+    light.style.color = active ? '#16a34a' : (state === 'stalled' ? '#f97316' : '#ef4444');
+    banner.style.borderLeftColor = active ? '#16a34a' : (state === 'stalled' ? '#f97316' : '#ef4444');
+    const stateLabel = state === 'working' ? '正常工作' : state === 'stalled' ? '卡死待人工' : '待机/未运行';
+    title.textContent = '聚合引擎：' + stateLabel;
+    reason.textContent = e.reason || '';
+    const p = e.pipeline || {};
+    const res = e.results || {};
+    const hb = e.worker_heartbeat_seconds;
+    metrics.innerHTML = [
+        `<span><b>${p.candidate_queued||0}</b> 候选待聚合</span>`,
+        `<span><b>${p.running_jobs||0}</b> 任务运行中</span>`,
+        `<span><b>${p.job_backlog||0}</b> 队列积压</span>`,
+        `<span><b>${p.enrich_pending||0}</b> 音频排队</span>`,
+        `<span>心跳 ${hb==null?'无':(hb>=60?Math.floor(hb/60)+'分前':Math.round(hb)+'秒前')}</span>`,
+        `<span>今日聚合 <b>${res.today_crawled_articles||0}</b> 篇</span>`,
+    ].join('<span style="color:#d1d5db;margin:0 4px;">|</span>');
+    // 关闭触发时的临时提示
+    document.getElementById('engTriggerResult').textContent = '';
+}
+
+// ── 手动触发一轮聚合 ──
+async function manualTrigger(scope) {
+    const btn = document.getElementById('engTriggerBtn');
+    const out = document.getElementById('engTriggerResult');
+    if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+    if (out) out.textContent = '…';
+    try {
+        const res = await fetch('/api/system/crawl-trigger', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({scope: scope || 'auto'})
+        });
+        const d = await res.json();
+        if (d.success) {
+            const created = (d.jobs||[]).filter(j=>j.created).length;
+            if (out) out.textContent = `已创建 ${(d.jobs||[]).length} 个任务（新增 ${created}）`;
+            setTimeout(fetchAndRender, 800);
+            // 3-8 秒后再取一次，展示 worker 真正消费后的结果
+            setTimeout(fetchAndRender, 4000);
+            setTimeout(fetchAndRender, 8000);
+        } else {
+            if (out) out.textContent = '触发失败：' + (d.error||'').slice(0,80);
+        }
+    } catch(e) {
+        if (out) out.textContent = '触发失败：' + e.message;
+    } finally {
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
+}
+
+// 保存并发数
+async function saveConcurrent() {
+    const n = parseInt(document.getElementById('concInput').value) || 4;
+    try {
+        const res = await fetch('/api/thread-monitor/set-concurrent', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({max_concurrent: n})
+        });
+        const d = await res.json();
+        if (d.success) {
+            showToast(`并发数已设为 ${n}，立即生效`);
+            fetchAndRender();
+        }
+    } catch(e) { showToast('保存失败: '+e.message, false); }
+}
+
+function showToast(msg, ok=true) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;top:20px;right:20px;z-index:9999;padding:10px 18px;border-radius:8px;color:#fff;font-size:13px;background:${ok?'#10b981':'#ef4444'};box-shadow:0 4px 12px rgba(0,0,0,.2);`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(), 3000);
+}
+
+window.addEventListener('resize', () => { if (lastData) renderChart(lastData); });
+// 皮肤切换后自动按新皮肤重渲染（甘特图/待触发框为皮肤自适应）
+new MutationObserver(() => { if (lastData) { renderChart(lastData); renderRunning(lastData); renderPending(lastData); } })
+    .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+fetchAndRender();
+</script>
+</body>
+</html>

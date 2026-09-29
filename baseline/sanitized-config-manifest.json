@@ -1,0 +1,1347 @@
+{
+  "acceptance": {
+    "dotenv_values_committed": false,
+    "manifest_structure_safe": true,
+    "passed": true,
+    "raw_secret_values_absent": true,
+    "raw_secret_values_found": 0
+  },
+  "boolean_settings": [
+    {
+      "key": "CRAWL_DATE_RANGE_PRIORITY",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_NETWORK_JSON_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_PREFILTER_CANDIDATE_DATES",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_REQUIRE_KEYWORD_MATCH",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_ATTRIBUTES_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_FEEDS_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_HTML_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_SCRIPTS_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_SITEMAPS_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_STATIC_PAGINATION_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_SUPPLEMENTAL_STRUCTURED_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "CRAWL_USE_PROXY_DEFAULT",
+      "source": "dotenv",
+      "value": false
+    },
+    {
+      "key": "FLASK_DEBUG",
+      "source": "dotenv",
+      "value": false
+    },
+    {
+      "key": "INTEL_CANDIDATE_DISPATCH_ENABLED",
+      "source": "example_default",
+      "value": false
+    },
+    {
+      "key": "INTEL_CLASSIFICATION_ENABLED",
+      "source": "example_default",
+      "value": true
+    },
+    {
+      "key": "INTEL_LIGHT_SCANNER_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "INTEL_LLM_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "INTEL_SOURCE_SYNC_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "INTEL_TOPIC_CLUSTER_ENABLED",
+      "source": "example_default",
+      "value": false
+    },
+    {
+      "key": "PROXY_ENABLED",
+      "source": "dotenv",
+      "value": false
+    },
+    {
+      "key": "RAGFLOW_AUTO_PARSE",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "RAGFLOW_LLM_ENABLED",
+      "source": "example_default",
+      "value": false
+    },
+    {
+      "key": "RAGFLOW_PROXY_ENABLED",
+      "source": "dotenv",
+      "value": false
+    },
+    {
+      "key": "RAGFLOW_REUPLOAD_EXISTING",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "RAGFLOW_TTS_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "RAGFLOW_UPLOAD_ENABLED",
+      "source": "dotenv",
+      "value": true
+    },
+    {
+      "key": "SERPAPI_ENABLED",
+      "source": "dotenv",
+      "value": true
+    }
+  ],
+  "captured_at_utc": "2026-07-31T16:45:22Z",
+  "chat_model_configuration": {
+    "active_model": "chatgpt",
+    "exists": true,
+    "models": [
+      {
+        "api_key_configured": false,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "gpt-4o",
+        "provider": "chatgpt",
+        "use_proxy": true
+      },
+      {
+        "api_key_configured": false,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "claude-3-5-sonnet-20241022",
+        "provider": "claude",
+        "use_proxy": true
+      },
+      {
+        "api_key_configured": true,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "deepseek-chat",
+        "provider": "deepseek",
+        "use_proxy": false
+      },
+      {
+        "api_key_configured": true,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "doubao-seed-2-1-turbo-260628",
+        "provider": "doubao",
+        "use_proxy": false
+      },
+      {
+        "api_key_configured": true,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "gemini-2.5-flash",
+        "provider": "gemini",
+        "use_proxy": true
+      },
+      {
+        "api_key_configured": true,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "glm-5.2",
+        "provider": "glm52",
+        "use_proxy": false
+      },
+      {
+        "api_key_configured": true,
+        "endpoint": {
+          "configured": false,
+          "host": "",
+          "port": null,
+          "scheme": ""
+        },
+        "model_id": "moonshot-v1-32k",
+        "provider": "kimi",
+        "use_proxy": false
+      },
+      {
+        "api_key_configured": true,
+        "endpoint": {
+          "configured": true,
+          "host": "192.168.0.64",
+          "port": 8106,
+          "scheme": "http"
+        },
+        "model_id": "deepseek-v4-flash",
+        "provider": "local",
+        "use_proxy": false
+      }
+    ],
+    "ragflow_kb_configured": true
+  },
+  "configuration_keys": [
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "AUTH_CHECK_INTERVAL",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "AUTH_STORAGE_DIR",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": false,
+      "key": "CHAT_PROXY",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_DATE_RANGE_PRIORITY",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_DETAIL_MAX_RETRIES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_LINK_DISCOVERY_MAX_PAGES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_LINK_DISCOVERY_MAX_PAGES_WITH_LIMIT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_NETWORK_JSON_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_PLAYWRIGHT_CLICK_TIMEOUT_MS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_PLAYWRIGHT_MAX_EMPTY_PAGES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_PREFILTER_CANDIDATE_DATES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_RENDER_WAIT_MS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_REQUIRE_KEYWORD_MATCH",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_RESULTS_DIR",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_COMPLETED_RETENTION",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_DOMAIN_COOLDOWN",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_MAX_CONCURRENT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_MAX_PER_DOMAIN",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_RETRIES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_RETRY_BACKOFF",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SCHEDULER_TASK_TIMEOUT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_ATTRIBUTES_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_FEEDS_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_HTML_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_MAX_PER_SOURCE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_MAX_SITEMAPS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_MAX_STATIC_PAGES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_SCRIPTS_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_SITEMAPS_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_STATIC_PAGINATION_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_SUPPLEMENTAL_STRUCTURED_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_TIMEOUT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_USE_PROXY_DEFAULT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "CRAWL_WAIT_TIME",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "DATABASE_PATH",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "DEFAULT_ADMIN_EMAIL",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "DEFAULT_ADMIN_FULL_NAME",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "DEFAULT_ADMIN_PASSWORD",
+      "kind": "secret",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "DEFAULT_ADMIN_USERNAME",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "FLASK_DEBUG",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "FLASK_HOST",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "FLASK_PORT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_CANDIDATE_BATCH_SIZE",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_CANDIDATE_DISPATCH_ENABLED",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_CANDIDATE_LEASE_SECONDS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_CANDIDATE_MAX_RETRIES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_CLASSIFICATION_ENABLED",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_DEFAULT_INDUSTRY_PACK",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_JOB_LEASE_SECONDS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_JOB_MAX_RETRIES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LIGHT_SCANNER_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": false,
+      "key": "INTEL_LIGHT_SCAN_DAILY_TIME",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LIGHT_SCAN_INTERVAL_MINUTES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_CHAT_MODEL_ID",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_MAX_CONCURRENCY",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_MAX_INPUT_CHARS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_MAX_RETRIES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_PROVIDER",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_LLM_TIMEOUT_SECONDS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "INTEL_PRIVATE_NETWORK_ALLOWLIST",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SCAN_CONNECT_TIMEOUT_SECONDS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SCAN_MAX_ITEMS_PER_SOURCE",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SCAN_MAX_REDIRECTS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SCAN_MAX_RESPONSE_BYTES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SCAN_MAX_SOURCES_PER_RUN",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SCAN_READ_TIMEOUT_SECONDS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SOURCE_SYNC_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_SOURCE_SYNC_INTERVAL_HOURS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TOPIC_CLUSTER_ENABLED",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TOPIC_CLUSTER_INTERVAL_MINUTES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TOPIC_SUMMARY_MIN_ARTICLES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_BUFFER_MS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_DIALECT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_EMOTION",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_ENGINE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_GENDER",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_SEGMENT_MAX_CHARS_ZH",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_SEGMENT_MAX_WORDS_EN",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_SPEED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_TTS_VOICE_PROFILE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_WORKER_BATCH_SIZE",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "INTEL_WORKER_POLL_SECONDS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "LOG_FILE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "LOG_LEVEL",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "PLAYWRIGHT_PROXY",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "PROXY_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "PROXY_HTTP",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "PROXY_HTTPS",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "PROXY_SOCKS5",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_API_KEY",
+      "kind": "secret",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_AUTO_PARSE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_BASE_URL",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_APP_ID",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_ENABLED",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_MAX_CONCURRENCY",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_MAX_INPUT_CHARS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_MAX_RETRIES",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_MODEL_ID",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_LLM_TIMEOUT_SECONDS",
+      "kind": "setting",
+      "source": "example_default"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_PROXY_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_PROXY_HTTP",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_PROXY_HTTPS",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_PROXY_SOCKS5",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": false,
+      "key": "RAGFLOW_REUPLOAD_EXISTING",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TIMEOUT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_CACHE_DAYS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_CACHE_MAX_MB",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_LANGUAGE_MODE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_MAX_CHARS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_MODEL",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_PREBUFFER_SENTENCES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_TIMEOUT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_VOICE_CATALOG",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_VOICE_EN",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "RAGFLOW_TTS_VOICE_ZH",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_UPLOAD_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "RAGFLOW_UPLOAD_RETRIES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "REDIS_DB",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "REDIS_HOST",
+      "kind": "endpoint",
+      "source": "dotenv"
+    },
+    {
+      "configured": false,
+      "in_example": true,
+      "key": "REDIS_PASSWORD",
+      "kind": "secret",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "REDIS_PORT",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SECRET_KEY",
+      "kind": "secret",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_API_KEY",
+      "kind": "secret",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_DAILY_QUERY_BUDGET",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_DEFAULT_LANGUAGE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_DEFAULT_REGION",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_ENABLED",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_ENGINE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_MAX_QUERIES_PER_RUN",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_MAX_RETRIES",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": false,
+      "key": "SERPAPI_RECENCY_DAYS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": false,
+      "key": "SERPAPI_RESULT_LANGUAGE",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SERPAPI_TIMEOUT_SECONDS",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "SESSION_LIFETIME",
+      "kind": "setting",
+      "source": "dotenv"
+    },
+    {
+      "configured": true,
+      "in_example": true,
+      "key": "USER_AGENT",
+      "kind": "setting",
+      "source": "dotenv"
+    }
+  ],
+  "dotenv_key_set_sha256": "41de588b00a61d248623c1ec716b51657bd8bdb4d03d837df8717dce3e975ec9",
+  "dotenv_present": true,
+  "dotenv_values_committed": false,
+  "endpoint_hosts": [
+    {
+      "endpoint": {
+        "configured": true,
+        "host": "host.docker.internal",
+        "port": 1080,
+        "scheme": "socks5"
+      },
+      "key": "CHAT_PROXY",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": true,
+        "host": "0.0.0.0",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "FLASK_HOST",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "PLAYWRIGHT_PROXY",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "PROXY_HTTP",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "PROXY_HTTPS",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "PROXY_SOCKS5",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": true,
+        "host": "192.168.0.64",
+        "port": 9222,
+        "scheme": "http"
+      },
+      "key": "RAGFLOW_BASE_URL",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "RAGFLOW_PROXY_HTTP",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "RAGFLOW_PROXY_HTTPS",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": false,
+        "host": "",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "RAGFLOW_PROXY_SOCKS5",
+      "source": "dotenv"
+    },
+    {
+      "endpoint": {
+        "configured": true,
+        "host": "localhost",
+        "port": null,
+        "scheme": ""
+      },
+      "key": "REDIS_HOST",
+      "source": "dotenv"
+    }
+  ],
+  "manifest_version": "sanitized-config-baseline-v1",
+  "repository_root": "/home/timebot/app",
+  "sanitized_configuration_sha256": "c5cbda7ab68e18de1f25bd1960ab53597d441de62212593d46d8f14693015eb4",
+  "tracked_config_file_sha256": {
+    ".env.example": "80356ae9579e3a33fff28f6698624f338c2a885a37dd48ec343ac9b9f056d848",
+    "chat_api.py": "e34082d16d5945fe192c34a24bdff590a49f9df42c100cf1809c6668cdf85f67",
+    "config.py": "71de20452493eca5d4374e94e6a288946d9e389644af820e694a50a57c10e022",
+    "config_management_api.py": "33e33ff5751941d99c7cc7ef84ce54858144222a14cebb1b897832c984c19aa4"
+  }
+}

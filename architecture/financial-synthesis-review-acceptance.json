@@ -1,0 +1,53 @@
+{
+  "acceptance": "passed",
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "network_calls": 0,
+    "real_order_calls": 0,
+    "tests_run": 7
+  },
+  "scenarios": {
+    "bull_bear_reports_compared": true,
+    "different_instrument_implicit_merge_blocked": true,
+    "operation_api_grounded": true,
+    "same_fact_different_rating_is_opinion": true,
+    "same_instant_price_conflict_retained": true,
+    "same_report_period_conflict_retained": true,
+    "unrelated_sessions_not_forced": true,
+    "unverified_model_conflict_pending": true
+  },
+  "static": {
+    "conflict_classes": [
+      "fact_conflict",
+      "opinion_difference",
+      "pending_evidence"
+    ],
+    "conflict_fields": [
+      "claim",
+      "evidence",
+      "instrument",
+      "as_of",
+      "verdict",
+      "reason"
+    ],
+    "cross_instrument_implicit_merge": false,
+    "direct_network_or_model_imports": [],
+    "existing_operation": "POST /mapindex/api/chat/operations operation_type=synthesize",
+    "grounding_layers": [
+      "snapshot_provider_verification",
+      "TradingAgents_report_comparison",
+      "temporal_judge"
+    ],
+    "historical_opinion_erased": false,
+    "model_wording_selects_winner": false,
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "relationship_model_preserved": true,
+    "schema_version": "financial-synthesis-review-v1",
+    "source_sessions_immutable": true
+  },
+  "task": "3.11"
+}

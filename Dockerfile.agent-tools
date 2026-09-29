@@ -1,0 +1,27 @@
+# 信源工具叠加层：复用已含全部依赖的 firecrawlapp-crawler（playwright + torch 等），
+# 只在其上安装 Agent-Reach + 上游信源工具，避免重新下载 torch/CUDA。
+FROM firecrawlapp-crawler:latest
+
+ENV PYTHONPATH=/app \
+    PATH="/usr/local/bin:${PATH}"
+
+WORKDIR /app
+
+# 拷贝信源工具源码（Agent-Reach 已迁移到工作区 agent_reach_tool）
+COPY agent_reach_tool /app/agent_reach_tool
+
+# 信源抓取工具：GitHub CLI(gh) + ffmpeg(小宇宙转写) + Agent-Reach +
+#   twitter-cli / rdt-cli / bili-cli（pipx 装到 /usr/local/bin 进入 PATH）
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+    && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh ffmpeg git python3.10-venv \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir pipx \
+    && pip install --no-cache-dir -e /app/agent_reach_tool \
+    && PIPX_BIN_DIR=/usr/local/bin pipx install twitter-cli \
+    && PIPX_BIN_DIR=/usr/local/bin pipx install 'git+https://github.com/public-clis/rdt-cli.git@5e4fb3720d5c174e976cd425ccc3b879d52cac66' \
+    && PIPX_BIN_DIR=/usr/local/bin pipx install bilibili-cli \
+    && pipx ensurepath

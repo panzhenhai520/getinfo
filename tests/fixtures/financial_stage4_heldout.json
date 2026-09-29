@@ -1,0 +1,160 @@
+{
+  "schema_version": "financial-stage4-heldout-v1",
+  "fixture_id": "stage4-independent-conflicts-2026q3-v1",
+  "dataset_policy": {
+    "label_source": "manual_scenario_review",
+    "rule_development_usage": "prohibited",
+    "case_origin": "synthetic business scenarios with held-out entities, values, periods and source lineages",
+    "production_data": false,
+    "contains_personal_data": false
+  },
+  "thresholds": {
+    "current_fact_precision": 0.95,
+    "current_fact_recall": 0.95
+  },
+  "cases": [
+    {
+      "case_id": "price-future-xhkg",
+      "category": "price",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T02:00:00Z", "requested_as_of": "2026-09-18T02:00:00Z"},
+      "market_session": {"market_calendar_id": "XHKG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "future-0388", "claim_type": "fact", "subject": "HK:XHKG:EQUITY:00388", "metric": "last_price", "value": {"kind": "scalar", "number": 421.2}, "unit": "港元", "currency": "HKD", "adjustment": "raw", "as_of": "2026-09-18T02:05:00Z", "period": {"kind": "instant", "start": "2026-09-18T02:05:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T02:05:00Z", "fetched_at": "2026-09-18T02:05:01Z", "freshness_threshold_seconds": 300, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1001, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001001", "provider_id": "tushare_cn", "underlying_source_id": "tushare", "evidence_type": "structured_snapshot", "instrument_key": "HK:XHKG:EQUITY:00388", "metric": "last_price", "value": 421.2, "unit": "港元", "currency": "HKD", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T02:05:00Z"}, "observed_at": "2026-09-18T02:05:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://future.example/quote"}],
+      "expected": {"temporal_verdict": "insufficient_evidence", "conflict_verdict": "insufficient_evidence", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "price-stale-xshe",
+      "category": "price",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:10:00Z", "requested_as_of": "2026-09-18T03:10:00Z"},
+      "market_session": {"market_calendar_id": "XSHE", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "stale-000333", "claim_type": "fact", "subject": "CN:XSHE:EQUITY:000333", "metric": "last_price", "value": {"kind": "scalar", "number": 73.1}, "unit": "元", "currency": "CNY", "adjustment": "raw", "as_of": "2026-09-18T03:00:00Z", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T03:00:00Z", "fetched_at": "2026-09-18T03:00:02Z", "freshness_threshold_seconds": 300, "freshness_state": "delayed", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1002, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001002", "provider_id": "akshare_cn", "underlying_source_id": "eastmoney", "evidence_type": "structured_snapshot", "instrument_key": "CN:XSHE:EQUITY:000333", "metric": "last_price", "value": 73.1, "unit": "元", "currency": "CNY", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}, "observed_at": "2026-09-18T03:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://stale.example/quote"}],
+      "expected": {"temporal_verdict": "stale", "conflict_verdict": "insufficient_evidence", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "price-independent-divergence-xshg",
+      "category": "price",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XSHG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "diverge-601318", "claim_type": "fact", "subject": "CN:XSHG:EQUITY:601318", "metric": "last_price", "value": {"kind": "scalar", "number": 55.0}, "unit": "元", "currency": "CNY", "adjustment": "raw", "as_of": "2026-09-18T03:00:00Z", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T03:00:00Z", "fetched_at": "2026-09-18T03:00:02Z", "freshness_threshold_seconds": 300, "freshness_state": "current", "quality_status": "verified"}, {"evidence_id": 2, "relationship": "supports", "observed_at": "2026-09-18T03:00:00Z", "fetched_at": "2026-09-18T03:00:03Z", "freshness_threshold_seconds": 300, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1003, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001003", "provider_id": "akshare_cn", "underlying_source_id": "eastmoney", "evidence_type": "structured_snapshot", "instrument_key": "CN:XSHG:EQUITY:601318", "metric": "last_price", "value": 55.0, "unit": "元", "currency": "CNY", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}, "observed_at": "2026-09-18T03:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://eastmoney.example/quote"}, {"evidence_id": 2, "snapshot_id": 1004, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001004", "provider_id": "tushare_cn", "underlying_source_id": "tushare", "evidence_type": "structured_snapshot", "instrument_key": "CN:XSHG:EQUITY:601318", "metric": "last_price", "value": 57.0, "unit": "元", "currency": "CNY", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}, "observed_at": "2026-09-18T03:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://tushare.example/quote"}],
+      "expected": {"temporal_verdict": "verified_current", "conflict_verdict": "unresolved_conflict", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "price-independent-consensus-xhkg",
+      "category": "price",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XHKG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "consensus-1299", "claim_type": "fact", "subject": "HK:XHKG:EQUITY:01299", "metric": "last_price", "value": {"kind": "scalar", "number": 84.2}, "unit": "港元", "currency": "HKD", "adjustment": "raw", "as_of": "2026-09-18T03:00:00Z", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T03:00:00Z", "fetched_at": "2026-09-18T03:00:02Z", "freshness_threshold_seconds": 300, "freshness_state": "current", "quality_status": "verified"}, {"evidence_id": 2, "relationship": "supports", "observed_at": "2026-09-18T03:00:00Z", "fetched_at": "2026-09-18T03:00:03Z", "freshness_threshold_seconds": 300, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1005, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001005", "provider_id": "akshare_cn", "underlying_source_id": "eastmoney", "evidence_type": "structured_snapshot", "instrument_key": "HK:XHKG:EQUITY:01299", "metric": "last_price", "value": 84.2, "unit": "港元", "currency": "HKD", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}, "observed_at": "2026-09-18T03:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://eastmoney.example/1299"}, {"evidence_id": 2, "snapshot_id": 1006, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001006", "provider_id": "tushare_cn", "underlying_source_id": "tushare", "evidence_type": "structured_snapshot", "instrument_key": "HK:XHKG:EQUITY:01299", "metric": "last_price", "value": 84.25, "unit": "港元", "currency": "HKD", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}, "observed_at": "2026-09-18T03:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://tushare.example/1299"}],
+      "expected": {"temporal_verdict": "verified_current", "conflict_verdict": "verified_consensus", "current_fact": true, "historical_fact": true}
+    },
+    {
+      "case_id": "financial-reported-official-authority",
+      "category": "financial_statement",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XSHG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "revenue-600036-2026h1", "claim_type": "fact", "subject": "CN:XSHG:EQUITY:600036", "metric": "revenue", "value": {"kind": "scalar", "number": 1729.45}, "unit": "亿元", "currency": "CNY", "adjustment": "reported", "as_of": "2026-08-29T10:00:00Z", "period": {"kind": "reported", "label": "2026H1"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-08-29T10:00:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}, {"evidence_id": 2, "relationship": "supports", "observed_at": "2026-08-29T10:00:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1007, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001007", "provider_id": "issuer_official", "underlying_source_id": "issuer_filing", "authority_score": 1.0, "authority_class": "issuer", "evidence_type": "source_document", "instrument_key": "CN:XSHG:EQUITY:600036", "metric": "revenue", "value": 1729.45, "unit": "亿元", "currency": "CNY", "adjustment": "reported", "period": {"kind": "reported", "label": "2026H1"}, "observed_at": "2026-08-29T10:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://issuer.example/600036/h1"}, {"evidence_id": 2, "snapshot_id": 1008, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001008", "provider_id": "yahoo", "underlying_source_id": "yahoo", "authority_score": 0.58, "evidence_type": "structured_snapshot", "instrument_key": "CN:XSHG:EQUITY:600036", "metric": "revenue", "value": 1690.0, "unit": "亿元", "currency": "CNY", "adjustment": "reported", "period": {"kind": "reported", "label": "2026H1"}, "observed_at": "2026-08-29T10:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://yahoo.example/600036/h1"}],
+      "expected": {"temporal_verdict": "verified_historical", "conflict_verdict": "verified_authoritative", "current_fact": false, "historical_fact": true}
+    },
+    {
+      "case_id": "financial-period-mismatch",
+      "category": "financial_statement",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XHKG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "income-0005-2025fy", "claim_type": "fact", "subject": "HK:XHKG:EQUITY:00005", "metric": "net_income", "value": {"kind": "scalar", "number": 1350.0}, "unit": "亿港元", "currency": "HKD", "adjustment": "reported", "as_of": "2026-03-01T02:00:00Z", "period": {"kind": "reported", "label": "2025FY"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-03-01T02:00:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1009, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001009", "provider_id": "issuer_official", "underlying_source_id": "issuer_filing", "authority_score": 1.0, "authority_class": "issuer", "evidence_type": "source_document", "instrument_key": "HK:XHKG:EQUITY:00005", "metric": "net_income", "value": 350.0, "unit": "亿港元", "currency": "HKD", "adjustment": "reported", "period": {"kind": "reported", "label": "2025Q4"}, "observed_at": "2026-03-01T02:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://issuer.example/0005/q4"}],
+      "expected": {"temporal_verdict": "verified_historical", "conflict_verdict": "insufficient_evidence", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "financial-model-report-only",
+      "category": "financial_statement",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XHKG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "ta-margin-2020", "claim_type": "fact", "subject": "HK:XHKG:EQUITY:02020", "metric": "operating_margin", "value": {"kind": "scalar", "number": 18.7}, "unit": "%", "currency": "", "adjustment": "reported", "as_of": "2026-09-18T03:00:00Z", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T03:00:00Z", "fetched_at": "2026-09-18T03:00:05Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "generated_unverified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1010, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001010", "provider_id": "tradingagents_report", "underlying_source_id": "tradingagents_report", "authority_score": 0.35, "evidence_type": "research_report", "instrument_key": "HK:XHKG:EQUITY:02020", "metric": "operating_margin", "value": 18.7, "unit": "%", "currency": "", "adjustment": "reported", "period": {"kind": "instant", "start": "2026-09-18T03:00:00Z"}, "observed_at": "2026-09-18T03:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "/api/financial/reports/901"}],
+      "expected": {"temporal_verdict": "verified_current", "conflict_verdict": "single_source", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "announcement-future-effective",
+      "category": "announcement",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:00:00Z", "requested_as_of": "2026-09-18T03:00:00Z"},
+      "market_session": {"market_calendar_id": "XSHG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "future-dividend-600519", "claim_type": "fact", "subject": "CN:XSHG:EQUITY:600519", "metric": "announcement", "value": {"kind": "scalar", "number": 25.0}, "unit": "元/股", "currency": "CNY", "adjustment": "raw", "as_of": "2026-09-19T00:00:00Z", "period": {"kind": "instant", "start": "2026-09-19T00:00:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-19T00:00:00Z", "fetched_at": "2026-09-19T00:00:01Z", "freshness_threshold_seconds": 3600, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1011, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001011", "provider_id": "issuer_official", "underlying_source_id": "issuer_notice", "authority_score": 1.0, "authority_class": "issuer", "evidence_type": "source_document", "instrument_key": "CN:XSHG:EQUITY:600519", "metric": "announcement", "value": 25.0, "unit": "元/股", "currency": "CNY", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-19T00:00:00Z"}, "observed_at": "2026-09-19T00:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://issuer.example/600519/dividend"}],
+      "expected": {"temporal_verdict": "insufficient_evidence", "conflict_verdict": "insufficient_evidence", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "announcement-official-current",
+      "category": "announcement",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XHKG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "buyback-0011", "claim_type": "fact", "subject": "HK:XHKG:EQUITY:00011", "metric": "announcement", "value": {"kind": "scalar", "number": 3.0}, "unit": "亿港元", "currency": "HKD", "adjustment": "raw", "as_of": "2026-09-18T02:30:00Z", "period": {"kind": "instant", "start": "2026-09-18T02:30:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T02:30:00Z", "fetched_at": "2026-09-18T03:00:00Z", "freshness_threshold_seconds": 3600, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1012, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001012", "provider_id": "issuer_official", "underlying_source_id": "issuer_notice", "authority_score": 1.0, "authority_class": "issuer", "evidence_type": "source_document", "instrument_key": "HK:XHKG:EQUITY:00011", "metric": "announcement", "value": 3.0, "unit": "亿港元", "currency": "HKD", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T02:30:00Z"}, "observed_at": "2026-09-18T02:30:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://issuer.example/0011/buyback"}],
+      "expected": {"temporal_verdict": "verified_current", "conflict_verdict": "verified_authoritative", "current_fact": true, "historical_fact": true}
+    },
+    {
+      "case_id": "index-membership-superseded",
+      "category": "index_membership",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XSHG", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "csi300-member-601919", "claim_type": "fact", "subject": "CN:XSHG:INDEX:000300", "metric": "index_membership", "value": {"kind": "scalar", "number": 1}, "unit": "boolean", "currency": "", "adjustment": "raw", "revision": 1, "as_of": "2026-06-01T00:00:00Z", "period": {"kind": "validity", "start": "2026-06-01T00:00:00Z", "valid_to": "2026-12-31T23:59:59Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "revises", "event_type": "revision", "revision": 2, "supersedes_claim_key": "csi300-member-601919", "affects_metrics": ["index_membership"], "observed_at": "2026-09-15T00:00:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1013, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001013", "provider_id": "exchange_official", "underlying_source_id": "index_notice", "authority_score": 1.0, "authority_class": "exchange", "evidence_type": "source_document", "instrument_key": "CN:XSHG:INDEX:000300", "metric": "index_membership", "value": 0, "unit": "boolean", "currency": "", "adjustment": "raw", "period": {"kind": "validity", "start": "2026-09-15T00:00:00Z", "valid_to": "2026-12-31T23:59:59Z"}, "observed_at": "2026-09-15T00:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://index.example/csi300/revision"}],
+      "expected": {"temporal_verdict": "superseded", "conflict_verdict": "insufficient_evidence", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "index-membership-official-current",
+      "category": "index_membership",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "XSHE", "market_session_state": "open", "trading_date": "2026-09-18", "calendar_source": "official_calendar", "calendar_version": "2026-v1"},
+      "claim": {"claim_key": "sz100-member-300750", "claim_type": "fact", "subject": "CN:XSHE:INDEX:399330", "metric": "index_membership", "value": {"kind": "scalar", "number": 1}, "unit": "boolean", "currency": "", "adjustment": "raw", "as_of": "2026-09-18T02:00:00Z", "period": {"kind": "instant", "start": "2026-09-18T02:00:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T02:00:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1014, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001014", "provider_id": "exchange_official", "underlying_source_id": "index_roster", "authority_score": 1.0, "authority_class": "exchange", "evidence_type": "source_document", "instrument_key": "CN:XSHE:INDEX:399330", "metric": "index_membership", "value": 1, "unit": "boolean", "currency": "", "adjustment": "raw", "period": {"kind": "instant", "start": "2026-09-18T02:00:00Z"}, "observed_at": "2026-09-18T02:00:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://index.example/sz100/roster"}],
+      "expected": {"temporal_verdict": "verified_current", "conflict_verdict": "verified_authoritative", "current_fact": true, "historical_fact": true}
+    },
+    {
+      "case_id": "macro-cpi-revision-supersedes",
+      "category": "macro_revision",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "", "market_session_state": "not_applicable", "trading_date": "2026-09-18", "calendar_source": "not_applicable", "calendar_version": "v1"},
+      "claim": {"claim_key": "us-cpi-2026-07", "claim_type": "fact", "subject": "US:MACRO:CPI", "metric": "cpi", "value": {"kind": "scalar", "number": 2.6}, "unit": "%", "currency": "", "adjustment": "seasonally_adjusted", "revision": 1, "as_of": "2026-08-12T12:30:00Z", "period": {"kind": "reported", "label": "2026-07"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "revises", "event_type": "macro_revision", "revision": 2, "supersedes_claim_key": "us-cpi-2026-07", "affects_metrics": ["cpi"], "observed_at": "2026-09-10T12:30:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1015, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001015", "provider_id": "fred", "underlying_source_id": "fred_alfred", "authority_score": 0.98, "authority_class": "central_bank", "evidence_type": "structured_snapshot", "instrument_key": "US:MACRO:CPI", "metric": "cpi", "value": 2.5, "unit": "%", "currency": "", "adjustment": "seasonally_adjusted", "period": {"kind": "reported", "label": "2026-07"}, "observed_at": "2026-09-10T12:30:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://fred.example/cpi/vintage"}],
+      "expected": {"temporal_verdict": "superseded", "conflict_verdict": "insufficient_evidence", "current_fact": false, "historical_fact": false}
+    },
+    {
+      "case_id": "macro-gdp-independent-consensus",
+      "category": "macro_revision",
+      "case_origin": "held_out_manual",
+      "request_context": {"server_now_utc": "2026-09-18T03:01:00Z", "requested_as_of": "2026-09-18T03:01:00Z"},
+      "market_session": {"market_calendar_id": "", "market_session_state": "not_applicable", "trading_date": "2026-09-18", "calendar_source": "not_applicable", "calendar_version": "v1"},
+      "claim": {"claim_key": "cn-gdp-nowcast", "claim_type": "fact", "subject": "CN:MACRO:GDP", "metric": "gdp", "value": {"kind": "scalar", "number": 4.8}, "unit": "%", "currency": "", "adjustment": "seasonally_adjusted", "as_of": "2026-09-18T02:30:00Z", "period": {"kind": "instant", "start": "2026-09-18T02:30:00Z"}},
+      "temporal_evidence": [{"evidence_id": 1, "relationship": "supports", "observed_at": "2026-09-18T02:30:00Z", "fetched_at": "2026-09-18T02:59:00Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}, {"evidence_id": 2, "relationship": "supports", "observed_at": "2026-09-18T02:30:00Z", "fetched_at": "2026-09-18T02:59:30Z", "freshness_threshold_seconds": 86400, "freshness_state": "current", "quality_status": "verified"}],
+      "conflict_evidence": [{"evidence_id": 1, "snapshot_id": 1016, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001016", "provider_id": "official_evidence", "underlying_source_id": "stats_release", "authority_score": 1.0, "authority_class": "official", "evidence_type": "structured_snapshot", "instrument_key": "CN:MACRO:GDP", "metric": "gdp", "value": 4.8, "unit": "%", "currency": "", "adjustment": "seasonally_adjusted", "period": {"kind": "instant", "start": "2026-09-18T02:30:00Z"}, "observed_at": "2026-09-18T02:30:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://stats.example/gdp"}, {"evidence_id": 2, "snapshot_id": 1017, "payload_sha256": "0000000000000000000000000000000000000000000000000000000000001017", "provider_id": "fred", "underlying_source_id": "fred_alfred", "authority_score": 0.98, "authority_class": "central_bank", "evidence_type": "structured_snapshot", "instrument_key": "CN:MACRO:GDP", "metric": "gdp", "value": 4.82, "unit": "%", "currency": "", "adjustment": "seasonally_adjusted", "period": {"kind": "instant", "start": "2026-09-18T02:30:00Z"}, "observed_at": "2026-09-18T02:30:00Z", "availability_status": "available", "integrity_valid": true, "source_url": "https://fred.example/gdp"}],
+      "expected": {"temporal_verdict": "verified_current", "conflict_verdict": "verified_consensus", "current_fact": true, "historical_fact": true}
+    }
+  ]
+}

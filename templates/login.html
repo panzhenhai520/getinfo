@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户登录</title>
+    <link rel="stylesheet" href="/static/css/responsive.css?v=17">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: radial-gradient(circle at 18% 14%, rgba(29,127,104,0.10), transparent 28%),
+                        linear-gradient(180deg,#f7faf7 0%,#eef2ef 100%);
+            color:#17201d; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:3rem 1rem; }
+        body.skin-darkblue { background: radial-gradient(circle at 18% 14%, rgba(56,189,248,0.14), transparent 28%),
+                        linear-gradient(180deg,#0e1d3a 0%,#08101f 100%); color:#e6f0ff; }
+        .container { max-width: 28rem; width: 100%; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .header h2 { font-size: 1.875rem; font-weight: 800; color:#17201d; margin-bottom: 0.5rem; }
+        .header p { font-size: 0.875rem; color:#66736d; }
+        body.skin-darkblue .header h2{color:#e6f0ff} body.skin-darkblue .header p{color:#93a9cc}
+        .card { background: rgba(250,252,249,0.94); border-radius: 0.5rem; border:1px solid rgba(23,32,29,0.14);
+            box-shadow: 0 16px 38px rgba(33,43,38,0.10); padding: 2rem; backdrop-filter: blur(14px); }
+        body.skin-darkblue .card{background:rgba(13,28,56,0.82);border-color:rgba(96,165,250,0.24);box-shadow:0 16px 38px rgba(0,0,0,0.45)}
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display:block; font-size:0.875rem; font-weight:500; color:#17201d; margin-bottom:0.4rem; }
+        .form-group input { width:100%; padding:0.5rem 0.75rem; border:1px solid rgba(23,32,29,0.16); border-radius:0.375rem;
+            font-size:0.875rem; color:#17201d; background:rgba(255,255,255,0.78); transition:all .15s; }
+        body.skin-darkblue .form-group label{color:#dbeafe}
+        body.skin-darkblue .form-group input{color:#e6f0ff;background:rgba(14,29,58,0.9);border-color:rgba(96,165,250,0.28)}
+        .form-group input:focus { outline:none; border-color:#1d7f68; box-shadow:0 0 0 3px rgba(29,127,104,0.14); }
+        body.skin-darkblue .form-group input:focus{border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,0.18)}
+        .form-group input::placeholder { color:#9ca3af; }
+        body.skin-darkblue .form-group input::placeholder{color:#8ea6c8}
+        .btn { width:100%; padding:0.5rem 1rem; background:#1d7f68; color:#fff; border:none; border-radius:0.375rem;
+            font-size:0.875rem; font-weight:600; cursor:pointer; transition:background-color .15s; display:flex; align-items:center; justify-content:center; }
+        body.skin-darkblue .btn{background:#2563eb}
+        .btn:hover { background:#15624f; }
+        body.skin-darkblue .btn:hover{background:#1d4ed8}
+        .btn:disabled { opacity:.5; cursor:not-allowed; }
+        .btn2 { background:rgba(250,252,249,0.9); color:#334155; border:1px solid rgba(23,32,29,0.14); }
+        .btn2:hover { background:rgba(29,127,104,0.12); }
+        body.skin-darkblue .btn2{background:rgba(18,35,63,0.9);color:#dbeafe;border-color:rgba(96,165,250,0.28)}
+        body.skin-darkblue .btn2:hover{background:rgba(56,189,248,0.16)}
+        .spinner { display:none; width:1rem; height:1rem; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; margin-left:.5rem; }
+        .spinner.show { display:inline-block; }
+        @keyframes spin { to{transform:rotate(360deg);} }
+        .alert { padding:0.9rem; margin-bottom:1rem; border-radius:0.375rem; font-size:0.875rem; display:none; }
+        .alert.show { display:block; }
+        .alert-error { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+        .alert-success { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+        body.skin-darkblue .alert-error{background:rgba(248,113,113,0.16);color:#fca5a5;border-color:rgba(248,113,113,0.3)}
+        body.skin-darkblue .alert-success{background:rgba(52,211,153,0.16);color:#6ee7b7;border-color:rgba(52,211,153,0.3)}
+        .switch-row { display:flex; justify-content:flex-end; margin-top:0.4rem; }
+        .switch-row a { font-size:0.8rem; color:#1d7f68; text-decoration:none; }
+        body.skin-darkblue .switch-row a{color:#7dd3fc}
+        .switch-row a:hover { text-decoration:underline; }
+        .hint { font-size:0.8rem; color:#b45309; margin-bottom:1rem; display:none; }
+        body.skin-darkblue .hint{color:#fbbf24}
+        /* 登录页右上角换肤按钮 */
+        .login-skin-btn{position:fixed;top:14px;right:14px;z-index:50;width:44px;height:44px;border-radius:50%;border:1px solid rgba(23,32,29,.16);background:rgba(250,252,249,.92);color:#1f2937;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(33,43,38,.10)}
+        body.skin-darkblue .login-skin-btn{background:rgba(13,28,56,.85);border-color:rgba(96,165,250,.28);color:#fbbf24}
+        /* 手机端锁定登录页：html/body 全部固定、禁止滚动与手势，
+           iOS Safari 的橡皮筋上下左右拖动在此彻底失效；内容超高时卡片内部滚动兜底 */
+        @media (max-width: 767px) {
+            html, body {
+                position: fixed !important;
+                inset: 0 !important;
+                width: 100% !important;
+                height: 100dvh !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+                overscroll-behavior: none !important;
+                touch-action: none !important;
+            }
+            body { padding: 1.25rem 1rem !important; }
+            .container {
+                max-height: calc(100dvh - 2.5rem);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #email, #verifyCode { flex: 1; min-width: 0; }
+        }
+    </style>
+</head>
+<body>
+<button id="loginSkinBtn" class="login-skin-btn" type="button" title="切换皮肤" aria-label="切换皮肤" onclick="toggleLoginSkin()">🌙</button>
+<script>
+/* 登录页皮肤：读取全站设置 + 提供右上角换肤按钮（与全站同一 dashSkin 存储，全局生效） */
+try{
+  (function(){
+    function curSkin(){ try{ var v=localStorage.getItem('dashSkin'); return v===null?'darkblue':v; }catch(e){ return 'darkblue'; } }
+    function applySkin(skin){
+      document.body.classList.toggle('skin-darkblue', skin==='darkblue');
+      var b=document.getElementById('loginSkinBtn');
+      if(b){ b.textContent = skin==='darkblue' ? '🌙' : '☀️'; b.title = skin==='darkblue' ? '当前深色，点击切换浅色' : '当前浅色，点击切换深色'; }
+    }
+    window.toggleLoginSkin = function(){
+      var next = curSkin()==='darkblue' ? '' : 'darkblue';
+      try{ localStorage.setItem('dashSkin', next); }catch(e){}
+      applySkin(next);
+    };
+    applySkin(curSkin());
+  })();
+}catch(e){ document.body.classList.add('skin-darkblue'); }
+/* iOS Safari 橡皮筋锁定：CSS 的 html/body fixed 在部分 iOS 版本仍可拖动，
+   用 touchmove 兜底——只放行登录卡片内部的滚动（内容超高时的兜底滚动）。 */
+try{
+  document.addEventListener('touchmove', function(e){
+    var t = e.target;
+    while (t && t !== document.body) { if (t.classList && t.classList.contains('container')) return; t = t.parentNode; }
+    e.preventDefault();
+  }, { passive: false });
+}catch(e){}
+</script>
+    <div class="container">
+        <div class="header">
+            <h2>欢迎登录到{{ platform_name }}</h2>
+            <p>请输入用户名和密码</p>
+        </div>
+        <div class="card">
+            <div id="alertDiv" class="alert"></div>
+            <div id="bindHint" class="hint"><i class="fa fa-info-circle"></i> 您的账号未绑定邮箱，请填写邮箱并发送验证码完成绑定。</div>
+            <form id="loginForm">
+                <div class="form-group"><label for="username">用户名</label><input id="username" name="username" type="text" required placeholder="请输入用户名"></div>
+                <div class="form-group"><label for="password">密码</label><input id="password" name="password" type="password" required placeholder="请输入密码"></div>
+                <div class="form-group" id="emailGroup" style="display:none"><label for="email">绑定邮箱</label>
+                    <div style="display:flex;gap:8px"><input id="email" type="email" placeholder="请输入邮箱">
+                    <button type="button" class="btn btn2" id="sendCodeBtn" style="width:auto;white-space:nowrap">发送验证码</button></div></div>
+                <div class="form-group" id="codeGroup" style="display:none"><label for="verifyCode">邮箱验证码</label>
+                    <div style="display:flex;gap:8px"><input id="verifyCode" type="text" placeholder="请输入邮箱验证码">
+                    <button type="button" class="btn" id="verifyBtn" style="width:auto;white-space:nowrap">验证并登录</button></div></div>
+                <div class="form-group" id="changePwBox" style="display:none">
+                    <label for="npw">新口令（字母+数字，至少6位）</label><input id="npw" type="password" placeholder="输入新口令">
+                    <label for="npw2" style="margin-top:10px">确认新口令</label><input id="npw2" type="password" placeholder="再次输入新口令">
+                    <button type="button" class="btn" id="confirmPwBtn" style="margin-top:12px">确认修改并登录</button>
+                    <div id="pwMsg" style="font-size:12px;margin-top:6px"></div>
+                </div>
+                <div class="form-group" id="loginGroup"><button type="submit" class="btn" id="loginBtn"><span id="loginText">登录</span><span id="loginSpinner" class="spinner"></span></button></div>
+            </form>
+            <div class="switch-row" style="justify-content:space-between"><a href="javascript:void(0)" id="registerLink">没有账号？注册</a><a href="javascript:void(0)" id="forgotLink">忘记口令？</a></div>
+            <div id="registerHint" style="display:none;margin-top:0.6rem;padding:0.6rem 0.8rem;border:1px solid #fde68a;border-radius:0.375rem;background:#fffbeb;color:#92400e;font-size:0.8rem">暂无自助注册，请联系<b>灵蹊科技</b>开通账号。</div>
+        </div>
+    </div>
+
+    <script>
+        var pendingUser=null, pendingPw=null, needBind=false;
+        var alertDiv=document.getElementById('alertDiv');
+        function showAlert(m,t){ alertDiv.className='alert show '+(t==='error'?'alert-error':'alert-success'); alertDiv.textContent=m; }
+        function busy(on){ var s=document.getElementById('loginSpinner'); if(s) s.classList.toggle('show',!!on); var b=document.getElementById('loginBtn'); if(b) b.disabled=!!on; }
+        function startCodeCountdown(){ var b=document.getElementById('sendCodeBtn'); if(!b) return; var l=60; b.disabled=true;
+          var t=setInterval(function(){ l--; if(l<=0){ clearInterval(t); b.disabled=false; b.textContent='发送验证码'; } else { b.textContent=l+'s 后重发'; } }, 1000); }
+        document.getElementById('forgotLink').addEventListener('click',function(){
+            var em=prompt('请输入绑定邮箱，我们将发送找回口令链接：'); if(!em) return;
+            fetch('/api/pack-users/reset-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em})})
+              .then(function(r){return r.json();}).then(function(d){ showAlert(d.success?'已发送重置链接到邮箱（30分钟内有效）':(d.message||'失败'), d.success?'success':'error'); });
+        });
+        // 注册入口：暂不开自助注册，点击提示联系灵蹊科技开通
+        document.getElementById('registerLink').addEventListener('click',function(){
+            var h=document.getElementById('registerHint');
+            if(h) h.style.display = (h.style.display==='none') ? 'block' : 'none';
+        });
+        // 提交：先试管理员登录，再试包用户
+        document.getElementById('loginForm').addEventListener('submit', async function(e){
+            e.preventDefault();
+            var username=document.getElementById('username').value.trim();
+            var password=document.getElementById('password').value;
+            busy(true); showAlert('','success');
+            try{
+                var adminResp=await fetch('/api/user/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:password})});
+                var adminData=await adminResp.json();
+                if(adminData.success){ showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); busy(false); return; }
+            }catch(err){}
+            // 包用户登录/绑定：不传 email 先试，若需绑定则提示填邮箱
+            try{
+                var pu=await fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:password})});
+                var pd=await pu.json();
+                if(!pd.success){ showAlert(pd.message||'登录失败：用户名或口令错误','error'); busy(false); return; }
+                pendingUser=username; pendingPw=password;
+                if(pd.activated){ showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); busy(false); return; }
+                // 未激活 → 提示绑定邮箱（此步不发验证码），并隐藏"登录"按钮（只留"验证并登录"）
+                needBind=true; pendingUser=username; pendingPw=password;
+                document.getElementById('bindHint').style.display='block';
+                document.getElementById('emailGroup').style.display='block';
+                document.getElementById('codeGroup').style.display='none';
+                document.getElementById('loginGroup').style.display='none';
+                if(pd.email_sent){ showAlert('验证码已发送到邮箱，请查收','success'); }
+                else { showAlert('请先填写邮箱并点击“发送验证码”','error'); }
+                busy(false);
+            }catch(err){ showAlert('网络错误','error'); busy(false); }
+        });
+        // 发送验证码（绑定邮箱）
+        document.getElementById('sendCodeBtn').addEventListener('click', async function(){
+            var em=document.getElementById('email').value.trim();
+            if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ showAlert('邮箱格式不正确，请检查后重试','error'); return; }
+            try{
+                var r=await fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('username').value.trim(),password:document.getElementById('password').value,email:em})});
+                var d=await r.json();
+                if(!d.success){ showAlert(d.message||'失败','error'); return; }
+                if(d.activated){ showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); return; }
+                if(d.email_sent){ document.getElementById('codeGroup').style.display='block'; showAlert('验证码已发送到 '+em+'，请查收','success'); startCodeCountdown(); }
+                else if(d.dev_code){ document.getElementById('codeGroup').style.display='block'; showAlert('测试模式验证码：'+d.dev_code,'success'); startCodeCountdown(); }
+                else { showAlert(d.message||'请绑定邮箱后重新发送','error'); }
+            }catch(err){ showAlert('网络错误','error'); }
+        });
+        // 验证并登录
+        document.getElementById('verifyBtn').addEventListener('click', async function(){
+            var code=document.getElementById('verifyCode').value.trim();
+            if(!pendingUser){ showAlert('请先提交用户名口令','error'); return; }
+            try{
+                var v=await fetch('/api/pack-users/login/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:pendingUser,code:code})});
+                var vd=await v.json();
+                if(!vd.success){ showAlert(vd.message||'验证码错误','error'); return; }
+                if(vd.step==='change_password'){
+                    // 首次登录强制改密：两次输入校验
+                    document.getElementById('changePwBox').style.display='block';
+                    document.getElementById('codeGroup').style.display='none';
+                    document.getElementById('emailGroup').style.display='none';
+                    showAlert('验证通过，请设置新口令（字母+数字，至少6位）','success');
+                    return;
+                }
+                showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500);
+            }catch(err){ showAlert('网络错误','error'); }
+        });
+        // 首次登录强制改密：两次输入校验
+        document.getElementById('confirmPwBtn').addEventListener('click', async function(){
+            var np=document.getElementById('npw').value, np2=document.getElementById('npw2').value, pm=document.getElementById('pwMsg');
+            if(np!==np2){ pm.textContent='两次输入不一致'; pm.style.color='#f87171'; return; }
+            if(!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(np)){ pm.textContent='口令需字母+数字且至少6位'; pm.style.color='#f87171'; return; }
+            try{
+                var c=await fetch('/api/pack-users/login/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:pendingUser,old_password:pendingPw,new_password:np})});
+                var cd=await c.json();
+                if(cd.success){ pm.textContent='改密成功，登录中…'; pm.style.color='#4ade80'; showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); }
+                else { pm.textContent=cd.message||'改密失败'; pm.style.color='#f87171'; }
+            }catch(err){ pm.textContent='网络错误'; pm.style.color='#f87171'; }
+        });
+    </script>
+</body>
+</html>

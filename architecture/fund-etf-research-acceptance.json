@@ -1,0 +1,57 @@
+{
+  "check_version": "fund-etf-research-v1",
+  "checked_at_utc": "2026-08-01T12:56:39Z",
+  "static": {
+    "component_path": "fund_etf_research.py",
+    "component_version": "fund-etf-research-v1",
+    "registered_fund_tools": [
+      "get_etf_constituents",
+      "get_etf_liquidity",
+      "get_etf_tracking",
+      "get_fund_fees",
+      "get_fund_holdings",
+      "get_fund_identity",
+      "get_fund_manager",
+      "get_fund_nav",
+      "get_fund_profile",
+      "get_fund_share",
+      "get_fund_subscription_redemption"
+    ],
+    "company_only_tools": [],
+    "direct_vendor_or_model_imports": [],
+    "order_write_paths": 0,
+    "new_services": [],
+    "new_ports": [],
+    "new_databases": []
+  },
+  "runtime": {
+    "executed": true,
+    "etf_target": "510300.SH",
+    "fund_target": "110020.OF",
+    "fund_share_class": "A",
+    "fund_currency": "CNY",
+    "weekend_requested_date": "2026-08-01",
+    "latest_disclosed_nav_date": "2026-07-31",
+    "etf_section_count": 8,
+    "fund_section_count": 8,
+    "a_c_share_clarification": [
+      "share_class"
+    ],
+    "company_statement_sections": 0,
+    "intraday_open_fund_assumptions": 0,
+    "orders_created": 0,
+    "network_calls": 0
+  },
+  "acceptance": {
+    "etf_and_open_fund_templates_are_distinct": true,
+    "asset_share_class_and_currency_are_not_guessed": true,
+    "etf_tracking_constituents_fees_and_liquidity_present": true,
+    "open_fund_nav_share_holdings_manager_terms_present": true,
+    "non_trading_day_uses_last_disclosed_nav": true,
+    "disclosure_lag_is_explicit": true,
+    "company_statement_and_intraday_open_fund_assumptions_excluded": true,
+    "no_new_service_port_database_or_model_client": true,
+    "runtime_passed": true,
+    "passed": true
+  }
+}

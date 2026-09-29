@@ -1,0 +1,71 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "external_content_can_change_configuration": false,
+    "external_content_can_choose_or_expand_tools": false,
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "new_table": false,
+    "real_trading": false
+  },
+  "browser": {
+    "active_event_payloads": 0,
+    "active_image_nodes": 0,
+    "active_script_nodes": 0,
+    "active_svg_nodes": 0,
+    "check_version": "financial-dashboard-xss-v2",
+    "external_network_requests": 0,
+    "financial_feed_hostile_text_preserved_as_text": true,
+    "financial_report_hostile_text_preserved_as_text": true,
+    "page_errors": 0,
+    "secret_or_fragment_links": 0,
+    "unsafe_links": 0
+  },
+  "controls": {
+    "authenticated_financial_reads": true,
+    "configured_secret_redaction": true,
+    "event_specific_sse_allowlists": true,
+    "external_documents_are_untrusted_data": true,
+    "malicious_rss_dtd_and_entity_rejection": true,
+    "private_and_loopback_url_rejection": true,
+    "private_redirect_revalidation": true,
+    "public_url_credential_query_removal": true,
+    "shared_log_metric_json_and_sse_error_redaction": true,
+    "tradingagents_registered_tools_only": true,
+    "xss_safe_text_and_href_projection": true
+  },
+  "runtime": {
+    "errors": 0,
+    "failures": 0,
+    "network_calls": 0,
+    "secrets_in_output": false,
+    "tests_run": 83
+  },
+  "security_version": "financial-security-v1",
+  "task": "6.2",
+  "verification": {
+    "architecture_gate": "passed",
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "full_regression_tests": 522,
+    "offline_build": {
+      "base_image": "collectinfo:financial-source-license-acceptance",
+      "base_image_digest": "sha256:a9024020ee3b6581a4f49f780ea5ad43e79022033c71695af5f7ee30ef72dcc6",
+      "browser_gate": "passed",
+      "full_regression_tests": 522,
+      "image": "collectinfo:financial-security-acceptance",
+      "image_digest": "sha256:e20e9e46b64d9934ae89ab6bab310d997a6399405c7f876f1446af9f8827cf01",
+      "network": "none",
+      "related_regression_tests": 83
+    },
+    "published_ports": [
+      8003
+    ],
+    "related_regression_tests": 83
+  }
+}

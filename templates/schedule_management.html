@@ -1,0 +1,3488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务调度 - {{ platform_name }}</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+    <script src="/static/js/law_firms_urls.js"></script>
+    <style>
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+        .table-hover tbody tr:hover {
+            background-color: #f9fafb;
+        }
+        .schedule-view-tabs { display:flex; gap:12px; flex-wrap:wrap; padding:12px 0 2px; }
+        .schedule-view-tab { display:inline-flex; align-items:center; gap:8px; padding:10px 17px; border:1px solid #cbd5e1; border-radius:9px; background:#f8fafc; color:#475569; font-size:14px; font-weight:700; box-shadow:0 1px 2px rgba(15,23,42,.05); transition:all .16s ease; }
+        .schedule-view-tab:hover { border-color:#60a5fa; background:#eff6ff; color:#1d4ed8; }
+        .schedule-view-tab.is-active[data-view="legacy"] { border-color:#2563eb; background:#2563eb; color:#fff; box-shadow:0 3px 8px rgba(37,99,235,.25); }
+        .schedule-view-tab.is-active[data-view="source"] { border-color:#0f766e; background:#0f766e; color:#fff; box-shadow:0 3px 8px rgba(15,118,110,.25); }
+        .time-picker-container {
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .time-btn-up, .time-btn-down {
+            border: none;
+            transition: all 0.2s;
+        }
+        .time-btn-up:hover, .time-btn-down:hover {
+            background-color: #f3f4f6;
+        }
+        .time-btn-up:active, .time-btn-down:active {
+            background-color: #dbeafe !important;
+            transform: scale(0.95);
+        }
+        /* 隐藏数字输入框的默认上下箭头 */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        /* Primary颜色定义 - 蓝色主题 */
+        .bg-primary {
+            background-color: #3b82f6 !important; /* blue-500 */
+        }
+        .bg-primary\/90 {
+            background-color: rgba(59, 130, 246, 0.9) !important;
+        }
+        .hover\:bg-primary\/90:hover {
+            background-color: rgba(59, 130, 246, 0.9) !important;
+        }
+        .text-primary {
+            color: #3b82f6 !important; /* blue-500 */
+        }
+        .hover\:text-primary:hover {
+            color: #3b82f6 !important;
+        }
+        .hover\:text-primary\/80:hover {
+            color: rgba(59, 130, 246, 0.8) !important;
+        }
+        .text-dark {
+            color: #1f2937 !important; /* gray-800 */
+        }
+        .border-primary {
+            border-color: #3b82f6 !important;
+        }
+        .focus\:ring-primary:focus {
+            --tw-ring-color: #3b82f6 !important;
+        }
+        .focus\:border-primary:focus {
+            border-color: #3b82f6 !important;
+        }
+        .schedule-modal-panel {
+            width: min(96vw, 1040px);
+            max-height: 92vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 0 !important;
+        }
+        .schedule-modal-header {
+            flex-shrink: 0;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: #fff;
+            margin-bottom: 0 !important;
+        }
+        .schedule-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem 1.25rem;
+            background: #fff;
+        }
+        .schedule-selector-panel {
+            width: min(96vw, 34rem);
+            max-height: 92vh;
+            overflow-y: auto;
+        }
+        .schedule-url-selector-panel {
+            width: min(96vw, 46rem);
+            max-height: 92vh;
+            overflow-y: auto;
+        }
+        .schedule-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            flex-shrink: 0;
+            padding: 1rem 1.25rem;
+            border-top: 1px solid #e5e7eb;
+            background: #fff;
+            box-shadow: 0 -8px 18px rgba(15, 23, 42, 0.06);
+        }
+        @media (max-width: 640px) {
+            .schedule-modal-actions {
+                flex-direction: column-reverse;
+            }
+            .schedule-modal-actions button {
+                width: 100%;
+            }
+        }
+        .field-hint {
+            color: #6b7280;
+            font-size: 0.75rem;
+            line-height: 1.25rem;
+        }
+        .schedule-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 0.875rem;
+            background: #fff;
+        }
+        .schedule-section + .schedule-section {
+            margin-top: 0.875rem;
+        }
+        .schedule-section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #111827;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .edit-task-name-hero {
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .edit-task-name-hero label {
+            display: block;
+            color: #64748b;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.35rem;
+        }
+        .edit-task-name-hero input {
+            width: min(100%, 42rem);
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            color: #111827;
+            font-size: 1.5rem;
+            line-height: 2rem;
+            font-weight: 800;
+            text-align: center;
+            outline: none;
+        }
+        .edit-task-name-hero input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+        }
+        .edit-task-name-smart {
+            width: min(100%, 42rem);
+            margin: 0.5rem auto 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .edit-task-name-smart-results {
+            width: min(100%, 42rem);
+            margin: 0.5rem auto 0;
+            text-align: left;
+        }
+        .strategy-option {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            background: #fff;
+            padding: 0.75rem;
+        }
+        .strategy-option-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            color: #374151;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .strategy-unit {
+            color: #6b7280;
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .strategy-toggle {
+            min-height: 2.75rem;
+        }
+        .strategy-details {
+            background: #f8fafc;
+        }
+        .strategy-details .grid > div:has(> input[type="number"]) {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            background: #fff;
+            padding: 0.75rem;
+        }
+        .strategy-details .grid > div:has(> input[type="number"]) > label {
+            display: none;
+        }
+        .strategy-details .grid > div:has(> input[type="number"])::before {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            color: #374151;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .strategy-details .grid > div:has(> #addScheduleWaitForMs)::before,
+        .strategy-details .grid > div:has(> #editScheduleWaitForMs)::before {
+            content: "动态页面等待（毫秒）";
+        }
+        .strategy-details .grid > div:has(> #addScheduleMaxPages)::before,
+        .strategy-details .grid > div:has(> #editScheduleMaxPages)::before {
+            content: "栏目最多翻页（页）";
+        }
+        .strategy-details .grid > div:has(> #addScheduleMaxEmptyPages)::before,
+        .strategy-details .grid > div:has(> #editScheduleMaxEmptyPages)::before {
+            content: "连续空页停止（页）";
+        }
+        .strategy-details .grid > div:has(> #addScheduleDetailMaxRetries)::before,
+        .strategy-details .grid > div:has(> #editScheduleDetailMaxRetries)::before {
+            content: "正文提取重试（次）";
+        }
+        .strategy-details input[type="number"] {
+            font-size: 1rem;
+        }
+        .strategy-summary {
+            cursor: pointer;
+            list-style: none;
+        }
+        .strategy-summary::-webkit-details-marker {
+            display: none;
+        }
+        .strategy-details[open] .strategy-chevron {
+            transform: rotate(180deg);
+        }
+        .strategy-chevron {
+            transition: transform 0.2s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->{% include "_dashboard_nav.html" %}
+
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="mb-5 bg-white rounded-xl p-5 card-shadow">
+            <h2 class="text-xl font-bold text-dark">调度与信源扫描</h2>
+            <p class="mt-1 text-sm text-gray-500">两类任务共用同一套 URL 库，但职责不同：传统任务调度按管理员创建的关键词、周期与 URL 执行专项聚合；信源扫描按信源自身的每日/每周时间自动发现新链接，再交给候选聚合与分类链路。二者没有强制先后关系，重复目标应只保留一种自动方式。</p>
+            <div id="activeIndustryKeywordSnapshot" class="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">正在读取当前行业包关键词快照…</div>
+            <div class="schedule-view-tabs" role="tablist"><button type="button" class="schedule-view-tab is-active" data-view="legacy"><i class="fa fa-clock-o"></i>任务调度</button><button type="button" class="schedule-view-tab" data-view="source"><i class="fa fa-radar"></i>信源扫描任务</button></div>
+        </div>
+        <!-- 定时任务设置区域 -->
+        <section id="schedule" class="mb-5">
+            <div class="bg-white rounded-xl p-5 card-shadow">
+                <div class="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h3 class="text-xl font-bold flex items-center text-dark">
+                        <i class="fa fa-clock-o text-primary mr-2"></i> 任务调度
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="refreshScheduleBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center shadow-sm">
+                            <i class="fa fa-refresh mr-1.5 text-xs"></i> 刷新
+                        </button>
+                        <button id="addScheduleModalBtn" class="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center shadow-sm">
+                            <i class="fa fa-plus mr-1.5 text-xs"></i> 添加任务
+                        </button>
+                        <button id="smartAnalyzeBtn" onclick="openSmartAnalysis()"
+                            style="background:#7c3aed;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                            <i class="fa fa-magic"></i> 智能分析URL
+                        </button>
+
+                        <div class="text-xs text-gray-500 ml-2 whitespace-nowrap">
+                            共 <span id="scheduleCount">0</span> 个任务
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 搜索和筛选 -->
+                <div class="mb-4 flex flex-col sm:flex-row gap-3">
+                    <div class="flex-1">
+                        <div class="relative">
+                            <input type="text" id="scheduleSearch"
+                                   class="w-full px-3 py-2 pl-9 pr-9 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                                   placeholder="搜索任务名称或URL...">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa fa-search text-gray-400"></i>
+                            </div>
+                            <button id="clearSearch" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 hidden">
+                                <i class="fa fa-times-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="statusFilter" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary bg-white">
+                            <option value="">全部状态</option>
+                            <option value="enabled">已启用</option>
+                            <option value="disabled">已禁用</option>
+                        </select>
+                        <select id="repeatFilter" class="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary bg-white">
+                            <option value="">全部类型</option>
+                            <option value="once">仅执行一次</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每周</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                        <button id="resetFilters" class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors" title="重置筛选">
+                            <i class="fa fa-undo"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!--
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="text-md font-semibold text-gray-800 mb-3">添加任务</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">目标URL</label>
+                            <div class="relative">
+                                <input type="text" id="selectedUrlDisplay" readonly
+                                       class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-primary focus:border-primary"
+                                       placeholder="点击选择URL">
+                                <input type="hidden" id="selectedUrlValue">
+                                <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+                                    <i class="fa fa-chevron-down text-gray-400"></i>
+                                </div>
+                            </div>
+                            <div class="mt-1 text-xs text-gray-500">
+                                <a href="/url-management" class="text-primary hover:underline">添加新URL</a>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">执行时间</label>
+                            <div class="relative">
+                                <input type="text" id="selectedTimeDisplay" readonly
+                                       class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm bg-white cursor-pointer hover:bg-gray-50 focus:outline-none focus:ring-primary focus:border-primary"
+                                       placeholder="点击选择时间">
+                                <input type="hidden" id="scheduleHour">
+                                <input type="hidden" id="scheduleMinute">
+                                <input type="hidden" id="scheduleSecond">
+                                <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
+                                    <i class="fa fa-clock-o text-gray-400"></i>
+                                </div>
+                                </div>
+                            <p class="mt-1 text-xs text-gray-500">24小时制</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">聚合深度</label>
+                            <select id="scheduleDepth" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                            <option value="1">浅层聚合</option>
+                            <option value="2" selected>标准聚合</option>
+                            <option value="3">深度聚合</option>
+                            <option value="4">深入聚合</option>
+                            <option value="5">全面聚合</option>
+                        </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">聚合模式</label>
+                            <select id="scheduleMode" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                                <option value="standard" selected>栏目文章聚合</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">页面限制</label>
+                        <input type="number" id="scheduleLimit" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" value="50" min="1" max="1000">
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">任务名称（可选）</label>
+                        <input type="text" id="scheduleName" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" placeholder="例如：每日新闻聚合">
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">重复设置</label>
+                        <select id="scheduleRepeat" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                            <option value="once" selected>仅执行一次</option>
+                            <option value="daily">每天</option>
+                            <option value="weekly">每周</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ragflow 知识库（可选）</label>
+                        <div class="flex gap-2">
+                            <select id="scheduleRagflowKb" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary">
+                                <option value="">不入库</option>
+                            </select>
+                            <button type="button" class="ragflow-refresh-btn px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                刷新
+                            </button>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">选择后任务成功时会将文章同步到对应知识库。</p>
+                    </div>
+                    <div class="mt-4">
+                        <button id="addScheduleBtn" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                            添加任务
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 定时任务列表 -->
+                <div id="scheduleList" class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200 table-hover">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">任务名称</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">网站名称</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">目标URL</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">执行时间</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">重复设置</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">知识库</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">入库文章数量</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleTableBody" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="10" class="px-4 py-6 text-center text-gray-500">
+                                    <div class="flex flex-col items-center justify-center py-4">
+                                        <i class="fas fa-clock text-2xl text-gray-300 mb-2"></i>
+                                        <p class="text-gray-500 text-sm">暂无任务</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 分页控件 -->
+                <div class="mt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div class="text-sm text-gray-700">
+                        显示第 <span id="pageStart">0</span> - <span id="pageEnd">0</span> 条，共 <span id="totalSchedules">0</span> 条
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="prevPageBtn" class="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i class="fa fa-chevron-left mr-1"></i> 上一页
+                        </button>
+                        <div class="flex items-center gap-1" id="pageNumbers"></div>
+                        <button id="nextPageBtn" class="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            下一页 <i class="fa fa-chevron-right ml-1"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-700">每页显示：</label>
+                        <select id="pageSizeSelect" class="px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary focus:border-primary bg-white">
+                            <option value="10" selected>10条</option>
+                            <option value="20">20条</option>
+                            <option value="50">50条</option>
+                            <option value="100">100条</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sourceScanTasks" class="mb-5 hidden">
+            <div class="bg-white rounded-xl p-5 card-shadow">
+                <div class="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div><h3 class="text-xl font-bold flex items-center text-dark"><i class="fa fa-radar text-primary mr-2"></i> 信源扫描任务</h3><p class="mt-1 text-xs text-gray-500">自动化任务：worker 每分钟判断信源是否到期；到达各信源配置的每日/每周时刻后，扫描 RSS/资讯页、发现候选链接并按行业门禁入库。这里用于观察结果和处理失败原因，不需要每天手工启动。</p></div>
+                    <button id="refreshSourceTasksBtn" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center shadow-sm"><i class="fa fa-refresh mr-1.5 text-xs"></i> 刷新扫描状态</button>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-gray-200"><table class="min-w-full divide-y divide-gray-200 table-hover text-sm"><thead class="bg-gray-50"><tr><th class="px-3 py-3 text-left text-xs font-medium text-gray-500">信源中文名 / URL</th><th class="px-3 py-3 text-left text-xs font-medium text-gray-500">浏览器聚合</th><th class="px-3 py-3 text-left text-xs font-medium text-gray-500">上次扫描</th><th class="px-3 py-3 text-left text-xs font-medium text-gray-500">下次扫描</th><th class="px-3 py-3 text-center text-xs font-medium text-gray-500">发现数</th><th class="px-3 py-3 text-center text-xs font-medium text-gray-500">入库数</th><th class="px-3 py-3 text-left text-xs font-medium text-gray-500">入库知识库</th><th class="px-3 py-3 text-left text-xs font-medium text-gray-500">状态 / 失败原因</th></tr></thead><tbody id="sourceTasksTableBody" class="bg-white divide-y divide-gray-200"><tr><td colspan="8" class="px-4 py-6 text-center text-gray-500">正在加载信源扫描任务…</td></tr></tbody></table></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 添加定时任务模态框 -->
+    <div id="addScheduleModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50 hidden flex items-start justify-center p-3 sm:p-6">
+        <div class="relative mx-auto p-4 sm:p-5 border shadow-lg rounded-lg bg-white schedule-modal-panel">
+            <div class="schedule-modal-header flex items-center justify-between mb-3">
+                <h3 class="text-lg font-semibold text-gray-900">添加任务</h3>
+                <button id="closeAddScheduleModal" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="schedule-modal-body">
+                <div class="schedule-section-title"><i class="fa fa-list-check text-primary"></i>基础配置</div>
+
+                <!-- 第一行：目标URL -->
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">目标URL</label>
+                    <div class="relative">
+                        <input type="text" id="addSelectedUrlDisplay" readonly class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md bg-white cursor-pointer hover:bg-gray-50" placeholder="点击选择URL">
+                        <input type="hidden" id="addSelectedUrlValue">
+                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none"><i class="fa fa-chevron-down text-gray-400"></i></div>
+                    </div>
+                </div>
+
+                <!-- 第二行：执行时间、任务名称 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">执行时间</label>
+                        <div class="relative">
+                            <input type="text" id="addSelectedTimeDisplay" readonly class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md bg-white cursor-pointer hover:bg-gray-50" placeholder="点击选择">
+                            <input type="hidden" id="addScheduleHour"><input type="hidden" id="addScheduleMinute"><input type="hidden" id="addScheduleSecond">
+                            <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none"><i class="fa fa-clock-o text-gray-400"></i></div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">任务名称</label>
+                        <input type="text" id="addScheduleName" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="任务名称">
+                    </div>
+                </div>
+
+                <!-- 第三行：聚合参数（两列排列） -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">深度</label>
+                        <select id="addScheduleDepth" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                            <option value="1">浅层</option><option value="2" selected>标准</option><option value="3">深度</option><option value="4">深入</option><option value="5">全面</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">模式</label>
+                        <select id="addScheduleMode" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                            <option value="standard" selected>栏目文章聚合</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">文章上限</label>
+                        <input type="number" id="addScheduleLimit" class="w-full px-3 py-2 border border-gray-300 rounded-md" value="50" min="1" max="1000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">知识库</label>
+                        <select id="addScheduleRagflowKb" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">不入库</option></select>
+                        <p id="addScheduleRagflowStatus" class="mt-1 text-xs text-gray-500">正在检查知识库连接...</p>
+                    </div>
+                </div>
+
+                <!-- 第四行：重复设置 -->
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">重复设置</label>
+                    <select id="addScheduleRepeat" class="w-full px-3 py-2 border border-gray-300 rounded-md" onchange="toggleScheduleOptions('add')">
+                        <option value="once" selected>仅执行一次</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option>
+                    </select>
+                </div>
+
+                <!-- 每周/每月选项 -->
+                <div id="addWeeklyOptions" class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded hidden">
+                    <div class="flex flex-wrap gap-2">
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="0" class="add-weekday-checkbox rounded text-primary mr-1">周一</label>
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="1" class="add-weekday-checkbox rounded text-primary mr-1">周二</label>
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="2" class="add-weekday-checkbox rounded text-primary mr-1">周三</label>
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="3" class="add-weekday-checkbox rounded text-primary mr-1">周四</label>
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="4" class="add-weekday-checkbox rounded text-primary mr-1">周五</label>
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="5" class="add-weekday-checkbox rounded text-primary mr-1">周六</label>
+                        <label class="inline-flex items-center text-sm"><input type="checkbox" value="6" class="add-weekday-checkbox rounded text-primary mr-1">周日</label>
+                    </div>
+                </div>
+                <div id="addMonthlyOptions" class="mb-3 p-2 bg-green-50 border border-green-200 rounded hidden">
+                    <div class="flex flex-wrap gap-1" id="addMonthdayContainer"></div>
+                    <p class="mt-1 text-xs text-gray-500">该月无对应日期则跳过</p>
+                </div>
+
+                <!-- 第四行：关键词过滤、日期限制 -->
+                <div class="schedule-section-title mt-4"><i class="fa fa-filter text-primary"></i>过滤范围</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                    <div class="p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fa fa-filter text-yellow-600 mr-1"></i>关键词过滤</label>
+                        <input type="text" id="addScheduleKeywords" class="w-full px-3 py-2 border border-gray-300 rounded" placeholder="英伟达,NVIDIA,GPU">
+                    </div>
+                    <div class="p-2 bg-purple-50 border border-purple-200 rounded">
+                        <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fa fa-calendar text-purple-600 mr-1"></i>日期限制</label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="number" id="addScheduleDaysLimit" value="7" min="0" max="365" class="w-20 px-3 py-2 border border-gray-300 rounded text-center">
+                            <span class="text-sm text-gray-600">天</span>
+                            <button type="button" onclick="document.getElementById('addScheduleDaysLimit').value='0'" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded">不限制</button>
+                            <button type="button" onclick="document.getElementById('addScheduleDaysLimit').value='7'" class="px-2 py-1 text-xs bg-blue-200 hover:bg-blue-300 rounded">7天</button>
+                            <button type="button" onclick="document.getElementById('addScheduleDaysLimit').value='30'" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded">30天</button>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded strategy-details">
+                    <summary class="strategy-summary flex items-center justify-between gap-3">
+                        <span class="text-sm font-medium text-gray-800"><i class="fa fa-magic text-gray-600 mr-1"></i>自动识别设置</span>
+                        <span class="flex items-center gap-2 text-xs text-gray-500">
+                            系统自动识别栏目、链接、日期、分页；通常不用改
+                            <i class="fa fa-chevron-down strategy-chevron"></i>
+                        </span>
+                    </summary>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button type="button" onclick="applyScheduleStrategyPreset('add', 'recommended')" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded">推荐</button>
+                        <button type="button" onclick="applyScheduleStrategyPreset('add', 'stable')" class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">更稳</button>
+                        <button type="button" onclick="applyScheduleStrategyPreset('add', 'fast')" class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">更快</button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">页面等待(ms)</label>
+                            <input type="number" id="addScheduleWaitForMs" value="8000" min="1000" max="60000" step="500" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="等待动态内容渲染，8000约等于8秒">
+                            <p class="field-hint">动态网站可调大</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">最多翻页</label>
+                            <input type="number" id="addScheduleMaxPages" value="30" min="1" max="1000" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="栏目页最多向后翻多少页">
+                            <p class="field-hint">按日期范围聚合时不按页数截断文章</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">空页停止</label>
+                            <input type="number" id="addScheduleMaxEmptyPages" value="5" min="1" max="50" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="连续多少页没有新文章后停止">
+                            <p class="field-hint">防止无限翻页</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">详情重试</label>
+                            <input type="number" id="addScheduleDetailMaxRetries" value="2" min="1" max="5" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="正文提取失败时重试次数">
+                            <p class="field-hint">网络不稳可调大</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3 text-sm text-gray-700">
+                        <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="addScheduleDateRangePriority" class="rounded text-primary" checked>日期范围优先</label>
+                        <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="addScheduleCandidateDatePrefilter" class="rounded text-primary" checked>候选日期预过滤</label>
+                        <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="addScheduleNetworkJsonEnabled" class="rounded text-primary" checked>聚合接口文章</label>
+                        <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="addScheduleSupplementalEnabled" class="rounded text-primary" checked>补充发现</label>
+                        <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="addScheduleProxyEnabled" class="rounded text-primary">使用代理</label>
+                    </div>
+                </details>
+
+                <!-- 按钮 -->
+            </div>
+            <div class="schedule-modal-actions pt-3 border-t border-gray-200">
+                <button id="cancelAddSchedule" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium">取消</button>
+                <button id="confirmAddSchedule" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑定时任务模态框 -->
+    <div id="editScheduleModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50 hidden flex items-start justify-center p-3 sm:p-6">
+        <div class="relative mx-auto p-4 sm:p-5 border shadow-lg rounded-lg bg-white schedule-modal-panel">
+            <div class="schedule-modal-header flex items-center justify-between mb-3">
+                <h3 class="text-lg font-semibold text-gray-900">Edit Task</h3>
+                <button id="closeEditScheduleModal" class="text-gray-400 hover:text-gray-600"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="schedule-modal-body">
+            <div class="schedule-section-title"><i class="fa fa-list-check text-primary"></i>基础配置</div>
+            <input type="hidden" id="editScheduleId">
+            <div class="edit-task-name-hero">
+                <label for="editScheduleName">任务名称</label>
+                <input type="text" id="editScheduleName" placeholder="任务名称">
+                <div class="edit-task-name-smart">
+                    <button type="button" id="editSmartUrlAnalyzeBtn"
+                        style="display:inline-flex;align-items:center;gap:5px;background:#4f46e5;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.18);">
+                        <i class="fa fa-magic"></i>智能分析URL
+                    </button>
+                    <span id="editSmartUrlStatus" class="text-xs text-gray-500"></span>
+                </div>
+                <div id="editSmartUrlResults" class="edit-task-name-smart-results hidden"
+                    style="padding:12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;"></div>
+            </div>
+
+            <!-- 第一行：目标URL -->
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">目标URL</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="editSelectedUrlDisplay"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white"
+                        placeholder="可直接输入或粘贴目标URL">
+                    <input type="hidden" id="editSelectedUrlValue">
+                    <button type="button" id="editSelectUrlBtn"
+                        style="display:inline-flex;align-items:center;gap:5px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+                        <i class="fa fa-list"></i>选择
+                    </button>
+                </div>
+            </div>
+
+            <!-- 第二行：执行时间 -->
+            <div class="mb-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">执行时间</label>
+                    <div class="relative">
+                        <input type="text" id="editSelectedTimeDisplay" readonly class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md bg-white cursor-pointer hover:bg-gray-50" placeholder="点击选择">
+                        <input type="hidden" id="editScheduleHour"><input type="hidden" id="editScheduleMinute"><input type="hidden" id="editScheduleSecond">
+                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none"><i class="fa fa-clock-o text-gray-400"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第三行：聚合参数（两列排列） -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">深度</label>
+                    <select id="editScheduleDepth" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        <option value="1">浅层</option><option value="2">标准</option><option value="3">深度</option><option value="4">深入</option><option value="5">全面</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">模式</label>
+                    <select id="editScheduleMode" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        <option value="standard">栏目文章聚合</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">文章上限</label>
+                    <input type="number" id="editScheduleLimit" class="w-full px-3 py-2 border border-gray-300 rounded-md" value="50" min="1" max="1000">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">知识库</label>
+                    <select id="editScheduleRagflowKb" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="">不入库</option></select>
+                    <p id="editScheduleRagflowStatus" class="mt-1 text-xs text-gray-500">正在检查知识库连接...</p>
+                </div>
+            </div>
+
+            <!-- 第四行：重复设置 -->
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">重复设置</label>
+                <select id="editScheduleRepeat" class="w-full px-3 py-2 border border-gray-300 rounded-md" onchange="toggleScheduleOptions('edit')">
+                    <option value="once">仅执行一次</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option>
+                </select>
+            </div>
+
+            <!-- 每周/每月选项 -->
+            <div id="editWeeklyOptions" class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded hidden">
+                <div class="flex flex-wrap gap-2">
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="0" class="edit-weekday-checkbox rounded text-primary mr-1">周一</label>
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="1" class="edit-weekday-checkbox rounded text-primary mr-1">周二</label>
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="2" class="edit-weekday-checkbox rounded text-primary mr-1">周三</label>
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="3" class="edit-weekday-checkbox rounded text-primary mr-1">周四</label>
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="4" class="edit-weekday-checkbox rounded text-primary mr-1">周五</label>
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="5" class="edit-weekday-checkbox rounded text-primary mr-1">周六</label>
+                    <label class="inline-flex items-center text-sm"><input type="checkbox" value="6" class="edit-weekday-checkbox rounded text-primary mr-1">周日</label>
+                </div>
+            </div>
+            <div id="editMonthlyOptions" class="mb-3 p-2 bg-green-50 border border-green-200 rounded hidden">
+                <div class="flex flex-wrap gap-1" id="editMonthdayContainer"></div>
+                <p class="mt-1 text-xs text-gray-500">该月无对应日期则跳过</p>
+            </div>
+
+            <!-- 第四行：关键词过滤、日期限制 -->
+            <div class="schedule-section-title mt-4"><i class="fa fa-filter text-primary"></i>过滤范围</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div class="p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fa fa-filter text-yellow-600 mr-1"></i>关键词过滤</label>
+                    <input type="text" id="editScheduleKeywords" class="w-full px-3 py-2 border border-gray-300 rounded" placeholder="英伟达,NVIDIA,GPU">
+                </div>
+                <div class="p-2 bg-purple-50 border border-purple-200 rounded">
+                    <label class="block text-sm font-medium text-gray-700 mb-1"><i class="fa fa-calendar text-purple-600 mr-1"></i>日期限制</label>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="number" id="editScheduleDaysLimit" value="7" min="0" max="365" class="w-20 px-3 py-2 border border-gray-300 rounded text-center">
+                        <span class="text-sm text-gray-600">天</span>
+                        <button type="button" onclick="document.getElementById('editScheduleDaysLimit').value='0'" class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded">不限制</button>
+                        <button type="button" onclick="document.getElementById('editScheduleDaysLimit').value='7'" class="px-2 py-1 text-xs bg-blue-200 hover:bg-blue-300 rounded">7天</button>
+                        <button type="button" onclick="document.getElementById('editScheduleDaysLimit').value='30'" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 rounded">30天</button>
+                    </div>
+                </div>
+            </div>
+
+            <details class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded strategy-details">
+                <summary class="strategy-summary flex items-center justify-between gap-3">
+                    <span class="text-sm font-medium text-gray-800"><i class="fa fa-magic text-gray-600 mr-1"></i>自动识别设置</span>
+                    <span class="flex items-center gap-2 text-xs text-gray-500">
+                        系统自动识别栏目、链接、日期、分页；通常不用改
+                        <i class="fa fa-chevron-down strategy-chevron"></i>
+                    </span>
+                </summary>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="button" onclick="applyScheduleStrategyPreset('edit', 'recommended')" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded">推荐</button>
+                    <button type="button" onclick="applyScheduleStrategyPreset('edit', 'stable')" class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">更稳</button>
+                    <button type="button" onclick="applyScheduleStrategyPreset('edit', 'fast')" class="px-3 py-1.5 text-xs bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50">更快</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">页面等待(ms)</label>
+                        <input type="number" id="editScheduleWaitForMs" value="8000" min="1000" max="60000" step="500" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="等待动态内容渲染，8000约等于8秒">
+                        <p class="field-hint">动态网站可调大</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">最多翻页</label>
+                        <input type="number" id="editScheduleMaxPages" value="30" min="1" max="1000" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="栏目页最多向后翻多少页">
+                        <p class="field-hint">按日期范围聚合时不按页数截断文章</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">空页停止</label>
+                        <input type="number" id="editScheduleMaxEmptyPages" value="5" min="1" max="50" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="连续多少页没有新文章后停止">
+                        <p class="field-hint">防止无限翻页</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">详情重试</label>
+                        <input type="number" id="editScheduleDetailMaxRetries" value="2" min="1" max="5" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" title="正文提取失败时重试次数">
+                        <p class="field-hint">网络不稳可调大</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-3 text-sm text-gray-700">
+                    <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="editScheduleDateRangePriority" class="rounded text-primary" checked>日期范围优先</label>
+                    <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="editScheduleCandidateDatePrefilter" class="rounded text-primary" checked>候选日期预过滤</label>
+                    <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="editScheduleNetworkJsonEnabled" class="rounded text-primary" checked>聚合接口文章</label>
+                    <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="editScheduleSupplementalEnabled" class="rounded text-primary" checked>补充发现</label>
+                    <label class="inline-flex items-center gap-2 p-2 bg-white border border-gray-200 rounded"><input type="checkbox" id="editScheduleProxyEnabled" class="rounded text-primary">使用代理</label>
+                </div>
+            </details>
+
+            <div class="schedule-section mb-4">
+                <div class="schedule-section-title">
+                    <i class="fa fa-sitemap text-primary"></i>智能派生 URL 与聚合来源
+                    <button type="button" id="refreshEditSmartRuntimeBtn" class="ml-auto px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50">刷新</button>
+                </div>
+                <div id="editSmartRuntimeStatus" class="text-xs text-gray-500 mb-2">打开任务后自动加载</div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div>
+                        <div class="text-xs font-semibold text-gray-600 mb-1">派生聚合 URL</div>
+                        <div id="editSmartTargetsPanel" class="text-xs text-gray-500 border border-gray-200 rounded bg-gray-50 p-2 max-h-48 overflow-y-auto">暂无数据</div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-semibold text-gray-600 mb-1">智能分析 / Crawl4AI 尝试</div>
+                        <div id="editCrawlAttemptsPanel" class="text-xs text-gray-500 border border-gray-200 rounded bg-gray-50 p-2 max-h-48 overflow-y-auto">暂无数据</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 按钮 -->
+            </div>
+            <div class="schedule-modal-actions pt-3 border-t border-gray-200">
+                <button id="cancelEditSchedule" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium">取消</button>
+                <button id="updateScheduleBtn" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium">更新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 时间选择器模态框 -->
+    <div id="timeSelectorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50 hidden flex items-start justify-center p-3 sm:p-6">
+        <div class="relative mx-auto p-4 sm:p-6 border shadow-lg rounded-lg bg-white schedule-selector-panel">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">选择执行时间</h3>
+                <button id="closeTimeSelector" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- 时间选择器 -->
+            <div class="flex justify-center items-center gap-2 mb-6">
+                <!-- 小时 -->
+                <div class="flex flex-col items-center">
+                    <label class="text-xs text-gray-500 mb-2">小时</label>
+                    <div class="time-picker-container">
+                        <button type="button" class="time-btn-up w-16 h-8 flex items-center justify-center hover:bg-gray-100 rounded-t-md border-b border-gray-200" data-target="hour" data-action="up">
+                            <i class="fa fa-chevron-up text-gray-600"></i>
+                        </button>
+                        <input type="number" id="timePickerHour" min="0" max="23"
+                               class="w-16 h-14 text-center text-3xl font-bold border-0 focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50 text-blue-900"
+                               value="18">
+                        <button type="button" class="time-btn-down w-16 h-8 flex items-center justify-center hover:bg-gray-100 rounded-b-md border-t border-gray-200" data-target="hour" data-action="down">
+                            <i class="fa fa-chevron-down text-gray-600"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <span class="text-3xl font-bold text-gray-400 mt-6">:</span>
+
+                <!-- 分钟 -->
+                <div class="flex flex-col items-center">
+                    <label class="text-xs text-gray-500 mb-2">分钟</label>
+                    <div class="time-picker-container">
+                        <button type="button" class="time-btn-up w-16 h-8 flex items-center justify-center hover:bg-gray-100 rounded-t-md border-b border-gray-200" data-target="minute" data-action="up">
+                            <i class="fa fa-chevron-up text-gray-600"></i>
+                        </button>
+                        <input type="number" id="timePickerMinute" min="0" max="59"
+                               class="w-16 h-14 text-center text-3xl font-bold border-0 focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50 text-blue-900"
+                               value="00">
+                        <button type="button" class="time-btn-down w-16 h-8 flex items-center justify-center hover:bg-gray-100 rounded-b-md border-t border-gray-200" data-target="minute" data-action="down">
+                            <i class="fa fa-chevron-down text-gray-600"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <span class="text-3xl font-bold text-gray-400 mt-6">:</span>
+
+                <!-- 秒 -->
+                <div class="flex flex-col items-center">
+                    <label class="text-xs text-gray-500 mb-2">秒</label>
+                    <div class="time-picker-container">
+                        <button type="button" class="time-btn-up w-16 h-8 flex items-center justify-center hover:bg-gray-100 rounded-t-md border-b border-gray-200" data-target="second" data-action="up">
+                            <i class="fa fa-chevron-up text-gray-600"></i>
+                        </button>
+                        <input type="number" id="timePickerSecond" min="0" max="59"
+                               class="w-16 h-14 text-center text-3xl font-bold border-0 focus:outline-none focus:ring-2 focus:ring-primary bg-blue-50 text-blue-900"
+                               value="00">
+                        <button type="button" class="time-btn-down w-16 h-8 flex items-center justify-center hover:bg-gray-100 rounded-b-md border-t border-gray-200" data-target="second" data-action="down">
+                            <i class="fa fa-chevron-down text-gray-600"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快捷按钮 -->
+            <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                <button type="button" id="setNowTime" class="flex-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+                    <i class="fa fa-clock-o mr-1"></i> 当前时间
+                </button>
+                <button type="button" id="addOneHourTime" class="flex-1 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+                    <i class="fa fa-plus mr-1"></i> 加1小时
+                </button>
+            </div>
+
+            <div class="schedule-modal-actions">
+                <button id="cancelTimeSelection" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    取消
+                </button>
+                <button id="confirmTimeSelection" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    确定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- URL选择模态框 -->
+    <div id="urlSelectorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50 hidden flex items-start justify-center p-3 sm:p-6">
+        <div class="relative mx-auto p-4 sm:p-6 border shadow-lg rounded-lg bg-white schedule-url-selector-panel">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">选择目标URL</h3>
+                <button id="closeUrlSelector" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <!-- 搜索框 -->
+            <div class="mb-4">
+                <div class="relative">
+                    <input type="text" id="urlSelectorSearch"
+                           class="w-full px-3 py-2 pl-9 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                           placeholder="搜索URL或名称...">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fa fa-search text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- URL树形列表 -->
+            <div id="urlTreeContainer" class="border border-gray-200 rounded-md max-h-96 overflow-y-auto">
+                <div id="urlTreeBody" class="divide-y divide-gray-100">
+                    <div class="px-4 py-8 text-center text-gray-500">
+                        <i class="fa fa-spinner fa-spin text-2xl mb-2"></i>
+                        <p class="text-sm">加载中...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="schedule-modal-actions mt-4">
+                <button id="cancelUrlSelection" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 版本参数，用于强制浏览器重新加载JavaScript代码
+        const SCRIPT_VERSION = "2.0";
+
+        // 移动端菜单切换
+        document.getElementById('menuBtn').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobileMenu');
+            mobileMenu.classList.toggle('hidden');
+        });
+
+        // DOM元素（将在DOMContentLoaded后获取）
+        let refreshScheduleBtn, scheduleCount, scheduleTableBody, addScheduleBtn;
+        let scheduleHour, scheduleMinute, scheduleSecond;
+        let scheduleDepth, scheduleMode, scheduleLimit, scheduleName, scheduleRepeat;
+        let ragflowDatasets = [];
+        let ragflowDatasetMap = {};
+        let ragflowLoading = false;
+        let ragflowConfigured = null;
+        let ragflowUploadEnabled = false;
+        let ragflowStatusMessage = '正在检查知识库连接...';
+        let ragflowLastError = false;
+        let crawlRuntimeDefaults = {};
+        let crawlProxyConfigured = false;
+
+        function numberValue(id, fallback, minValue, maxValue) {
+            const el = document.getElementById(id);
+            let value = parseInt(el ? el.value : fallback, 10);
+            if (!Number.isFinite(value)) value = fallback;
+            if (minValue !== undefined) value = Math.max(minValue, value);
+            if (maxValue !== undefined) value = Math.min(maxValue, value);
+            return value;
+        }
+
+        function checkedValue(id) {
+            const el = document.getElementById(id);
+            return !!(el && el.checked);
+        }
+
+        function setCheckedValue(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.checked = !!value;
+        }
+
+        function setNumberValue(id, value) {
+            const el = document.getElementById(id);
+            if (el && value !== undefined && value !== null) el.value = value;
+        }
+
+        function applyScheduleStrategyPreset(prefix, preset) {
+            const presets = {
+                recommended: { wait_for_ms: 8000, max_pages: 30, max_empty_pages: 5, detail_max_retries: 2 },
+                stable: { wait_for_ms: 12000, max_pages: 80, max_empty_pages: 8, detail_max_retries: 3 },
+                fast: { wait_for_ms: 4000, max_pages: 15, max_empty_pages: 3, detail_max_retries: 1 }
+            };
+            const values = presets[preset] || presets.recommended;
+            setNumberValue(`${prefix}ScheduleWaitForMs`, values.wait_for_ms);
+            setNumberValue(`${prefix}ScheduleMaxPages`, values.max_pages);
+            setNumberValue(`${prefix}ScheduleMaxEmptyPages`, values.max_empty_pages);
+            setNumberValue(`${prefix}ScheduleDetailMaxRetries`, values.detail_max_retries);
+            setCheckedValue(`${prefix}ScheduleDateRangePriority`, true);
+            setCheckedValue(`${prefix}ScheduleCandidateDatePrefilter`, true);
+            setCheckedValue(`${prefix}ScheduleNetworkJsonEnabled`, true);
+            setCheckedValue(`${prefix}ScheduleSupplementalEnabled`, true);
+            const proxyEl = document.getElementById(`${prefix}ScheduleProxyEnabled`);
+            if (proxyEl && !crawlProxyConfigured) {
+                proxyEl.checked = false;
+            }
+        }
+
+        function getScheduleCrawlOptions(prefix) {
+            return {
+                wait_for_ms: numberValue(`${prefix}ScheduleWaitForMs`, 8000, 1000, 60000),
+                max_pages: numberValue(`${prefix}ScheduleMaxPages`, 30, 1, 1000),
+                max_empty_pages: numberValue(`${prefix}ScheduleMaxEmptyPages`, 5, 1, 50),
+                detail_max_retries: numberValue(`${prefix}ScheduleDetailMaxRetries`, 2, 1, 5),
+                date_range_priority: checkedValue(`${prefix}ScheduleDateRangePriority`),
+                candidate_date_prefilter: checkedValue(`${prefix}ScheduleCandidateDatePrefilter`),
+                network_json_enabled: checkedValue(`${prefix}ScheduleNetworkJsonEnabled`),
+                supplemental_enabled: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_html: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_attributes: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_structured: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_scripts: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_static_pagination: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_feeds: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                supplemental_sitemaps: checkedValue(`${prefix}ScheduleSupplementalEnabled`),
+                proxy_enabled: checkedValue(`${prefix}ScheduleProxyEnabled`)
+            };
+        }
+
+        function applyScheduleCrawlOptions(prefix, options) {
+            const merged = Object.assign({}, crawlRuntimeDefaults, options || {});
+            setNumberValue(`${prefix}ScheduleWaitForMs`, merged.wait_for_ms || 8000);
+            setNumberValue(`${prefix}ScheduleMaxPages`, merged.max_pages || 30);
+            setNumberValue(`${prefix}ScheduleMaxEmptyPages`, merged.max_empty_pages || 5);
+            setNumberValue(`${prefix}ScheduleDetailMaxRetries`, merged.detail_max_retries || 2);
+            setCheckedValue(`${prefix}ScheduleDateRangePriority`, merged.date_range_priority !== false);
+            setCheckedValue(`${prefix}ScheduleCandidateDatePrefilter`, merged.candidate_date_prefilter !== false);
+            setCheckedValue(`${prefix}ScheduleNetworkJsonEnabled`, merged.network_json_enabled !== false);
+            setCheckedValue(`${prefix}ScheduleSupplementalEnabled`, merged.supplemental_enabled !== false);
+            const proxyEl = document.getElementById(`${prefix}ScheduleProxyEnabled`);
+            if (proxyEl) {
+                proxyEl.checked = !!merged.proxy_enabled && crawlProxyConfigured;
+                proxyEl.disabled = !crawlProxyConfigured;
+            }
+        }
+
+        function loadCrawlRuntimeConfig(callback) {
+            fetch('/api/crawl-runtime-config')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        crawlRuntimeDefaults = data.defaults || {};
+                        crawlProxyConfigured = !!(data.proxy && data.proxy.configured);
+                        applyScheduleCrawlOptions('add', crawlRuntimeDefaults);
+                        applyScheduleCrawlOptions('edit', crawlRuntimeDefaults);
+                    }
+                })
+                .catch(error => console.error('加载聚合运行配置失败:', error))
+                .finally(() => {
+                    if (typeof callback === 'function') callback();
+                });
+        }
+
+        function attachRagflowRefreshHandlers() {
+            document.querySelectorAll('.ragflow-refresh-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const original = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i>刷新中';
+                    loadRagflowDatasets(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    });
+                });
+            });
+        }
+
+        function loadRagflowDatasets(callback) {
+            ragflowLoading = true;
+            ragflowStatusMessage = '正在加载知识库...';
+            ragflowLastError = false;
+            updateRagflowSelectOptions();
+            fetch('/api/schedule-management/ragflow/datasets')
+                .then(response => response.json().then(data => {
+                    if (!response.ok) {
+                        throw new Error(data.error || data.message || `HTTP ${response.status}`);
+                    }
+                    return data;
+                }))
+                .then(data => {
+                    if (data.success) {
+                        ragflowConfigured = data.configured !== false;
+                        ragflowUploadEnabled = ragflowConfigured && data.upload_enabled !== false;
+                        ragflowStatusMessage = data.message || '';
+                        ragflowDatasets = Array.isArray(data.datasets) ? data.datasets : [];
+                        ragflowDatasetMap = {};
+                        ragflowDatasets.forEach(dataset => {
+                            if (dataset && dataset.id) {
+                                ragflowDatasetMap[dataset.id] = dataset;
+                            }
+                        });
+                        updateRagflowSelectOptions();
+                        filterAndRenderSchedules();
+                    } else {
+                        ragflowConfigured = data.configured !== false ? data.configured : null;
+                        ragflowUploadEnabled = false;
+                        ragflowStatusMessage = data.error || data.message || '知识库加载失败';
+                        ragflowLastError = true;
+                        ragflowDatasets = [];
+                        ragflowDatasetMap = {};
+                        updateRagflowSelectOptions();
+                        console.warn('获取 Ragflow 知识库失败:', ragflowStatusMessage);
+                    }
+                })
+                .catch(err => {
+                    ragflowConfigured = null;
+                    ragflowUploadEnabled = false;
+                    ragflowStatusMessage = err.message || '知识库加载失败，请检查 RAGFlow 配置和网络';
+                    ragflowLastError = true;
+                    ragflowDatasets = [];
+                    ragflowDatasetMap = {};
+                    updateRagflowSelectOptions();
+                    console.error('获取 Ragflow 知识库失败:', err);
+                })
+                .finally(() => {
+                    ragflowLoading = false;
+                    updateRagflowSelectOptions();
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+                });
+        }
+
+        function getRagflowStatusText() {
+            if (ragflowLoading) return '正在加载知识库...';
+            if (ragflowConfigured === false) {
+                return ragflowStatusMessage || 'AI Server Parameters RAGFLOW_BASE_URL 和 RAGFLOW_API_KEY are not configured';
+            }
+            if (ragflowLastError) {
+                return ragflowStatusMessage || '知识库加载失败，请检查 RAGFlow 地址、API Key 或网络';
+            }
+            if (ragflowConfigured && !ragflowUploadEnabled) {
+                return ragflowStatusMessage || 'RAGFlow 已连接，但上传开关已关闭';
+            }
+            if (ragflowConfigured && ragflowDatasets.length === 0) {
+                return ragflowStatusMessage || 'RAGFlow 已连接，但没有知识库';
+            }
+            if (ragflowDatasets.length > 0) {
+                return `已加载 ${ragflowDatasets.length} 个知识库`;
+            }
+            return ragflowStatusMessage || '正在检查知识库连接...';
+        }
+
+        function updateRagflowStatusText() {
+            const text = getRagflowStatusText();
+            const isWarning = ragflowConfigured === false || ragflowLastError || (ragflowConfigured && !ragflowUploadEnabled);
+            ['scheduleRagflowStatus', 'addScheduleRagflowStatus', 'editScheduleRagflowStatus'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = text;
+                el.className = `mt-1 text-xs ${isWarning ? 'text-amber-600' : 'text-gray-500'}`;
+            });
+        }
+
+        function updateRagflowSelectOptions() {
+            const selectIds = ['scheduleRagflowKb', 'addScheduleRagflowKb', 'editScheduleRagflowKb'];
+            const statusText = getRagflowStatusText();
+            selectIds.forEach(id => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">不入库</option>';
+                if (statusText && (ragflowDatasets.length === 0 || ragflowConfigured === false || ragflowLastError || !ragflowUploadEnabled)) {
+                    const statusOption = document.createElement('option');
+                    statusOption.value = '';
+                    statusOption.disabled = true;
+                    statusOption.textContent = statusText;
+                    select.appendChild(statusOption);
+                }
+                ragflowDatasets.forEach(dataset => {
+                    if (!dataset || !dataset.id) return;
+                    const option = document.createElement('option');
+                    option.value = dataset.id;
+                    option.textContent = dataset.name || dataset.dataset_name || dataset.display_name || dataset.id;
+                    select.appendChild(option);
+                });
+                if (currentValue && !ragflowDatasetMap[currentValue]) {
+                    const fallback = document.createElement('option');
+                    fallback.value = currentValue;
+                    fallback.textContent = `未知知识库 (${currentValue})`;
+                    select.appendChild(fallback);
+                }
+                select.value = currentValue || '';
+            });
+            updateRagflowStatusText();
+        }
+
+        function setSelectValue(selectId, value) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+            if (value && !ragflowDatasetMap[value]) {
+                const exists = Array.from(select.options).some(opt => opt.value === value);
+                if (!exists) {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = `未知知识库 (${value})`;
+                    select.appendChild(opt);
+                }
+            }
+            select.value = value || '';
+        }
+
+        function getRagflowDatasetName(datasetId) {
+            if (!datasetId) return '—';
+            const dataset = ragflowDatasetMap[datasetId];
+            if (dataset) {
+                return dataset.name || dataset.dataset_name || dataset.display_name || datasetId;
+            }
+            return datasetId;
+        }
+
+        function validateRagflowSelection(ragflowKbId) {
+            if (!ragflowKbId) return true;
+            if (ragflowLoading) {
+                alert('知识库还在加载中，请稍后再保存');
+                return false;
+            }
+            if (ragflowConfigured === false) {
+                alert('AI Server Parameters RAGFLOW_BASE_URL 和 RAGFLOW_API_KEY are not configured');
+                return false;
+            }
+            if (ragflowLastError) {
+                alert('知识库加载失败，不能确认该知识库是否可用。请检查 RAGFlow 配置和网络后重试，或选择“不入库”。');
+                return false;
+            }
+            if (!ragflowUploadEnabled) {
+                alert('RAGFlow 上传开关已关闭，选择知识库后也不会入库。请开启 RAGFLOW_UPLOAD_ENABLED，或选择“不入库”。');
+                return false;
+            }
+            return true;
+        }
+
+        // 🔥 切换重复设置选项（每周/每月）
+        function toggleScheduleOptions(prefix) {
+            const repeatSelect = document.getElementById(prefix + 'ScheduleRepeat');
+            const weeklyOptions = document.getElementById(prefix + 'WeeklyOptions');
+            const monthlyOptions = document.getElementById(prefix + 'MonthlyOptions');
+
+            if (!repeatSelect) return;
+
+            const value = repeatSelect.value;
+
+            // 隐藏所有选项
+            if (weeklyOptions) weeklyOptions.classList.add('hidden');
+            if (monthlyOptions) monthlyOptions.classList.add('hidden');
+
+            // 根据选择显示对应选项（不清空数据，保存时由后端处理）
+            if (value === 'weekly' && weeklyOptions) {
+                weeklyOptions.classList.remove('hidden');
+            } else if (value === 'monthly' && monthlyOptions) {
+                monthlyOptions.classList.remove('hidden');
+            }
+        }
+
+        // 🔥 判断是否为闰年
+        function isLeapYear(year) {
+            return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+        }
+
+        // 🔥 获取某月的天数
+        function getDaysInMonth(year, month) {
+            const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            return daysInMonth[month - 1];
+        }
+
+        // 🔥 初始化月份日期选择器（带月份选择）
+        function initMonthDayPicker(containerId, checkboxClass) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const prefix = checkboxClass.replace('-monthday-checkbox', '');
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+
+            // 创建月份选择器和日期容器
+            let html = `
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs text-gray-600">参考月份:</span>
+                    <select id="${prefix}MonthSelect" class="px-2 py-1 text-xs border border-gray-300 rounded" onchange="updateMonthDays('${containerId}', '${checkboxClass}', this.value)">
+                        <option value="1" ${currentMonth===1?'selected':''}>1月(31天)</option>
+                        <option value="2" ${currentMonth===2?'selected':''}>2月(${isLeapYear(currentYear)?29:28}天)</option>
+                        <option value="3" ${currentMonth===3?'selected':''}>3月(31天)</option>
+                        <option value="4" ${currentMonth===4?'selected':''}>4月(30天)</option>
+                        <option value="5" ${currentMonth===5?'selected':''}>5月(31天)</option>
+                        <option value="6" ${currentMonth===6?'selected':''}>6月(30天)</option>
+                        <option value="7" ${currentMonth===7?'selected':''}>7月(31天)</option>
+                        <option value="8" ${currentMonth===8?'selected':''}>8月(31天)</option>
+                        <option value="9" ${currentMonth===9?'selected':''}>9月(30天)</option>
+                        <option value="10" ${currentMonth===10?'selected':''}>10月(31天)</option>
+                        <option value="11" ${currentMonth===11?'selected':''}>11月(30天)</option>
+                        <option value="12" ${currentMonth===12?'selected':''}>12月(31天)</option>
+                    </select>
+                    <span class="text-xs text-gray-500">(${isLeapYear(currentYear)?'闰年':'平年'})</span>
+                </div>
+                <div id="${containerId}Days" class="flex flex-wrap gap-1"></div>
+            `;
+            container.innerHTML = html;
+
+            // 初始化日期选择
+            updateMonthDays(containerId, checkboxClass, currentMonth);
+        }
+
+        // 🔥 更新月份日期显示
+        function updateMonthDays(containerId, checkboxClass, month) {
+            const daysContainer = document.getElementById(containerId + 'Days');
+            if (!daysContainer) return;
+
+            const year = new Date().getFullYear();
+            const maxDays = getDaysInMonth(year, parseInt(month));
+
+            // 保存当前选中的日期
+            const selectedDays = [];
+            document.querySelectorAll('.' + checkboxClass + ':checked').forEach(cb => {
+                selectedDays.push(parseInt(cb.value));
+            });
+
+            let html = '';
+            for (let day = 1; day <= maxDays; day++) {
+                const isSelected = selectedDays.includes(day);
+                html += `
+                    <label class="inline-flex items-center justify-center px-2 py-1 cursor-pointer hover:bg-gray-100 rounded">
+                        <input type="checkbox" value="${day}" class="${checkboxClass} rounded text-primary mr-1" ${isSelected?'checked':''}>
+                        <span class="text-sm">${day}</span>
+                    </label>
+                `;
+            }
+            daysContainer.innerHTML = html;
+        }
+
+        // 🔥 获取选中的星期几
+        function getSelectedWeekdays(prefix) {
+            const checkboxes = document.querySelectorAll('.' + prefix + '-weekday-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value).join(',');
+        }
+
+        // 🔥 获取选中的月份日期
+        function getSelectedMonthdays(prefix) {
+            const checkboxes = document.querySelectorAll('.' + prefix + '-monthday-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value).join(',');
+        }
+
+        // 🔥 设置星期几选中状态
+        function setSelectedWeekdays(prefix, weekdaysStr) {
+            const checkboxes = document.querySelectorAll('.' + prefix + '-weekday-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if (weekdaysStr) {
+                const days = weekdaysStr.split(',');
+                days.forEach(day => {
+                    const cb = document.querySelector('.' + prefix + '-weekday-checkbox[value="' + day.trim() + '"]');
+                    if (cb) cb.checked = true;
+                });
+            }
+        }
+
+        // 🔥 设置月份日期选中状态
+        function setSelectedMonthdays(prefix, monthdaysStr) {
+            const checkboxes = document.querySelectorAll('.' + prefix + '-monthday-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+
+            if (monthdaysStr) {
+                const days = monthdaysStr.split(',');
+                days.forEach(day => {
+                    const cb = document.querySelector('.' + prefix + '-monthday-checkbox[value="' + day.trim() + '"]');
+                    if (cb) cb.checked = true;
+                });
+            }
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+
+    // 初始化月份日期选择器（添加和编辑模态框）
+    initMonthDayPicker('addMonthdayContainer', 'add-monthday-checkbox');
+    initMonthDayPicker('editMonthdayContainer', 'edit-monthday-checkbox');
+
+    // 初始化DOM元素
+    refreshScheduleBtn = document.getElementById('refreshScheduleBtn');
+    scheduleCount = document.getElementById('scheduleCount');
+    scheduleTableBody = document.getElementById('scheduleTableBody');
+    addScheduleBtn = document.getElementById('addScheduleBtn');
+    scheduleHour = document.getElementById('scheduleHour');
+    scheduleMinute = document.getElementById('scheduleMinute');
+    scheduleSecond = document.getElementById('scheduleSecond');
+    scheduleDepth = document.getElementById('scheduleDepth');
+    scheduleMode = document.getElementById('scheduleMode');
+    scheduleLimit = document.getElementById('scheduleLimit');
+    scheduleName = document.getElementById('scheduleName');
+    scheduleRepeat = document.getElementById('scheduleRepeat');
+
+    initializeTimeInputs();
+    initializeUrlSelector();
+    attachRagflowRefreshHandlers();
+    loadCrawlRuntimeConfig(function() {
+        loadRagflowDatasets(function() {
+            loadSchedules();
+            loadSourceScanTasks();
+        });
+    });
+
+    // 刷新按钮
+    if (refreshScheduleBtn) {
+        refreshScheduleBtn.addEventListener('click', function() {
+            loadSchedules();
+            loadSourceScanTasks();
+        });
+    }
+
+    const refreshSourceTasksBtn = document.getElementById('refreshSourceTasksBtn');
+    if (refreshSourceTasksBtn) refreshSourceTasksBtn.addEventListener('click', loadSourceScanTasks);
+
+    // 添加定时任务模态框按钮
+    const addScheduleModalBtn = document.getElementById('addScheduleModalBtn');
+    if (addScheduleModalBtn) {
+        addScheduleModalBtn.addEventListener('click', function() {
+            openAddScheduleModal();
+        });
+    }
+
+    // 关闭添加模态框
+    const closeAddScheduleModal = document.getElementById('closeAddScheduleModal');
+    const cancelAddSchedule = document.getElementById('cancelAddSchedule');
+
+    if (closeAddScheduleModal) {
+        closeAddScheduleModal.addEventListener('click', function() {
+            document.getElementById('addScheduleModal').classList.add('hidden');
+        });
+    }
+
+    if (cancelAddSchedule) {
+        cancelAddSchedule.addEventListener('click', function() {
+            document.getElementById('addScheduleModal').classList.add('hidden');
+        });
+    }
+
+    // 确认添加定时任务
+    const confirmAddSchedule = document.getElementById('confirmAddSchedule');
+    if (confirmAddSchedule) {
+        confirmAddSchedule.addEventListener('click', function() {
+            addSchedule();
+        });
+    }
+
+    // 搜索框
+    const scheduleSearch = document.getElementById('scheduleSearch');
+    const clearSearch = document.getElementById('clearSearch');
+
+    if (scheduleSearch) {
+        scheduleSearch.addEventListener('input', function() {
+            currentPage = 1;
+            filterAndRenderSchedules();
+
+            // 显示/隐藏清除按钮
+            if (clearSearch) {
+                if (this.value.trim()) {
+                    clearSearch.classList.remove('hidden');
+                } else {
+                    clearSearch.classList.add('hidden');
+                }
+            }
+        });
+    }
+
+    // 清除搜索按钮
+    if (clearSearch) {
+        clearSearch.addEventListener('click', function() {
+            if (scheduleSearch) {
+                scheduleSearch.value = '';
+                this.classList.add('hidden');
+                currentPage = 1;
+                filterAndRenderSchedules();
+            }
+        });
+    }
+
+    // 状态筛选
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            currentPage = 1;
+            filterAndRenderSchedules();
+        });
+    }
+
+    // 重复类型筛选
+    const repeatFilter = document.getElementById('repeatFilter');
+    if (repeatFilter) {
+        repeatFilter.addEventListener('change', function() {
+            currentPage = 1;
+            filterAndRenderSchedules();
+        });
+    }
+
+    // 重置筛选按钮
+    const resetFilters = document.getElementById('resetFilters');
+    if (resetFilters) {
+        resetFilters.addEventListener('click', function() {
+            if (scheduleSearch) scheduleSearch.value = '';
+            if (statusFilter) statusFilter.value = '';
+            if (repeatFilter) repeatFilter.value = '';
+            if (clearSearch) clearSearch.classList.add('hidden');
+            currentPage = 1;
+            filterAndRenderSchedules();
+        });
+    }
+
+    // 每页显示数量
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            pageSize = parseInt(this.value);
+            currentPage = 1;
+            filterAndRenderSchedules();
+        });
+    }
+
+    // 上一页
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    if (prevPageBtn) {
+        prevPageBtn.addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                filterAndRenderSchedules();
+            }
+        });
+    }
+
+    // 下一页
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    if (nextPageBtn) {
+        nextPageBtn.addEventListener('click', function() {
+            const totalPages = Math.ceil(filteredSchedules.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                filterAndRenderSchedules();
+            }
+        });
+    }
+
+    // 添加定时任务按钮
+    if (addScheduleBtn) {
+        addScheduleBtn.addEventListener('click', function() {
+            const url = document.getElementById('selectedUrlValue').value.trim();
+            const hour = String(parseInt(scheduleHour.value) || 0).padStart(2, '0');
+            const minute = String(parseInt(scheduleMinute.value) || 0).padStart(2, '0');
+            const second = String(parseInt(scheduleSecond.value) || 0).padStart(2, '0');
+            const depth = scheduleDepth.value;
+            const mode = 'standard';
+            const limit = scheduleLimit.value;
+            const name = scheduleName.value.trim();
+            const repeat = scheduleRepeat.value;
+            const ragflowKbId = document.getElementById('scheduleRagflowKb')?.value || '';
+            const crawlOptions = Object.assign({}, crawlRuntimeDefaults || {});
+            const today = new Date();
+            const scheduleWeekdays = repeat === 'weekly' ? String((today.getDay() + 6) % 7) : '';
+            const scheduleMonthdays = repeat === 'monthly' ? String(today.getDate()) : '';
+
+            if (!url) {
+                alert('请选择一个目标URL');
+                return;
+            }
+            if (!validateRagflowSelection(ragflowKbId)) {
+                return;
+            }
+
+            // 禁用按钮，显示加载状态
+            addScheduleBtn.disabled = true;
+            addScheduleBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1.5"></i> Adding...';
+
+            fetch('/api/schedules', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: url,
+                    execution_time_hour: hour,
+                    execution_time_minute: minute,
+                    execution_time_second: second,
+                    depth: depth,
+                    mode: mode,
+                    limit: limit,
+                    name: name,
+                    repeat: repeat,
+                    ragflow_kb_id: ragflowKbId,
+                    days_limit: 7,
+                    crawl_options: crawlOptions,
+                    schedule_weekdays: scheduleWeekdays,
+                    schedule_monthdays: scheduleMonthdays
+                })
+            })
+            .then(response => response.json())
+                .then(data => {
+                // 恢复按钮状态
+                addScheduleBtn.disabled = false;
+                addScheduleBtn.innerHTML = '添加任务';
+
+                if (data.success) {
+                    // 重置表单
+                    document.getElementById('selectedUrlValue').value = '';
+                    document.getElementById('selectedUrlDisplay').value = '';
+                    scheduleName.value = '';
+
+                    // 重新设置默认时间
+                    const now = new Date();
+                    const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
+                    scheduleHour.value = nextHour.getHours();
+                    scheduleMinute.value = nextHour.getMinutes();
+                    scheduleSecond.value = 0;
+                    updateTimeDisplay();
+
+                    // 刷新定时任务列表
+                    loadSchedules();
+                } else {
+                    alert('添加失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                // 恢复按钮状态
+                addScheduleBtn.disabled = false;
+                addScheduleBtn.innerHTML = '添加任务';
+
+                console.error('添加定时任务失败:', error);
+                alert('添加失败: ' + error.message);
+            });
+        });
+    }
+});
+
+        // 全局变量
+        let allUrlsData = [];
+        let allCategoriesData = [];
+        let allSchedules = []; // 所有定时任务
+        let filteredSchedules = []; // 过滤后的定时任务
+        let currentPage = parseInt(sessionStorage.getItem('schedule_mgmt_page') || '1'); // 刷新后恢复页码
+        let pageSize = 10; // 每页显示数量
+        const schedulePageParams = new URLSearchParams(window.location.search);
+        let pendingEditScheduleId = schedulePageParams.get('edit_schedule_id') || '';
+        const returnToConsoleAfterEdit = schedulePageParams.get('return_to') === 'console';
+
+        // 初始化时间输入框和选择器
+        function initializeTimeInputs() {
+            const now = new Date();
+            const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
+
+            // 设置默认时间
+            if (scheduleHour) scheduleHour.value = nextHour.getHours();
+            if (scheduleMinute) scheduleMinute.value = nextHour.getMinutes();
+            if (scheduleSecond) scheduleSecond.value = 0;
+
+            // 更新显示
+            if (scheduleHour && scheduleMinute && scheduleSecond) {
+                updateTimeDisplay();
+            }
+
+            // 点击时间输入框打开选择器
+            const selectedTimeDisplay = document.getElementById('selectedTimeDisplay');
+            if (selectedTimeDisplay) {
+                selectedTimeDisplay.addEventListener('click', function() {
+                    openTimePicker();
+                });
+            }
+
+            // 关闭时间选择器
+            document.getElementById('closeTimeSelector').addEventListener('click', function() {
+                document.getElementById('timeSelectorModal').classList.add('hidden');
+            });
+
+            document.getElementById('cancelTimeSelection').addEventListener('click', function() {
+                document.getElementById('timeSelectorModal').classList.add('hidden');
+            });
+
+            // 确认时间选择
+            document.getElementById('confirmTimeSelection').addEventListener('click', function() {
+                const hour = parseInt(document.getElementById('timePickerHour').value);
+                const minute = parseInt(document.getElementById('timePickerMinute').value);
+                const second = parseInt(document.getElementById('timePickerSecond').value);
+
+                // 判断是添加、编辑还是其他模式
+                if (window.addingSchedule) {
+                    document.getElementById('addScheduleHour').value = hour;
+                    document.getElementById('addScheduleMinute').value = minute;
+                    document.getElementById('addScheduleSecond').value = second;
+                    updateAddTimeDisplay();
+                    window.addingSchedule = false;
+                } else if (window.editingSchedule) {
+                    document.getElementById('editScheduleHour').value = hour;
+                    document.getElementById('editScheduleMinute').value = minute;
+                    document.getElementById('editScheduleSecond').value = second;
+                    updateEditTimeDisplay();
+                    window.editingSchedule = false;
+                } else {
+                    if (scheduleHour && scheduleMinute && scheduleSecond) {
+                        scheduleHour.value = hour;
+                        scheduleMinute.value = minute;
+                        scheduleSecond.value = second;
+                        updateTimeDisplay();
+                    }
+                }
+
+                document.getElementById('timeSelectorModal').classList.add('hidden');
+            });
+
+            // 时间增减按钮
+            document.querySelectorAll('.time-btn-up, .time-btn-down').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const target = this.dataset.target;
+                    const action = this.dataset.action;
+                    adjustTime(target, action === 'up' ? 1 : -1);
+                });
+            });
+
+            // 输入框验证
+            const timeInputs = [
+                {id: 'timePickerHour', max: 23},
+                {id: 'timePickerMinute', max: 59},
+                {id: 'timePickerSecond', max: 59}
+            ];
+
+            timeInputs.forEach(config => {
+                const input = document.getElementById(config.id);
+
+                // 点击时选中所有文本，方便快速输入
+                input.addEventListener('focus', function() {
+                    this.select();
+                });
+
+                // 点击时也选中
+                input.addEventListener('click', function() {
+                    this.select();
+                });
+
+                // 输入时验证
+                input.addEventListener('input', function() {
+                    // 只允许数字
+                    this.value = this.value.replace(/[^0-9]/g, '');
+
+                    // 限制长度为2位
+                    if (this.value.length > 2) {
+                        this.value = this.value.slice(0, 2);
+                    }
+
+                    // 实时验证范围
+                    let val = parseInt(this.value);
+                    if (!isNaN(val) && val > config.max) {
+                        this.value = String(config.max);
+                    }
+                });
+
+                // 失去焦点时格式化
+                input.addEventListener('blur', function() {
+                    let val = parseInt(this.value) || 0;
+                    if (val < 0) val = 0;
+                    if (val > config.max) val = config.max;
+                    this.value = String(val).padStart(2, '0');
+                });
+
+                // 按下Enter键确认
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        document.getElementById('confirmTimeSelection').click();
+                    }
+                });
+            });
+
+            // 快捷按钮
+            document.getElementById('setNowTime').addEventListener('click', function() {
+                const now = new Date();
+                setPickerTime(now.getHours(), now.getMinutes(), now.getSeconds());
+            });
+
+            document.getElementById('addOneHourTime').addEventListener('click', function() {
+                // 在当前选择的时间基础上加1小时
+                let currentHour = parseInt(document.getElementById('timePickerHour').value) || 0;
+                let currentMinute = parseInt(document.getElementById('timePickerMinute').value) || 0;
+                let currentSecond = parseInt(document.getElementById('timePickerSecond').value) || 0;
+
+                currentHour = (currentHour + 1) % 24; // 循环到0-23
+                setPickerTime(currentHour, currentMinute, currentSecond);
+            });
+        }
+
+        // 打开时间选择器
+        function openTimePicker() {
+            const hour = parseInt(scheduleHour.value) || 0;
+            const minute = parseInt(scheduleMinute.value) || 0;
+            const second = parseInt(scheduleSecond.value) || 0;
+
+            setPickerTime(hour, minute, second);
+            document.getElementById('timeSelectorModal').classList.remove('hidden');
+        }
+
+        // 设置时间选择器的值
+        function setPickerTime(hour, minute, second) {
+            document.getElementById('timePickerHour').value = String(hour).padStart(2, '0');
+            document.getElementById('timePickerMinute').value = String(minute).padStart(2, '0');
+            document.getElementById('timePickerSecond').value = String(second).padStart(2, '0');
+        }
+
+        // 调整时间
+        function adjustTime(target, delta) {
+            let inputId, max;
+
+            if (target === 'hour') {
+                inputId = 'timePickerHour';
+                max = 23;
+            } else if (target === 'minute') {
+                inputId = 'timePickerMinute';
+                max = 59;
+                        } else {
+                inputId = 'timePickerSecond';
+                max = 59;
+            }
+
+            const input = document.getElementById(inputId);
+            let value = parseInt(input.value) + delta;
+
+            // 循环处理
+            if (value < 0) value = max;
+            if (value > max) value = 0;
+
+            input.value = String(value).padStart(2, '0');
+        }
+
+        // 更新时间显示
+        function updateTimeDisplay() {
+            if (!scheduleHour || !scheduleMinute || !scheduleSecond) {
+                return;
+            }
+            const hour = String(scheduleHour.value || 0).padStart(2, '0');
+            const minute = String(scheduleMinute.value || 0).padStart(2, '0');
+            const second = String(scheduleSecond.value || 0).padStart(2, '0');
+            const selectedTimeDisplay = document.getElementById('selectedTimeDisplay');
+            if (selectedTimeDisplay) {
+                selectedTimeDisplay.value = `${hour}:${minute}:${second}`;
+            }
+        }
+
+        // 更新编辑模态框的时间显示
+        function updateEditTimeDisplay() {
+            const hour = String(document.getElementById('editScheduleHour').value || 0).padStart(2, '0');
+            const minute = String(document.getElementById('editScheduleMinute').value || 0).padStart(2, '0');
+            const second = String(document.getElementById('editScheduleSecond').value || 0).padStart(2, '0');
+            document.getElementById('editSelectedTimeDisplay').value = `${hour}:${minute}:${second}`;
+        }
+
+        // 初始化URL选择器
+        function initializeUrlSelector() {
+            const selectedUrlDisplay = document.getElementById('selectedUrlDisplay');
+            const urlSelectorModal = document.getElementById('urlSelectorModal');
+            const closeUrlSelector = document.getElementById('closeUrlSelector');
+            const cancelUrlSelection = document.getElementById('cancelUrlSelection');
+            const urlSelectorSearch = document.getElementById('urlSelectorSearch');
+
+            // 点击输入框打开模态框
+            if (selectedUrlDisplay) {
+                selectedUrlDisplay.addEventListener('click', function() {
+                    loadUrlsForSelector();
+                    urlSelectorModal.classList.remove('hidden');
+                });
+            }
+
+            // 关闭模态框
+            if (closeUrlSelector) {
+                closeUrlSelector.addEventListener('click', function() {
+                    urlSelectorModal.classList.add('hidden');
+                });
+            }
+
+            if (cancelUrlSelection) {
+                cancelUrlSelection.addEventListener('click', function() {
+                    urlSelectorModal.classList.add('hidden');
+                });
+            }
+
+            // 搜索功能
+            if (urlSelectorSearch) {
+                urlSelectorSearch.addEventListener('input', function() {
+                    renderUrlTree(this.value.toLowerCase().trim());
+                });
+            }
+        }
+
+        // 加载URL和分类数据
+        function loadUrlsForSelector() {
+            const urlTreeBody = document.getElementById('urlTreeBody');
+            urlTreeBody.innerHTML = `
+                <div class="px-4 py-8 text-center text-gray-500">
+                    <i class="fa fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p class="text-sm">加载中...</p>
+                </div>
+            `;
+
+            // 加载分类
+            fetch('/api/categories')
+                .then(r => r.json())
+                .then(catData => {
+                    if (catData.success) {
+                        allCategoriesData = catData.categories || [];
+                    }
+
+                    // 加载URL
+                    return fetch('/api/urls?page=1&page_size=1000');
+                })
+                .then(r => r.json())
+                .then(urlData => {
+                    if (urlData.success) {
+                        allUrlsData = urlData.urls || [];
+                        renderUrlTree('');
+                    } else {
+                        urlTreeBody.innerHTML = `
+                            <div class="px-4 py-8 text-center text-gray-500">
+                                <i class="fa fa-exclamation-triangle text-2xl mb-2"></i>
+                                <p class="text-sm">加载失败</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('加载URL失败:', error);
+                    urlTreeBody.innerHTML = `
+                        <div class="px-4 py-8 text-center text-gray-500">
+                            <i class="fa fa-exclamation-triangle text-2xl mb-2 text-red-400"></i>
+                            <p class="text-sm text-red-500">加载失败: ${error.message}</p>
+                        </div>
+                    `;
+                });
+        }
+
+        // 渲染URL树形列表
+        function renderUrlTree(searchTerm) {
+            const urlTreeBody = document.getElementById('urlTreeBody');
+
+            // 过滤URL
+            let filteredUrls = allUrlsData.filter(u => !u.parent_id);
+            if (searchTerm) {
+                filteredUrls = filteredUrls.filter(u =>
+                    (u.name && u.name.toLowerCase().includes(searchTerm)) ||
+                    u.url.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            // 按分类组织
+            const urlsByCategory = {};
+            allCategoriesData.forEach(cat => {
+                urlsByCategory[cat.id] = [];
+            });
+            urlsByCategory['uncategorized'] = [];
+
+            filteredUrls.forEach(url => {
+                if (url.category_id && urlsByCategory[url.category_id]) {
+                    urlsByCategory[url.category_id].push(url);
+                    } else {
+                    urlsByCategory['uncategorized'].push(url);
+                }
+            });
+
+            let html = '';
+
+            // 渲染分类
+            allCategoriesData.forEach(category => {
+                const urls = urlsByCategory[category.id] || [];
+                if (urls.length > 0) {
+                    html += `
+                        <div class="category-block">
+                            <div class="px-3 py-2 bg-blue-50 text-sm font-semibold text-blue-900">
+                                <i class="fa fa-folder mr-2"></i>${category.name} (${urls.length})
+                            </div>
+                            ${urls.map(url => `
+                                <div class="url-item px-4 py-3 hover:bg-gray-50 cursor-pointer border-t border-gray-100 flex items-center justify-between" data-url="${url.url}" data-name="${url.name || url.url}">
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium text-gray-900">${url.name || url.url}</div>
+                                        <div class="text-xs text-gray-500 truncate">${url.url}</div>
+                                    </div>
+                                    <i class="fa fa-check-circle text-primary opacity-0"></i>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            });
+
+            // 无分类
+            if (urlsByCategory['uncategorized'].length > 0) {
+                html += `
+                    <div class="category-block">
+                        <div class="px-3 py-2 bg-gray-50 text-sm font-semibold text-gray-700">
+                            <i class="fa fa-folder-open mr-2"></i>无分类 (${urlsByCategory['uncategorized'].length})
+                        </div>
+                        ${urlsByCategory['uncategorized'].map(url => `
+                            <div class="url-item px-4 py-3 hover:bg-gray-50 cursor-pointer border-t border-gray-100 flex items-center justify-between" data-url="${url.url}" data-name="${url.name || url.url}">
+                                <div class="flex-1">
+                                    <div class="text-sm font-medium text-gray-900">${url.name || url.url}</div>
+                                    <div class="text-xs text-gray-500 truncate">${url.url}</div>
+                                </div>
+                                <i class="fa fa-check-circle text-primary opacity-0"></i>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            if (!html) {
+                html = `
+                    <div class="px-4 py-8 text-center text-gray-500">
+                        <i class="fa fa-search text-2xl mb-2"></i>
+                        <p class="text-sm">没有找到匹配的URL</p>
+                    </div>
+                `;
+            }
+
+            urlTreeBody.innerHTML = html;
+
+            // 绑定点击事件
+            document.querySelectorAll('.url-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const url = this.dataset.url;
+                    const name = this.dataset.name;
+
+                    // 判断是添加、编辑还是其他模式
+                    if (window.addingSchedule) {
+                        document.getElementById('addSelectedUrlValue').value = url;
+                        document.getElementById('addSelectedUrlDisplay').value = name;
+                        window.addingSchedule = false;
+                    } else if (window.editingSchedule) {
+                        document.getElementById('editSelectedUrlValue').value = url;
+                        document.getElementById('editSelectedUrlDisplay').value = url;
+                        window.editingSchedule = false;
+                    } else {
+                        const selectedUrlValue = document.getElementById('selectedUrlValue');
+                        const selectedUrlDisplay = document.getElementById('selectedUrlDisplay');
+                        if (selectedUrlValue) selectedUrlValue.value = url;
+                        if (selectedUrlDisplay) selectedUrlDisplay.value = name;
+                    }
+
+                    document.getElementById('urlSelectorModal').classList.add('hidden');
+                });
+            });
+        }
+
+        // 加载定时任务列表
+function loadSchedules() {
+    fetch('/api/schedules')
+        .then(response => response.json())
+        .then(data => {
+            console.log('API返回数据:', data);
+            if (data.success) {
+                allSchedules = data.schedules || [];
+                scheduleCount.textContent = allSchedules.length;
+                currentPage = 1;
+                filterAndRenderSchedules();
+                openPendingEditSchedule();
+            } else {
+                console.error('获取定时任务列表失败:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('获取定时任务列表失败:', error);
+        });
+}
+
+function escapeSourceTaskHtml(value) {
+    return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function formatSourceTaskTime(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? escapeSourceTaskHtml(value) : date.toLocaleString('zh-CN', { timeZone: 'Asia/Hong_Kong', hour12: false });
+}
+function loadSourceScanTasks() {
+    const body = document.getElementById('sourceTasksTableBody');
+    if (!body) return;
+    const activeIndustryPackId = {{ active_industry_pack.id|tojson }};
+    fetch('/api/intel/source-tasks?industry_pack_id=' + encodeURIComponent(activeIndustryPackId) + '&per_page=500')
+        .then(response => response.ok ? response.json() : Promise.reject(new Error('HTTP ' + response.status)))
+        .then(data => {
+            const tasks = data.source_tasks || [];
+            if (!data.success || !tasks.length) { body.innerHTML = '<tr><td colspan="8" class="px-4 py-6 text-center text-gray-500">暂无已注册的行业信源</td></tr>'; return; }
+            body.innerHTML = tasks.map(task => {
+                const status = task.scan_status || 'not_scanned';
+                const label = { completed:'已完成', partial:'部分完成', running:'扫描中', failed:'失败', rate_limited:'受限', skipped:'跳过', not_scanned:'未扫描' }[status] || status;
+                const style = ['failed','rate_limited'].includes(status) ? 'text-red-700' : (status === 'completed' ? 'text-emerald-700' : 'text-amber-700');
+                const reason = task.failure_reason ? `<div class="mt-1 text-xs text-red-600 break-all">${escapeSourceTaskHtml(task.failure_reason)}</div>` : '';
+                const kb = (task.knowledge_base_ids || []).map(escapeSourceTaskHtml).join('<br>') || '—';
+                return `<tr><td class="px-3 py-3 min-w-72"><div class="font-medium text-gray-900">${escapeSourceTaskHtml(task.source_name || '未命名信源')}</div><div class="mt-1 text-xs text-gray-500 break-all">${escapeSourceTaskHtml(task.source_url)}</div></td><td class="px-3 py-3 whitespace-nowrap">${task.browser_fetch_enabled ? '<span class="text-indigo-700">已启用</span>' : '<span class="text-gray-500">轻量请求</span>'}</td><td class="px-3 py-3 whitespace-nowrap text-xs text-gray-600">${formatSourceTaskTime(task.last_scan_at)}</td><td class="px-3 py-3 whitespace-nowrap text-xs text-gray-600">${formatSourceTaskTime(task.next_scan_at)}</td><td class="px-3 py-3 text-center">${Number(task.discovered_count || 0)}</td><td class="px-3 py-3 text-center">${Number(task.ingested_count || 0)}</td><td class="px-3 py-3 text-xs text-gray-600 break-all">${kb}</td><td class="px-3 py-3 min-w-48"><div class="font-medium ${style}">${label}</div>${reason}</td></tr>`;
+            }).join('');
+        }).catch(error => { body.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center text-red-600">加载信源扫描任务失败：${escapeSourceTaskHtml(error.message)}</td></tr>`; });
+}
+
+function openPendingEditSchedule() {
+    if (!pendingEditScheduleId) return;
+    const schedule = (allSchedules || []).find(item => String(item.id) === String(pendingEditScheduleId));
+    if (!schedule) return;
+    pendingEditScheduleId = '';
+    openEditScheduleModal(schedule);
+}
+
+function closeEditScheduleModal() {
+    document.getElementById('editScheduleModal').classList.add('hidden');
+    if (returnToConsoleAfterEdit) {
+        window.location.href = '/';
+    }
+}
+
+// 过滤和渲染定时任务
+function filterAndRenderSchedules() {
+    const searchTerm = document.getElementById('scheduleSearch')?.value.toLowerCase().trim() || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const repeatFilter = document.getElementById('repeatFilter')?.value || '';
+
+    // 过滤任务
+    filteredSchedules = allSchedules.filter(schedule => {
+        // 搜索过滤
+        const matchesSearch = !searchTerm ||
+            (schedule.name && schedule.name.toLowerCase().includes(searchTerm)) ||
+            (schedule.task_name && schedule.task_name.toLowerCase().includes(searchTerm)) ||
+            (schedule.url && schedule.url.toLowerCase().includes(searchTerm)) ||
+            (schedule.target_url && schedule.target_url.toLowerCase().includes(searchTerm));
+
+        // 状态过滤
+        const enabled = schedule.enabled !== undefined ? schedule.enabled : (schedule.is_active !== undefined ? schedule.is_active : true);
+        const matchesStatus = !statusFilter ||
+            (statusFilter === 'enabled' && enabled) ||
+            (statusFilter === 'disabled' && !enabled);
+
+        // 重复类型过滤
+        const repeat = schedule.repeat || schedule.schedule_type || 'once';
+        const matchesRepeat = !repeatFilter || repeat === repeatFilter;
+
+        return matchesSearch && matchesStatus && matchesRepeat;
+    });
+
+    // 计算分页
+    const totalPages = Math.ceil(filteredSchedules.length / pageSize);
+    if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+    }
+    sessionStorage.setItem('schedule_mgmt_page', currentPage);
+
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, filteredSchedules.length);
+    const pageSchedules = filteredSchedules.slice(start, end);
+
+    // 渲染表格
+    renderSchedulesTable(pageSchedules);
+
+    // 更新分页信息
+    updatePagination(filteredSchedules.length, totalPages);
+}
+
+// 更新分页控件
+function updatePagination(totalItems, totalPages) {
+    const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, totalItems);
+
+    document.getElementById('pageStart').textContent = start;
+    document.getElementById('pageEnd').textContent = end;
+    document.getElementById('totalSchedules').textContent = totalItems;
+
+    // 更新按钮状态
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+
+    if (prevBtn) {
+        prevBtn.disabled = currentPage <= 1;
+    }
+
+    if (nextBtn) {
+        nextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+    }
+
+    // 生成页码按钮
+    const pageNumbers = document.getElementById('pageNumbers');
+    if (pageNumbers) {
+        pageNumbers.innerHTML = '';
+
+        if (totalPages <= 7) {
+            // 显示所有页码
+            for (let i = 1; i <= totalPages; i++) {
+                pageNumbers.appendChild(createPageButton(i));
+            }
+        } else {
+            // 显示部分页码
+            pageNumbers.appendChild(createPageButton(1));
+
+            if (currentPage > 3) {
+                pageNumbers.appendChild(createEllipsis());
+            }
+
+            const startPage = Math.max(2, currentPage - 1);
+            const endPage = Math.min(totalPages - 1, currentPage + 1);
+
+            for (let i = startPage; i <= endPage; i++) {
+                pageNumbers.appendChild(createPageButton(i));
+            }
+
+            if (currentPage < totalPages - 2) {
+                pageNumbers.appendChild(createEllipsis());
+            }
+
+            pageNumbers.appendChild(createPageButton(totalPages));
+        }
+    }
+}
+
+// 创建页码按钮
+function createPageButton(pageNum) {
+    const button = document.createElement('button');
+    button.textContent = pageNum;
+    button.className = `px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+        pageNum === currentPage
+            ? 'bg-primary text-white border-primary'
+            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+    }`;
+    button.addEventListener('click', function() {
+        currentPage = pageNum;
+        filterAndRenderSchedules();
+    });
+    return button;
+}
+
+// 创建省略号
+function createEllipsis() {
+    const span = document.createElement('span');
+    span.textContent = '...';
+    span.className = 'px-2 text-gray-500';
+    return span;
+}
+
+        // 渲染定时任务表格
+function renderSchedulesTable(schedules) {
+    console.log('渲染定时任务表格，数据:', schedules);
+
+    if (!schedules || schedules.length === 0) {
+        // 检查是否是因为搜索/筛选导致的空结果
+        const hasFilters = (document.getElementById('scheduleSearch')?.value.trim() ||
+                           document.getElementById('statusFilter')?.value ||
+                           document.getElementById('repeatFilter')?.value);
+
+        scheduleTableBody.innerHTML = `
+            <tr>
+                <td colspan="10" class="px-4 py-6 text-center text-gray-500">
+                    <div class="flex flex-col items-center justify-center py-4">
+                        <i class="fa fa-${hasFilters ? 'search' : 'clock-o'} text-2xl text-gray-300 mb-2"></i>
+                        <p class="text-gray-500 text-sm">${hasFilters ? '没有找到匹配的任务' : '暂无任务'}</p>
+                        ${hasFilters ? '<button onclick="document.getElementById(\'resetFilters\').click()" class="mt-2 text-primary hover:underline text-sm">清除筛选条件</button>' : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    scheduleTableBody.innerHTML = schedules.map(schedule => {
+        console.log('处理单个任务:', schedule); // 添加调试日志
+
+        // 格式化执行时间 - 适配API返回的格式
+        const executionTime = (schedule.execution_time_hour || '00') + ':' +
+                             (schedule.execution_time_minute || '00') + ':' +
+                             (schedule.execution_time_second || '00');
+
+        // 格式化重复设置 - 适配API返回的格式
+        let repeatText = '';
+        const repeat = schedule.repeat || 'once';
+        switch (repeat) {
+            case 'once':
+                repeatText = '仅执行一次';
+                break;
+            case 'daily':
+                repeatText = '每天';
+                break;
+            case 'weekly':
+                repeatText = '每周';
+                break;
+            case 'monthly':
+                repeatText = '每月';
+                break;
+            default:
+                repeatText = repeat || '未知';
+        }
+
+        // 格式化状态 - 适配API返回的格式
+        let statusClass = '';
+        let statusText = '';
+        const enabled = schedule.enabled !== undefined ? schedule.enabled : true;
+
+        if (enabled) {
+            statusClass = 'bg-green-100 text-green-800';
+            statusText = '已启用';
+        } else {
+            statusClass = 'bg-gray-100 text-gray-800';
+            statusText = '已禁用';
+        }
+
+        const url = schedule.url || schedule.target_url || '';
+        const urlDisplayName = schedule.url_display_name || '';
+        const displayUrl = url.length > 50 ? url.substring(0, 50) + '...' : url;
+
+        // 格式化创建时间
+        const createdTime = formatDate(schedule.created_at);
+
+        // 任务名称 - 适配API返回的格式
+        const taskName = schedule.name || schedule.task_name || '-';
+
+        const ragflowName = getRagflowDatasetName(schedule.ragflow_kb_id);
+        const hasRagflow = !!schedule.ragflow_kb_id;
+        const ingestStats = schedule.ingest_stats || {};
+        const matchedArticleCount = Number(ingestStats.matched_article_count ?? schedule.matched_article_count ?? 0);
+        const ragflowArticleCount = Number(ingestStats.ragflow_article_count ?? schedule.ragflow_article_count ?? 0);
+
+        return `
+            <tr class="h-14">
+                <td class="px-4 py-2 whitespace-nowrap max-w-[180px]">
+                    <div class="text-sm font-medium text-gray-900 truncate" title="${taskName}">${taskName}</div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap max-w-[130px]">
+                    ${urlDisplayName
+                        ? `<span class="text-sm font-medium text-blue-700 truncate block" title="${urlDisplayName}">${urlDisplayName}</span>`
+                        : '<span class="text-xs text-gray-300">-</span>'}
+                </td>
+                <td class="px-4 py-2 max-w-[260px]">
+                    <div class="text-sm text-gray-500 truncate whitespace-nowrap" title="${url}">${displayUrl}</div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                    <div class="text-sm text-gray-500">${executionTime}</div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                    <div class="text-sm text-gray-500">${repeatText}</div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap max-w-[160px]">
+                    ${hasRagflow
+                        ? `<span class="px-2 inline-flex max-w-full text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 truncate" title="${ragflowName}">${ragflowName}</span>`
+                        : '<span class="text-xs text-gray-400">不入库</span>'}
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                    <div class="text-sm font-semibold text-gray-900">${matchedArticleCount}</div>
+                    <div class="text-xs text-gray-500">知识库 ${ragflowArticleCount}</div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+                        ${statusText}
+                    </span>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap">
+                    <div class="text-sm text-gray-500">${createdTime}</div>
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">
+                    <button class="edit-schedule-btn text-blue-600 hover:text-blue-800 mr-2" data-schedule="${encodeURIComponent(JSON.stringify(schedule))}" title="编辑">
+                        <i class="fa fa-edit"></i>
+                    </button>
+                    <button class="toggle-schedule-btn text-primary hover:text-primary/80 mr-2" data-schedule-id="${schedule.id}" data-enabled="${enabled}" title="${enabled ? '暂停' : '启用'}">
+                        ${enabled ? "<i class='fa fa-pause'></i>" : "<i class='fa fa-play'></i>"}
+                    </button>
+                    <button class="stop-task-btn text-orange-600 hover:text-orange-800 mr-2" data-schedule-id="${schedule.id}" title="停止运行中的聚合任务">
+                        <i class="fa fa-stop-circle"></i>
+                    </button>
+                    <button class="delete-schedule-btn text-red-600 hover:text-red-900" data-schedule-id="${schedule.id}" title="删除">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // 添加编辑按钮事件监听
+    document.querySelectorAll('.edit-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const schedule = JSON.parse(decodeURIComponent(this.dataset.schedule));
+            openEditScheduleModal(schedule);
+        });
+    });
+
+    // 添加启用/禁用按钮事件监听
+    document.querySelectorAll('.toggle-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const scheduleId = this.dataset.scheduleId;
+            const enabled = this.dataset.enabled === 'true';
+            toggleSchedule(scheduleId, !enabled);
+        });
+    });
+
+    // 添加删除按钮事件监听
+    document.querySelectorAll('.delete-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const scheduleId = this.dataset.scheduleId;
+            if (confirm('确定要删除这个定时任务吗？')) {
+                deleteSchedule(scheduleId);
+            }
+        });
+    });
+
+    // 添加停止任务按钮事件监听
+    document.querySelectorAll('.stop-task-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const scheduleId = this.dataset.scheduleId;
+            stopRunningTask(scheduleId);
+        });
+    });
+}
+
+// 停止运行中的聚合任务
+function stopRunningTask(scheduleId) {
+    if (!confirm('确定要停止该任务正在执行的聚合操作吗？')) {
+        return;
+    }
+
+    fetch(`/api/schedule-management/tasks/${scheduleId}/stop`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+        } else {
+            alert('⚠️ ' + (data.message || '未找到运行中的任务'));
+        }
+    })
+    .catch(error => {
+        console.error('停止任务失败:', error);
+        alert('停止任务失败: ' + error.message);
+    });
+}
+
+        // 切换定时任务状态
+        function toggleSchedule(scheduleId, enabled) {
+            fetch('/api/schedules/' + scheduleId, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    enabled: enabled
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSchedules();
+                } else {
+                    alert('操作失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('切换定时任务状态失败:', error);
+                alert('操作失败: ' + error.message);
+            });
+        }
+
+        // 删除定时任务
+        function deleteSchedule(scheduleId) {
+            fetch('/api/schedules/' + scheduleId, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadSchedules();
+                } else {
+                    alert('删除失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('删除定时任务失败:', error);
+                alert('删除失败: ' + error.message);
+            });
+        }
+
+        // 打开添加定时任务模态框
+        function openAddScheduleModal() {
+            // 设置默认时间为1小时后
+            const now = new Date();
+            const nextHour = new Date(now.getTime() + 60 * 60 * 1000);
+
+            document.getElementById('addScheduleHour').value = nextHour.getHours();
+            document.getElementById('addScheduleMinute').value = nextHour.getMinutes();
+            document.getElementById('addScheduleSecond').value = 0;
+
+            // 更新显示
+            updateAddTimeDisplay();
+
+            // 重置其他字段
+            document.getElementById('addSelectedUrlValue').value = '';
+            document.getElementById('addSelectedUrlDisplay').value = '';
+            document.getElementById('addScheduleName').value = '';
+            document.getElementById('addScheduleDepth').value = '2';
+            document.getElementById('addScheduleMode').value = 'standard';
+            document.getElementById('addScheduleLimit').value = '50';
+            document.getElementById('addScheduleRepeat').value = 'once';
+            setSelectValue('addScheduleRagflowKb', '');
+            applyScheduleCrawlOptions('add', crawlRuntimeDefaults);
+
+            // 🔥 重置每周/每月选项
+            setSelectedWeekdays('add', '');
+            // 将月份选择器重置为1月(31天)
+            const addMonthSelect = document.getElementById('addMonthSelect');
+            if (addMonthSelect) {
+                addMonthSelect.value = '1';
+                updateMonthDays('addMonthdayContainer', 'add-monthday-checkbox', 1);
+            }
+            setSelectedMonthdays('add', '');
+            toggleScheduleOptions('add');
+
+            // 显示模态框
+            const addModal = document.getElementById('addScheduleModal');
+            addModal.querySelector('.strategy-details')?.removeAttribute('open');
+            addModal.querySelector('.schedule-modal-body')?.scrollTo({ top: 0 });
+            addModal.classList.remove('hidden');
+        }
+
+        // 更新添加模态框的时间显示
+        function updateAddTimeDisplay() {
+            const hour = String(document.getElementById('addScheduleHour').value || 0).padStart(2, '0');
+            const minute = String(document.getElementById('addScheduleMinute').value || 0).padStart(2, '0');
+            const second = String(document.getElementById('addScheduleSecond').value || 0).padStart(2, '0');
+            document.getElementById('addSelectedTimeDisplay').value = `${hour}:${minute}:${second}`;
+        }
+
+        // 添加定时任务
+        function addSchedule() {
+            const url = document.getElementById('addSelectedUrlValue').value.trim();
+            const hour = String(parseInt(document.getElementById('addScheduleHour').value) || 0).padStart(2, '0');
+            const minute = String(parseInt(document.getElementById('addScheduleMinute').value) || 0).padStart(2, '0');
+            const second = String(parseInt(document.getElementById('addScheduleSecond').value) || 0).padStart(2, '0');
+            const depth = document.getElementById('addScheduleDepth').value;
+            const mode = 'standard';
+            const limit = document.getElementById('addScheduleLimit').value;
+            const name = document.getElementById('addScheduleName').value.trim();
+            const repeat = document.getElementById('addScheduleRepeat').value;
+            const keywords = document.getElementById('addScheduleKeywords').value.trim();
+            const ragflowKbId = document.getElementById('addScheduleRagflowKb')?.value || '';
+            const daysLimitRaw = parseInt(document.getElementById('addScheduleDaysLimit')?.value, 10);
+            const daysLimit = Number.isFinite(daysLimitRaw) ? Math.max(0, daysLimitRaw) : 7;
+            const crawlOptions = getScheduleCrawlOptions('add');
+
+            // 获取每周/每月选项
+            const scheduleWeekdays = getSelectedWeekdays('add');
+            const scheduleMonthdays = getSelectedMonthdays('add');
+
+            if (!url) {
+                alert('请选择一个目标URL');
+                return;
+            }
+            if (!validateRagflowSelection(ragflowKbId)) {
+                return;
+            }
+
+            // 禁用按钮，显示加载状态
+            const confirmBtn = document.getElementById('confirmAddSchedule');
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1.5"></i> Adding...';
+
+            fetch('/api/schedules', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: url,
+                    execution_time_hour: hour,
+                    execution_time_minute: minute,
+                    execution_time_second: second,
+                    depth: depth,
+                    mode: mode,
+                    limit: limit,
+                    name: name,
+                    repeat: repeat,
+                    keywords: keywords,
+                    ragflow_kb_id: ragflowKbId,
+                    days_limit: daysLimit,
+                    crawl_options: crawlOptions,
+                    schedule_weekdays: scheduleWeekdays,
+                    schedule_monthdays: scheduleMonthdays
+                })
+            })
+            .then(response => response.json())
+                .then(data => {
+                // 恢复按钮状态
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = 'Add';
+
+                if (data.success) {
+                    // 关闭模态框
+                    document.getElementById('addScheduleModal').classList.add('hidden');
+
+                    // 刷新定时任务列表
+                    loadSchedules();
+                } else {
+                    alert('添加失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                // 恢复按钮状态
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = 'Add';
+
+                console.error('添加定时任务失败:', error);
+                alert('添加失败: ' + error.message);
+            });
+        }
+
+        // 打开编辑定时任务模态框
+        let editPendingAdditionalUrls = [];
+
+        function normalizeSmartTaskBaseName(value) {
+            const raw = String(value || '').trim() || '智能URL任务';
+            return raw.replace(/_\d+$/, '') || '智能URL任务';
+        }
+
+        async function loadEditSmartRuntime(scheduleId) {
+            const status = document.getElementById('editSmartRuntimeStatus');
+            const targetsPanel = document.getElementById('editSmartTargetsPanel');
+            const attemptsPanel = document.getElementById('editCrawlAttemptsPanel');
+            if (!scheduleId || !status || !targetsPanel || !attemptsPanel) return;
+
+            status.textContent = '正在加载智能派生 URL 和聚合尝试记录...';
+            targetsPanel.innerHTML = '加载中...';
+            attemptsPanel.innerHTML = '加载中...';
+
+            try {
+                const [targetsRes, attemptsRes] = await Promise.all([
+                    fetch(`/api/schedule-management/tasks/${scheduleId}/smart-targets?include_expired=true`),
+                    fetch(`/api/schedule-management/tasks/${scheduleId}/crawl-attempts?limit=20`)
+                ]);
+                const targetsData = await targetsRes.json();
+                const attemptsData = await attemptsRes.json();
+
+                const targets = targetsData.targets || [];
+                const attempts = attemptsData.attempts || [];
+                status.textContent = `派生 URL ${targets.length} 条，尝试记录 ${attempts.length} 条`;
+
+                targetsPanel.innerHTML = targets.length ? targets.map(item => {
+                    const matched = item.matched_keywords || '';
+                    const articles = Array.isArray(item.verified_articles) ? item.verified_articles.length : 0;
+                    const badge = item.status === 'active'
+                        ? '<span class="px-1.5 py-0.5 bg-green-100 text-green-700 rounded">active</span>'
+                        : `<span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">${_esc(item.status || '')}</span>`;
+                    return `
+                        <div class="mb-2 pb-2 border-b border-gray-200 last:border-b-0">
+                            <div class="flex items-center gap-2 mb-1">${badge}<span class="text-gray-600">${_esc(item.target_type || item.source || 'smart')}</span><span class="text-gray-400">score ${_esc(item.score || 0)}</span></div>
+                            <a href="${_esc(item.resolved_target_url || '')}" target="_blank" class="text-blue-700 hover:underline break-all">${_esc(item.resolved_target_url || '')}</a>
+                            <div class="text-gray-500 mt-1">命中：${_esc(matched || '-')}；样本：${_esc(item.match_count || 0)}/${_esc(item.sample_total || 0)}；验证文章：${articles}</div>
+                            <div class="text-gray-400 mt-1">生成：${_esc(item.generated_by || '')}；验证时间：${_esc(item.last_verified_at || '')}；过期：${_esc(item.expires_at || '')}</div>
+                        </div>
+                    `;
+                }).join('') : '暂无派生 URL';
+
+                attemptsPanel.innerHTML = attempts.length ? attempts.map(item => {
+                    const reason = item.fallback_trigger_reason ? `；原因：${_esc(item.fallback_trigger_reason)}` : '';
+                    const error = item.error_message ? `<div class="text-red-600 mt-1">${_esc(item.error_message)}</div>` : '';
+                    return `
+                        <div class="mb-2 pb-2 border-b border-gray-200 last:border-b-0">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                <span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">${_esc(item.crawler_engine || '')}</span>
+                                <span class="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded">${_esc(item.status || '')}</span>
+                                <span class="text-gray-500">${_esc(item.phase || '')}${reason}</span>
+                            </div>
+                            <div class="text-gray-500">候选 URL：${_esc(item.candidate_urls || 0)}；文章：${_esc(item.articles_found || 0)}；关键词命中：${_esc(item.keyword_hits || 0)}</div>
+                            <div class="text-gray-400">开始：${_esc(item.started_at || '')}；结束：${_esc(item.completed_at || '-')}</div>
+                            ${error}
+                        </div>
+                    `;
+                }).join('') : '暂无尝试记录';
+            } catch (error) {
+                status.textContent = `加载失败：${error.message}`;
+                targetsPanel.innerHTML = '加载失败';
+                attemptsPanel.innerHTML = '加载失败';
+            }
+        }
+
+        function openEditScheduleModal(schedule) {
+            document.getElementById('editScheduleId').value = schedule.id;
+            document.getElementById('editSelectedUrlValue').value = schedule.url || schedule.target_url || '';
+            document.getElementById('editSelectedUrlDisplay').value = schedule.url || schedule.target_url || '';
+            document.getElementById('editScheduleName').value = schedule.name || schedule.task_name || '';
+            document.getElementById('editScheduleDepth').value = schedule.depth || '2';
+            document.getElementById('editScheduleMode').value = 'standard';
+            document.getElementById('editScheduleLimit').value = schedule.limit || '50';
+            document.getElementById('editScheduleRepeat').value = schedule.repeat || 'once';
+            document.getElementById('editScheduleKeywords').value = schedule.keywords || '';
+            setSelectValue('editScheduleRagflowKb', schedule.ragflow_kb_id || '');
+            document.getElementById('editScheduleDaysLimit').value = schedule.days_limit !== undefined && schedule.days_limit !== null ? schedule.days_limit : '7';
+            applyScheduleCrawlOptions('edit', schedule.crawl_options || {});
+
+            // 设置时间
+            const hour = schedule.execution_time_hour || '00';
+            const minute = schedule.execution_time_minute || '00';
+            const second = schedule.execution_time_second || '00';
+            document.getElementById('editScheduleHour').value = hour;
+            document.getElementById('editScheduleMinute').value = minute;
+            document.getElementById('editScheduleSecond').value = second;
+            document.getElementById('editSelectedTimeDisplay').value = `${hour}:${minute}:${second}`;
+
+            // 设置每周/每月选项并触发显示
+            setSelectedWeekdays('edit', schedule.schedule_weekdays || '');
+
+            // 先将月份选择器重置为1月(31天)，确保所有日期都能回显
+            const editMonthSelect = document.getElementById('editMonthSelect');
+            if (editMonthSelect) {
+                editMonthSelect.value = '1';
+                updateMonthDays('editMonthdayContainer', 'edit-monthday-checkbox', 1);
+            }
+            setSelectedMonthdays('edit', schedule.schedule_monthdays || '');
+            toggleScheduleOptions('edit');
+
+            // 显示模态框
+            const editModal = document.getElementById('editScheduleModal');
+            editModal.querySelector('.strategy-details')?.removeAttribute('open');
+            editPendingAdditionalUrls = [];
+            const smartStatus = document.getElementById('editSmartUrlStatus');
+            const smartResults = document.getElementById('editSmartUrlResults');
+            if (smartStatus) smartStatus.textContent = '';
+            if (smartResults) {
+                smartResults.classList.add('hidden');
+                smartResults.innerHTML = '';
+            }
+            loadEditSmartRuntime(schedule.id);
+            editModal.querySelector('.schedule-modal-body')?.scrollTo({ top: 0 });
+            editModal.classList.remove('hidden');
+        }
+
+        // 关闭编辑模态框
+        document.getElementById('closeEditScheduleModal').addEventListener('click', function() {
+            closeEditScheduleModal();
+        });
+
+        document.getElementById('cancelEditSchedule').addEventListener('click', function() {
+            closeEditScheduleModal();
+        });
+
+        // 添加模态框中的URL选择
+        const addSelectedUrlDisplay = document.getElementById('addSelectedUrlDisplay');
+        if (addSelectedUrlDisplay) {
+            addSelectedUrlDisplay.addEventListener('click', function() {
+                window.addingSchedule = true;
+                loadUrlsForSelector();
+                document.getElementById('urlSelectorModal').classList.remove('hidden');
+            });
+        }
+
+        // 添加模态框中的时间选择
+        const addSelectedTimeDisplay = document.getElementById('addSelectedTimeDisplay');
+        if (addSelectedTimeDisplay) {
+            addSelectedTimeDisplay.addEventListener('click', function() {
+                window.addingSchedule = true;
+                const hour = parseInt(document.getElementById('addScheduleHour').value) || 0;
+                const minute = parseInt(document.getElementById('addScheduleMinute').value) || 0;
+                const second = parseInt(document.getElementById('addScheduleSecond').value) || 0;
+                setPickerTime(hour, minute, second);
+                document.getElementById('timeSelectorModal').classList.remove('hidden');
+            });
+        }
+
+        // 编辑模态框中的URL选择
+        document.getElementById('editSelectUrlBtn').addEventListener('click', function() {
+            window.editingSchedule = true;
+            loadUrlsForSelector();
+            document.getElementById('urlSelectorModal').classList.remove('hidden');
+        });
+        document.getElementById('editSelectedUrlDisplay').addEventListener('input', function() {
+            document.getElementById('editSelectedUrlValue').value = this.value.trim();
+        });
+        const refreshEditSmartRuntimeBtn = document.getElementById('refreshEditSmartRuntimeBtn');
+        if (refreshEditSmartRuntimeBtn) {
+            refreshEditSmartRuntimeBtn.addEventListener('click', function() {
+                const scheduleId = document.getElementById('editScheduleId')?.value;
+                loadEditSmartRuntime(scheduleId);
+            });
+        }
+
+        // 编辑模态框中的时间选择
+        document.getElementById('editSelectedTimeDisplay').addEventListener('click', function() {
+            window.editingSchedule = true;
+            const hour = parseInt(document.getElementById('editScheduleHour').value) || 0;
+            const minute = parseInt(document.getElementById('editScheduleMinute').value) || 0;
+            const second = parseInt(document.getElementById('editScheduleSecond').value) || 0;
+            setPickerTime(hour, minute, second);
+            document.getElementById('timeSelectorModal').classList.remove('hidden');
+        });
+
+        function getEditableTargetUrl() {
+            const display = document.getElementById('editSelectedUrlDisplay');
+            const hidden = document.getElementById('editSelectedUrlValue');
+            const url = (display?.value || hidden?.value || '').trim();
+            if (hidden) hidden.value = url;
+            return url;
+        }
+
+        function applyManualEditSmartUrl() {
+            const input = document.getElementById('editManualSmartUrl');
+            const url = (input?.value || '').trim();
+            if (!url) {
+                alert('请填写目标URL');
+                return;
+            }
+            document.getElementById('editSelectedUrlDisplay').value = url;
+            document.getElementById('editSelectedUrlValue').value = url;
+            document.getElementById('editSmartUrlStatus').textContent = '已复制到目标URL，保存任务后生效';
+        }
+
+        function renderEditableUrlFallback(message) {
+            const currentUrl = getEditableTargetUrl();
+            const results = document.getElementById('editSmartUrlResults');
+            results.innerHTML = `
+                <div style="font-size:12px;color:#7f1d1d;margin-bottom:8px;">${_esc(message)}</div>
+                <div style="font-size:12px;color:#374151;margin-bottom:6px;">你可以直接修改下面的 URL 后重新分析，或应用到目标URL再保存任务。</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="editManualSmartUrl" value="${_esc(currentUrl)}"
+                        style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">
+                    <button type="button" onclick="applyManualEditSmartUrl()"
+                        style="background:#059669;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">应用到目标URL</button>
+                    <button type="button" onclick="applyManualEditSmartUrl(); analyzeEditSmartUrls();"
+                        style="background:#4f46e5;color:#fff;border:none;border-radius:6px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">重新分析</button>
+                </div>
+            `;
+        }
+
+        async function analyzeEditSmartUrls() {
+            const url = getEditableTargetUrl();
+            const keywords = document.getElementById('editScheduleKeywords').value.trim();
+            const btn = document.getElementById('editSmartUrlAnalyzeBtn');
+            const status = document.getElementById('editSmartUrlStatus');
+            const results = document.getElementById('editSmartUrlResults');
+
+            if (!url) {
+                alert('请先选择目标URL');
+                return;
+            }
+            if (!keywords) {
+                alert('请先填写关键词');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.style.opacity = '0.75';
+            btn.style.cursor = 'wait';
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>分析中';
+            status.textContent = '正在聚合站点栏目并采样文章...';
+            results.classList.remove('hidden');
+            results.innerHTML = '<div style="font-size:12px;color:#3730a3;">分析中，请稍候。完成后可勾选 URL 并点击“URL变更”。</div>';
+
+            try {
+                const response = await fetch('/api/schedule-management/smart-url-suggestions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url, keywords, max_results: 8})
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    status.textContent = data.message || '分析失败';
+                    renderEditableUrlFallback(data.message || '分析失败。请检查目标 URL 后重新分析。');
+                    return;
+                }
+
+                const suggestions = data.suggestions || [];
+                if (!suggestions.length) {
+                    status.textContent = '未发现可推荐栏目';
+                    renderEditableUrlFallback(data.message || '没有找到可加入的栏目 URL。可能是该站首页没有暴露内容栏目、当前 URL 不是站点首页、站点需要 JS 渲染或关键词没有命中。');
+                    return;
+                }
+
+                const checkedDefault = data.status === 'suggestions_found';
+                status.textContent = `发现 ${suggestions.length} 个候选栏目，最佳采样命中 ${data.best_match_count || 0} 篇`;
+                results.innerHTML = `
+                    <div style="font-size:12px;color:#312e81;margin-bottom:8px;">
+                        当前站点：${_esc(data.homepage || '')}。勾选后，第一个 URL 会替换当前任务；多个 URL 会在保存时按 _1、_2 创建同配置任务。
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        ${suggestions.map((item, idx) => {
+                            const title = item.link_text || item.title || item.url;
+                            const autoChecked = Boolean(item.auto_checked || (checkedDefault && idx === 0 && (item.match_count || 0) > 0));
+                            const checked = item.is_current ? '' : (autoChecked ? 'checked' : '');
+                            const currentBadge = item.is_current ? '<span class="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 rounded">当前</span>' : '';
+                            const matchedKeywords = (item.matched_keywords || []).join('，');
+                            const verifiedArticles = (item.verified_articles || []).slice(0, 3);
+                            const sourceLabel = item.source === 'site_search_verified'
+                                ? '站内搜索验证'
+                                : (item.source === 'site_search_verified_section' ? '命中文章所在栏目' : '栏目采样');
+                            return `<label style="display:flex;align-items:flex-start;gap:8px;padding:8px;background:#fff;border:1px solid #c7d2fe;border-radius:6px;cursor:pointer;">
+                                <input type="checkbox" class="edit-smart-url-checkbox" value="${_esc(item.url)}" data-title="${_esc(title)}" ${checked} style="margin-top:3px;width:15px;height:15px;">
+                                <span style="min-width:0;">
+                                    <span style="display:block;font-size:13px;font-weight:700;color:#1f2937;word-break:break-all;">${_esc(title)}${currentBadge}</span>
+                                    <span style="display:block;font-size:12px;color:#6b7280;word-break:break-all;">${_esc(item.url)}</span>
+                                    <span style="display:block;font-size:12px;color:#4338ca;">${sourceLabel}，结构评分 ${item.score || 0}，命中 ${item.match_count || 0}/${item.sample_total || 0}</span>
+                                    ${matchedKeywords ? `<span style="display:block;font-size:12px;color:#047857;">命中关键词：${_esc(matchedKeywords)}</span>` : ''}
+                                    ${verifiedArticles.length ? `<span style="display:block;margin-top:4px;font-size:11px;color:#6b7280;">
+                                        ${verifiedArticles.map(article => {
+                                            const articleKeywords = (article.matched_keywords || []).join('，');
+                                            return `<span style="display:block;word-break:break-all;">• ${_esc(article.title || article.url)}${articleKeywords ? `（${_esc(articleKeywords)}）` : ''}</span>`;
+                                        }).join('')}
+                                    </span>` : ''}
+                                </span>
+                            </label>`;
+                        }).join('')}
+                    </div>
+                    <div style="margin-top:12px;display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+                        <button type="button" onclick="applyEditSmartUrlSelection()"
+                            style="display:inline-flex;align-items:center;gap:5px;background:#059669;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+                            <i class="fa fa-check"></i>URL变更
+                        </button>
+                    </div>
+                `;
+            } catch (error) {
+                status.textContent = '请求失败: ' + error.message;
+                results.innerHTML = `<div class="text-xs text-red-700">请求失败: ${_esc(error.message)}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+                btn.innerHTML = '<i class="fa fa-magic"></i>智能分析URL';
+            }
+        }
+
+        function applyEditSmartUrlSelection() {
+            const checked = Array.from(document.querySelectorAll('.edit-smart-url-checkbox:checked'));
+            if (!checked.length) {
+                alert('请至少勾选一个URL');
+                return;
+            }
+
+            const currentUrl = getEditableTargetUrl();
+            const selected = checked.map(input => ({
+                url: input.value,
+                title: input.dataset.title || input.value
+            })).filter(item => item.url);
+
+            const first = selected[0];
+            document.getElementById('editSelectedUrlValue').value = first.url;
+            document.getElementById('editSelectedUrlDisplay').value = first.url;
+
+            const nameInput = document.getElementById('editScheduleName');
+            const baseName = normalizeSmartTaskBaseName(nameInput.value);
+            if (selected.length > 1) {
+                nameInput.value = `${baseName}_1`;
+            }
+
+            const seen = new Set([first.url, currentUrl].filter(Boolean));
+            editPendingAdditionalUrls = selected.slice(1).filter(item => {
+                if (seen.has(item.url)) return false;
+                seen.add(item.url);
+                return true;
+            }).map((item, index) => {
+                return {
+                    ...item,
+                    taskName: `${baseName}_${index + 2}`
+                };
+            });
+
+            const status = document.getElementById('editSmartUrlStatus');
+            status.textContent = editPendingAdditionalUrls.length
+                ? `已加入：当前任务将改为 ${baseName}_1，保存时会额外创建 ${editPendingAdditionalUrls.length} 个同配置任务`
+                : '已加入：当前任务URL将在保存时更新';
+        }
+
+        const editSmartUrlAnalyzeBtn = document.getElementById('editSmartUrlAnalyzeBtn');
+        if (editSmartUrlAnalyzeBtn) {
+            editSmartUrlAnalyzeBtn.addEventListener('click', analyzeEditSmartUrls);
+        }
+
+        function buildSchedulePayloadFromEdit(url, nameOverride) {
+            const hour = String(parseInt(document.getElementById('editScheduleHour').value) || 0).padStart(2, '0');
+            const minute = String(parseInt(document.getElementById('editScheduleMinute').value) || 0).padStart(2, '0');
+            const second = String(parseInt(document.getElementById('editScheduleSecond').value) || 0).padStart(2, '0');
+            const daysLimitRaw = parseInt(document.getElementById('editScheduleDaysLimit')?.value, 10);
+            return {
+                url: url,
+                execution_time_hour: hour,
+                execution_time_minute: minute,
+                execution_time_second: second,
+                name: nameOverride || document.getElementById('editScheduleName').value.trim(),
+                depth: document.getElementById('editScheduleDepth').value,
+                mode: 'standard',
+                limit: document.getElementById('editScheduleLimit').value,
+                repeat: document.getElementById('editScheduleRepeat').value,
+                keywords: document.getElementById('editScheduleKeywords').value.trim(),
+                ragflow_kb_id: document.getElementById('editScheduleRagflowKb')?.value || '',
+                days_limit: Number.isFinite(daysLimitRaw) ? Math.max(0, daysLimitRaw) : 7,
+                crawl_options: getScheduleCrawlOptions('edit'),
+                schedule_weekdays: getSelectedWeekdays('edit'),
+                schedule_monthdays: getSelectedMonthdays('edit')
+            };
+        }
+
+        async function createAdditionalSchedulesFromEdit() {
+            if (!editPendingAdditionalUrls.length) return {created: 0, failed: 0};
+
+            let created = 0;
+            let failed = 0;
+            for (const item of editPendingAdditionalUrls) {
+                const payload = buildSchedulePayloadFromEdit(item.url, item.taskName);
+                try {
+                    const response = await fetch('/api/schedules', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (data.success) created++; else failed++;
+                } catch (error) {
+                    failed++;
+                }
+            }
+            editPendingAdditionalUrls = [];
+            return {created, failed};
+        }
+
+        // 更新定时任务
+        document.getElementById('updateScheduleBtn').addEventListener('click', function() {
+            const id = document.getElementById('editScheduleId').value;
+            const url = getEditableTargetUrl();
+            const hour = String(parseInt(document.getElementById('editScheduleHour').value) || 0).padStart(2, '0');
+            const minute = String(parseInt(document.getElementById('editScheduleMinute').value) || 0).padStart(2, '0');
+            const second = String(parseInt(document.getElementById('editScheduleSecond').value) || 0).padStart(2, '0');
+            const name = document.getElementById('editScheduleName').value.trim();
+            const depth = document.getElementById('editScheduleDepth').value;
+            const mode = 'standard';
+            const limit = document.getElementById('editScheduleLimit').value;
+            const repeat = document.getElementById('editScheduleRepeat').value;
+            const keywords = document.getElementById('editScheduleKeywords').value.trim();
+            const ragflowKbId = document.getElementById('editScheduleRagflowKb')?.value || '';
+            const daysLimitRaw = parseInt(document.getElementById('editScheduleDaysLimit')?.value, 10);
+            const daysLimit = Number.isFinite(daysLimitRaw) ? Math.max(0, daysLimitRaw) : 7;
+            const crawlOptions = getScheduleCrawlOptions('edit');
+
+            // 获取每周/每月选项
+            const scheduleWeekdays = getSelectedWeekdays('edit');
+            const scheduleMonthdays = getSelectedMonthdays('edit');
+
+            if (!url) {
+                alert('请选择一个目标URL');
+                return;
+            }
+            if (!validateRagflowSelection(ragflowKbId)) {
+                return;
+            }
+
+            fetch('/api/schedules/' + id, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: url,
+                    execution_time_hour: hour,
+                    execution_time_minute: minute,
+                    execution_time_second: second,
+                    name: name,
+                    depth: depth,
+                    mode: mode,
+                    limit: limit,
+                    repeat: repeat,
+                    keywords: keywords,
+                    ragflow_kb_id: ragflowKbId,
+                    days_limit: daysLimit,
+                    crawl_options: crawlOptions,
+                    schedule_weekdays: scheduleWeekdays,
+                    schedule_monthdays: scheduleMonthdays
+                })
+            })
+            .then(response => response.json())
+            .then(async data => {
+                if (data.success) {
+                    const extraResult = await createAdditionalSchedulesFromEdit();
+                    document.getElementById('editScheduleModal').classList.add('hidden');
+                    if (returnToConsoleAfterEdit) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    loadSchedules();
+                    if (extraResult.created || extraResult.failed) {
+                        alert(`任务已更新；额外URL创建 ${extraResult.created} 个${extraResult.failed ? `，失败 ${extraResult.failed} 个` : ''}`);
+                    }
+                } else {
+                    alert('更新失败: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('更新定时任务失败:', error);
+                alert('更新失败: ' + error.message);
+            });
+        });
+
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+
+            // 处理数据库返回的本地时间格式: "2025-11-03 02:43:49"
+            // 直接按本地时间解析，不做时区转换
+            if (dateString.includes(' ') && !dateString.includes('T')) {
+                // 格式: "YYYY-MM-DD HH:mm:ss"
+                // 直接返回，不做任何转换
+                return dateString;
+            }
+
+            // 其他格式使用默认解析
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+
+            return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+        }
+
+        // ── 智能分析 URL 功能 ──────────────────────────────────────────────
+        let _analysisResults = [];
+
+        function openSmartAnalysis() {
+            const modal = document.getElementById('smartAnalysisModal');
+            modal.style.display = 'flex';
+            document.getElementById('saResults').innerHTML = '';
+            document.getElementById('saStatus').textContent = '';
+            document.getElementById('saApplyBtn').style.display = 'none';
+            renderSmartAnalysisTaskPicker();
+        }
+
+        function closeSmartAnalysis() {
+            document.getElementById('smartAnalysisModal').style.display = 'none';
+        }
+
+        function renderSmartAnalysisTaskPicker() {
+            const picker = document.getElementById('saTaskPicker');
+            const schedules = (allSchedules || []).filter(schedule => {
+                const enabled = schedule.enabled !== undefined ? schedule.enabled : (schedule.is_active !== undefined ? schedule.is_active : true);
+                return enabled && (schedule.url || schedule.target_url);
+            });
+
+            if (!schedules.length) {
+                picker.innerHTML = '<div style="font-size:12px;color:#6b7280;">没有可分析的启用任务。</div>';
+                return;
+            }
+
+            picker.innerHTML = schedules.map(schedule => {
+                const id = _esc(schedule.id);
+                const name = _esc(schedule.name || schedule.task_name || `任务${schedule.id}`);
+                const url = _esc(schedule.url || schedule.target_url || '');
+                return `<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;cursor:pointer;">
+                    <input type="checkbox" class="sa-task-check" value="${id}" checked style="margin-top:3px;">
+                    <span style="min-width:0;">
+                        <span style="display:block;font-size:12px;font-weight:600;color:#374151;">${name}</span>
+                        <span style="display:block;font-size:11px;color:#6b7280;word-break:break-all;">${url}</span>
+                    </span>
+                </label>`;
+            }).join('');
+        }
+
+        function setSmartAnalysisTaskChecks(checked) {
+            document.querySelectorAll('#saTaskPicker .sa-task-check').forEach(input => {
+                input.checked = checked;
+            });
+        }
+
+        async function runSmartAnalysis() {
+            const keywords = document.getElementById('saKeywords').value.trim()
+                || '家族办公室,家族信托,家族财富,财富传承,家族传承,家族治理,家族宪章,家族信托架构,信托架构,家办,单一家族办公室,联合家族办公室,高净值,财富管理,资产隔离,传承安排,跨境传承,税务豁免,family office,family trust';
+            const taskIds = Array.from(document.querySelectorAll('#saTaskPicker .sa-task-check:checked'))
+                .map(input => parseInt(input.value, 10))
+                .filter(Number.isFinite);
+            const btn = document.getElementById('saRunBtn');
+            const status = document.getElementById('saStatus');
+            const container = document.getElementById('saResults');
+
+            if (!taskIds.length) {
+                alert('请至少选择一个任务URL');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '分析中…（每个站点约15-30秒）';
+            status.textContent = `正在分析 ${taskIds.length} 个任务 URL，请耐心等待…`;
+            container.innerHTML = '';
+            document.getElementById('saApplyBtn').style.display = 'none';
+            _analysisResults = [];
+
+            try {
+                const res = await fetch('/api/schedule-management/smart-url-analysis', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({keywords, task_ids: taskIds}),
+                });
+                const d = await res.json();
+                if (!d.success) { status.textContent = '失败: ' + d.message; return; }
+
+                _analysisResults = d.results || [];
+                const total = _analysisResults.length;
+                const needChange = _analysisResults.filter(r => r.status === 'suggest_change' && r.suggestions.length > 0).length;
+                const noMatch = _analysisResults.filter(r => r.status === 'no_match_found').length;
+                const openccText = d.opencc_available ? '简繁自动匹配已启用' : '简繁自动匹配不可用，请检查 opencc 依赖';
+                status.textContent = `分析完成：共 ${total} 个任务，${needChange} 个建议调整 URL，${noMatch} 个未发现关键词。${openccText}`;
+
+                container.innerHTML = _analysisResults.map((r, idx) => {
+                    if (r.status === 'error') {
+                        return `<div style="padding:8px 12px;border:1px solid #fca5a5;border-radius:6px;margin-bottom:6px;background:#fff5f5;">
+                            <span style="font-size:12px;color:#991b1b;">✗ ${_esc(r.task_name)}</span>
+                            <span style="font-size:11px;color:#9ca3af;margin-left:8px;">${_esc(r.current_url)}</span>
+                            <span style="font-size:11px;color:#dc2626;margin-left:8px;">错误: ${_esc(r.error)}</span>
+                        </div>`;
+                    }
+                    if (r.status === 'ok') {
+                        return `<div style="padding:8px 12px;border:1px solid #bbf7d0;border-radius:6px;margin-bottom:6px;background:#f0fdf4;">
+                            <span style="font-size:12px;color:#166534;">✓ ${_esc(r.task_name)}</span>
+                            <span style="font-size:11px;color:#9ca3af;margin-left:8px;">${_esc(r.current_url)}</span>
+                            <span style="font-size:11px;color:#15803d;margin-left:8px;">命中 ${r.current_match_count} 篇</span>
+                        </div>`;
+                    }
+                    if (r.status === 'no_match_found') {
+                        const urlChoices = renderSmartUrlChoices(r, idx, r.exploration_urls || r.suggestions || []);
+                        return `<div style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:6px;margin-bottom:8px;background:#eff6ff;">
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                <span style="font-size:12px;font-weight:600;color:#1d4ed8;">? ${_esc(r.task_name)}</span>
+                            </div>
+                            <div style="font-size:11px;color:#6b7280;margin:4px 0 6px 0;">
+                                当前: <span style="color:#1d4ed8;">${_esc(r.current_url)}</span>
+                                <span style="color:#6b7280;"> — 采样 5 篇未命中关键词，该站可能无相关内容</span>
+                            </div>
+                            ${urlChoices || '<div style="font-size:11px;color:#6b7280;">没有可探索 URL。</div>'}
+                        </div>`;
+                    }
+                    // suggest_change：有更好的栏目
+                    const urlChoices = renderSmartUrlChoices(r, idx, r.exploration_urls || r.suggestions || []);
+                    return `<div style="padding:10px 12px;border:1px solid #fde68a;border-radius:6px;margin-bottom:8px;background:#fffbeb;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:12px;font-weight:600;color:#92400e;">⚠ ${_esc(r.task_name)}</span>
+                        </div>
+                        <div style="font-size:11px;color:#6b7280;margin:4px 0 6px 23px;">
+                            当前: <span style="color:#dc2626;">${_esc(r.current_url)}</span>
+                            <span style="color:#9ca3af;"> → 采样无命中，发现更优栏目</span>
+                        </div>
+                        ${urlChoices}
+                    </div>`;
+                }).join('');
+
+                const hasApplyable = _analysisResults.some(r =>
+                    (r.status === 'suggest_change' || r.status === 'no_match_found')
+                    && ((r.exploration_urls || r.suggestions || []).length > 0)
+                );
+                if (hasApplyable) document.getElementById('saApplyBtn').style.display = '';
+            } catch(e) {
+                status.textContent = '请求失败: ' + e.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '开始分析';
+            }
+        }
+
+        function buildSchedulePayloadFromSchedule(schedule, url, nameOverride) {
+            const time = String(schedule.schedule_time || '00:00:00').split(':');
+            return {
+                url: url,
+                execution_time_hour: String(schedule.execution_time_hour || time[0] || '00').padStart(2, '0'),
+                execution_time_minute: String(schedule.execution_time_minute || time[1] || '00').padStart(2, '0'),
+                execution_time_second: String(schedule.execution_time_second || time[2] || '00').padStart(2, '0'),
+                name: nameOverride || schedule.name || schedule.task_name || '智能URL任务',
+                depth: schedule.depth || schedule.config?.depth || 2,
+                mode: 'standard',
+                limit: schedule.limit || schedule.config?.limit || 50,
+                repeat: schedule.repeat || schedule.schedule_type || 'daily',
+                keywords: schedule.keywords || '',
+                ragflow_kb_id: schedule.ragflow_kb_id || '',
+                days_limit: schedule.days_limit ?? 7,
+                crawl_options: schedule.crawl_options || schedule.config || {},
+                schedule_weekdays: schedule.schedule_weekdays || '',
+                schedule_monthdays: schedule.schedule_monthdays || '',
+                enabled: schedule.enabled !== undefined ? schedule.enabled : (schedule.is_active !== undefined ? schedule.is_active : true)
+            };
+        }
+
+        async function createSmartAnalysisSiblingTask(schedule, url, label) {
+            const baseName = schedule.name || schedule.task_name || `任务${schedule.id}`;
+            const suffix = label && label !== url ? label : url;
+            const payload = buildSchedulePayloadFromSchedule(schedule, url, `${baseName} - ${suffix}`.slice(0, 120));
+            const response = await fetch('/api/schedules', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            return Boolean(data.success);
+        }
+
+        async function applySmartAnalysis() {
+            const container = document.getElementById('saResults');
+            const checkboxes = container.querySelectorAll('.sa-url-change-checkbox:checked');
+            if (!checkboxes.length) { alert('未选择任何任务'); return; }
+
+            let applied = 0, created = 0, failed = 0;
+            const grouped = new Map();
+            for (const chk of checkboxes) {
+                const taskId = chk.dataset.taskId;
+                if (!taskId) continue;
+                if (!grouped.has(taskId)) grouped.set(taskId, []);
+                grouped.get(taskId).push({
+                    url: chk.value,
+                    label: chk.dataset.label || chk.value
+                });
+            }
+
+            for (const [taskId, selectedUrls] of grouped.entries()) {
+                const schedule = (allSchedules || []).find(item => String(item.id) === String(taskId)) || {};
+                const primary = selectedUrls[0];
+                try {
+                    const res = await fetch(`/api/schedule-management/tasks/${taskId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({target_url: primary.url}),
+                    });
+                    const d = await res.json();
+                    if (d.success) applied++; else failed++;
+                } catch { failed++; }
+
+                const seen = new Set([primary.url, schedule.url, schedule.target_url].filter(Boolean));
+                for (const extra of selectedUrls.slice(1)) {
+                    if (seen.has(extra.url)) continue;
+                    seen.add(extra.url);
+                    try {
+                        const ok = await createSmartAnalysisSiblingTask(schedule, extra.url, extra.label);
+                        if (ok) created++; else failed++;
+                    } catch { failed++; }
+                }
+            }
+            document.getElementById('saStatus').textContent =
+                `已应用 ${applied} 个 URL 更新，额外创建 ${created} 个任务${failed ? '，' + failed + ' 个失败' : ''}。`;
+            if (applied > 0 || created > 0) document.getElementById('refreshScheduleBtn').click();
+        }
+
+        function renderSmartUrlChoices(result, resultIndex, choices) {
+            if (!choices || !choices.length) return '';
+            return `<div style="margin-top:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fff;">
+                <div style="padding:6px 8px;border-bottom:1px solid #f3f4f6;font-size:11px;font-weight:600;color:#374151;">可探索网址</div>
+                ${choices.map((s, choiceIndex) => {
+                    const label = s.link_text || s.title || s.url;
+                    const checkboxId = `saUrl_${resultIndex}_${choiceIndex}`;
+                    const matchedKeywords = (s.matched_keywords || []).join('，');
+                    const verifiedArticles = (s.verified_articles || []).slice(0, 3);
+                    const sourceLabel = s.source === 'site_search_verified'
+                        ? '站内搜索验证'
+                        : (s.source === 'site_search_verified_section' ? '命中文章所在栏目' : '栏目采样');
+                    const checked = s.auto_checked !== false ? 'checked' : '';
+                    return `<label for="${checkboxId}" style="display:flex;align-items:flex-start;gap:8px;padding:8px;border-bottom:1px solid #f9fafb;cursor:pointer;">
+                        <input id="${checkboxId}" type="checkbox" class="sa-url-change-checkbox" data-task-id="${_esc(result.task_id)}" data-label="${_esc(label)}" value="${_esc(s.url)}" ${checked} style="margin-top:3px;width:15px;height:15px;">
+                        <span style="min-width:0;">
+                            <span style="display:block;font-size:12px;font-weight:600;color:#111827;word-break:break-all;">${_esc(label)}</span>
+                            <span style="display:block;font-size:11px;color:#6b7280;word-break:break-all;">${_esc(s.url)}</span>
+                            <span style="display:block;font-size:11px;color:#4f46e5;">${sourceLabel}，结构评分 ${s.score}，${s.match_count}/${s.sample_total} 命中</span>
+                            ${matchedKeywords ? `<span style="display:block;font-size:11px;color:#047857;">命中关键词：${_esc(matchedKeywords)}</span>` : ''}
+                            ${verifiedArticles.length ? `<span style="display:block;margin-top:3px;font-size:11px;color:#6b7280;">
+                                ${verifiedArticles.map(article => {
+                                    const articleKeywords = (article.matched_keywords || []).join('，');
+                                    return `<span style="display:block;word-break:break-all;">• ${_esc(article.title || article.url)}${articleKeywords ? `（${_esc(articleKeywords)}）` : ''}</span>`;
+                                }).join('')}
+                            </span>` : ''}
+                        </span>
+                    </label>`;
+                }).join('')}
+                <div style="padding:6px 8px;font-size:11px;color:#6b7280;">同一任务勾选多个 URL 时，第一个会重定向原任务，其余会复制同配置创建新任务。</div>
+            </div>`;
+        }
+
+        function _esc(s) {
+            return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+    </script>
+
+    <!-- 智能分析 URL 弹窗 -->
+    <div id="smartAnalysisModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto;">
+        <div style="background:#fff;border-radius:12px;width:100%;max-width:1120px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <h3 style="font-size:16px;font-weight:700;color:#1f2937;margin:0;">
+                    <i class="fa fa-magic" style="color:#7c3aed;margin-right:6px;"></i>智能分析任务 URL
+                </h3>
+                <button onclick="closeSmartAnalysis()" style="background:none;border:none;font-size:20px;color:#9ca3af;cursor:pointer;">✕</button>
+            </div>
+
+            <div style="margin-bottom:12px;padding:10px 12px;background:#f5f3ff;border-radius:8px;font-size:12px;color:#5b21b6;">
+                系统将逐个聚合每个任务对应网站的首页，分析其内容栏目结构，判断当前配置的 URL 是否能覆盖核心关键词，并推荐更合适的子路径。<br>
+                <strong>注意：每个网站约需 30-60 秒，48 个任务预计需要 20-40 分钟，建议勾选关注的任务后单独分析。</strong>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                <label style="font-size:13px;font-weight:600;color:#374151;white-space:nowrap;">核心关键词:</label>
+                <input id="saKeywords" type="text" value="家族办公室,家族信托,家族财富,财富传承,家族传承,家族治理,家族宪章,家族信托架构,信托架构,家办,单一家族办公室,联合家族办公室,高净值,财富管理,资产隔离,传承安排,跨境传承,税务豁免,family office,family trust"
+                    style="flex:1;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                <button id="saRunBtn" onclick="runSmartAnalysis()"
+                    style="padding:6px 16px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                    开始分析
+                </button>
+            </div>
+            <div style="margin-bottom:12px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #e5e7eb;">
+                    <span style="font-size:13px;font-weight:600;color:#374151;">选择要分析的任务 URL</span>
+                    <div style="display:flex;gap:6px;">
+                        <button type="button" onclick="setSmartAnalysisTaskChecks(true)" style="padding:3px 8px;border:1px solid #d1d5db;background:#fff;border-radius:4px;font-size:12px;color:#374151;">全选</button>
+                        <button type="button" onclick="setSmartAnalysisTaskChecks(false)" style="padding:3px 8px;border:1px solid #d1d5db;background:#fff;border-radius:4px;font-size:12px;color:#374151;">清空</button>
+                    </div>
+                </div>
+                <div id="saTaskPicker" style="max-height:180px;overflow-y:auto;padding:8px 10px;"></div>
+            </div>
+
+            <div id="saStatus" style="font-size:12px;color:#6b7280;margin-bottom:8px;min-height:18px;"></div>
+            <div id="saResults" style="max-height:62vh;overflow-y:auto;"></div>
+
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #f3f4f6;">
+                <button id="saApplyBtn" onclick="applySmartAnalysis()"
+                    style="display:none;padding:6px 16px;background:#059669;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+                    <i class="fa fa-check mr-1"></i>URL变更
+                </button>
+                <button onclick="closeSmartAnalysis()"
+                    style="padding:6px 16px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;font-size:13px;cursor:pointer;">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+<script>
+async function loadActiveIndustryKeywordSnapshot(){const box=document.getElementById('activeIndustryKeywordSnapshot');try{const response=await fetch('/api/schedule-management/all-keywords'),data=await response.json();if(!data.success)throw new Error(data.error||'读取失败');const version=data.industry_pack_version_id?`发布版本 #${data.industry_pack_version_id}`:'安装种子版本';box.textContent=`当前行业：${data.industry_pack_id} · ${version} · 关键词来源：行业包 core_keywords + expanded_keywords · ${data.keywords.length} 个门控词：${data.keywords.join('、')}`;const smartInput=document.getElementById('saKeywords');if(smartInput)smartInput.value=data.keywords.join(',')}catch(error){box.textContent=`当前行业关键词读取失败：${error.message}`;box.classList.add('border-red-200','bg-red-50','text-red-800')}}
+document.addEventListener('DOMContentLoaded',()=>{const legacy=document.getElementById('schedule'),source=document.getElementById('sourceScanTasks');source.classList.add('hidden');loadActiveIndustryKeywordSnapshot();document.querySelectorAll('.schedule-view-tab').forEach(btn=>btn.addEventListener('click',()=>{const onSource=btn.dataset.view==='source';legacy.classList.toggle('hidden',onSource);source.classList.toggle('hidden',!onSource);document.querySelectorAll('.schedule-view-tab').forEach(x=>x.classList.toggle('is-active',x===btn));if(onSource)loadSourceScanTasks()}));});
+</script>
+</body>
+</html>

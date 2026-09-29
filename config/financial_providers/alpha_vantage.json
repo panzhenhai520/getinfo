@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "provider_id": "alpha_vantage",
+  "display_name": "Alpha Vantage 全球研究行情",
+  "access_tier": "free_key_or_paid_entitlement",
+  "default_enabled": false,
+  "license_profile": "alpha_vantage_service_terms_entitlement_aware",
+  "provider_type": "https_api",
+  "priority": 60,
+  "daily_call_budget": 25,
+  "fallback_rank": 30,
+  "api_base_url": "https://www.alphavantage.co/query",
+  "documentation_url": "https://www.alphavantage.co/documentation/",
+  "token_url": "https://www.alphavantage.co/support/#api-key",
+  "terms_url": "https://www.alphavantage.co/terms_of_service/",
+  "attribution_text": "Data supplied by Alpha Vantage; key tier and exchange entitlements apply.",
+  "terms_note": "免费 Key 当前公开额度为每天 25 次，多数免费股票报价默认日终更新；实时或 15 分钟延迟行情必须有对应付费授权。",
+  "sla": "plan_dependent",
+  "capabilities": ["quote", "bar"],
+  "logical_endpoints": {"quote": ["GLOBAL_QUOTE"], "bars": ["TIME_SERIES_DAILY"]}
+}

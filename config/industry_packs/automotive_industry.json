@@ -1,0 +1,99 @@
+{
+  "id": "automotive_industry",
+  "name": "汽车行业（智能汽车·新能源·产业链）",
+  "schema_version": 3,
+  "pack_version": "1.0.0",
+  "enabled": true,
+  "default_market": "CN",
+  "timezone": "Asia/Shanghai",
+  "pack_kind": "primary",
+  "includes": [{"pack_id": "financial_markets", "required": true}],
+  "capabilities": [
+    {"key": "auto_industry_intelligence", "name": "汽车产业情报聚合", "enabled": true, "implementation_status": "existing"},
+    {"key": "nev_supply_chain", "name": "新能源产业链情报", "enabled": true, "implementation_status": "existing"},
+    {"key": "intelligent_driving_radar", "name": "智能驾驶雷达", "enabled": true, "implementation_status": "planned"}
+  ],
+  "dashboard_categories": [],
+  "dashboard_capabilities": {"show_financial_news": false, "show_market_index_cards": false, "show_watched_stock_cards": false, "show_spatiotemporal_map": false},
+  "ragflow_policy": {"upload_crawled_articles": false, "knowledge_base_key": "news"},
+  "core_keywords": [
+    "汽车", "整车", "乘用车", "商用车", "新能源汽车", "电动车", "智能网联汽车",
+    "自动驾驶", "智能驾驶", "智能座舱", "汽车电子", "动力电池", "汽车产业链",
+    "汽车零部件", "汽车制造", "二手车", "汽车后市场", "汽车出口", "上海车展"
+  ],
+  "expanded_keywords": [
+    "造车新势力", "传统车企", "车企转型", "车规级芯片", "激光雷达", "摄像头",
+    "高精地图", "线控制动", "一体化压铸", "域控制器", "800V 高压平台", "充电桩",
+    "换电", "智能驾驶芯片", "座舱芯片", "汽车软件", "OTA", "无图智驾", "V2X"
+  ],
+  "trend_keywords": [
+    "城市NOA", "端到端自动驾驶", "固态电池", "半固态电池", "智能驾驶平权",
+    "高阶智驾", "车路云一体化", "飞行汽车", "人形机器人上车", "汽车出海",
+    "价格战", "以旧换新", "智驾供应商", "电池回收", "充换电网络", "Robotaxi",
+    "车联网", "智能座舱体验", "燃油车退坡", "汽车经销商", "电车渗透率"
+  ],
+  "event_keywords": [
+    "发布", "上市", "销量", "降价", "召回车", "融资", "合作", "收购",
+    "量产", "下线", "中标", "签约", "Recall", "Launch", "Release"
+  ],
+  "negative_keywords": ["招聘", "培训", "广告", "兼职", "求职"],
+  "classification": {
+    "core_weight": 3, "expanded_weight": 1, "trend_weight": 2, "event_weight": 2,
+    "negative_weight": -3, "minimum_relevance_score": 2, "llm_confidence_threshold": 0.65,
+    "tie_break_order": ["trend", "event", "other"],
+    "recent_today_window_days": 5, "recent_trend_window_days": 21
+  },
+  "serpapi_queries": [
+    "新能源汽车 销量 月度",
+    "智能驾驶 城市 NOA 新闻",
+    "汽车整车 企业 动态 发布",
+    "汽车产业链 零部件 融资",
+    "固态电池 量产 进展"
+  ],
+  "default_sources": [
+    {"name": "中国汽车工业协会(CAAM)", "url": "https://www.caam.org.cn", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 5, "authority_scope": ["official_statistics"], "publisher_key": "caam.org.cn"},
+    {"name": "中国汽车技术研究中心(CATARC)", "url": "https://www.catarc.ac.cn", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "catarc.ac.cn"},
+    {"name": "中国汽车工程学会(SAE-China)", "url": "https://www.sae-china.org", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 4, "authority_scope": ["official_rule"], "publisher_key": "sae-china.org"},
+    {"name": "中国电动汽车百人会(EV100)", "url": "https://www.chinaev100.com", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "chinaev100.com"},
+    {"name": "中国汽车工业信息网", "url": "https://www.autoinfo.org.cn", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "autoinfo.org.cn"},
+    {"name": "盖世汽车", "url": "https://auto.gasgoo.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "gasgoo.com"},
+    {"name": "第一电动", "url": "https://www.d1ev.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "d1ev.com"},
+    {"name": "汽车之家研究院", "url": "https://research.autohome.com.cn", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "autohome.com.cn"},
+    {"name": "易车研究院", "url": "https://yiche.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "yiche.com"},
+    {"name": "国汽智联(CICV)", "url": "https://www.cicv.com.cn", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "cicv.com.cn"},
+    {"name": "中国人工智能学会(CAAI)", "url": "https://www.caai.cn", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "caai.cn"},
+    {"name": "中国智能网联汽车产业创新联盟(CAICV)", "url": "https://www.caicv.org.cn", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 4, "authority_scope": ["official_rule"], "publisher_key": "caicv.org.cn"},
+    {"name": "汽车网(Autotimes)", "url": "https://www.autotimes.cn", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "autotimes.cn"},
+    {"name": "高工智能汽车", "url": "https://www.qiche-heng.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "qiche-heng.com"},
+    {"name": "SAE International", "url": "https://www.sae.org", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 5, "authority_scope": ["official_rule"], "publisher_key": "sae.org"},
+    {"name": "S&P Global Mobility", "url": "https://mobility.spglobal.com", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "spglobal.com"},
+    {"name": "MarkLines", "url": "https://www.marklines.com", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "marklines.com"},
+    {"name": "OICA", "url": "https://www.oica.net", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 5, "authority_scope": ["official_statistics"], "publisher_key": "oica.net"},
+    {"name": "WardsAuto", "url": "https://wardsauto.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "wardsauto.com"},
+    {"name": "Automotive News", "url": "https://www.autonews.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "autonews.com"},
+    {"name": "J.D. Power", "url": "https://www.jdpower.com", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "jdpower.com"},
+    {"name": "NHTSA", "url": "https://www.nhtsa.gov", "source_type": "website", "is_enabled": true, "source_role": "government_regulator", "authority_level": 5, "authority_scope": ["regulatory_decision", "official_rule"], "publisher_key": "nhtsa.gov"},
+    {"name": "SAE International Mobility Database", "url": "https://saemobilus.sae.org", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "saemobilus.sae.org"},
+    {"name": "INTER-NOISE/NOISE-CON", "url": "https://www.i-ince.org", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "i-ince.org"},
+    {"name": "HEAD acoustics", "url": "https://www.head-acoustics.com", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 3, "authority_scope": ["research_finding"], "publisher_key": "head-acoustics.com"},
+    {"name": "Brüel & Kjær(B&K)", "url": "https://www.bksv.com", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 3, "authority_scope": ["research_finding"], "publisher_key": "bksv.com"},
+    {"name": "中国乘用车市场信息联席会(CPCA)", "url": "https://www.cpcaauto.com", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 4, "authority_scope": ["official_statistics"], "publisher_key": "cpcaauto.com"},
+    {"name": "中国汽车流通协会(CADA)", "url": "https://www.cada.cn", "source_type": "website", "is_enabled": true, "source_role": "industry_association", "authority_level": 4, "authority_scope": ["official_statistics"], "publisher_key": "cada.cn"},
+    {"name": "汽车之家", "url": "https://www.autohome.com.cn", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "autohome.com.cn"},
+    {"name": "懂车帝", "url": "https://www.dongchedi.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "dongchedi.com"},
+    {"name": "车东西", "url": "https://www.chedongxi.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "chedongxi.com"},
+    {"name": "工业和信息化部(汽车产业)", "url": "https://www.miit.gov.cn", "source_type": "website", "is_enabled": true, "source_role": "government_regulator", "authority_level": 5, "authority_scope": ["regulatory_decision", "official_rule", "official_statistics"], "publisher_key": "miit.gov.cn"},
+    {"name": "国际能源署IEA", "url": "https://www.iea.org", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 5, "authority_scope": ["official_statistics"], "publisher_key": "iea.org"},
+    {"name": "罗兰贝格Roland Berger", "url": "https://www.rolandberger.com", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "rolandberger.com"},
+    {"name": "麦肯锡McKinsey", "url": "https://www.mckinsey.com", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "mckinsey.com"},
+    {"name": "波士顿BCG", "url": "https://www.bcg.com", "source_type": "website", "is_enabled": true, "source_role": "independent_research", "authority_level": 4, "authority_scope": ["research_finding"], "publisher_key": "bcg.com"},
+    {"name": "亿欧汽车", "url": "https://www.iyiou.com", "source_type": "website", "is_enabled": true, "source_role": "professional_trade_media", "authority_level": 3, "authority_scope": ["media_reporting"], "publisher_key": "iyiou.com"}
+  ],
+  "fixed_topics": [
+    {"key": "nev_sales", "name": "新能源销量", "keywords": ["新能源汽车", "销量", "渗透率", "电动车"]},
+    {"key": "intelligent_driving", "name": "智能驾驶", "keywords": ["自动驾驶", "智能驾驶", "城市NOA", "Robotaxi", "智驾"]},
+    {"key": "supply_chain", "name": "产业链/零部件", "keywords": ["零部件", "动力电池", "芯片", "激光雷达", "域控制器"]},
+    {"key": "policy_industry", "name": "产业政策", "keywords": ["汽车", "工信部", "以旧换新", "准入", "标准"]}
+  ],
+  "serpapi_query_gates": {}
+}

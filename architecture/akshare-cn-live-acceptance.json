@@ -1,0 +1,73 @@
+{
+  "report_version": "akshare-cn-live-v1",
+  "passed": true,
+  "provider_id": "akshare_cn",
+  "sdk_version": "1.18.72",
+  "database": "/tmp/collectinfo-akshare-stage210.sqlite3",
+  "initial_snapshot_count": 8,
+  "snapshot_count": 10,
+  "new_snapshot_count": 2,
+  "persisted_target_count": 3,
+  "health": {
+    "provider_id": "akshare_cn",
+    "status": "healthy",
+    "sdk_version": "1.18.72",
+    "checked_at": "2026-08-01T06:57:24Z",
+    "record_count": 1,
+    "error_type": null
+  },
+  "profile": {
+    "access_tier": "free_no_api_key",
+    "enabled": true,
+    "health_status": "healthy"
+  },
+  "targets": [
+    {
+      "canonical_symbol": "000001.SH",
+      "label": "上证指数",
+      "provider_symbol": "000001",
+      "observed_at": "2026-08-01T06:57:03.880Z",
+      "fetched_at": "2026-08-01T06:57:03.880Z",
+      "freshness_state": "unknown",
+      "market_status": "closed",
+      "value": 3832.2624,
+      "quality_flags": [
+        "provider_timestamp_missing"
+      ],
+      "source_url": "https://vip.stock.finance.sina.com.cn/mkt/#hs_s",
+      "snapshot_persisted": true
+    },
+    {
+      "canonical_symbol": "399001.SZ",
+      "label": "深证成指",
+      "provider_symbol": "399001",
+      "observed_at": "2026-08-01T06:57:19.137Z",
+      "fetched_at": "2026-08-01T06:57:19.137Z",
+      "freshness_state": "unknown",
+      "market_status": "closed",
+      "value": 13578.93,
+      "quality_flags": [
+        "provider_timestamp_missing"
+      ],
+      "source_url": "https://vip.stock.finance.sina.com.cn/mkt/#hs_s",
+      "snapshot_persisted": true
+    },
+    {
+      "canonical_symbol": "000001.SZ",
+      "label": "平安银行",
+      "provider_symbol": "000001",
+      "observed_at": "2026-07-31T07:00:00.000Z",
+      "fetched_at": "2026-08-01T06:57:24.617Z",
+      "freshness_state": "stale",
+      "market_status": "closed",
+      "value": 11.63,
+      "quality_flags": [
+        "quote_derived_from_latest_daily_bar",
+        "not_realtime_quote",
+        "provider_timezone_assumed_asia_shanghai"
+      ],
+      "source_url": "https://gu.qq.com/",
+      "snapshot_persisted": true
+    }
+  ]
+}

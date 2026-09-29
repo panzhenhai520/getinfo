@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 -Rag Search</title>
+    <link href="/static/css/tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/fontawesome.css">
+    <link rel="stylesheet" href="/static/css/dashboard-theme.css">
+    <style>
+        .user-modal-panel {
+            width: min(94vw, 28rem);
+            max-height: 92vh;
+            overflow-y: auto;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- 顶部导航栏 -->{% include "_dashboard_nav.html" %}
+
+
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- 操作栏 -->
+        <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+            <div class="flex flex-wrap gap-2">
+                <button id="addUserBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    <i class="fas fa-plus mr-2"></i>添加用户
+                </button>
+                <button id="refreshBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                    <i class="fas fa-refresh mr-2"></i>刷新
+                </button>
+            </div>
+            <div class="flex items-center w-full sm:w-auto">
+                <input type="text" id="searchInput" placeholder="搜索用户..." 
+                       class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md text-sm">
+            </div>
+        </div>
+
+        <!-- 用户列表 -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <div id="loadingDiv" class="text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
+                    <p class="mt-2 text-gray-500">加载中...</p>
+                </div>
+                
+                <div id="usersTable" class="hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">角色</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后登录</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分页 -->
+                    <div id="pagination" class="mt-4 flex justify-between items-center">
+                        <div class="text-sm text-gray-700">
+                            显示 <span id="pageInfo"></span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="prevBtn" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50">上一页</button>
+                            <button id="nextBtn" class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50">下一页</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑用户模态框 -->
+    <div id="userModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50 flex items-start justify-center p-3 sm:p-6">
+        <div class="relative mx-auto p-4 sm:p-5 border shadow-lg bg-white user-modal-panel">
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="modalTitle" class="text-lg font-medium text-gray-900">添加用户</h3>
+                    <button type="button" onclick="hideUserModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
+                        <input type="text" id="username" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">邮箱</label>
+                        <input type="email" id="email" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4" id="passwordField">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
+                        <input type="password" id="password" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">角色</label>
+                        <select id="role" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <option value="user">普通用户</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+                        <button type="button" id="cancelBtn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            取消
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">
+                            保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示消息 -->
+    <div id="alertDiv" class="hidden fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-sm">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i id="alertIcon" class="fas fa-info-circle text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <p id="alertMessage" class="text-sm font-medium"></p>
+            </div>
+            <div class="ml-auto pl-3">
+                <div class="-mx-1.5 -my-1.5">
+                    <button onclick="hideAlert()" class="p-1.5 hover:bg-gray-100 rounded-full">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let isEditing = false;
+
+        // 移动端菜单切换
+        const menuBtn = document.getElementById('menuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        if (menuBtn && mobileMenu) {
+            menuBtn.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+            });
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUsers();
+            
+            // 绑定事件
+            document.getElementById('addUserBtn').addEventListener('click', showAddUserModal);
+            document.getElementById('refreshBtn').addEventListener('click', loadUsers);
+            document.getElementById('cancelBtn').addEventListener('click', hideUserModal);
+            document.getElementById('userForm').addEventListener('submit', saveUser);
+            document.getElementById('searchInput').addEventListener('input', debounce(loadUsers, 500));
+            document.getElementById('prevBtn').addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadUsers(); }});
+            document.getElementById('nextBtn').addEventListener('click', () => { if (currentPage < totalPages) { currentPage++; loadUsers(); }});
+        });
+
+        async function loadUsers() {
+            try {
+                showLoading();
+                const search = document.getElementById('searchInput').value;
+                const response = await fetch(`/api/user/list?page=${currentPage}&search=${encodeURIComponent(search)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayUsers(data.users);
+                    updatePagination(data.pagination);
+                } else {
+                    showAlert(data.error || '加载用户失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误，请稍后重试', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">${user.username}</div>
+                                <div class="text-sm text-gray-500">${user.email || '-'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                            ${user.role === 'admin' ? '管理员' : '普通用户'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${user.is_active ? '正常' : '禁用'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${formatDate(user.created_at)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${user.last_login ? formatDate(user.last_login) : '-'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="editUser(${user.id})" class="text-indigo-600 hover:text-indigo-900 mr-3">编辑</button>
+                        ${user.id !== 1 ? `<button onclick="deleteUser(${user.id})" class="text-red-600 hover:text-red-900">删除</button>` : ''}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function showAddUserModal() {
+            isEditing = false;
+            document.getElementById('modalTitle').textContent = '添加用户';
+            document.getElementById('userId').value = '';
+            document.getElementById('username').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('role').value = 'user';
+            document.getElementById('password').required = true;
+            document.getElementById('passwordField').style.display = 'block';
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+
+        async function editUser(userId) {
+            try {
+                const response = await fetch(`/api/user/list`);
+                const data = await response.json();
+                const user = data.users.find(u => u.id === userId);
+                
+                if (user) {
+                    isEditing = true;
+                    document.getElementById('modalTitle').textContent = '编辑用户';
+                    document.getElementById('userId').value = user.id;
+                    document.getElementById('username').value = user.username;
+                    document.getElementById('email').value = user.email || '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('role').value = user.role;
+                    document.getElementById('password').required = false;
+                    document.getElementById('userModal').classList.remove('hidden');
+                }
+            } catch (error) {
+                showAlert('获取用户信息失败', 'error');
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('确定要删除该用户吗？')) return;
+            
+            try {
+                const response = await fetch(`/api/user/delete/${userId}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('用户删除成功', 'success');
+                    loadUsers();
+                } else {
+                    showAlert(data.error || '删除失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误，请稍后重试', 'error');
+            }
+        }
+
+        async function saveUser(e) {
+            e.preventDefault();
+            
+            const formData = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                role: document.getElementById('role').value
+            };
+
+            try {
+                let response;
+                if (isEditing) {
+                    const userId = document.getElementById('userId').value;
+                    response = await fetch(`/api/user/update/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    response = await fetch('/api/user/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert(isEditing ? '用户更新成功' : '用户创建成功', 'success');
+                    hideUserModal();
+                    loadUsers();
+                } else {
+                    showAlert(data.error || '操作失败', 'error');
+                }
+            } catch (error) {
+                showAlert('网络错误，请稍后重试', 'error');
+            }
+        }
+
+        function hideUserModal() {
+            document.getElementById('userModal').classList.add('hidden');
+        }
+
+        function updatePagination(pagination) {
+            totalPages = pagination.pages;
+            currentPage = pagination.page;
+            
+            document.getElementById('pageInfo').textContent = 
+                `${pagination.start}-${pagination.end} 共 ${pagination.total} 条`;
+            
+            document.getElementById('prevBtn').disabled = currentPage <= 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+
+        function showLoading() {
+            document.getElementById('loadingDiv').classList.remove('hidden');
+            document.getElementById('usersTable').classList.add('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingDiv').classList.add('hidden');
+            document.getElementById('usersTable').classList.remove('hidden');
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alertDiv');
+            const alertIcon = document.getElementById('alertIcon');
+            const alertMessage = document.getElementById('alertMessage');
+            
+            alertDiv.className = 'fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-sm';
+            
+            if (type === 'error') {
+                alertDiv.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200');
+                alertIcon.className = 'fas fa-exclamation-circle text-xl text-red-500';
+            } else {
+                alertDiv.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
+                alertIcon.className = 'fas fa-check-circle text-xl text-green-500';
+            }
+            
+            alertMessage.textContent = message;
+            alertDiv.classList.remove('hidden');
+            
+            setTimeout(hideAlert, 5000);
+        }
+
+        function hideAlert() {
+            document.getElementById('alertDiv').classList.add('hidden');
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+    </script>
+</body>
+</html>

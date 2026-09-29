@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "provider_id": "tushare_cn",
+  "display_name": "Tushare Pro 中国市场结构化数据",
+  "package_version": "1.4.29",
+  "package_wheel_sha256": "82554af953ea5ac3d8771d42330493181031c7e68dccce03a491c7356e9ba4b2",
+  "access_tier": "account_token_points_or_paid_entitlement",
+  "default_enabled": false,
+  "license_profile": "tushare_bsd_sdk_service_entitlements_apply",
+  "provider_type": "sdk_adapter",
+  "priority": 10,
+  "daily_call_budget": 1000,
+  "fallback_rank": 10,
+  "package_url": "https://pypi.org/project/tushare/",
+  "documentation_url": "https://tushare.pro/document/2",
+  "attribution_text": "Data supplied by Tushare Pro; account entitlements and terms apply.",
+  "token_url": "https://tushare.pro/user/token",
+  "api_base_url": "https://api.waditu.com/dataapi/",
+  "sdk_transport_override": "SDK 1.4.29 的明文默认地址必须在客户端初始化后强制改为同主机 HTTPS；无法验证或覆盖时拒绝调用。",
+  "terms_note": "Python SDK 采用 BSD 许可；Tushare Pro 数据服务按账户积分、频率和单独授权控制，展示、缓存及再分发受平台条款约束。",
+  "sla": "account_entitlement_dependent_no_exchange_grade_sla_declared",
+  "capabilities": ["quote", "bar", "constituent", "fundamental", "news"],
+  "logical_endpoints": {
+    "instrument_master": ["stock_basic", "index_basic", "fund_basic"],
+    "quote": ["rt_min", "rt_etf_min", "rt_idx_min"],
+    "bars": ["daily", "fund_daily", "index_daily"],
+    "constituents": ["index_weight"],
+    "fund": ["fund_basic", "fund_nav", "fund_portfolio", "fund_manager", "fund_share"],
+    "financials": ["income", "balancesheet", "cashflow", "fina_indicator"],
+    "announcements": ["anns_d"]
+  },
+  "permission_capabilities": [
+    "instrument_master",
+    "daily_market",
+    "realtime_equity",
+    "realtime_etf",
+    "realtime_index",
+    "index_constituents",
+    "fund",
+    "financials",
+    "announcements"
+  ]
+}

@@ -1,0 +1,19 @@
+ARG BASE_IMAGE=infiniflow/ragflow:v0.25.6
+FROM ${BASE_IMAGE}
+
+LABEL org.opencontainers.image.title="RAGFlow v0.25.6 custom backend"
+LABEL org.opencontainers.image.description="Official RAGFlow v0.25.6 image with custom team/user permission backend patches."
+
+COPY backend/api/db/db_models.py /ragflow/api/db/db_models.py
+COPY backend/api/db/services/user_service.py /ragflow/api/db/services/user_service.py
+COPY backend/api/db/services/dialog_service.py /ragflow/api/db/services/dialog_service.py
+COPY backend/api/apps/restful_apis/chat_api.py /ragflow/api/apps/restful_apis/chat_api.py
+COPY backend/api/apps/restful_apis/document_api.py /ragflow/api/apps/restful_apis/document_api.py
+COPY backend/nginx/ragflow.conf.python /etc/nginx/conf.d/ragflow.conf.python
+
+RUN python3 -m py_compile \
+    /ragflow/api/db/db_models.py \
+    /ragflow/api/db/services/user_service.py \
+    /ragflow/api/db/services/dialog_service.py \
+    /ragflow/api/apps/restful_apis/chat_api.py \
+    /ragflow/api/apps/restful_apis/document_api.py

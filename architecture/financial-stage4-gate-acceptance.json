@@ -1,0 +1,588 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "answer_composer_regression_exercised": true,
+    "held_out_fixture_not_used_to_tune_rules": true,
+    "model_report_is_research_not_fact": true,
+    "new_database": false,
+    "new_model_client": false,
+    "production_judges_exercised": true,
+    "rag_gate_regression_exercised": true,
+    "real_order_execution": false
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "held_out_evaluation": {
+      "boundaries": {
+        "future_stale_conflicted_or_incomparable_current_fact": false,
+        "model_calls": 0,
+        "model_report_is_research_only": true,
+        "model_report_promoted_to_fact": false,
+        "network_calls": 0,
+        "production_conflict_judge_used": true,
+        "production_temporal_judge_used": true,
+        "real_order_execution": false
+      },
+      "cases": [
+        {
+          "actual": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "insufficient_evidence"
+          },
+          "case_id": "price-future-xhkg",
+          "category": "price",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "insufficient_evidence"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "no_eligible_evidence"
+            ],
+            "conflict_ignored": [
+              "temporally_ineligible"
+            ],
+            "temporal": [
+              "future_evidence_ignored",
+              "no_supporting_temporal_evidence"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "stale"
+          },
+          "case_id": "price-stale-xshe",
+          "category": "price",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "stale"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "no_eligible_evidence"
+            ],
+            "conflict_ignored": [
+              "temporally_ineligible"
+            ],
+            "temporal": [
+              "freshness_threshold_exceeded"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "unresolved_conflict",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": true,
+            "temporal_verdict": "verified_current"
+          },
+          "case_id": "price-independent-divergence-xshg",
+          "category": "price",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "unresolved_conflict",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "verified_current"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "independent_sources_exceed_tolerance"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "within_freshness_threshold"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "verified_consensus",
+            "current_fact": true,
+            "historical_fact": true,
+            "human_review_required": false,
+            "temporal_verdict": "verified_current"
+          },
+          "case_id": "price-independent-consensus-xhkg",
+          "category": "price",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "verified_consensus",
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": "verified_current"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "independent_sources_within_tolerance",
+              "highest_authority_value_selected_without_averaging"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "within_freshness_threshold"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "verified_authoritative",
+            "current_fact": false,
+            "historical_fact": true,
+            "human_review_required": false,
+            "temporal_verdict": "verified_historical"
+          },
+          "case_id": "financial-reported-official-authority",
+          "category": "financial_statement",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "verified_authoritative",
+            "current_fact": false,
+            "historical_fact": true,
+            "temporal_verdict": "verified_historical"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "authoritative_source_overrides_conflict",
+              "conflicting_values_not_averaged"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "reported_period_fact"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "verified_historical"
+          },
+          "case_id": "financial-period-mismatch",
+          "category": "financial_statement",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "verified_historical"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "no_eligible_evidence"
+            ],
+            "conflict_ignored": [
+              "period_mismatch"
+            ],
+            "temporal": [
+              "reported_period_fact"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "single_source",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "verified_current"
+          },
+          "case_id": "financial-model-report-only",
+          "category": "financial_statement",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "single_source",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "verified_current"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "single_independent_source"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "latest_effective_version"
+            ]
+          },
+          "report_only_evidence": true,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "insufficient_evidence"
+          },
+          "case_id": "announcement-future-effective",
+          "category": "announcement",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "insufficient_evidence"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "no_eligible_evidence"
+            ],
+            "conflict_ignored": [
+              "temporally_ineligible"
+            ],
+            "temporal": [
+              "future_evidence_ignored",
+              "no_supporting_temporal_evidence"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "verified_authoritative",
+            "current_fact": true,
+            "historical_fact": true,
+            "human_review_required": false,
+            "temporal_verdict": "verified_current"
+          },
+          "case_id": "announcement-official-current",
+          "category": "announcement",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "verified_authoritative",
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": "verified_current"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "single_authoritative_source"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "latest_effective_version"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "superseded"
+          },
+          "case_id": "index-membership-superseded",
+          "category": "index_membership",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "superseded"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "no_eligible_evidence"
+            ],
+            "conflict_ignored": [
+              "temporally_ineligible"
+            ],
+            "temporal": [
+              "newer_revision_or_effective_event"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "verified_authoritative",
+            "current_fact": true,
+            "historical_fact": true,
+            "human_review_required": false,
+            "temporal_verdict": "verified_current"
+          },
+          "case_id": "index-membership-official-current",
+          "category": "index_membership",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "verified_authoritative",
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": "verified_current"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "single_authoritative_source"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "latest_effective_version"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "human_review_required": false,
+            "temporal_verdict": "superseded"
+          },
+          "case_id": "macro-cpi-revision-supersedes",
+          "category": "macro_revision",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "insufficient_evidence",
+            "current_fact": false,
+            "historical_fact": false,
+            "temporal_verdict": "superseded"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "no_eligible_evidence"
+            ],
+            "conflict_ignored": [
+              "temporally_ineligible"
+            ],
+            "temporal": [
+              "newer_revision_or_effective_event"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        },
+        {
+          "actual": {
+            "conflict_verdict": "verified_consensus",
+            "current_fact": true,
+            "historical_fact": true,
+            "human_review_required": false,
+            "temporal_verdict": "verified_current"
+          },
+          "case_id": "macro-gdp-independent-consensus",
+          "category": "macro_revision",
+          "checks": {
+            "conflict_verdict": true,
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": true
+          },
+          "expected": {
+            "conflict_verdict": "verified_consensus",
+            "current_fact": true,
+            "historical_fact": true,
+            "temporal_verdict": "verified_current"
+          },
+          "passed": true,
+          "reason_codes": {
+            "conflict": [
+              "independent_sources_within_tolerance",
+              "highest_authority_value_selected_without_averaging"
+            ],
+            "conflict_ignored": [],
+            "temporal": [
+              "latest_effective_version"
+            ]
+          },
+          "report_only_evidence": false,
+          "report_promoted_to_fact": false
+        }
+      ],
+      "coverage": {
+        "categories": [
+          "announcement",
+          "financial_statement",
+          "index_membership",
+          "macro_revision",
+          "price"
+        ],
+        "future_data": true,
+        "report_only_cases": 1,
+        "required_categories": [
+          "announcement",
+          "financial_statement",
+          "index_membership",
+          "macro_revision",
+          "price"
+        ],
+        "scope_conflict": true,
+        "stale_data": true,
+        "unresolved_conflict": true
+      },
+      "dataset": {
+        "case_count": 13,
+        "fixture_id": "stage4-independent-conflicts-2026q3-v1",
+        "held_out": true,
+        "label_source": "manual_scenario_review",
+        "rule_development_usage": "prohibited",
+        "schema_version": "financial-stage4-heldout-v1"
+      },
+      "gate_version": "financial-stage4-gate-v1",
+      "metrics": {
+        "current_fact_precision": 1.0,
+        "current_fact_recall": 1.0,
+        "exact_case_matches": 13,
+        "false_negative": 0,
+        "false_positive": 0,
+        "minimum_precision": 0.95,
+        "minimum_recall": 0.95,
+        "true_negative": 9,
+        "true_positive": 4
+      },
+      "schema_version": "financial-stage4-gate-result-v1",
+      "status": "passed"
+    },
+    "model_calls": 0,
+    "network_calls": 0,
+    "suites": [
+      "tests.test_financial_stage4_gate",
+      "tests.test_financial_temporal_judge",
+      "tests.test_financial_conflict_judge",
+      "tests.test_financial_rag_gate",
+      "tests.test_financial_answer_composer"
+    ],
+    "tests_run": 43
+  },
+  "static": {
+    "case_count": 13,
+    "checks": {
+      "closed_result_schema": true,
+      "five_required_categories": true,
+      "future_stale_conflict_boundaries": true,
+      "held_out_policy_explicit": true,
+      "manual_labels_explicit": true,
+      "minimum_case_count": true,
+      "model_report_boundary": true,
+      "no_direct_model_or_network_client": true,
+      "precision_recall_gate": true,
+      "production_judges_reused": true
+    },
+    "direct_model_or_network_imports": [],
+    "fixture": "tests/fixtures/financial_stage4_heldout.json",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": []
+  },
+  "task": "4.6",
+  "verification": {
+    "architecture_gate": "passed",
+    "fixture_sha256": "0578ed7e9a563c231deb8d3213c030759cd7d56d2cca9b0268ae5f962e23b775",
+    "full_regression_tests": 443,
+    "judge_rule_files_modified": false,
+    "offline_build_base": "collectinfo:financial-rag-gate-acceptance",
+    "offline_build_network": "none",
+    "offline_image": "sha256:47df7c8a35205a399adb400fb71cee05713f7802d5286d73a0748f7ad17ba486",
+    "related_regression_tests": 43
+  }
+}

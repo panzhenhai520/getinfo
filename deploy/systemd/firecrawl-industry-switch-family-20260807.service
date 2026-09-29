@@ -1,0 +1,12 @@
+[Unit]
+Description=Switch Firecrawl aggregation back to family office and audit isolation
+After=network-online.target firecrawl.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=timebot
+WorkingDirectory=/home/timebot/app
+EnvironmentFile=-/home/timebot/app/.env
+ExecStart=/usr/bin/python3 /home/timebot/app/tools/run_scheduled_industry_switch.py --industry-pack-id family_office --actor systemd-20260807-0700
+

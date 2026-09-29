@@ -1,0 +1,12 @@
+[Unit]
+Description=Run family-office industry switch at 2026-08-07 07:00 Hong Kong time
+
+[Timer]
+OnCalendar=2026-08-07 07:00:00 Asia/Hong_Kong
+AccuracySec=1s
+Persistent=true
+Unit=firecrawl-industry-switch-family-20260807.service
+
+[Install]
+WantedBy=timers.target
+

@@ -1,0 +1,35 @@
+{
+  "browser": "/home/timebot/app/data/ms-playwright/chromium-1228/chrome-linux64/chrome",
+  "calls": [
+    {
+      "endpoint": "capabilities"
+    },
+    {
+      "content_kind": "research_opinion",
+      "endpoint": "feed"
+    },
+    {
+      "endpoint": "report",
+      "report_id": 7
+    }
+  ],
+  "check_version": "financial-stage3-browser-v1",
+  "menu": {
+    "backtesting": true,
+    "financial_zone": true,
+    "simulation": true,
+    "tradingagents_reports": true
+  },
+  "network_scope": "loopback_fixture_only",
+  "page_errors": [],
+  "passed": true,
+  "report": {
+    "active_scripts": 0,
+    "feed_badge": "研究观点",
+    "group_count": 5,
+    "home_view": "dashboard",
+    "modal_open": true,
+    "report_text": "终极结论终极结论核心理由核心理由主要反证主要反证风险摘要中等风险覆盖率与数据缺口sentiment时效与市场状态以报告 as_of 为准分析师报告（1）分析师报告类型：fixture · 状态：completed · 证据：0分析师报告的公开产物多空研究动态讨论（1）多空研究动态讨论类型：fixture · 状态：completed · 证据：0多空研究动态讨论的公开产物Trader 决策（1）Trader 决策类型：fixture · 状态：completed · 证据：0Trader 决策的公开产物风险评估（1）风险评估类型：fixture · 状态：completed · 证据：0风险评估的公开产物Portfolio Manager 终极结论（1）Portfolio Manager 终极结论类型：fixture · 状态：completed · 证据：0Portfolio Manager 终极结论的公开产物模拟研究参考 不构成投资建议"
+  },
+  "report_filter_used": true
+}

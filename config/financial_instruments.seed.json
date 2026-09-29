@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "seed_version": "cn-hk-global-index-resolution-v5",
+  "source": "project_controlled_seed",
+  "effective_on": "2026-07-31",
+  "instruments": [
+    {
+      "canonical_symbol": "000001.SH",
+      "display_name": "上证综合指数",
+      "asset_type": "index",
+      "market": "CN",
+      "exchange": "XSHG",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "1991-07-15",
+      "provider_mappings": {
+        "akshare_cn": "000001",
+        "tushare_cn": "000001.SH",
+        "yahoo": "000001.SS",
+        "easyquotation": "sh000001"
+      },
+      "aliases": ["000001", "上证指数", "上证综指", "上海综合指数"],
+      "metadata": {
+        "benchmark_family": "SSE",
+        "compiler": "上海证券交易所",
+        "official_url": "https://www.sse.com.cn/market/sseindex/overview/",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "000001.SZ",
+      "display_name": "平安银行",
+      "asset_type": "equity",
+      "market": "CN",
+      "exchange": "XSHE",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "1991-04-03",
+      "effective_from": "2012-08-02",
+      "provider_mappings": {
+        "akshare_cn": "000001",
+        "tushare_cn": "000001.SZ",
+        "yahoo": "000001.SZ",
+        "easyquotation": "sz000001"
+      },
+      "aliases": [
+        {"alias": "000001", "valid_from": "1991-04-03"},
+        {"alias": "深发展", "valid_from": "1991-04-03", "valid_to": "2012-08-02"},
+        {"alias": "深发展A", "valid_from": "1991-04-03", "valid_to": "2012-08-02"},
+        "PAYH"
+      ],
+      "metadata": {"security_board": "main", "official_domains": ["pingan.com"]}
+    },
+    {
+      "canonical_symbol": "600000.SH",
+      "display_name": "浦发银行",
+      "asset_type": "equity",
+      "market": "CN",
+      "exchange": "XSHG",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "1999-11-10",
+      "provider_mappings": {
+        "akshare_cn": "600000",
+        "tushare_cn": "600000.SH",
+        "yahoo": "600000.SS",
+        "easyquotation": "sh600000"
+      },
+      "aliases": ["600000.SS", "浦发", "上海浦东发展银行"],
+      "metadata": {"security_board": "main", "official_domains": ["spdb.com.cn"]}
+    },
+    {
+      "canonical_symbol": "0700.HK",
+      "display_name": "腾讯控股",
+      "asset_type": "equity",
+      "market": "HK",
+      "exchange": "XHKG",
+      "currency": "HKD",
+      "country_code": "HK",
+      "listed_at": "2004-06-16",
+      "provider_mappings": {
+        "akshare_cn": "00700",
+        "tushare_cn": "00700.HK",
+        "yahoo": "0700.HK",
+        "alpha_vantage": "0700.HKG",
+        "easyquotation": "00700"
+      },
+      "aliases": ["00700", "0700", "00700.HK", "腾讯", "騰訊", "腾讯控股有限公司"],
+      "metadata": {"security_board": "main", "official_domains": ["tencent.com"]}
+    },
+    {
+      "canonical_symbol": "000300.SH",
+      "display_name": "沪深300指数",
+      "asset_type": "index",
+      "market": "CN",
+      "exchange": "XSHG",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "2005-04-08",
+      "provider_mappings": {
+        "akshare_cn": "000300",
+        "tushare_cn": "000300.SH"
+      },
+      "aliases": ["沪深300", "CSI300", "中证沪深300"],
+      "metadata": {
+        "benchmark_family": "CSI",
+        "compiler": "中证指数有限公司",
+        "official_url": "https://www.csindex.com.cn/",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "510300.SH",
+      "display_name": "华泰柏瑞沪深300ETF",
+      "asset_type": "etf",
+      "market": "CN",
+      "exchange": "XSHG",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "2012-05-28",
+      "provider_mappings": {
+        "akshare_cn": "510300",
+        "tushare_cn": "510300.SH",
+        "yahoo": "510300.SS"
+      },
+      "aliases": ["沪深300", "沪深300ETF", "300ETF"],
+      "metadata": {
+        "tracks_instrument": "000300.SH",
+        "benchmark_instrument": "000300.SH"
+      }
+    },
+    {
+      "canonical_symbol": "399001.SZ",
+      "display_name": "深证成份指数",
+      "asset_type": "index",
+      "market": "CN",
+      "exchange": "XSHE",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "1995-01-23",
+      "provider_mappings": {
+        "akshare_cn": "399001",
+        "tushare_cn": "399001.SZ",
+        "yahoo": "399001.SZ"
+      },
+      "aliases": ["深证成指", "深成指", "深圳成指"],
+      "metadata": {
+        "benchmark_family": "SZSE",
+        "compiler": "深圳证券交易所",
+        "official_url": "https://www.szse.cn/market/product/index/",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "399006.SZ",
+      "display_name": "创业板指数",
+      "asset_type": "index",
+      "market": "CN",
+      "exchange": "XSHE",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "2010-06-01",
+      "provider_mappings": {
+        "akshare_cn": "399006",
+        "tushare_cn": "399006.SZ",
+        "yahoo": "399006.SZ"
+      },
+      "aliases": ["创业板指", "创业板"],
+      "metadata": {
+        "benchmark_family": "SZSE",
+        "compiler": "深圳证券交易所",
+        "official_url": "https://www.szse.cn/market/product/index/",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "HSI.HK",
+      "display_name": "恒生指数",
+      "asset_type": "index",
+      "market": "HK",
+      "exchange": "XHKG",
+      "currency": "HKD",
+      "country_code": "HK",
+      "listed_at": "1969-11-24",
+      "provider_mappings": {
+        "akshare_cn": "恒生指数",
+        "yahoo": "^HSI"
+      },
+      "aliases": ["恒指", "HSI", "香港恒生指数"],
+      "metadata": {
+        "benchmark_family": "Hang Seng Indexes",
+        "compiler": "恒生指数有限公司",
+        "official_url": "https://www.hsi.com.hk/",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "HSTECH.HK",
+      "display_name": "恒生科技指数",
+      "asset_type": "index",
+      "market": "HK",
+      "exchange": "XHKG",
+      "currency": "HKD",
+      "country_code": "HK",
+      "listed_at": "2020-07-27",
+      "provider_mappings": {
+        "akshare_cn": "恒生科技指数",
+        "yahoo": "^HSTECH"
+      },
+      "aliases": ["恒生科技", "恒科指", "HSTECH"],
+      "metadata": {
+        "benchmark_family": "Hang Seng Indexes",
+        "compiler": "恒生指数有限公司",
+        "official_url": "https://www.hsi.com.hk/",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "110020.OF",
+      "display_name": "易方达沪深300ETF联接A",
+      "asset_type": "fund",
+      "market": "CN_FUND",
+      "exchange": "",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "2009-08-26",
+      "provider_mappings": {
+        "akshare_cn": "110020",
+        "tushare_cn": "110020.OF"
+      },
+      "aliases": ["易方达沪深300ETF联接", "易方达300联接A"],
+      "metadata": {
+        "share_class": "A",
+        "tracks_instrument": "510300.SH",
+        "benchmark_instrument": "000300.SH"
+      }
+    },
+    {
+      "canonical_symbol": "007339.OF",
+      "display_name": "易方达沪深300ETF联接C",
+      "asset_type": "fund",
+      "market": "CN_FUND",
+      "exchange": "",
+      "currency": "CNY",
+      "country_code": "CN",
+      "listed_at": "2019-04-23",
+      "provider_mappings": {
+        "akshare_cn": "007339",
+        "tushare_cn": "007339.OF"
+      },
+      "aliases": ["易方达沪深300ETF联接", "易方达300联接C"],
+      "metadata": {
+        "share_class": "C",
+        "tracks_instrument": "510300.SH",
+        "benchmark_instrument": "000300.SH"
+      }
+    },
+    {
+      "canonical_symbol": "AAPL.US",
+      "display_name": "Apple Inc.",
+      "asset_type": "equity",
+      "market": "US",
+      "exchange": "XNAS",
+      "currency": "USD",
+      "country_code": "US",
+      "listed_at": "1980-12-12",
+      "provider_mappings": {"yahoo": "AAPL", "alpha_vantage": "AAPL"},
+      "aliases": ["AAPL", "Apple", "苹果公司"],
+      "metadata": {"security_board": "nasdaq_global_select", "official_domains": ["apple.com"]}
+    },
+    {
+      "canonical_symbol": "SPY.US",
+      "display_name": "SPDR S&P 500 ETF Trust",
+      "asset_type": "etf",
+      "market": "US",
+      "exchange": "ARCX",
+      "currency": "USD",
+      "country_code": "US",
+      "listed_at": "1993-01-22",
+      "provider_mappings": {"yahoo": "SPY", "alpha_vantage": "SPY"},
+      "aliases": ["SPY", "标普500ETF"],
+      "metadata": {"tracks_instrument": "GSPC.US"}
+    },
+    {
+      "canonical_symbol": "GSPC.US",
+      "display_name": "S&P 500 Index",
+      "asset_type": "index",
+      "market": "US",
+      "exchange": "INDEX",
+      "currency": "USD",
+      "country_code": "US",
+      "listed_at": "1957-03-04",
+      "provider_mappings": {"yahoo": "^GSPC"},
+      "aliases": ["S&P500", "标普500", "标普500指数"],
+      "metadata": {"benchmark_family": "S&P DJI"}
+    },
+    {
+      "canonical_symbol": "IXIC.US",
+      "display_name": "纳斯达克综合指数",
+      "asset_type": "index",
+      "market": "US",
+      "exchange": "XNAS",
+      "currency": "USD",
+      "country_code": "US",
+      "listed_at": "1971-02-05",
+      "provider_mappings": {"yahoo": "^IXIC"},
+      "aliases": ["NASDAQ Composite", "Nasdaq Composite", "纳斯达克指数", "纳指"],
+      "metadata": {
+        "benchmark_family": "Nasdaq",
+        "compiler": "Nasdaq, Inc.",
+        "official_url": "https://www.nasdaq.com/market-activity/index/comp",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "N225.JP",
+      "display_name": "日经225指数",
+      "asset_type": "index",
+      "market": "JP",
+      "exchange": "XTKS",
+      "currency": "JPY",
+      "country_code": "JP",
+      "listed_at": "1950-09-07",
+      "provider_mappings": {"yahoo": "^N225"},
+      "aliases": ["Nikkei 225", "Nikkei Stock Average", "日经指数", "日经平均指数"],
+      "metadata": {
+        "benchmark_family": "Nikkei",
+        "compiler": "Nikkei Inc.",
+        "official_url": "https://indexes.nikkei.co.jp/en/nkave/index/profile",
+        "directly_tradeable": false
+      }
+    },
+    {
+      "canonical_symbol": "CPIAUCSL.FRED",
+      "display_name": "美国城市消费者价格指数",
+      "asset_type": "macro",
+      "market": "MACRO",
+      "exchange": "FRED",
+      "currency": "",
+      "country_code": "US",
+      "listed_at": "1947-01-01",
+      "provider_mappings": {"fred": "CPIAUCSL"},
+      "aliases": ["CPIAUCSL", "美国CPI", "US CPI"],
+      "metadata": {"unit_hint": "index_1982_1984_100"}
+    },
+    {
+      "canonical_symbol": "UNRATE.FRED",
+      "display_name": "美国失业率",
+      "asset_type": "macro",
+      "market": "MACRO",
+      "exchange": "FRED",
+      "currency": "",
+      "country_code": "US",
+      "listed_at": "1948-01-01",
+      "provider_mappings": {"fred": "UNRATE"},
+      "aliases": ["UNRATE", "美国失业率", "US unemployment rate"],
+      "metadata": {"unit_hint": "percent"}
+    },
+    {
+      "canonical_symbol": "DFF.FRED",
+      "display_name": "美国联邦基金有效利率",
+      "asset_type": "macro",
+      "market": "MACRO",
+      "exchange": "FRED",
+      "currency": "",
+      "country_code": "US",
+      "listed_at": "1954-07-01",
+      "provider_mappings": {"fred": "DFF"},
+      "aliases": ["DFF", "联邦基金有效利率", "Fed Funds Effective Rate"],
+      "metadata": {"unit_hint": "percent"}
+    },
+    {
+      "canonical_symbol": "MARKET-EXPECTATION.POLY",
+      "display_name": "Polymarket 市场隐含预期范围",
+      "asset_type": "prediction",
+      "market": "PREDICTION",
+      "exchange": "POLYMARKET",
+      "currency": "",
+      "country_code": "US",
+      "listed_at": "2020-01-01",
+      "provider_mappings": {"polymarket": "public_read_only"},
+      "aliases": ["Polymarket", "预测市场", "市场隐含预期"],
+      "metadata": {"semantic_boundary": "expectation_not_fact"}
+    }
+  ]
+}

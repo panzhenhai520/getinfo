@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>手动发文章</title>
+  <link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css">
+  <link rel="stylesheet" href="/static/js/wangeditor/style.css">
+  <script src="/static/js/marked.min.js"></script>
+  <script src="/static/js/wangeditor/index.js"></script>
+  <style>
+    main{max-width:1280px;margin:82px auto 40px;padding:0 22px}
+    .panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:22px}
+    .hint{color:#64748b;font-size:13px;line-height:1.6}
+    .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .field{display:flex;flex-direction:column;gap:4px}
+    .field label{font-size:13px;font-weight:600;color:#374151}
+    input,select,textarea{box-sizing:border-box;width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px}
+    .toolbar{display:flex;flex-wrap:wrap;border:1px solid #e5e7eb;border-bottom:0;border-radius:10px 10px 0 0;padding:6px}
+    .editor-wrap{border:1px solid #e5e7eb;border-radius:0 0 10px 10px;min-height:420px}
+    #editor-container{height:460px;overflow-y:auto}
+    .preview-box{border:1px solid #e5e7eb;border-radius:10px;padding:18px;min-height:420px;background:#fff}
+    .preview-box img{max-width:100%;height:auto}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .btn{padding:9px 16px;border:0;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600}
+    .btn.primary{background:#0f766e;color:#fff}
+    .btn.sec{background:#e5e7eb;color:#374151}
+    .btn.warn{background:#b91c1c;color:#fff}
+    .msg{font-size:13px;margin-top:8px}
+    .draft-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #f1f5f9;font-size:13px}
+    .draft-item b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    body.skin-darkblue .panel{background:#0e1d3a;border-color:rgba(96,165,250,.24);color:#e6f0ff}
+    body.skin-darkblue .field label{color:#dbeafe}
+    body.skin-darkblue input,body.skin-darkblue select,body.skin-darkblue textarea{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#e6f0ff}
+    body.skin-darkblue .preview-box{background:#0e1d3a;border-color:rgba(96,165,250,.24);color:#e6f0ff}
+    body.skin-darkblue .hint{color:#93a9cc}
+    body.skin-darkblue .btn.sec{background:#1e3a5f;color:#dbeafe}
+    body.skin-darkblue .toolbar,.body.skin-darkblue .editor-wrap{border-color:rgba(96,165,250,.24)}
+    body.skin-darkblue .w-e-text-container{background:#0e1d3a !important;color:#e6f0ff !important}
+    body.skin-darkblue .w-e-text-container [data-slate-editor]{color:#e6f0ff}
+  </style>
+</head>
+<body>
+{% include "_dashboard_nav.html" %}
+<main>
+  <h1>手动发文章</h1>
+  <p class="hint">选择行业与主题/领域，录入标题、标签、关键词与正文（图文混排、自由排版）。发布后文章直接出现在对应行业与主题的卡片上，<b>不经过 LLM 清洗加工</b>，正文按你编辑的样式原样展示。</p>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="form-grid">
+      <div class="field"><label>行业（行业包）</label>
+        <select id="fPack" onchange="onPackChange()"><option value="">加载中…</option></select></div>
+      <div class="field"><label>主题 / 领域</label>
+        <select id="fTopic"><option value="">（可选）</option></select></div>
+      <div class="field"><label>文章 URL（可选，来源链接）</label><input id="fUrl" placeholder="https://…"></div>
+      <div class="field"><label>标题</label><input id="fTitle" placeholder="文章标题"></div>
+      <div class="field"><label>标签（逗号分隔，展示在卡片/详情）</label><input id="fTags" placeholder="例如：智慧医院, 评级"></div>
+      <div class="field"><label>关键词（逗号分隔，参与行业检索）</label><input id="fKeywords" placeholder="例如：HIS, 电子病历"></div>
+      <div class="field" style="grid-column:span 2"><label>主题词 / 趋势词（逗号分隔，参与趋势统计）</label><input id="fTrend" placeholder="例如：医疗信息化, DRG 3.0"></div>
+      <div class="field" style="grid-column:span 2"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="fPinned" style="width:auto"> 置顶（在所在主题卡片中排第 1 位）</label></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:14px">正文编辑（图文混排）</b>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn sec" onclick="setMode('edit')">编辑</button>
+          <button type="button" class="btn sec" onclick="setMode('preview')">预览</button>
+        </div>
+      </div>
+      <div id="editArea">
+        <div id="toolbar-container" class="toolbar"></div>
+        <div class="editor-wrap"><div id="editor-container"></div></div>
+      </div>
+      <div id="previewArea" class="preview-box" style="display:none"></div>
+    </div>
+
+    <div class="actions">
+      <button type="button" id="btnSaveDraft" class="btn sec" onclick="saveDraft()"><i class="fa fa-save"></i> 保存草稿</button>
+      <button type="button" id="btnSaveEdit" class="btn primary" onclick="saveDraft()" style="display:none"><i class="fa fa-check"></i> 保存修改</button>
+      <button type="button" id="btnPublish" class="btn primary" onclick="publishNow()"><i class="fa fa-paper-plane"></i> 正式发布</button>
+      <span id="msg" class="msg"></span>
+    </div>
+  </div>
+
+  <div class="panel" id="draftPanel" style="margin-top:18px">
+    <h3 style="margin:0 0 10px">草稿（当前行业）</h3>
+    <div id="draftList"><span class="hint">选择行业后加载草稿…</span></div>
+  </div>
+</main>
+
+<script>
+let editor = null, currentDraftId = null, currentMode = 'edit';
+let editArticleId = null;   // 编辑已发布文章模式：非空时保存=更新文章
+const esc = v => String(v==null?'':v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path, opt){
+  const r = await fetch(path, opt);
+  const d = await r.json().catch(()=>({}));
+  if(!d.success) throw new Error(d.error || d.message || '请求失败');
+  return d;
+}
+function msg(t, ok){ const m=document.getElementById('msg'); m.textContent=t; m.style.color=ok?'#047857':'#b91c1c'; }
+
+async function loadPacks(){
+  try{
+    const d = await api('/api/intel/industry-packs');
+    const packs = d.industry_packs || [];
+    const sel = document.getElementById('fPack');
+    sel.innerHTML = packs.map(p => `<option value="${esc(p.id)}">${esc(p.name||p.id)}</option>`).join('')
+      || '<option value="">无行业包</option>';
+    const defaultId = d.default_industry_pack_id || '';
+    if(defaultId) sel.value = defaultId;
+    onPackChange();
+  }catch(e){ msg(e.message, false); }
+}
+async function onPackChange(){
+  const pack = document.getElementById('fPack').value;
+  const tsel = document.getElementById('fTopic');
+  tsel.innerHTML = '<option value="">（可选）</option>';
+  loadDrafts(pack);
+  if(!pack) return;
+  try{
+    const d = await api('/api/intel/manual-articles/topics?industry_pack_id=' + encodeURIComponent(pack));
+    (d.topics||[]).forEach(t => {
+      const o = document.createElement('option');
+      o.value = JSON.stringify({key:t.key, name:t.name});
+      o.textContent = t.name + (t.kind==='dashboard_category' ? '（领域）' : '');
+      tsel.appendChild(o);
+    });
+  }catch(e){}
+}
+async function loadDrafts(pack){
+  const box = document.getElementById('draftList');
+  if(!pack){ box.innerHTML='<span class="hint">请先选择行业</span>'; return; }
+  try{
+    const d = await api('/api/intel/manual-articles?industry_pack_id='+encodeURIComponent(pack)+'&status=draft');
+    const rows = d.articles||[];
+    box.innerHTML = rows.length ? rows.map(r =>
+      `<div class="draft-item"><b title="${esc(r.title)}">${esc(r.title)}</b>
+       <span class="hint">${esc((r.updated_at||'').slice(0,16))}</span>
+       <button class="btn sec" onclick="loadDraft(${r.id})">继续编辑</button>
+       <button class="btn warn" onclick="removeDraft(${r.id})">删除</button></div>`).join('')
+      : '<span class="hint">暂无草稿</span>';
+  }catch(e){ box.innerHTML='<span class="hint">加载失败</span>'; }
+}
+async function loadDraft(id){
+  const d = await api('/api/intel/manual-articles/'+id);
+  const a = d.article;
+  currentDraftId = a.id;
+  document.getElementById('fPack').value = a.industry_pack_id;
+  onPackChange();
+  document.getElementById('fUrl').value = a.url||'';
+  document.getElementById('fTitle').value = a.title||'';
+  document.getElementById('fTags').value = (a.tags||[]).join(', ');
+  document.getElementById('fKeywords').value = (a.keywords||[]).join(', ');
+  document.getElementById('fTrend').value = (a.trend_words||[]).join(', ');
+  if(a.topic_key){
+    const tsel = document.getElementById('fTopic');
+    [...tsel.options].forEach(o => { if(o.value.indexOf(a.topic_key)>=0) tsel.value = o.value; });
+  }
+  editor.setHtml(a.content_html||'<p><br></p>');
+  msg('已加载草稿 #'+id, true);
+}
+async function removeDraft(id){
+  if(!confirm('删除该草稿？')) return;
+  try{ await api('/api/intel/manual-articles/'+id, {method:'DELETE'}); loadDrafts(document.getElementById('fPack').value); }catch(e){ msg(e.message,false); }
+}
+function collect(){
+  const tsel = document.getElementById('fTopic');
+  let topicKey='', topicName='';
+  if(tsel.value){ try{ const t=JSON.parse(tsel.value); topicKey=t.key; topicName=t.name; }catch(e){} }
+  const payload = {
+    draft_id: currentDraftId,
+    industry_pack_id: document.getElementById('fPack').value,
+    topic_key: topicKey, topic_name: topicName,
+    url: document.getElementById('fUrl').value.trim(),
+    title: document.getElementById('fTitle').value.trim(),
+    tags: document.getElementById('fTags').value,
+    keywords: document.getElementById('fKeywords').value,
+    trend_words: document.getElementById('fTrend').value,
+    content_html: editor.getHtml(),
+    pinned: document.getElementById('fPinned').checked ? 1 : 0,
+  };
+  if (editArticleId) payload.article_id = editArticleId;
+  return payload;
+}
+async function saveDraft(){
+  try{
+    const d = await api('/api/intel/manual-articles', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(collect())});
+    if (editArticleId) {
+      msg('✅ 文章已保存修改（ID=' + editArticleId + '），详情页刷新即可看到', true);
+    } else {
+      currentDraftId = d.draft.id;
+      msg('草稿已保存（#'+d.draft.id+'）', true);
+      loadDrafts(document.getElementById('fPack').value);
+    }
+  }catch(e){ msg(e.message, false); }
+}
+async function publishNow(){
+  if(!document.getElementById('fTitle').value.trim()){ msg('请填写标题', false); return; }
+  if(!document.getElementById('fPack').value){ msg('请选择行业', false); return; }
+  if(!confirm('确认正式发布？发布后文章将直接出现在对应行业与主题卡片上，且不再经过 LLM 加工。')) return;
+  try{
+    const d = await api('/api/intel/manual-articles', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...collect(), publish:true})});
+    msg('✅ 已发布：文章 ID='+d.article_id+'（'+esc(d.title||'')+'）', true);
+    currentDraftId = null;
+    document.getElementById('fTitle').value=''; document.getElementById('fUrl').value='';
+    document.getElementById('fTags').value=''; document.getElementById('fKeywords').value=''; document.getElementById('fTrend').value='';
+    editor.clear();
+    loadDrafts(document.getElementById('fPack').value);
+  }catch(e){ msg(e.message, false); }
+}
+function setMode(mode){
+  currentMode = mode;
+  document.getElementById('editArea').style.display = mode==='edit' ? '' : 'none';
+  document.getElementById('previewArea').style.display = mode==='preview' ? '' : 'none';
+  if(mode==='preview'){
+    const html = editor.getHtml();
+    document.getElementById('previewArea').innerHTML = marked.parse(html) || '';
+  }
+}
+// —— wangEditor 初始化 ——
+function initEditor(){
+  const { createEditor, createToolbar } = window.wangEditor;
+  editor = createEditor({
+    selector: '#editor-container',
+    html: '<p><br></p>',
+    config: {
+      placeholder: '在这里输入正文…支持图片、表格、链接与自由排版',
+      MENU_CONF: {
+        uploadImage: {
+          server: '/api/intel/manual-articles/upload-image',
+          fieldName: 'file',
+          maxFileSize: 10*1024*1024,
+          base64LimitSize: 0,
+        },
+        editImage: { onError: ()=>{}, onSuccess: ()=>{} },
+      },
+      onChange(){ if(currentMode==='preview') setMode('preview'); },
+    },
+    mode: 'default',
+  });
+  createToolbar({
+    editor,
+    selector: '#toolbar-container',
+    config: {
+      toolbarKeys: [
+        'headerSelect','fontFamily','fontSize','|',
+        'bold','underline','italic','through','color','bgColor','|',
+        'justifyLeft','justifyCenter','justifyRight','|',
+        'bulletedList','numberedList','blockquote','|',
+        'insertLink','insertImage','editImage','insertTable','codeBlock','divider','|',
+        'undo','redo','fullScreen'
+      ],
+    },
+    mode: 'default',
+  });
+}
+// —— 编辑已发布文章模式（?article_id=xx&from=edit） ——
+async function enterEditMode(articleId){
+  editArticleId = articleId;
+  const d = await api('/api/intel/manual-articles/edit-source?article_id=' + encodeURIComponent(articleId));
+  const a = d.article;
+  document.getElementById('fPack').value = a.industry_pack_id;
+  await onPackChange();
+  document.getElementById('fUrl').value = a.url || '';
+  document.getElementById('fTitle').value = a.title || '';
+  document.getElementById('fTags').value = (a.tags || []).join(', ');
+  document.getElementById('fKeywords').value = (a.keywords || []).join(', ');
+  document.getElementById('fTrend').value = (a.trend_words || []).join(', ');
+  document.getElementById('fPinned').checked = a.pinned ? true : false;
+  if (a.topic_key) {
+    const tsel = document.getElementById('fTopic');
+    [...tsel.options].forEach(o => {
+      try { const t = JSON.parse(o.value); if (t.key === a.topic_key) tsel.value = o.value; } catch(e) {}
+    });
+  } else if (a.topic_name) {
+    const tsel = document.getElementById('fTopic');
+    [...tsel.options].forEach(o => { if (o.textContent === a.topic_name) tsel.value = o.value; });
+  }
+  editor.setHtml(a.content_html || '<p><br></p>');
+  // 编辑模式：隐藏草稿/发布按钮，显示「保存修改」
+  document.getElementById('btnSaveDraft').style.display = 'none';
+  document.getElementById('btnPublish').style.display = 'none';
+  document.getElementById('btnSaveEdit').style.display = '';
+  document.getElementById('draftPanel').style.display = 'none';
+  document.querySelector('h1').textContent = '编辑文章 #' + articleId;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  try{ const s = localStorage.getItem('dashSkin'); document.body.classList.add((s===null||s==='darkblue')?'skin-darkblue':'skin-light'); }catch(e){}
+  initEditor();
+  const qp = new URLSearchParams(location.search);
+  const editId = qp.get('article_id');
+  if (editId) {
+    enterEditMode(editId).catch(e => msg('加载文章失败：' + e.message, false));
+  } else {
+    loadPacks();
+  }
+});
+</script>
+</body>
+</html>

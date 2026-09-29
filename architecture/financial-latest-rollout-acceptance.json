@@ -1,0 +1,159 @@
+{
+  "acceptance": "passed",
+  "acceptance_version": "financial-latest-production-rollout-v2",
+  "accepted_at": "2026-08-04T16:11:09+08:00",
+  "scope": "six_isolated_gray_stages_and_production_progressive_rollout",
+  "stages": [
+    {
+      "order": 1,
+      "stage": "information_needs_only",
+      "isolated_status": "passed",
+      "production_status": "passed",
+      "evidence": "architecture/financial-latest-gray1-acceptance.json"
+    },
+    {
+      "order": 2,
+      "stage": "candidate_discovery_without_auto_promotion",
+      "isolated_status": "passed",
+      "production_status": "passed",
+      "evidence": "architecture/financial-latest-gray2-acceptance.json"
+    },
+    {
+      "order": 3,
+      "stage": "internal_auto_promotion",
+      "isolated_status": "passed",
+      "production_status": "passed",
+      "evidence": "architecture/financial-latest-gray3-acceptance.json"
+    },
+    {
+      "order": 4,
+      "stage": "quote_only",
+      "isolated_status": "passed",
+      "production_status": "passed",
+      "evidence": "architecture/financial-latest-gray4-acceptance.json"
+    },
+    {
+      "order": 5,
+      "stage": "news_only",
+      "isolated_status": "passed",
+      "production_status": "passed",
+      "evidence": "architecture/financial-latest-gray5-acceptance.json"
+    },
+    {
+      "order": 6,
+      "stage": "quote_and_news_bundle",
+      "isolated_status": "passed",
+      "production_status": "passed",
+      "evidence": "architecture/financial-latest-gray6-acceptance.json"
+    }
+  ],
+  "production_evidence": {
+    "information_needs": {
+      "closed_without_guess": true,
+      "general_model_fallback": false
+    },
+    "instrument_discovery": {
+      "canonical_symbol": "SPCX.US",
+      "candidate_idempotent": true,
+      "auto_promotion_disabled_during_discovery_gate": true
+    },
+    "instrument_promotion": {
+      "candidate_status": "promoted",
+      "formal_instrument_count": 1,
+      "promotion_idempotent": true
+    },
+    "quote_only": {
+      "structured_provider_evidence": true,
+      "stale_data_labeled": true,
+      "unverified_price_published": false,
+      "snapshot_idempotent": true
+    },
+    "news_only": {
+      "verified_document_evidence": true,
+      "future_articles_rejected": true,
+      "document_numbers_used_as_quotes": false
+    },
+    "quote_and_news_bundle": {
+      "ready_case_passed": true,
+      "partial_case_passed": true,
+      "verified_channel_preserved_on_partial_failure": true,
+      "general_model_fallback": false
+    },
+    "post_reload_public_sse": {
+      "question": "SpaceX 股票最新信息",
+      "route_destination": "financial_latest_bundle",
+      "canonical_symbol": "SPCX.US",
+      "source_kinds": [
+        "financial_snapshot"
+      ],
+      "done": true
+    }
+  },
+  "test_summary": {
+    "latest_information_tests": 54,
+    "latest_information_failures": 0,
+    "release_readiness_passed": true,
+    "migration_rehearsal_passed": true,
+    "rollback_rehearsal_passed": true,
+    "full_regression_tests": 601,
+    "full_regression_failures": 0,
+    "container_offline_tests": 54,
+    "container_offline_failures": 0,
+    "automated_gate_network_calls": 0,
+    "generic_model_fallback_calls": 0,
+    "git_diff_check": "passed"
+  },
+  "release_image": {
+    "tag": "collectinfo:financial-latest-final-20260804",
+    "digest": "sha256:af27b9efb00f150955fcd448ebdbf3cdb646a3105799c463db01d1cdcc6a1274",
+    "build_gates": "passed",
+    "offline_container_gate": "passed"
+  },
+  "production_main": {
+    "service": "firecrawl.service",
+    "process_id_after_reload": 610550,
+    "health_status": "ok",
+    "configuration_stage": "simulation_backtest",
+    "configuration_valid": true,
+    "all_latest_information_child_switches_enabled": true,
+    "process_reloaded": true,
+    "public_sse_smoke": "passed",
+    "production_rollout_status": "completed",
+    "running_tasks_before_schedule_resume": 0,
+    "running_tasks_after_schedule_resume": 2,
+    "scheduler_resume_health_status": "ok"
+  },
+  "scheduler_restore": {
+    "frozen_original_task_count": 56,
+    "restored_original_task_count": 56,
+    "active_original_task_count": 56,
+    "inactive_original_task_count": 0,
+    "passed": true
+  },
+  "operational_hardening": {
+    "partial_config_update_preserves_implicit_rollout_stage": true,
+    "explicit_financial_domain_evidence_cannot_be_overridden_by_llm": true,
+    "scheduler_shutdown_request_is_non_blocking": true,
+    "process_shutdown_has_bounded_watchdog": true
+  },
+  "cleanup": {
+    "temporary_admin_session_deleted": true,
+    "temporary_auth_files_deleted": true,
+    "isolated_gray_containers_removed": 6,
+    "production_worker_preserved": true
+  },
+  "recovery": {
+    "pre_rollout_database_backup": "/tmp/crawler_articles_before_financial_latest_rollout_20260803.db",
+    "database_restore_executed": false,
+    "new_legal_data_preserved": true
+  },
+  "boundaries": {
+    "production_database_modified": true,
+    "production_modifications_limited_to_authorized_candidate_instrument_snapshot_and_route_audit_evidence": true,
+    "existing_articles_deleted": false,
+    "real_order_execution": false,
+    "unverified_prices_published": false,
+    "destructive_database_action_executed": false
+  },
+  "next_action": null
+}

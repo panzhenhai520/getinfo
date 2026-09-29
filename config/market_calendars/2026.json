@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "calendar_version": "official-2026-v3",
+  "coverage_start": "2026-01-01",
+  "coverage_end": "2026-12-31",
+  "verified_at_utc": "2026-08-05T08:30:00Z",
+  "calendars": {
+    "XSHG": {
+      "name": "上海证券交易所",
+      "timezone": "Asia/Shanghai",
+      "pre_open_start": "09:15",
+      "regular_sessions": [["09:30", "11:30"], ["13:00", "15:00"]],
+      "holidays": [
+        "2026-01-01", "2026-01-02",
+        "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23",
+        "2026-04-06",
+        "2026-05-01", "2026-05-04", "2026-05-05",
+        "2026-06-19",
+        "2026-09-25",
+        "2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07"
+      ],
+      "half_days": {},
+      "holiday_source_url": "https://www.sse.com.cn/disclosure/dealinstruc/closed/",
+      "hours_source_url": "https://one.sse.com.cn/onething/gptz/"
+    },
+    "XSHE": {
+      "name": "深圳证券交易所",
+      "timezone": "Asia/Shanghai",
+      "pre_open_start": "09:15",
+      "regular_sessions": [["09:30", "11:30"], ["13:00", "15:00"]],
+      "holidays": [
+        "2026-01-01", "2026-01-02",
+        "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23",
+        "2026-04-06",
+        "2026-05-01", "2026-05-04", "2026-05-05",
+        "2026-06-19",
+        "2026-09-25",
+        "2026-10-01", "2026-10-02", "2026-10-05", "2026-10-06", "2026-10-07"
+      ],
+      "half_days": {},
+      "holiday_source_url": "https://www.szse.cn/disclosure/notice/general/t20251222_618087.html",
+      "hours_source_url": "https://docs.static.szse.cn/www/lawrules/rule/trade/current/W020260424690713155663.pdf"
+    },
+    "XHKG": {
+      "name": "香港联合交易所",
+      "timezone": "Asia/Hong_Kong",
+      "pre_open_start": "09:00",
+      "regular_sessions": [["09:30", "12:00"], ["13:00", "16:00"]],
+      "holidays": [
+        "2026-01-01",
+        "2026-02-17", "2026-02-18", "2026-02-19",
+        "2026-04-03", "2026-04-06", "2026-04-07",
+        "2026-05-01", "2026-05-25",
+        "2026-06-19",
+        "2026-07-01",
+        "2026-10-01", "2026-10-19",
+        "2026-12-25"
+      ],
+      "half_days": {
+        "2026-02-16": [["09:30", "12:00"]],
+        "2026-12-24": [["09:30", "12:00"]],
+        "2026-12-31": [["09:30", "12:00"]]
+      },
+      "holiday_source_url": "https://www.hkex.com.hk/-/media/HKEX-Market/Services/Circulars-and-Notices/Participant-and-Members-Circulars/SEHK/2025/ce_SEHK_CT_075_2025.pdf",
+      "hours_source_url": "https://www.hkex.com.hk/Services/Trading-hours-and-Severe-Weather-Arrangements/Trading-Hours/Securities-Market?sc_lang=en"
+    },
+    "XNAS": {
+      "name": "Nasdaq Stock Market",
+      "timezone": "America/New_York",
+      "pre_open_start": "04:00",
+      "regular_sessions": [["09:30", "16:00"]],
+      "holidays": [
+        "2026-01-01",
+        "2026-01-19",
+        "2026-02-16",
+        "2026-04-03",
+        "2026-05-25",
+        "2026-06-19",
+        "2026-07-03",
+        "2026-09-07",
+        "2026-11-26",
+        "2026-12-25"
+      ],
+      "half_days": {
+        "2026-11-27": [["09:30", "13:00"]],
+        "2026-12-24": [["09:30", "13:00"]]
+      },
+      "holiday_source_url": "https://www.nasdaqtrader.com/Trader.aspx?id=calendar",
+      "hours_source_url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule"
+    },
+    "XTKS": {
+      "name": "Tokyo Stock Exchange",
+      "timezone": "Asia/Tokyo",
+      "pre_open_start": "08:00",
+      "regular_sessions": [["09:00", "11:30"], ["12:30", "15:30"]],
+      "holidays": [
+        "2026-01-01", "2026-01-02",
+        "2026-01-12",
+        "2026-02-11", "2026-02-23",
+        "2026-03-20",
+        "2026-04-29",
+        "2026-05-04", "2026-05-05", "2026-05-06",
+        "2026-07-20",
+        "2026-08-11",
+        "2026-09-21", "2026-09-22", "2026-09-23",
+        "2026-10-12",
+        "2026-11-03", "2026-11-23",
+        "2026-12-31"
+      ],
+      "half_days": {},
+      "holiday_source_url": "https://www.jpx.co.jp/english/corporate/about-jpx/calendar/",
+      "hours_source_url": "https://www.jpx.co.jp/english/equities/trading/domestic/01.html"
+    }
+  }
+}

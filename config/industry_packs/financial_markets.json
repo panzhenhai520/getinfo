@@ -1,0 +1,532 @@
+{
+  "id": "financial_markets",
+  "name": "金融市场资讯",
+  "schema_version": 3,
+  "pack_version": "2.0.0",
+  "enabled": true,
+  "default_market": "CN_HK",
+  "timezone": "Asia/Hong_Kong",
+  "pack_kind": "hybrid",
+  "includes": [],
+  "capabilities": [
+    {
+      "key": "financial_market_data",
+      "name": "金融时效数据聚合",
+      "enabled": false,
+      "activation_flag": "FINANCIAL_INTELLIGENCE_ENABLED",
+      "implementation_status": "planned"
+    },
+    {
+      "key": "tradingagents_research",
+      "name": "TradingAgents 多角色研究",
+      "enabled": false,
+      "activation_flag": "TRADING_AGENTS_ENABLED",
+      "implementation_status": "planned"
+    },
+    {
+      "key": "financial_conflict_verification",
+      "name": "金融事实冲突核验与裁决",
+      "enabled": false,
+      "activation_flag": "FINANCIAL_INTELLIGENCE_ENABLED",
+      "implementation_status": "planned"
+    },
+    {
+      "key": "paper_trading",
+      "name": "交易模拟",
+      "enabled": false,
+      "activation_flag": "TRADING_SIMULATION_ENABLED",
+      "implementation_status": "planned"
+    },
+    {
+      "key": "financial_backtesting",
+      "name": "策略回测",
+      "enabled": false,
+      "activation_flag": "TRADING_SIMULATION_ENABLED",
+      "implementation_status": "planned"
+    }
+  ],
+  "dashboard_categories": [
+    {
+      "key": "financial_market_snapshot",
+      "name": "金融市场实时概览",
+      "enabled": false,
+      "activation_flag": "FINANCIAL_INTELLIGENCE_ENABLED",
+      "implementation_status": "planned"
+    },
+    {
+      "key": "financial_risk_management",
+      "name": "风险管理报告",
+      "enabled": false,
+      "activation_flag": "TRADING_AGENTS_ENABLED",
+      "implementation_status": "planned"
+    },
+    {
+      "key": "financial_collaborative_assessment",
+      "name": "协同评估报告",
+      "enabled": false,
+      "activation_flag": "TRADING_AGENTS_ENABLED",
+      "implementation_status": "planned"
+    }
+  ],
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": false,
+    "show_watched_stock_cards": false,
+    "show_spatiotemporal_map": true
+  },
+  "ragflow_policy": {
+    "upload_crawled_articles": false,
+    "knowledge_base_key": "news"
+  },
+  "core_keywords": [
+    "金融市场",
+    "资本市场",
+    "证券市场",
+    "股票市场",
+    "债券市场",
+    "外汇市场",
+    "货币市场",
+    "金融监管",
+    "证券监管",
+    "货币政策",
+    "financial market",
+    "capital market",
+    "securities market",
+    "stock market",
+    "bond market",
+    "foreign exchange market",
+    "monetary policy",
+    "banking sector",
+    "government bonds",
+    "Exchange Fund",
+    "gross domestic product",
+    "股票",
+    "证券",
+    "基金",
+    "指数"
+  ],
+  "expanded_keywords": [
+    "A股",
+    "港股",
+    "公募基金",
+    "私募基金",
+    "交易所买卖基金",
+    "ETF",
+    "IPO",
+    "上市公司",
+    "资产管理",
+    "财富管理",
+    "银行间市场",
+    "virtual asset",
+    "OTC derivative",
+    "exchange-traded derivatives",
+    "mortgage loans",
+    "consumer prices",
+    "retail sales"
+  ],
+  "candidate_gate": {
+    "anchor_keywords": [
+      "金融市场",
+      "资本市场",
+      "证券市场",
+      "股票市场",
+      "债券市场",
+      "外汇市场",
+      "货币市场",
+      "金融监管",
+      "证券监管",
+      "银行监管",
+      "货币政策",
+      "利率决议",
+      "A股",
+      "港股",
+      "上证指数",
+      "上证综指",
+      "深证成指",
+      "创业板指",
+      "沪深300",
+      "恒生指数",
+      "恒生科技指数",
+      "公募基金",
+      "私募基金",
+      "证券投资基金",
+      "交易所买卖基金",
+      "financial market",
+      "capital market",
+      "securities market",
+      "stock market",
+      "bond market",
+      "foreign exchange market",
+      "monetary policy",
+      "interest rate decision",
+      "banking sector",
+      "government bonds",
+      "Exchange Fund",
+      "gross domestic product",
+      "consumer prices",
+      "corporate tax",
+      "gold clearing and settlement",
+      "mortgage loans",
+      "monetary statistics",
+      "virtual asset",
+      "OTC derivative",
+      "exchange-traded derivatives",
+      "mutual recognition of funds",
+      "real estate investment trusts",
+      "listed structured funds",
+      "insider dealing",
+      "market misconduct"
+    ],
+    "entity_keywords": [
+      "中国人民银行",
+      "中国证监会",
+      "国家金融监督管理总局",
+      "上海证券交易所",
+      "深圳证券交易所",
+      "香港金融管理局",
+      "香港证券及期货事务监察委员会",
+      "香港证监会",
+      "香港交易所",
+      "People's Bank of China",
+      "China Securities Regulatory Commission",
+      "Hong Kong Monetary Authority",
+      "Securities and Futures Commission",
+      "Hong Kong Exchanges and Clearing",
+      "HKMA",
+      "SFC",
+      "HKEX"
+    ],
+    "description": "文章必须命中明确的金融市场、监管、资产类别、指数或官方金融机构锚点；单独出现‘基金’‘证券’‘指数’等泛词不能证明金融市场相关性。"
+  },
+  "trend_keywords": [
+    "监管政策",
+    "货币政策",
+    "利率",
+    "降息",
+    "加息",
+    "降准",
+    "市场走势",
+    "资金流向",
+    "成交量",
+    "估值",
+    "风险溢价",
+    "市场波动",
+    "指数调整",
+    "制度改革",
+    "regulatory framework",
+    "monetary policy",
+    "interest rate",
+    "market trading",
+    "market systems",
+    "economic growth",
+    "inflation",
+    "consultation",
+    "regulatory regime",
+    "降息降准",
+    "国债收益率",
+    "北向资金",
+    "IPO节奏",
+    "ETF规模",
+    "量化交易",
+    "债券违约",
+    "汇率双向波动",
+    "央行公开市场操作",
+    "证券监管新政",
+    "上市公司回购",
+    "分红政策",
+    "港股通",
+    "存款利率下调",
+    "资产荒"
+  ],
+  "event_keywords": [
+    "发布",
+    "公告",
+    "上市",
+    "停牌",
+    "复牌",
+    "增持",
+    "减持",
+    "回购",
+    "分红",
+    "发行",
+    "获批",
+    "处罚",
+    "调查",
+    "并购",
+    "收购",
+    "launches",
+    "issues",
+    "announces",
+    "reprimands",
+    "fines",
+    "suspends",
+    "concludes",
+    "circular",
+    "tender results",
+    "restriction notice"
+  ],
+  "negative_keywords": [
+    "科研基金",
+    "慈善基金",
+    "社会保险基金宣传",
+    "证券从业培训广告",
+    "股票软件广告"
+  ],
+  "classification": {
+    "core_weight": 3,
+    "expanded_weight": 1,
+    "trend_weight": 2,
+    "event_weight": 2,
+    "negative_weight": -3,
+    "minimum_relevance_score": 3,
+    "llm_confidence_threshold": 0.65,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ]
+  },
+  "serpapi_queries": [
+    "A股 市场 监管 最新",
+    "港股 市场 香港证监会 最新",
+    "上证指数 深证成指 市场走势",
+    "中国人民银行 货币政策",
+    "香港金融管理局 金融市场"
+  ],
+  "default_sources": [
+    {
+      "name": "香港政府新闻网财经",
+      "url": "https://www.news.gov.hk/en/categories/finance/html/articlelist.rss.xml",
+      "source_type": "rss",
+      "content_type": "official",
+      "authority_level": 5,
+      "source_role": "government_regulator",
+      "language": "en",
+      "market": "HK",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss",
+      "license_profile": "hk_news_finance_public_rss",
+      "origin_pack_id": "financial_markets"
+    },
+    {
+      "name": "香港金融管理局新闻稿",
+      "url": "https://www.hkma.gov.hk/eng/other-information/rss/rss_press-release.xml",
+      "source_type": "rss",
+      "content_type": "official",
+      "authority_level": 5,
+      "source_role": "government_regulator",
+      "language": "en",
+      "market": "HK",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss",
+      "license_profile": "hkma_press_release_public_rss",
+      "origin_pack_id": "financial_markets"
+    },
+    {
+      "name": "香港证监会新闻稿",
+      "url": "https://www.sfc.hk/en/RSS-Feeds/Press-releases",
+      "source_type": "rss",
+      "content_type": "official",
+      "authority_level": 5,
+      "source_role": "government_regulator",
+      "language": "en",
+      "market": "HK",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss",
+      "license_profile": "sfc_press_release_public_rss",
+      "origin_pack_id": "financial_markets"
+    },
+    {
+      "name": "香港证监会通函",
+      "url": "https://www.sfc.hk/en/RSS-Feeds/Circulars",
+      "source_type": "rss",
+      "content_type": "official",
+      "authority_level": 5,
+      "source_role": "government_regulator",
+      "language": "en",
+      "market": "HK",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss",
+      "license_profile": "sfc_circulars_public_rss",
+      "origin_pack_id": "financial_markets"
+    },
+    {
+      "name": "香港证监会咨询及结论",
+      "url": "https://www.sfc.hk/en/RSS-Feeds/Consultations-and-Conclusions",
+      "source_type": "rss",
+      "content_type": "official",
+      "authority_level": 5,
+      "source_role": "government_regulator",
+      "language": "en",
+      "market": "HK",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss",
+      "license_profile": "sfc_consultations_public_rss",
+      "origin_pack_id": "financial_markets"
+    },
+    {
+      "name": "港交所披露易上市公司公告",
+      "url": "https://www.hkexnews.hk/homelcicontentsearch.html",
+      "source_type": "list_page",
+      "content_type": "official",
+      "authority_level": 5,
+      "language": "zh-HK,en",
+      "market": "HK",
+      "expected_classifications": [
+        "event",
+        "report",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_website",
+      "origin_pack_id": "financial_markets",
+      "source_role": "exchange_official",
+      "approval_status": "approved",
+      "on_demand_only": true,
+      "approved_domains": [
+        "hkexnews.hk"
+      ],
+      "search_query_template": "site:hkexnews.hk {target} 公告",
+      "evidence_url": "https://www2.hkexnews.hk/-/media/HKEXnews/Homepage/Listed-Company-Publications/Search-Guide/TitleSearchGuide_e.pdf"
+    },
+    {
+      "name": "中国光大控股投资者关系公告",
+      "url": "https://www.everbright.com/en/investor-relations",
+      "source_type": "list_page",
+      "content_type": "official",
+      "authority_level": 5,
+      "language": "zh-HK,en",
+      "market": "HK",
+      "expected_classifications": [
+        "event",
+        "report",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_website",
+      "origin_pack_id": "financial_markets",
+      "source_role": "issuer_official",
+      "approval_status": "approved",
+      "on_demand_only": true,
+      "approved_domains": [
+        "everbright.com"
+      ],
+      "target_symbols": [
+        "0165.HK"
+      ],
+      "search_query_template": "site:everbright.com {target} announcement",
+      "evidence_url": "https://www.everbright.com/en/investor-relations"
+    }
+  ],
+  "fixed_topics": [
+    {
+      "key": "monetary_policy",
+      "name": "货币政策与利率",
+      "keywords": [
+        "货币政策",
+        "利率",
+        "降息",
+        "加息",
+        "降准"
+      ]
+    },
+    {
+      "key": "market_regulation",
+      "name": "市场监管",
+      "keywords": [
+        "金融监管",
+        "证券监管",
+        "监管政策",
+        "处罚",
+        "调查"
+      ]
+    },
+    {
+      "key": "mainland_market",
+      "name": "A股与内地市场",
+      "keywords": [
+        "A股",
+        "上证指数",
+        "深证成指",
+        "创业板指",
+        "沪深300"
+      ]
+    },
+    {
+      "key": "hong_kong_market",
+      "name": "港股与香港市场",
+      "keywords": [
+        "港股",
+        "恒生指数",
+        "恒生科技指数",
+        "香港交易所"
+      ]
+    },
+    {
+      "key": "funds",
+      "name": "基金与资产管理",
+      "keywords": [
+        "公募基金",
+        "私募基金",
+        "证券投资基金",
+        "交易所买卖基金",
+        "资产管理"
+      ]
+    },
+    {
+      "key": "fixed_income_fx",
+      "name": "债券与外汇",
+      "keywords": [
+        "债券市场",
+        "外汇市场",
+        "银行间市场"
+      ]
+    },
+    {
+      "key": "listed_companies",
+      "name": "上市公司动态",
+      "keywords": [
+        "上市公司",
+        "IPO",
+        "回购",
+        "分红",
+        "并购"
+      ]
+    },
+    {
+      "key": "market_risk",
+      "name": "市场风险",
+      "keywords": [
+        "市场波动",
+        "风险溢价",
+        "估值",
+        "资金流向"
+      ]
+    }
+  ]
+}

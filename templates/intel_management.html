@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>信源管理</title><link rel="stylesheet" href="/static/css/tailwind.css"><link rel="stylesheet" href="/static/css/fontawesome.css"><link rel="stylesheet" href="/static/css/dashboard-theme.css">
+  <style>
+    main{max-width:1440px;margin:82px auto 40px;padding:0 22px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tabs button,.action{padding:9px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;cursor:pointer}.action,.tabs button.active{background:#0f766e;color:#fff;border-color:#0f766e}.panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:22px}.hidden{display:none}.hint{color:#64748b;font-size:13px;line-height:1.6}.form-grid,.pdf-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{border:1px solid #dbe5e7;border-radius:10px;padding:16px;background:#fbfdfc}.card h3{margin:0 0 8px}input,textarea{box-sizing:border-box;width:100%;padding:10px;margin:5px 0;border:1px solid #cbd5e1;border-radius:7px}button{cursor:pointer}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 7px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}code{word-break:break-all}.ok{color:#047857}.bad{color:#b91c1c}.url-catalog-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0}.url-catalog-toolbar input{width:min(320px,100%);margin:0}.url-catalog-summary{margin-left:auto;color:#64748b;font-size:13px}.url-catalog-tree{border:1px solid #dbe5e7;border-radius:12px;overflow:hidden;background:#fff}.url-category{border-bottom:1px solid #e2e8f0}.url-category:last-child{border-bottom:0}.url-category-head{display:flex;align-items:center;gap:9px;padding:12px 14px;background:linear-gradient(90deg,#f0fdfa,#f8fafc)}.url-category-name{font-weight:700;color:#1e293b}.url-category-count{color:#64748b;font-size:12px}.url-category-actions{margin-left:auto;display:flex;gap:6px}.url-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(300px,2.2fr) 100px 116px;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid #f1f5f9;font-size:13px}.url-row-name{font-weight:600;color:#334155}.url-row-url{min-width:0;color:#0f766e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.url-row-actions{display:flex;gap:6px;justify-content:flex-end}.catalog-button{padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#334155;font-size:13px;font-weight:600}.catalog-button.primary{background:#0f766e;color:#fff;border-color:#0f766e}.catalog-button.danger{color:#b91c1c;border-color:#fecaca}.catalog-button.small{padding:5px 8px;font-size:12px}.catalog-status{font-size:12px}.catalog-modal{position:fixed;inset:0;z-index:120;background:rgba(15,23,42,.42);display:flex;align-items:center;justify-content:center;padding:18px}.catalog-modal-card{width:min(620px,100%);max-height:90vh;overflow:auto;padding:22px;border-radius:12px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.28)}.catalog-modal-card h3{margin:0 0 10px}.catalog-field{margin:10px 0}.catalog-field label{display:block;margin-bottom:4px;color:#475569;font-size:13px;font-weight:600}.catalog-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.report-import-button{display:inline-flex;align-items:center;gap:7px;margin-top:13px;padding:10px 14px;border:0;border-radius:8px;background:#0f766e;color:#fff;font-weight:600;box-shadow:0 2px 5px rgba(15,118,110,.22);transition:transform .15s,background .15s}.report-import-button:hover{background:#0b5f59;transform:translateY(-1px)}.scan-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fff}.scan-table{width:max-content;min-width:1880px}.scan-table th,.scan-table td{white-space:nowrap;padding:12px 14px}.scan-table th{background:#f8fafc;color:#475569;font-weight:600}.scan-table th:first-child,.scan-table td:first-child{min-width:340px}.scan-table th:nth-child(2),.scan-table td:nth-child(2){min-width:92px}.scan-table th:nth-child(3),.scan-table td:nth-child(3){min-width:180px}.scan-table th:nth-child(4),.scan-table td:nth-child(4){min-width:86px}.scan-table th:nth-child(5),.scan-table td:nth-child(5){min-width:215px}.scan-table th:nth-child(6),.scan-table td:nth-child(6){min-width:160px}.scan-table th:nth-child(7),.scan-table td:nth-child(7){min-width:115px}.scan-table th:nth-child(8),.scan-table td:nth-child(8){min-width:100px}.scan-table th:nth-child(9),.scan-table td:nth-child(9){min-width:290px}.scan-table code{white-space:nowrap;word-break:normal}@media(max-width:760px){.form-grid,.pdf-actions{grid-template-columns:1fr}main{padding:0 12px}.url-row{grid-template-columns:1fr}.url-row-actions{justify-content:flex-start}.url-catalog-summary{margin-left:0}.catalog-modal{align-items:flex-end;padding:0}.catalog-modal-card{width:100%;border-radius:14px 14px 0 0}}
+    /* A modal is hidden until the user explicitly chooses an add/edit action. */
+    .catalog-modal.hidden { display: none; }
+    .url-category-toggle { display:flex;align-items:center;gap:9px;min-width:0;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer; }
+    .url-category-toggle .fa-chevron-right { transition:transform .16s ease; }
+    .url-category-toggle[aria-expanded="true"] .fa-chevron-right { transform:rotate(90deg); }
+</style>
+<style>
+.gate-panel{padding:34px 40px 44px;min-height:560px}.gate-panel h2{margin:0 0 18px;font-size:25px;color:#134e4a}.gate-intro{max-width:980px;margin:0 0 38px;font-size:14px;line-height:1.9}.gate-rule-title{padding:20px 22px;margin:0 0 34px;border-left:4px solid #0f766e;border-radius:0 10px 10px 0;background:#f0fdfa;color:#134e4a;font-size:16px;font-weight:650;line-height:1.75}.gate-group{padding:0 2px}.gate-group h3,.gate-entities h3{margin:0 0 19px;font-size:18px;color:#1e293b}.gate-tags{display:flex;flex-wrap:wrap;gap:15px 18px;align-items:center}.gate-tag{display:inline-flex;align-items:center;min-height:34px;padding:4px 13px;border:1px solid transparent;border-radius:18px;font-size:14px;font-weight:600;line-height:1.4}.gate-tag.teal{background:#ccfbf1;border-color:#99f6e4;color:#115e59}.gate-tag.sky{background:#e0f2fe;border-color:#bae6fd;color:#075985}.gate-tag.violet{background:#ede9fe;border-color:#ddd6fe;color:#5b21b6}.gate-tag.amber{background:#fef3c7;border-color:#fde68a;color:#92400e}.gate-tag.rose{background:#ffe4e6;border-color:#fecdd3;color:#9f1239}.gate-tag.emerald{background:#d1fae5;border-color:#a7f3d0;color:#065f46}.gate-tag.indigo{background:#e0e7ff;border-color:#c7d2fe;color:#3730a3}.gate-tag.cyan{background:#cffafe;border-color:#a5f3fc;color:#155e75}.gate-entities{margin-top:52px;padding:25px 28px 28px;border:1px solid #99f6e4;border-radius:14px;background:linear-gradient(135deg,#ecfdf5,#f0fdfa)}.gate-entities h3{font-size:21px;color:#065f46}.gate-tag.entity{min-height:42px;padding:6px 18px;border-width:1px;font-size:17px;box-shadow:0 2px 6px rgba(15,118,110,.09)}@media(max-width:760px){.gate-panel{padding:25px 20px 34px}.gate-tags{gap:11px}.gate-entities{margin-top:38px;padding:20px}.gate-tag.entity{font-size:15px}}
+</style>
+</head>
+<body>
+{% include "_dashboard_nav.html" %}
+<main>
+  <h1>信源管理</h1><p class="hint">统一入口：URL 分类库 → 信源定位 → 定时扫描 → 候选去重 → 正文聚合 → 分类 → Dashboard。新登记的 URL 与原 URL 管理页面是同一份数据，不会产生两套网址。</p>
+  <div class="tabs"><button data-tab="register" class="active">注册与智能定位</button><button data-tab="sources">扫描状态</button><button data-tab="urls">URL 分类管理</button><button data-tab="deny">域名黑名单</button><button data-tab="reports">AI 周报</button><button data-tab="waterline">水位线</button><button data-tab="trend">趋势分析配置</button><button data-tab="pack">行业门禁</button><button data-tab="topics" class="tab-button" type="button">主题维护</button></div>
+  <section id="register" class="panel"><h2>注册与智能定位</h2><p class="hint">先登记网站首页、RSS 或已知资讯页：系统会把 URL 写入统一 URL 分类库、同步为信源，并创建一次初始扫描。智能定位用于从网站中找出更适合聚合的新闻/洞察栏目；它只给出经过行业锚点验证的建议 URL，确认后可将原入口更新为该栏目，不会额外创建重复聚合。</p><div class="form-grid"><div class="card"><h3>登记信源并启动初始扫描</h3><input id="newName" placeholder="中文名称"><input id="newUrl" placeholder="网站首页、RSS 或资讯列表 URL"><textarea id="newDesc" placeholder="备注（可选）"></textarea><button class="action" onclick="registerSource()">登记并初始扫描</button><p id="registerResult"></p></div><div class="card"><h3>智能定位资讯栏目</h3><p class="hint">用于优化聚合入口：例如将泛网站首页改为更稳定的“新闻”“洞察”或 RSS 列表页。</p><input id="analyseUrl" placeholder="https://example.com"><button class="action" onclick="analyseUrl()">智能分析 URL</button><div id="analyseResult"></div></div></div></section>
+  <section id="sources" class="panel hidden"><h2>信源扫描状态</h2><p class="hint">这里反映每个信源的自动扫描计划、最近一次发现和实际入库结果。worker 每分钟检查到期信源；到达各信源配置的每日/每周时间后自动扫描。红色错误表示该次扫描失败或受限：先查看原因，403 会自动改用浏览器聚合；登录限制、站点改版或长期失败则应更新 URL、改用 RSS/订阅入口，或暂时禁用该信源。</p><button onclick="loadAll()">刷新</button><div class="scan-table-wrap"><table class="scan-table"><thead><tr><th># / 信源 / 入口</th><th>类型</th><th>频率</th><th>浏览器</th><th>上次扫描</th><th>发现→候选→入库</th><th>状态</th><th>失败</th><th>失败信息</th></tr></thead><tbody id="sourceRows"></tbody></table></div></section>
+  <section id="urls" class="panel hidden"><h2>URL 分类管理</h2><p class="hint">这里显示你的行业包继承来的网址（激活时落地）+ 你个人新增的网址。</p><div class="url-catalog-toolbar"><input id="urlCatalogSearch" placeholder="搜索名称、网址或备注"><button type="button" class="catalog-button primary" onclick="openUrlCatalogEditor()"><i class="fa fa-plus"></i> 新增网址</button><button type="button" class="catalog-button hidden" onclick="openCategoryCatalogEditor()"><i class="fa fa-folder-plus"></i> 新增分类</button><button type="button" class="catalog-button hidden" onclick="checkCatalogAccessibility()"><i class="fa fa-plug"></i> 检测全部可访问性</button><button type="button" class="catalog-button" onclick="loadUrlCatalog()"><i class="fa fa-refresh"></i> 刷新</button><span id="urlCatalogSummary" class="url-catalog-summary">正在加载…</span></div><div id="urlCatalogTree" class="url-catalog-tree"></div></section>
+  <div id="urlCatalogEditor" class="catalog-modal hidden"><div class="catalog-modal-card"><h3 id="urlCatalogEditorTitle">新增网址</h3><div class="catalog-field"><label>中文名称</label><input id="catalogUrlName" placeholder="例如：国家金融监督管理总局"></div><div class="catalog-field"><label>网址</label><input id="catalogUrlAddress" placeholder="https://example.com"></div><div class="catalog-field"><label>分类</label><select id="catalogUrlCategory"></select></div><div class="catalog-field"><label>父网址（可选，用于建立子网址）</label><select id="catalogUrlParent"></select></div><div class="catalog-field"><label>备注</label><textarea id="catalogUrlDescription" placeholder="说明、栏目用途或聚合提示"></textarea></div><label><input id="catalogUrlActive" type="checkbox" checked> 启用此网址</label><div class="catalog-modal-actions"><button type="button" class="catalog-button" onclick="closeCatalogModal('urlCatalogEditor')">取消</button><button type="button" class="catalog-button primary" onclick="saveUrlCatalogEditor()">保存网址</button></div></div></div>
+  <div id="categoryCatalogEditor" class="catalog-modal hidden"><div class="catalog-modal-card"><h3 id="categoryCatalogEditorTitle">新增分类</h3><div class="catalog-field"><label>分类名称</label><input id="catalogCategoryName" placeholder="例如：行业资讯"></div><div class="catalog-field"><label>分类说明</label><textarea id="catalogCategoryDescription" placeholder="可选"></textarea></div><label><input id="catalogCategoryActive" type="checkbox" checked> 启用此分类</label><div class="catalog-modal-actions"><button type="button" class="catalog-button" onclick="closeCatalogModal('categoryCatalogEditor')">取消</button><button type="button" class="catalog-button primary" onclick="saveCategoryCatalogEditor()">保存分类</button></div></div></div>
+  <section id="deny" class="panel hidden"><h2>域名黑名单</h2><p class="hint">列入黑名单的域名（连同其子域）不会再产生候选与抓取任务——适用于境内服务器抓不到、DNS 被污染或长期不可达的源（例如 cn.investing.com）。保存后<b>立即生效</b>（worker 建候选时从数据库现读，无需重启）。环境变量基线（.env 的 CRAWL_DENY_DOMAINS）在此只读展示，需要修改时请到服务器 .env 调整。</p><div class="url-catalog-toolbar"><input id="denyDomainInput" placeholder="例如 cn.investing.com"><button type="button" class="action" onclick="addDenyDomain()"><i class="fa fa-plus"></i> 添加</button><button type="button" class="action" onclick="saveDenyDomains()"><i class="fa fa-save"></i> 保存</button><span id="denyResult" class="hint" aria-live="polite"></span></div><div id="denyChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><span class="hint">正在加载…</span></div><div id="denyEnvNote" class="hint" style="margin-top:8px"></div></section>
+  <section id="reports" class="panel hidden"><h2>AI 周报（每周五自动生成）</h2>
+  <style>
+  /* 本页深色皮肤由公共导航注入 body.skin-darkblue，但页面自身的表格/卡片仍是浅色定义，
+     导致深色下表格头出现白块。这里补齐深色覆盖（不影响浅色）。 */
+  body.skin-darkblue .panel{background:#0e1d3a;border-color:rgba(96,165,250,.24);color:#e6f0ff}
+  body.skin-darkblue table th{background:#12233f;color:#dbeafe;border-bottom-color:rgba(96,165,250,.24)}
+  body.skin-darkblue table td{color:#dbeafe;border-bottom-color:rgba(96,165,250,.16)}
+  body.skin-darkblue table tbody tr:hover{background:rgba(56,189,248,.08)}
+  body.skin-darkblue .card{background:#12233f;border-color:rgba(96,165,250,.24);color:#e6f0ff}
+  body.skin-darkblue .hint,body.skin-darkblue .url-catalog-summary{color:#93a9cc}
+  body.skin-darkblue input,body.skin-darkblue textarea,body.skin-darkblue select{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#e6f0ff}
+  body.skin-darkblue .url-catalog-tree{background:#0e1d3a;border-color:rgba(96,165,250,.24)}
+  body.skin-darkblue .url-category-head{background:linear-gradient(90deg,#12233f,#0e1d3a);color:#e6f0ff}
+  body.skin-darkblue .url-category-name{color:#e6f0ff}
+  body.skin-darkblue .url-category-count,body.skin-darkblue .url-row-name{color:#93a9cc}
+  body.skin-darkblue .url-row{border-top-color:rgba(96,165,250,.16)}
+  body.skin-darkblue .tabs button{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#dbeafe}
+  body.skin-darkblue .tabs button.active{background:#38bdf8;border-color:#38bdf8;color:#06121f}
+  /* 门禁说明块与规则条：原先用内联浅色底，深色皮肤下变成白底浅字看不清。
+     改为类驱动，浅/深两套配色。 */
+  .gate-help{margin:10px 0 14px;border:1px solid #dbe5e7;border-radius:10px;padding:10px 12px;background:#fbfdfc}
+  .gate-help>summary{cursor:pointer;font-weight:700}
+  .gate-help ul{margin:6px 0 6px 18px}
+  .gate-help code{background:rgba(15,118,110,.08);padding:1px 5px;border-radius:4px}
+  body.skin-darkblue .gate-help{background:#12233f;border-color:rgba(96,165,250,.24);color:#dbeafe}
+  body.skin-darkblue .gate-help>summary{color:#7dd3fc}
+  body.skin-darkblue .gate-help code{background:rgba(56,189,248,.16);color:#9ed2f7}
+  .gate-rule-title{background:#f0fdfa;border:1px solid #cceee4;border-left:4px solid #0f766e;border-radius:8px;padding:10px 12px;font-weight:700}
+  body.skin-darkblue .gate-rule-title{background:#12233f;border-color:rgba(96,165,250,.28);border-left-color:#38bdf8;color:#e6f0ff}
+  /* 其余浅色控件（弹窗、按钮、字段标签）在深色下的覆盖 */
+  body.skin-darkblue .catalog-button{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#dbeafe}
+  body.skin-darkblue .catalog-button:hover{background:#12233f;border-color:rgba(56,189,248,.55);color:#7dd3fc}
+  body.skin-darkblue .catalog-button.primary{background:#38bdf8;border-color:#38bdf8;color:#06121f}
+  body.skin-darkblue .catalog-modal-card{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#e6f0ff}
+  body.skin-darkblue .catalog-field label,body.skin-darkblue .gate-intro{color:#93a9cc}
+  body.skin-darkblue .url-category-toggle{color:#dbeafe}
+  body.skin-darkblue select option{background:#0e1d3a;color:#e6f0ff}
+  /* 兜底：页面里仍有内联 background:#fff / #fbfdfc 的块，内联样式优先于皮肤，
+     必须用 !important 才能压住——这正是"白底浅字看不清"反复出现的病根。 */
+  body.skin-darkblue #pack [style*="#fff"],body.skin-darkblue #pack [style*="#fbfdfc"],
+  body.skin-darkblue #urls [style*="#fff"],body.skin-darkblue #reports [style*="#fff"],
+  body.skin-darkblue .catalog-modal-card [style*="#fff"]{background:#12233f !important;color:#e6f0ff !important}
+  </style>
+  <p class="hint">系统每周五自动为<b>本行业包</b>总结最近 7 天的文章库，生成一份 Markdown 周报（行业热点 + 主题趋势泳道 + 趋势研判），在首页「报告」页查看。下面是生成报告用的提示词，可自行修改；占位符（行业名称/时间窗/统计表/代表文章）由系统自动填充。</p>
+  <div class="form-grid">
+    <div class="card"><h3>最近一次报告生成</h3><div id="reportLastInfo" class="hint">正在加载…</div></div>
+    <div class="card"><h3>报告提示词（可修改）</h3><textarea id="reportPrompt" rows="16" style="font-family:inherit;line-height:1.7"></textarea>
+      <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button type="button" class="catalog-button primary" onclick="saveReportPrompt()"><i class="fa fa-save"></i> 保存提示词</button>
+        <button type="button" class="catalog-button" onclick="restoreReportPrompt()">恢复默认</button>
+        <button type="button" class="catalog-button primary" onclick="testReportPrompt()"><i class="fa fa-flask"></i> 测试提示词效果</button>
+        <span id="reportPromptResult" class="hint" aria-live="polite"></span>
+      </div>
+      <p class="hint" style="margin-top:8px">「测试提示词效果」会派发一次 LLM 总结任务（时间窗=最近 7 天），完成后到首页「报告」查看效果；正式报告每周五由定时任务自动生成。</p>
+    </div>
+  </div></section>
+  <section id="trend" class="panel hidden"><h2>趋势分析配置</h2><p class="hint">指定参与趋势演化的<b>品牌</b>（驱动「品牌动态」）与<b>主题</b>（驱动「主题趋势」），各最多 5 个。保存后写入当前行业包并发布；趋势聚合任务会据此生成。</p><div class="form-grid"><div class="card"><h3>趋势品牌（≤5）</h3><textarea id="trendBrands" placeholder="每行一个，例如：&#10;木链科技&#10;安恒信息&#10;奇安信"></textarea></div><div class="card"><h3>趋势主题（≤5）</h3><textarea id="trendTopics" placeholder="每行一个，例如：&#10;工控安全&#10;算力交易&#10;政策法规"></textarea></div></div><button type="button" class="action" onclick="saveTrendConfig()">保存趋势分析配置</button><p id="trendResult" class="hint"></p></section>
+  <section id="waterline" class="panel hidden"><h2>增量爬取水位线</h2>
+  <p class="hint">每个列表页记录「上次爬取 / 上次新增 / 已见最新发布时间 / 已保存条目数」。扫描时新→旧遍历、连续命中已保存条目即停止；sitemap/RSS 信号不晚于水位线时整源跳过。给一个已知 URL 点「立即检查」，可自动探查该站文章列表页并落库。</p>
+  <div class="url-catalog-toolbar"><input id="wlCheckUrl" placeholder="已知 URL（如 https://www.chinaaeri.com/）"><button type="button" class="catalog-button primary" onclick="manualWaterlineCheck()"><i class="fa fa-play"></i> 立即检查</button><button type="button" class="catalog-button" onclick="loadWaterlines()"><i class="fa fa-refresh"></i> 刷新</button><span id="wlCheckResult" class="hint"></span></div>
+  <table><thead><tr><th>列表页 URL</th><th>上次爬取</th><th>上次新增</th><th>已见最新发布时间</th><th>已保存条目</th><th>ETag</th></tr></thead><tbody id="waterlineRows"><tr><td colspan="6" class="hint">正在加载…</td></tr></tbody></table></section>
+  <section id="topics" class="panel hidden"><h2>主题维护</h2>
+<p class="hint">下面是当前行业包的官方主题与关键词。你可以直接改成自己的主题；<b>改不改都能点「重新按此主题聚类」</b>——系统会自动重分类本包历史文章、再自动重跑主题投影，让新主题出现文章。</p>
+<div id="officialTopics" class="hint">正在加载主题…</div>
+<label style="margin-top:10px">编辑主题（每行格式：<code>主题名 | 关键词1,关键词2</code>）
+<textarea id="packTopicsEdit" rows="8" placeholder="例如：风洞测试技术 | 风洞,空气动力学&#10;科技越野属性开发技术 | 越野车,全地形车"></textarea></label>
+<div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+  <button type="button" class="catalog-button primary" onclick="reclusterTopics()">重新按此主题聚类</button>
+  <span id="reclusterResult" class="hint" aria-live="polite"></span>
+</div>
+<div id="reclusterBar" class="hidden" style="margin-top:10px;height:6px;border-radius:4px;background:rgba(148,163,184,.25);overflow:hidden"><div id="reclusterBarFill" style="height:100%;width:0;border-radius:4px;background:#38bdf8;transition:width .4s ease"></div></div>
+</section>
+<section id="pack" class="panel hidden gate-panel"><h2 id="packName">动态信息聚合门禁</h2><p class="hint gate-intro">行业门禁是入库前的相关性规则：文章必须命中行业锚点或备案机构实体；“发布、报告、获奖、政策、合作”等泛化词只用于分类，不能单独让无关文章进入系统。此处用于查看当前门禁，行业包迁移由管理员页面处理。</p><div class="gate-rule-title">下面是当前生效的行业门禁锚点词（来自本页所属行业包的配置）。文章必须命中其中至少一个，或在「备案机构」名单内，否则不入库。</div>
+<details class="gate-help">
+<summary>门禁怎么填？规则与示例（点击展开）</summary>
+<div style="margin-top:10px;font-size:13px;line-height:1.75">
+<p><b>0) 在哪里填（本页不能填）：</b>打开 <a href="/panython/admin">行业包管理</a> → 左侧选中要配置的行业包 → 页签「<b>关键词门控</b>」→ 填「<b>锚点词</b>」与「核心词 / 扩展词」等 → 点「<b>发布新版本</b>」→ 再点「<b>激活此行业包</b>」。激活后回到本页刷新，就能看到门禁词已生效。</p>
+<p><b>1) 匹配方式：文本包含，不是语义理解。</b>系统把「标题+正文」做归一化后，看里面是否<b>原样出现</b>该词；标题命中权重 ×1.5。所以词要写成文章里真会出现的样子。</p>
+<p><b>2) 锚点词是硬门槛。</b>一篇文章必须命中<b>至少一个</b>锚点词，或命中「备案机构」名单里的机构，否则直接丢弃——不入库、不分类、不进知识库。若没配锚点词，系统会退化用「核心词+扩展词」当锚点；<b>关键词全空时门禁等于不生效，什么都会被放进来</b>。</p>
+<p><b>3) 该填什么词：名词，且必须是行业专有名词。</b>技术名、产品/平台名、标准法规名、机构名、场景名。<b>不要填动词与泛化词</b>——「发布 / 报告 / 合作 / 中标 / 技术」这类任何行业都会命中，等于关掉门禁；<b>也避免单字</b>（「车」会命中「车站」「车险」），建议 ≥2 字。</p>
+<p><b>4) 各类词各管什么：</b></p>
+<ul style="margin:6px 0 6px 18px">
+<li><b>锚点词</b>（anchor_keywords）：管「属不属于本行业」——硬门槛，命中才准入。</li>
+<li><b>备案机构</b>（entity_keywords）：机构全称或常用简称；命中同样算过门槛，并按核心词权重加分。</li>
+<li><b>核心词 / 扩展词</b>：管「有多相关」——核心 3 分、扩展 1 分，标题命中 ×1.5，总分需 ≥ 最低相关度（默认 2）。</li>
+<li><b>趋势词 / 事件词</b>：描述「发生了什么」（政策、量产、召回…），只加分，<b>不能单独</b>证明属于哪个行业；负面词用于扣分。</li>
+</ul>
+<p><b>5) 本行业包实际配置（自动取自当前行业包，非写死示例）：</b></p>
+<ul style="margin:6px 0 6px 18px">
+<li>锚点词（硬门禁）：<span id="exAnchors" class="hint">加载中…</span></li>
+<li>备案机构（硬门禁，命中即通过）：<span id="exEntities" class="hint">加载中…</span></li>
+<li>核心词：<span id="exCore" class="hint">加载中…</span>；扩展词：<span id="exExpanded" class="hint">加载中…</span></li>
+<li>趋势词：<span id="exTrend" class="hint">加载中…</span>；事件词：<span id="exEvent" class="hint">加载中…</span>；负面词（只扣分）：<span id="exNegative" class="hint">加载中…</span></li>
+</ul>
+<p><b>备案机构怎么填、有什么用：</b>填机构<b>全称或业内常用简称</b>，一行一个，例如 <code>中国汽车工程学会</code>、<code>中汽研</code>、<code>工信部</code>。作用：命中机构名与命中锚点词<b>等效</b>，都能让文章通过行业门禁，并按核心词权重加分。适合"以权威机构发布为准"的行业（协会、监管、研究院）。</p>
+<p><b>负面词怎么填、有什么用：</b>填要<b>压制</b>的词，一行一个，例如 <code>招聘</code>、<code>广告</code>、<code>展会通知</code>。作用：命中即<b>扣分</b>（默认 −3），把该文的总相关度拉到最低门槛（默认 2）以下，从而<b>不入库</b>；它不是门禁，只负责减分。</p>
+<p><b>反例（不要当锚点词）</b>：发布 / 报告 / 合作 / 技术 / 单字（"车"会命中"车站""车险"）。</p>
+<p><b>6) 生效方式：</b>改完先「发布新版本」，再「激活此行业包」——运行时不读草稿，只读已激活版本（激活后会自动重跑一次主题聚类）。</p>
+</div>
+</details>
+<div id="packDetails"></div>
+<div class="card hidden" style="margin-top:14px">
+  <h3>主题维护（当前行业包的主题与关键词；修改只对你生效，保存后自动重聚类）</h3>
+  <p class="hint">下方列出当前行业包的主题。你可以改名称/关键词，也可以新增自己的主题；保存后系统自动重新聚类，并把新聚合的文章归入你的主题。</p>
+  <div id="topicCurrent" class="hint">正在加载主题…</div>
+  <label style="margin-top:10px">我的主题（每行一个，格式：<code>主题名 | 关键词1,关键词2</code>）<textarea id="myTopics" rows="4" placeholder="例如：风洞测试技术 | 风洞,空气动力学&#10;我的竞争对手动态 | B公司"></textarea></label>
+  <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+    <button type="button" class="catalog-button primary" onclick="saveMyTopics()">保存我的主题并重新聚类</button>
+    <span id="myTopicResult" class="hint" aria-live="polite"></span>
+  </div>
+  <div id="myTopicBar" class="hidden" style="margin-top:10px;height:6px;border-radius:4px;background:rgba(148,163,184,.25);overflow:hidden">
+    <div id="myTopicBarFill" style="height:100%;width:0;border-radius:4px;background:#38bdf8;transition:width .4s ease"></div>
+  </div>
+</div>
+  <div class="card" style="margin-top:14px">
+  <h3>我的门禁设置（只对我生效，保存后立即按新门禁派发一轮聚合）</h3>
+  <p class="hint">锚点词只能在官方门禁范围内<b>收紧</b>，不能放宽；留空则继承官方。每行一个。</p>
+  <label>我的行业锚点词 <details style="display:inline"><summary style="display:inline;cursor:pointer;color:#7dd3fc">?</summary><div class="hint">硬门禁。文章（标题+正文）必须<b>原样包含</b>其中至少一个词，才允许入库、分类、进知识库；否则在候选阶段就被丢弃，连正文都不聚合。只能从官方锚点词里选（收紧），不能新增官方范围之外的词。<br><b>填法：可以填多个词</b>——一行一个（回车换行），或用逗号/顿号分隔都行。</div></details><textarea id="myAnchors" rows="3" placeholder="例如（每行一个）：&#10;汽车&#10;智能网联&#10;也可以写成：汽车,智能网联"></textarea></label>
+  <label>我的备案机构 <details style="display:inline"><summary style="display:inline;cursor:pointer;color:#7dd3fc">?</summary><div class="hint">备案机构中填写的内容是第二道门禁：有些文章通篇没有出现行业关键词，但属于该行业包，只要文章中出现这些备案机构名称，就算通过门禁。<br><b>填法：可以填多个机构</b>——一行一个，或用逗号分隔。</div></details><textarea id="myEntities" rows="3" placeholder="例如（每行一个）：&#10;中汽研&#10;工信部"></textarea></label>
+  <label>我的竞争对手/品牌 <details style="display:inline"><summary style="display:inline;cursor:pointer;color:#7dd3fc">?</summary><div class="hint">关注维度，<b>不参与准入</b>。作用：把这些词加入候选打分，让关于竞争对手的文章能被聚合进来并<b>不被门禁挡住</b>，同时打标给你单独聚合。<br><b>填法：可以填多个</b>——一行一个，或用逗号分隔。</div></details><textarea id="myBrands" rows="3" placeholder="例如（每行一个）：&#10;B公司&#10;C公司"></textarea></label>
+  <label>我的趋势主题 <details style="display:inline"><summary style="display:inline;cursor:pointer;color:#7dd3fc">?</summary><div class="hint">决定趋势分析按哪些主题聚合（与"竞争对手/品牌"共同决定趋势图维度）。它<b>不控制聚合</b>，只影响统计与展示；留空则继承官方趋势主题。<br><b>填法：可以填多个</b>——一行一个，或用逗号分隔。</div></details><textarea id="myTrends" rows="3" placeholder="例如（每行一个）：&#10;新能源&#10;智能驾驶"></textarea></label>
+  <label>我的负面词（命中即对我隐藏） <details style="display:inline"><summary style="display:inline;cursor:pointer;color:#7dd3fc">?</summary><div class="hint">个人层过滤：命中即<b>对你隐藏</b>——文章仍会被聚合、仍留在库里、别人照样能看到，只是不进你的资讯流。用于排除招聘、广告、展会通知这类噪音。<br><b>填法：可以填多个</b>——一行一个，或用逗号分隔。</div></details><textarea id="myNegatives" rows="3" placeholder="例如（每行一个）：&#10;招聘&#10;广告"></textarea></label>
+  <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+    <button type="button" class="catalog-button primary" onclick="saveMyGate()">保存我的门禁并立即派发</button>
+    <span id="myGateResult" class="hint" aria-live="polite"></span>
+  </div>
+</div></section>
+</main>
+<script>
+const pack={{ active_industry_pack.id|tojson }};const esc=v=>{const d=document.createElement('div');d.textContent=v??'';return d.innerHTML};
+async function api(path,opt){const r=await fetch(path,opt);const d=await r.json();if(!d.success)throw Error(d.error||d.message||'请求失败');return d}
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('section.panel').forEach(x=>x.classList.add('hidden'));document.getElementById(b.dataset.tab).classList.remove('hidden');document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(b.dataset.tab==='urls')loadUrlCatalog();if(b.dataset.tab==='trend')loadTrendConfig();if(b.dataset.tab==='reports')loadReportPrompt();if(b.dataset.tab==='waterline')loadWaterlines();if(b.dataset.tab==='deny')loadDenyDomains();if(b.dataset.tab==='pack'){loadMyGate();loadMyTopics()}if(b.dataset.tab==='topics')loadTopicsTab()});
+// —— 域名黑名单维护 ——
+let denyDomainsState={runtime:[],env:[]};
+function denyChip(domain,{editable,env}){const tag=env?'（env 基线）':'';const del=editable?`<button type="button" style="margin-left:6px;border:0;background:transparent;color:#b91c1c;cursor:pointer" title="移除" onclick="removeDenyDomain('${esc(domain)}')"><i class="fa fa-times"></i></button>`:'';return `<span style="display:inline-flex;align-items:center;padding:5px 12px;border-radius:999px;font-size:13px;${env?'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb':'background:#fde8e8;color:#9b2c2c;border:1px solid #fecdd3'}">${esc(domain)}${tag}${del}</span>`}
+async function loadDenyDomains(){try{const d=await api('/api/intel/deny-domains');denyDomainsState={runtime:d.runtime_domains||[],env:d.env_domains||[]};renderDenyChips();denyEnvNote.textContent=(denyDomainsState.env.length?('环境变量基线：'+denyDomainsState.env.join('、')+'（只读，需在服务器 .env 修改）'):'')}catch(e){denyChips.innerHTML='<span class="hint">加载失败：'+esc(e.message)+'</span>'}}
+function renderDenyChips(){const envSet=new Set(denyDomainsState.env);const all=[...denyDomainsState.env,...denyDomainsState.runtime.filter(d=>!envSet.has(d))];denyChips.innerHTML=all.length?all.map(d=>denyChip(d,{editable:!envSet.has(d),env:envSet.has(d)})).join(''):'<span class="hint">暂无黑名单域名</span>'}
+function addDenyDomain(){const input=document.getElementById('denyDomainInput');const domain=(input.value||'').trim().toLowerCase();if(!domain){denyResult.textContent='请输入域名';return}if(!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(domain)){denyResult.textContent='域名格式不正确（如 cn.investing.com）';return}if(denyDomainsState.env.includes(domain)){denyResult.textContent='该域名已是环境变量基线，需在服务器 .env 修改';return}if(!denyDomainsState.runtime.includes(domain))denyDomainsState.runtime.push(domain);input.value='';renderDenyChips();denyResult.textContent='已加入列表，点击「保存」后生效'}
+function removeDenyDomain(domain){denyDomainsState.runtime=denyDomainsState.runtime.filter(d=>d!==domain);renderDenyChips();denyResult.textContent='已从列表移除，点击「保存」后生效'}
+async function saveDenyDomains(){try{const d=await api('/api/intel/deny-domains',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domains:denyDomainsState.runtime})});denyDomainsState.runtime=d.runtime_domains||[];renderDenyChips();denyResult.textContent='✅ 已保存（'+(d.runtime_domains||[]).length+' 个运行时域名），新候选立即生效'}catch(e){denyResult.textContent='保存失败：'+e.message}}
+function gateTags(items,kind){const palette=['teal','sky','violet','amber','rose','emerald','indigo','cyan'];return (items||[]).map((item,index)=>`<span class="gate-tag ${kind||''} ${palette[index%palette.length]}">${esc(item)}</span>`).join('')||'<span class="hint">无</span>'}
+async function loadAll(){try{const[t,p,s]=await Promise.all([api('/api/intel/source-tasks?industry_pack_id='+pack+'&per_page=500'),api('/api/intel/industry-packs/'+pack+'/configuration'),api('/api/intel/sources?industry_pack_id='+pack+'&per_page=500')]);sourceRows.innerHTML=t.source_tasks.map(x=>{const failed=Boolean(x.failure_reason)||['failed','error'].includes(String(x.scan_status||'').toLowerCase());return `<tr><td><b>${esc(x.source_name||'未命名')}</b><br><code>${esc(x.source_url)}</code></td><td>${esc(x.source_type)}</td><td>${esc(x.schedule_rule)} · ${esc(x.preferred_scan_time)}<br>${x.polling_interval_minutes} 分钟</td><td>${x.browser_fetch_enabled?'启用':'轻量'}</td><td>${esc(x.last_scan_at||'未扫描')}</td><td>${x.discovered_count||0} → ${x.queued_count||0} → ${x.ingested_count||0}</td><td>${esc(x.scan_status||'not_scanned')}</td><td class="${failed?'bad':'ok'}">${failed?'是':'否'}</td><td class="bad">${esc(x.failure_reason||'—')}</td></tr>`}).join('');packName.textContent='动态信息聚合门禁';const g=p.pack.candidate_gate||{};
+// 行业门禁：candidate_gate 未配置时，实际生效锚点回退为 core_keywords+expanded_keywords（与 industry_anchor_keywords 一致），
+// 避免页面误显示成"无"。备案机构仅来自 candidate_gate.entity_keywords，无配置则显示"无"。
+const effAnchors=(g.anchor_keywords&&g.anchor_keywords.length)?g.anchor_keywords:[...(p.pack.core_keywords||[]),...(p.pack.expanded_keywords||[])];
+// 帮助块的示例改为「当前行业包的真实配置」，不再写死某个行业的例子
+(function(){const fill=(id,arr)=>{const el=document.getElementById(id);if(el)el.innerHTML=(arr&&arr.length)?arr.map(x=>'<code>'+esc(x)+'</code>').join('、'):'（当前行业包未配置）'};
+fill('exAnchors',(p.pack.candidate_gate||{}).anchor_keywords);fill('exEntities',(p.pack.candidate_gate||{}).entity_keywords);
+fill('exCore',p.pack.core_keywords);fill('exExpanded',p.pack.expanded_keywords);
+fill('exTrend',p.pack.trend_keywords);fill('exEvent',p.pack.event_keywords);fill('exNegative',p.pack.negative_keywords)})();
+packDetails.innerHTML=effAnchors.length?`<div class="gate-group"><h3>行业锚点</h3><div class="gate-tags">${gateTags(effAnchors)}</div>${g.anchor_keywords&&g.anchor_keywords.length?'':'<p class="hint">（未单独配置 candidate_gate，按核心词+扩展词作为回退锚点）</p>'}</div><div class="gate-entities"><h3>备案机构</h3><div class="gate-tags">${gateTags(g.entity_keywords,'entity')}</div></div>`:`<div class="gate-group"><h3>该行业包尚未配置门禁关键词</h3><p class="hint">当前包的 candidate_gate.anchor_keywords、core_keywords、expanded_keywords 都是空的，所以这里没有可显示的锚点词。请先到「行业包管理」为该包配置关键词并发布/激活，门禁才会按行业生效。</p></div>`;}catch(e){alert(e.message)}}
+async function registerSource(){try{const d=await api('/api/url-management/urls',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:newUrl.value,name:newName.value,description:newDesc.value,category_id:19,is_active:true,auto_crawl:false,days_limit:30})});registerResult.textContent='已登记；初始扫描任务：'+(d.initial_scan_job_id||'已排队');loadAll()}catch(e){registerResult.textContent=e.message}}
+async function analyseUrl(){try{const p=await api('/api/intel/industry-packs/'+pack+'/configuration'),w=[...(p.pack.candidate_gate?.anchor_keywords||[]),...(p.pack.candidate_gate?.entity_keywords||[])].slice(0,12).join(','),d=await api('/api/schedule-management/smart-url-suggestions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:analyseUrl.value,keywords:w,max_results:8})});analyseResult.innerHTML=(d.suggestions||[]).map(x=>`<div class="card"><b>${esc(x.title||'建议栏目')}</b><br><code>${esc(x.url)}</code></div>`).join('')||'未找到栏目'}catch(e){analyseResult.textContent=e.message}}
+async function loadTrendConfig(){try{const p=await api('/api/intel/industry-packs/'+pack+'/configuration');const b=p.pack.brands||[];const t=p.pack.trend_topics||[];trendBrands.value=b.join('\n');trendTopics.value=t.join('\n');trendResult.textContent='当前：品牌 '+b.length+' 个、主题 '+t.length+' 个' }catch(e){trendResult.textContent=e.message}}
+async function saveTrendConfig(){try{const brands=(trendBrands.value||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,5);const topics=(trendTopics.value||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,5);const d=await api('/api/intel/industry-packs/'+pack+'/draft');const oldBrands=(d.draft.manifest.brands||[]).join('|');const m=d.draft.manifest;m.brands=brands;m.trend_topics=topics;const saved=await api('/api/intel/industry-packs/'+pack+'/draft',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({manifest:m,expected_revision:d.draft.revision})});const pub=await api('/api/intel/industry-packs/'+pack+'/draft/publish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expected_revision:saved.draft.revision})});const ver=pub.published.id;await api('/api/intel/industry-packs/'+pack+'/activate-version',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version_id:ver})});let extra='';if(brands.join('|')!==oldBrands){api('/api/intel/industry-packs/'+pack+'/reclassify',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(()=>{}).catch(()=>{});extra='；已自动触发品牌重分类（品牌变化）'}trendResult.textContent='✅ 已保存并激活（品牌 '+brands.length+'、主题 '+topics.length+'）'+extra}catch(e){trendResult.textContent='保存失败：'+e.message}}
+// —— AI 周报：提示词设置 + 测试派发 ——
+async function loadReportPrompt(){
+  const last=document.getElementById('reportLastInfo'),box=document.getElementById('reportPrompt'),msg=document.getElementById('reportPromptResult');
+  try{
+    const d=await api('/api/pack-reports/settings?industry_pack_id='+encodeURIComponent(pack));
+    box.value=d.prompt||'';
+    if(last){ if(d.last_report){ last.innerHTML='<div><b>'+esc(d.last_report.title||'报告')+'</b></div><div style="margin-top:4px">生成时间：'+esc(d.last_report.generated_at||'—')+'｜时间窗：'+esc(d.last_report.time_start||'')+' ~ '+esc(d.last_report.time_end||'')+'｜'+(d.last_report.article_count||0)+' 篇文章'+(d.last_report.source==='test'?'｜<span class="hint">（测试生成）</span>':'')+'</div><div style="margin-top:6px"><a href="/reports" style="color:#0f766e;font-weight:600">去首页「报告」查看 →</a></div>'; }
+      else last.innerHTML='<div class="hint">尚未生成过报告；每周五自动生成，或点右侧「测试提示词效果」立即生成一份。</div>'; }
+    if(d.is_default&&msg)msg.textContent='当前使用默认提示词';
+    else if(msg)msg.textContent='已加载保存的提示词（'+(d.updated_at||'')+'）';
+  }catch(e){ if(msg)msg.textContent='加载失败：'+e.message; }
+}
+async function saveReportPrompt(){
+  const box=document.getElementById('reportPrompt'),msg=document.getElementById('reportPromptResult');
+  try{ const d=await api('/api/pack-reports/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({industry_pack_id:pack,prompt:box.value})});
+    msg.textContent=d.is_default?'已清空，将使用默认提示词':'✅ 提示词已保存（'+d.updated_at+'）'; }
+  catch(e){ msg.textContent='保存失败：'+e.message; }
+}
+async function restoreReportPrompt(){
+  const box=document.getElementById('reportPrompt'),msg=document.getElementById('reportPromptResult');
+  try{ const d=await api('/api/pack-reports/settings?industry_pack_id='+encodeURIComponent(pack)); box.value=d.default_prompt||''; msg.textContent='已恢复默认提示词（尚未保存，点「保存提示词」生效）'; }
+  catch(e){ msg.textContent='恢复默认失败：'+e.message; }
+}
+async function testReportPrompt(){
+  const msg=document.getElementById('reportPromptResult');
+  try{
+    msg.textContent='正在派发 LLM 总结任务…';
+    const d=await api('/api/pack-reports/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({industry_pack_id:pack})});
+    trackPackReportJob(d.job_id);
+  }catch(e){ msg.textContent='派发失败：'+e.message; }
+}
+async function trackPackReportJob(jobId){
+  const msg=document.getElementById('reportPromptResult');
+  for(let attempt=0;attempt<240;attempt++){
+    try{
+      const d=await api('/api/intel/jobs/'+jobId),j=d.job||{},state=String(j.status||'queued');
+      if(state==='completed'){const r=j.result||{};msg.textContent='✅ 周报已生成：《'+esc(r.title||'报告')+'》（覆盖 '+(r.article_count||0)+' 篇文章），去首页「报告」查看';loadReportPrompt();return;}
+      if(state==='failed'){msg.textContent='生成失败：'+(j.last_error||'未知错误');return;}
+      if(state==='retry_wait'){msg.textContent='生成失败，正在等待自动重试：'+(j.last_error||'');}
+      else msg.textContent=(state==='running'?'正在检索文章库并由 LLM 总结…':'任务已排队…')+'（任务 #'+jobId+'）';
+    }catch(e){msg.textContent='读取任务进度失败：'+e.message;return;}
+    await new Promise(resolve=>setTimeout(resolve,3000));
+  }
+  msg.textContent='任务仍在后台处理中，可稍后到首页「报告」查看结果。';
+}
+// —— 水位线 tab ——
+async function loadWaterlines(){
+  const rows=document.getElementById('waterlineRows'),msg=document.getElementById('wlCheckResult');
+  try{
+    const d=await api('/api/intel/waterlines');
+    const wl=d.waterlines||[];
+    rows.innerHTML=wl.length?wl.map(w=>`<tr><td><code>${esc(w.list_url)}</code></td><td>${esc(w.last_crawl_at||'—')}</td><td>${w.last_new_count||0}</td><td>${esc(w.last_max_publish_time||'—')}</td><td>${w.saved_item_count||0}</td><td>${w.etag?'✓':'—'}</td></tr>`).join(''):'<tr><td colspan="6" class="hint">尚无水位线记录：扫描运行后自动建立；也可在上方输入已知 URL 点「立即检查」。</td></tr>';
+    if(msg)msg.textContent='共 '+(wl.length)+' 个列表页水位线';
+  }catch(e){rows.innerHTML='<tr><td colspan="6" class="hint">加载失败：'+esc(e.message)+'</td></tr>';}
+}
+async function manualWaterlineCheck(){
+  const url=document.getElementById('wlCheckUrl').value.trim(),msg=document.getElementById('wlCheckResult');
+  if(!url){msg.textContent='请先填写已知 URL';return;}
+  try{
+    msg.textContent='正在探查该站文章列表页…';
+    const d=await api('/api/intel/list-pages?url='+encodeURIComponent(url));
+    if(d.probe_error)msg.textContent='探查完成（'+(d.list_pages||[]).length+' 个列表页；部分探测失败：'+d.probe_error+'）';
+    else msg.textContent='✅ 探查完成：'+(d.list_pages||[]).length+' 个列表页（含强制纳入的动态/新闻栏目）';
+    loadWaterlines();
+  }catch(e){msg.textContent='立即检查失败：'+e.message;}
+}
+async function catalogRequest(path,opt){const response=await fetch(path,opt);const data=await response.json();if(!data.success)throw Error(data.error||data.message||'请求失败');return data}
+// —— 主题维护 tab ——
+async function loadTopicsTab(){const box=document.getElementById('officialTopics');if(!box)return;try{
+  const cfg=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/configuration');
+  const topics=(cfg.pack&&cfg.pack.fixed_topics)||[];
+  box.innerHTML=topics.length?('官方主题（'+topics.length+' 个）：'+topics.map(t=>'<div style="margin:4px 0"><b>'+esc(t.name||t.key)+'</b> <span class="hint">'+esc((t.keywords||[]).join('、'))+'</span></div>').join('')):'官方尚未配置主题';
+  const ta=document.getElementById('packTopicsEdit');if(ta&&!ta.value)ta.value=topics.map(t=>(t.name||t.key)+' | '+(t.keywords||[]).join(',')).join('\n');
+}catch(e){box.textContent='主题加载失败：'+e.message}}
+async function reclusterTopics(){const out=document.getElementById('reclusterResult'),bar=document.getElementById('reclusterBar'),fill=document.getElementById('reclusterBarFill');out.textContent='提交中…';try{
+  const topics=linesOf('packTopicsEdit').map(function(line){const p=line.split('|');const name=(p[0]||'').trim();const kws=(p[1]||'').split(/[,，]/).map(s=>s.trim()).filter(Boolean);return name?{key:name.toLowerCase().replace(/\s+/g,'_'),name:name,keywords:kws}:null}).filter(Boolean);
+  const cur=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override');const o=cur.personal_override||{};
+  await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({anchor_keywords:o.anchor_keywords,entity_keywords:o.entity_keywords,brands:o.brands,trend_topics:o.trend_topics,trend_settings:Object.assign({},o.trend_settings||{},{personal_topics:topics})})});
+  const r=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/recluster',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  out.textContent='已提交：正在重分类本包历史文章…';bar.classList.remove('hidden');fill.style.width='10%';
+  for(let i=0;i<60;i+=1){await new Promise(z=>setTimeout(z,4000));
+    const st=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/job-status?job_id='+r.job_id);const s=(st.job||{}).status;
+    fill.style.width=(s==='completed'?'100%':Math.min(90,10+i*2)+'%');
+    if(s==='completed'||s==='failed'){out.textContent=(s==='completed'?'✅ 重分类完成，已自动重跑主题投影':'失败：'+((st.job||{}).error||''));fill.style.width='100%';setTimeout(function(){location.reload()},2500);return}}
+  out.textContent='仍在进行中，稍后刷新查看';
+}catch(e){out.textContent='失败：'+e.message;bar.classList.add('hidden')}}
+// 个人门禁：用户自己设、保存即生效并立即派发一轮聚合（不产生行业包新版本、不影响他人）
+function linesOf(id){const el=document.getElementById(id);if(!el)return [];return String(el.value||'').split(/[\n,，、;；]+/).map(s=>s.trim()).filter(Boolean)}
+async function saveMyGate(){const out=document.getElementById('myGateResult');out.textContent='保存中…';try{
+  // 先取回现有个人设置：负面词与个人主题都存在 trend_settings 里，必须合并后写回，不能整份覆盖
+  const cur=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override');
+  const keep=((cur.personal_override||{}).trend_settings)||{};
+  const d=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    anchor_keywords:linesOf('myAnchors'),entity_keywords:linesOf('myEntities'),brands:linesOf('myBrands'),trend_topics:linesOf('myTrends'),
+    trend_settings:Object.assign({},keep,{negative_keywords:linesOf('myNegatives')})})});
+  const disp=d.dispatch||{};const scan=disp.light_scan||{};
+  out.textContent='已保存，并已派发一轮聚合（信源 '+ (scan.source_count==null?'-':scan.source_count) +' 个）';setTimeout(function(){location.reload()},1200);
+}catch(error){out.textContent='保存失败：'+error.message}}
+async function loadMyGate(){try{const d=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override');const o=d.personal_override||{};document.getElementById('myAnchors').value=(o.anchor_keywords||[]).join('\n');document.getElementById('myEntities').value=(o.entity_keywords||[]).join('\n');document.getElementById('myBrands').value=(o.brands||[]).join('\n');document.getElementById('myTrends').value=(o.trend_topics||[]).join('\n');document.getElementById('myNegatives').value=((o.trend_settings||{}).negative_keywords||[]).join('\n')}catch(e){}}
+// —— 主题维护：显示当前行业包主题；个人主题存于 trend_settings.personal_topics（不动表结构）
+function topicLine(t){return (t.name||t.key||'')+' | '+(t.keywords||[]).join(',')}
+async function loadMyTopics(){const box=document.getElementById('topicCurrent');if(!box)return;try{
+  const cfg=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/configuration');
+  // 帮助块里的"本行业包实际配置"在这里填充（该函数在打开页签时必定执行，
+  // 之前挂在别处的填充逻辑没有执行，导致一直显示占位词"加载中…"）
+  (function(){const fill=(id,arr)=>{const el=document.getElementById(id);if(el)el.innerHTML=(arr&&arr.length)?arr.map(x=>'<code>'+esc(x)+'</code>').join('、'):'（当前行业包未配置）'};
+  const pk=cfg.pack||{};const gate=pk.candidate_gate||{};
+  fill('exAnchors',gate.anchor_keywords);fill('exEntities',gate.entity_keywords);
+  fill('exCore',pk.core_keywords);fill('exExpanded',pk.expanded_keywords);
+  fill('exTrend',pk.trend_keywords);fill('exEvent',pk.event_keywords);fill('exNegative',pk.negative_keywords)})();
+  const topics=(cfg.pack&&cfg.pack.fixed_topics)||[];
+  box.innerHTML=topics.length?('当前行业包主题（'+topics.length+' 个）：'+topics.map(t=>'<div style="margin:4px 0"><b>'+esc(t.name||t.key)+'</b> <span class="hint">'+esc((t.keywords||[]).join('、'))+'</span></div>').join('')):'当前行业包未配置主题';
+  const d=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override');
+  const mine=((d.personal_override||{}).trend_settings||{}).personal_topics||[];
+  if(mine.length)document.getElementById('myTopics').value=mine.map(topicLine).join('\n');
+}catch(e){box.textContent='主题加载失败：'+e.message}}
+async function saveMyTopics(){const out=document.getElementById('myTopicResult'),bar=document.getElementById('myTopicBar'),fill=document.getElementById('myTopicBarFill');out.textContent='保存中…';
+  const topics=linesOf('myTopics').map(function(line){const parts=line.split('|');const name=(parts[0]||'').trim();const kws=(parts[1]||'').split(/[,，]/).map(s=>s.trim()).filter(Boolean);return name?{key:name.toLowerCase().replace(/\s+/g,'_'),name:name,keywords:kws}:null}).filter(Boolean);
+  try{
+    const cur=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override');
+    const o=cur.personal_override||{};
+    // 关键：把其它个人字段原样带回，避免保存主题时把锚点/品牌清空
+    const payload={anchor_keywords:o.anchor_keywords,entity_keywords:o.entity_keywords,brands:o.brands,trend_topics:o.trend_topics,
+      trend_settings:Object.assign({},o.trend_settings||{},{personal_topics:topics})};
+    const res=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/gate-override',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const jobId=((res.dispatch||{}).topic_cluster||{}).job_id;
+    out.textContent='已保存，正在重新聚类…';bar.classList.remove('hidden');fill.style.width='15%';
+    if(!jobId){out.textContent='已保存（未取得聚类任务号）';return}
+    for(let i=0;i<40;i+=1){await new Promise(r=>setTimeout(r,3000));
+      const st=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/job-status?job_id='+jobId);
+      const status=(st.job||{}).status;fill.style.width=(status==='completed'?'100%':Math.min(90,15+i*4)+'%');
+      if(status==='completed'||status==='failed'){out.textContent=(status==='completed'?'✅ 重聚类完成':'聚类失败：'+((st.job||{}).error||''));fill.style.width='100%';setTimeout(function(){location.reload()},1500);return}}
+    out.textContent='聚类仍在进行，稍后刷新查看';
+  }catch(error){out.textContent='保存失败：'+error.message;bar.classList.add('hidden')}}
+// 本页原先引用了 urlCatalogState / catalogEsc 但从未定义（潜在缺陷，页面卡在加载所以没暴露）。
+// 这里补上状态声明，使新代码与页面上的「新增网址/新增分类/检测可访问性」按钮都能正常工作。
+var urlCatalogState={categories:[],urls:[],sources:[],expandedCategories:new Set(),expandedInitialized:false,editingUrlId:null,editingCategoryId:null};
+async function loadUrlCatalog(){const tree=document.getElementById('urlCatalogTree'),summary=document.getElementById('urlCatalogSummary');if(!tree)return;summary.textContent='正在加载本行业包 URL…';const guard=setTimeout(function(){if(summary.textContent==='正在加载本行业包 URL…'){tree.innerHTML='<div class="p-5 bad">加载超时（15 秒未返回）。请稍后点「刷新」重试。</div>';summary.textContent='加载超时'}},15000);try{
+  // U1：只看「本行业包」的 URL（激活时从行业包落地），不再拉全局基础网址库
+  // （全局库 641 条、与行业包无关，且原实现容易卡在"正在加载分类与网址…"）
+  const data=await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/url-catalog');
+  const rows=data.sources||[];
+  urlCatalogState.sources=rows;
+  urlCatalogState.urls=[];urlCatalogState.categories=[];
+  summary.textContent='本行业包 '+rows.length+' 条 URL（继承 '+(data.inherited_count||0)+' · 个人 '+(data.personal_count||0)+'）';
+  if(!rows.length){tree.innerHTML='<div class="p-5 text-gray-500">该行业包暂无关联 URL。可在行业包管理页为该包配置信源，激活后会落地到这里。</div>';return}
+  tree.innerHTML='<div class="url-category"><div class="url-category-head"><span class="url-category-name">本行业包 URL</span><span class="url-category-count">'+rows.length+' 条</span></div>'
+    +rows.map(function(s){return '<div class="url-row"><div><div class="url-row-name">'+esc(s.name||s.url)+(s.source==='personal'?' <span class="badge custom">个人</span>':'')+'</div><div class="hint">'+esc(s.source_type||'')+(s.authority_level?(' · 权威度 '+s.authority_level):'')+'</div></div>'
+      +'<a class="url-row-url" href="'+esc(s.url||'#')+'" target="_blank" rel="noopener" title="'+esc(s.url||'')+'">'+esc(s.url||'-')+'</a>'
+      +'<div>'+(s.enabled?'<span class="ok">启用</span>':'<span class="bad">停用</span>')+'</div>'
+      +'<div>'+esc(s.report_section_url||'—')+'</div></div>'}).join('')
+    +'</div>';
+}catch(error){tree.innerHTML='<div class="p-5 bad">加载本行业包 URL 失败：'+esc(error.message)+'</div>';summary.textContent='加载失败'}finally{clearTimeout(guard)}}
+function catalogUrlParentId(item){return Number(item.parent_url_id||item.parent_id||0)}
+function catalogStatus(item){const value=String(item.access_status||'unknown');const label={reachable:'可访问',restricted:'受限',unreachable:'不可访问',unknown:'未检测'}[value]||value;return '<span class="catalog-status '+(value==='unreachable'?'bad':value==='reachable'?'ok':'')+'">'+esc(label)+'</span>'}
+function catalogUrlRows(items,parentId,level){return items.filter(item=>catalogUrlParentId(item)===parentId).map(item=>{const children=catalogUrlRows(items,Number(item.id),level+1);const indent=Math.min(level,4)*18;return '<div class="url-row" style="padding-left:'+(14+indent)+'px"><div><div class="url-row-name">'+esc(item.name||item.url||'未命名')+'</div><div class="hint">'+esc(item.description||'')+'</div></div><a class="url-row-url" href="'+esc(item.url||'#')+'" target="_blank" rel="noopener" title="'+esc(item.url||'')+'">'+esc(item.url||'-')+'</a><div>'+catalogStatus(item)+(item.is_active===false||item.is_active===0?' · 已停用':'')+'</div><div class="url-row-actions"><button class="catalog-button small" type="button" onclick="openUrlCatalogEditor('+Number(item.id)+')">编辑</button><button class="catalog-button small danger" type="button" onclick="deleteUrlCatalog('+Number(item.id)+')">删除</button></div></div>'+children}).join('')}
+function toggleUrlCatalogCategory(id){const key=String(id);if(urlCatalogState.expandedCategories.has(key))urlCatalogState.expandedCategories.delete(key);else urlCatalogState.expandedCategories.add(key);renderUrlCatalog()}
+function renderUrlCatalog(){const tree=document.getElementById('urlCatalogTree'),summary=document.getElementById('urlCatalogSummary');if(!tree)return;if(!urlCatalogState.expandedInitialized){const first=urlCatalogState.categories[0];if(first)urlCatalogState.expandedCategories.add(String(first.id));urlCatalogState.expandedInitialized=true}const keyword=(document.getElementById('urlCatalogSearch')?.value||'').trim().toLowerCase();const visible=urlCatalogState.urls.filter(item=>!keyword||[item.name,item.url,item.description].some(value=>String(value||'').toLowerCase().includes(keyword)));const section=(category,items)=>{const key=String(category.id);const expanded=keyword||urlCatalogState.expandedCategories.has(key);const content=expanded?catalogUrlRows(items,0,0):'';return '<div class="url-category"><div class="url-category-head"><button type="button" class="url-category-toggle" onclick="toggleUrlCatalogCategory(\''+key+'\')" aria-expanded="'+(expanded?'true':'false')+'"><i class="fa fa-chevron-right text-gray-500"></i><i class="fa fa-folder text-teal-600"></i><span class="url-category-name">'+esc(category.name)+'</span><span class="url-category-count">'+items.filter(x=>catalogUrlParentId(x)===0).length+' 个基础网址 · '+items.length+' 条记录</span></button><div class="url-category-actions"><button class="catalog-button small" type="button" onclick="openCategoryCatalogEditor('+Number(category.id)+')">编辑分类</button><button class="catalog-button small danger" type="button" onclick="deleteCategoryCatalog('+Number(category.id)+')">删除分类</button></div></div>'+content+'</div>'};let html=urlCatalogState.categories.map(category=>section(category,visible.filter(item=>Number(item.category_id||0)===Number(category.id)))).join('');const uncategorized=visible.filter(item=>!item.category_id);if(uncategorized.length)html+=section({id:0,name:'未分类网址'},uncategorized);tree.innerHTML=html||'<div class="p-5 text-gray-500">暂无匹配的网址；可新增分类或网址。</div>';summary.textContent=urlCatalogState.categories.length+' 个分类 / '+urlCatalogState.urls.length+' 条网址'}
+function catalogCategoryOptions(selected){return '<option value="">未分类</option>'+urlCatalogState.categories.map(category=>'<option value="'+Number(category.id)+'" '+(Number(selected)===Number(category.id)?'selected':'')+'>'+esc(category.name)+'</option>').join('')}
+function catalogParentOptions(selected,selfId){return '<option value="">无（基础网址）</option>'+urlCatalogState.urls.filter(item=>Number(item.id)!==Number(selfId)).map(item=>'<option value="'+Number(item.id)+'" '+(Number(selected)===Number(item.id)?'selected':'')+'>'+esc(item.name||item.url)+'</option>').join('')}
+function openUrlCatalogEditor(){document.getElementById('urlCatalogEditorTitle').textContent='新增我的网址';catalogUrlName.value='';catalogUrlAddress.value='';if(document.getElementById('catalogUrlDescription'))document.getElementById('catalogUrlDescription').value='';const cat=document.getElementById('catalogUrlCategory');if(cat)cat.innerHTML='<option value="">—</option>';const par=document.getElementById('catalogUrlParent');if(par)par.innerHTML='<option value="">—</option>';catalogUrlActive.checked=true;document.getElementById('urlCatalogEditor').classList.remove('hidden')}
+function openCategoryCatalogEditor(id){const item=urlCatalogState.categories.find(row=>Number(row.id)===Number(id))||{};urlCatalogState.editingCategoryId=id||null;document.getElementById('categoryCatalogEditorTitle').textContent=id?'编辑分类':'新增分类';catalogCategoryName.value=item.name||'';catalogCategoryDescription.value=item.description||'';catalogCategoryActive.checked=!(item.is_active===false||item.is_active===0);document.getElementById('categoryCatalogEditor').classList.remove('hidden')}
+function closeCatalogModal(id){document.getElementById(id)?.classList.add('hidden')}
+async function saveUrlCatalogEditor(){const name=catalogUrlName.value.trim(),url=catalogUrlAddress.value.trim();if(!name||!url){alert('请填写名称和网址');return}try{
+  // 存到"个人 URL 层"（只属于当前用户，参与他自己的聚合），不再写入全局基础网址库
+  await catalogRequest('/api/intel/industry-packs/'+encodeURIComponent(pack)+'/url-catalog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,url:url,enabled:catalogUrlActive.checked})});
+  closeCatalogModal('urlCatalogEditor');await loadUrlCatalog();
+}catch(error){alert(error.message)}}
+async function saveCategoryCatalogEditor(){const id=urlCatalogState.editingCategoryId;const payload={name:catalogCategoryName.value.trim(),description:catalogCategoryDescription.value.trim(),is_active:catalogCategoryActive.checked,display_order:0};if(!payload.name){alert('请填写分类名称');return}try{await catalogRequest(id?'/api/categories/'+id:'/api/categories',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});closeCatalogModal('categoryCatalogEditor');await loadUrlCatalog()}catch(error){alert(error.message)}}
+async function deleteUrlCatalog(id){const item=urlCatalogState.urls.find(row=>Number(row.id)===Number(id));if(!confirm('确定删除网址“'+(item?.name||'')+'”？'))return;try{await catalogRequest('/api/url-management/urls/'+id,{method:'DELETE'});await loadUrlCatalog()}catch(error){alert(error.message)}}
+async function deleteCategoryCatalog(id){const item=urlCatalogState.categories.find(row=>Number(row.id)===Number(id));if(!confirm('确定删除分类“'+(item?.name||'')+'”？分类下的网址将保留为未分类。'))return;try{await catalogRequest('/api/categories/'+id,{method:'DELETE'});await loadUrlCatalog()}catch(error){alert(error.message)}}
+async function checkCatalogAccessibility(){const ids=urlCatalogState.urls.map(item=>Number(item.id)).filter(Boolean);if(!ids.length){alert('暂无网址可检测');return}if(!confirm('将检测 '+ids.length+' 个网址的可访问性，是否继续？'))return;try{const result=await catalogRequest('/api/url-management/urls/check-accessibility',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url_ids:ids})});alert('检测完成：可访问 '+result.summary.reachable+'，受限 '+result.summary.restricted+'，不可访问 '+result.summary.unreachable);await loadUrlCatalog()}catch(error){alert(error.message)}}
+</script></body></html>

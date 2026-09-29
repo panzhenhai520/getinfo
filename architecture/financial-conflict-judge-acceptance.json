@@ -1,0 +1,92 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "different_scopes_never_averaged": true,
+    "existing_sqlite_reused": true,
+    "new_database": false,
+    "new_model_client": false,
+    "provider_names_are_not_independence": true,
+    "real_order_execution": false,
+    "temporal_judge_required_first": true,
+    "unresolved_conflict_never_current": true
+  },
+  "runtime": {
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 10,
+    "verdict_status_count": 6
+  },
+  "scenarios": {
+    "authoritative_source": true,
+    "delayed_observation": true,
+    "different_adjustment": true,
+    "different_currency": true,
+    "different_period": true,
+    "human_review_queue": true,
+    "idempotent_versioning": true,
+    "outside_tolerance": true,
+    "permission_denied": true,
+    "resolved_conflict_leaves_queue": true,
+    "same_underlying_source_collapsed": true,
+    "same_value": true,
+    "single_source": true,
+    "unknown_lineage_not_assumed_independent": true,
+    "within_tolerance": true
+  },
+  "static": {
+    "checks": {
+      "adjustment_and_period_isolation": true,
+      "all_verdicts_present": true,
+      "authority_policy_present": true,
+      "closed_schema": true,
+      "different_observation_time_isolated": true,
+      "existing_verdict_table_review_queue": true,
+      "input_snapshot_hashes_persisted": true,
+      "no_direct_model_or_network_client": true,
+      "no_implicit_fx": true,
+      "no_price_averaging": true,
+      "permission_failure_excluded": true,
+      "provider_name_not_independence": true,
+      "stable_instrument_dimension": true,
+      "timezone_normalized_to_utc": true,
+      "tolerance_policy_present": true,
+      "underlying_source_independence": true,
+      "unit_and_currency_normalization": true,
+      "unresolved_never_current": true,
+      "versioned_existing_verdict_table_reused": true
+    },
+    "direct_model_or_network_imports": [],
+    "existing_tables": [
+      "financial_claims",
+      "financial_claim_evidence",
+      "financial_verdicts",
+      "financial_data_snapshots",
+      "financial_provider_profiles"
+    ],
+    "human_review_queue": "latest unresolved_conflict rows in financial_verdicts",
+    "judge_version": "financial-conflict-judge-v1",
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "schema_version": "financial-conflict-verdict-v1",
+    "verdicts": [
+      "verified_consensus",
+      "verified_authoritative",
+      "single_source",
+      "unresolved_conflict",
+      "incomparable_evidence",
+      "insufficient_evidence"
+    ]
+  },
+  "verification": {
+    "architecture_gate": "passed",
+    "full_regression_tests": 418,
+    "offline_build_network": "none",
+    "offline_image": "sha256:554ce41204f85a8ac01761014e3bfccd728795950491c328f7a8280f31c17de5",
+    "related_regression_tests": 48
+  },
+  "task": "4.3"
+}

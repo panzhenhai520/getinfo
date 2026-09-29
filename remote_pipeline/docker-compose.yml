@@ -1,0 +1,38 @@
+services:
+  collectinfo-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: collectinfo-pipeline
+    restart: unless-stopped
+    init: true
+    shm_size: 2gb
+    env_file:
+      - .env
+    environment:
+      PIPELINE_DATA_DIR: /data
+      # 经 ollama_llama_shim（11435）访问常驻在 llama.cpp 的 Qwen3.8-27B：
+      # 共享 GPU 上唯一的大模型，避免 Ollama 本体（11434）再次加载模型挤爆显存
+      OLLAMA_BASE_URL: http://10.88.0.1:11435
+      TTS_BASE_URL: http://10.88.0.1:8005
+    ports:
+      - "${PIPELINE_BIND_IP:-10.88.0.1}:${PIPELINE_PORT:-11236}:11236"
+    volumes:
+      - pipeline_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:11236/v1/health', timeout=5).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
+
+volumes:
+  pipeline_data:
+

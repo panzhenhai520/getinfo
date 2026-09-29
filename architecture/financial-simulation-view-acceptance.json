@@ -1,0 +1,126 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "collapse_is_presentation_only": true,
+    "execution_mode": "paper",
+    "existing_sqlite_reused": true,
+    "existing_worker_reused": true,
+    "historical_performance_not_future_promise": true,
+    "new_database": false,
+    "new_service": false,
+    "real_order_execution": false
+  },
+  "browser": {
+    "accessibility": {
+      "aria_hidden": "true",
+      "aria_expanded": "false",
+      "controlled_body_hidden": true,
+      "controlled_body_inert": true
+    },
+    "backtest": {
+      "complete_export_link": true,
+      "data_limitations_visible": true,
+      "equity_chart_count": 1,
+      "historical_performance_notice_visible": true,
+      "paper_badge": "纸面回测"
+    },
+    "check_version": "financial-simulation-browser-v1",
+    "dynamic_category": {
+      "new_category_defaults_expanded": true,
+      "removed_category_state_cleaned": true,
+      "stable_id_state_persisted": true
+    },
+    "keyboard_toggle": true,
+    "layout": {
+      "lower_category_entered_viewport": true,
+      "next_category_shift_pixels": 241.0,
+      "released_actual_height": true
+    },
+    "mobile": {
+      "horizontal_overflow": false,
+      "metric_columns": 2,
+      "viewport_width": 390
+    },
+    "network_scope": "loopback_fixture_only",
+    "page_errors": [],
+    "passed": true,
+    "per_user_storage_namespace": true,
+    "rapid_reverse_settled": true,
+    "reduced_motion": {
+      "active_animations": 0,
+      "matched": true
+    },
+    "report_bidirectional_trace": true
+  },
+  "runtime": {
+    "broker_calls": 0,
+    "errors": 0,
+    "executed": true,
+    "failures": 0,
+    "model_calls": 0,
+    "network_calls": 0,
+    "tests_run": 46
+  },
+  "scenarios": {
+    "capability_and_owner_gate": true,
+    "complete_export": true,
+    "damped_interruptible_animation": true,
+    "dynamic_category_ids": true,
+    "empty_account": true,
+    "evidence_trace": true,
+    "independent_category_collapse": true,
+    "keyboard_and_screen_reader": true,
+    "layout_height_released": true,
+    "long_backtest": true,
+    "mobile": true,
+    "per_user_persistence": true,
+    "reduced_motion": true,
+    "report_bidirectional_trace": true
+  },
+  "static": {
+    "checks": {
+      "authenticated_export": true,
+      "authenticated_overview": true,
+      "complete_json_export": true,
+      "frontend_safe": true,
+      "long_trade_log_bounded": true,
+      "no_network_model_or_broker_client": true,
+      "owner_scoped": true,
+      "paper_only": true,
+      "read_only_history_when_disabled": true,
+      "report_and_evidence_links": true
+    },
+    "direct_prohibited_imports": [],
+    "endpoints": [
+      "GET /api/intel/financial/simulation/overview",
+      "GET /api/intel/financial/simulation/export",
+      "POST /api/intel/financial/simulation/jobs"
+    ],
+    "existing_tables": [
+      "paper_accounts",
+      "paper_orders",
+      "paper_fills",
+      "paper_positions",
+      "backtest_runs",
+      "backtest_metrics",
+      "backtest_trades"
+    ],
+    "new_ports": [],
+    "new_services": [],
+    "new_tables": [],
+    "view_version": "financial-simulation-view-v1"
+  },
+  "task": "5.5",
+  "verification": {
+    "architecture_gate": "passed",
+    "browser_gate": "passed",
+    "full_regression_tests": 495,
+    "offline_build": {
+      "base_image": "collectinfo:financial-backtest-metrics-acceptance",
+      "image_digest": "sha256:6f33723ef5c495f8e274b705f77aa276fbe20fdd3dac30c0dff71fe6bd37b232",
+      "network": "none"
+    },
+    "related_regression_tests": 46,
+    "stage3_browser_regression": "passed"
+  }
+}

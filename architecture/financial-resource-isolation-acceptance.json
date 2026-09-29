@@ -1,0 +1,102 @@
+{
+  "acceptance": "passed",
+  "boundaries": {
+    "existing_intel_jobs_reused": true,
+    "existing_intel_worker_service_reused": true,
+    "existing_sqlite_reused": true,
+    "new_database": false,
+    "new_port": false,
+    "new_service": false,
+    "new_table": false,
+    "real_trading": false
+  },
+  "controls": {
+    "artifact_file_size_and_io_concurrency_bounded": true,
+    "interactive_llm_capacity_reserved": true,
+    "provider_global_and_per_source_concurrency_bounded": true,
+    "provider_rate_limit_shared_cooldown": true,
+    "rss_priority_aging": true,
+    "sqlite_wal_reads_and_bounded_write_wait": true,
+    "worker_core_and_long_financial_lanes_disjoint": true
+  },
+  "resource_isolation_version": "financial-resource-isolation-v1",
+  "runtime": {
+    "combined_load": {
+      "budgets_ms": {
+        "dashboard": 250,
+        "interactive": 500,
+        "rss": 1000
+      },
+      "network_calls": 0,
+      "p95_ms": {
+        "dashboard": 0.007,
+        "interactive": 0.01,
+        "rss": 0.701
+      },
+      "paper_backtest_completed_after_research": true,
+      "provider_cooldown_enforced": true,
+      "rss_completed_while_research_running": true,
+      "sample_count": {
+        "dashboard": 25,
+        "interactive": 25,
+        "rss": 20
+      },
+      "slow_research_completed": true,
+      "sqlite_bounded_lock_wait_ms": 101.325,
+      "sqlite_recovered_after_lock": true
+    },
+    "errors": 0,
+    "failures": 0,
+    "network_calls": 0,
+    "tests_run": 46
+  },
+  "task": "6.3",
+  "verification": {
+    "architecture_gate": "passed",
+    "compose_services": [
+      "crawler",
+      "intel-worker",
+      "redis",
+      "worker"
+    ],
+    "full_regression_tests": 530,
+    "offline_build": {
+      "base_image": "collectinfo:financial-security-acceptance",
+      "base_image_digest": "sha256:e20e9e46b64d9934ae89ab6bab310d997a6399405c7f876f1446af9f8827cf01",
+      "image": "collectinfo:financial-resource-isolation-acceptance",
+      "image_digest": "sha256:576e572ac7a0ad4deed2611bd7eaf56a311046ecaf8587233776f104a121519b",
+      "network": "none",
+      "p95_ms": {
+        "dashboard": 0.009,
+        "interactive": 0.01,
+        "rss": 0.569
+      },
+      "related_regression_tests": 46,
+      "full_regression_tests": 530
+    },
+    "published_ports": [
+      8003
+    ],
+    "related_regression_tests": 46
+  },
+  "worker_lanes": {
+    "core": [
+      "classification",
+      "source_sync",
+      "light_scan",
+      "candidate_dispatch",
+      "topic_cluster",
+      "report_ingest",
+      "report_check",
+      "industry_revalidate",
+      "financial_snapshot",
+      "market_overview"
+    ],
+    "long_financial": [
+      "financial_research",
+      "financial_verify",
+      "paper_backtest"
+    ],
+    "overlap": []
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": "financial-latest-information-golden-v1",
+  "network_policy": "none",
+  "fixed_server_now_utc": "2026-08-03T15:00:00Z",
+  "question": "SpaceX 股票最新信息",
+  "repeat_runs": 3,
+  "expected_answer_sha256": "fbc632b0f27269d79c775ccd95d55f861bc8f7c75e1530b4620e49d62bb3e06f",
+  "expected_event_types": [
+    "status",
+    "route",
+    "research_status",
+    "research_status",
+    "route",
+    "status",
+    "research_status",
+    "research_status",
+    "sources",
+    "chunk",
+    "done"
+  ],
+  "expected_route_destination": "financial_latest_bundle",
+  "expected_source_kinds": ["financial_snapshot", "source_document"],
+  "required_answer_fragments": [
+    "SPCX.US",
+    "88.25 USD",
+    "SpaceX 完成首次公开募股后的首项业务更新",
+    "请求截止=2026-08-03T15:00:00.000Z",
+    "用户时区=Asia/Hong_Kong",
+    "市场时区=America/New_York",
+    "新闻文档不是结构化行情"
+  ],
+  "covered_cases": [
+    "P5-01", "P5-02", "P5-03", "P5-04", "P5-05", "P5-06",
+    "P5-07", "P5-08", "P5-09", "P5-10", "P5-11", "P5-12"
+  ]
+}
