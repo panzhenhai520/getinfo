@@ -63,6 +63,10 @@ DEFAULT_PACK_REPORT_PROMPT = """你是「{行业名称}」行业的资深情报�
 基于时序变化给出 3~5 条趋势判断（政策/技术/市场方向），每条注明依据；如材料显示风险或降温信号，单独指出。
 ## 五、下周关注
 列出 3~5 个值得继续跟踪的线索（新出现的主题、连续多天出现的主题、权威机构动向），说明理由。
+每条线索独立成一行，格式固定为：
+- 线索标题（不超过 20 字）：一句话说明为什么值得跟踪。跟踪关键词：词1、词2、词3
+「跟踪关键词」必须是可直接用于搜索的具体词（实体名/机构名/技术名/产品名/事件短语），
+不要用「关注」「趋势」「进展」这类空词；每条线索给 3~6 个，且不同线索之间尽量不重复。
 
 【写作要求】
 1. 全文中文，标题层级用 # / ## / ###。
@@ -547,6 +551,13 @@ def generate_pack_report(pack_id: str, time_start: str, time_end: str,
             sqlite_db.connection.commit()
         finally:
             cursor.close()
+    # 注意力方向：把「下周关注」的线索固化成追踪项 + 动态主题（关键词跟随周报变化）。
+    # 失败绝不影响周报本身，只打印告警。
+    try:
+        from pack_attention import sync_from_report
+        sync_from_report(pack_id, report_id, markdown)
+    except Exception as _attention_exc:
+        print(f"⚠️ 注意力方向同步失败（周报已正常入库）: {_attention_exc}")
     return {
         'id': report_id,
         'pack_id': pack_id,

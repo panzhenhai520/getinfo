@@ -144,6 +144,8 @@ try{
 
     <script>
         var pendingUser=null, pendingPw=null, needBind=false;
+        // 多租户：登录页可带 ?pack=<industry_pack_id>（或 ?industry_pack_id=）；登录/校验全程携带
+        var packId=(function(){ try{ var q=new URLSearchParams(location.search); return (q.get('pack')||q.get('industry_pack_id')||'').trim(); }catch(e){ return ''; } })();
         var alertDiv=document.getElementById('alertDiv');
         function showAlert(m,t){ alertDiv.className='alert show '+(t==='error'?'alert-error':'alert-success'); alertDiv.textContent=m; }
         function busy(on){ var s=document.getElementById('loginSpinner'); if(s) s.classList.toggle('show',!!on); var b=document.getElementById('loginBtn'); if(b) b.disabled=!!on; }
@@ -172,8 +174,9 @@ try{
             }catch(err){}
             // 包用户登录/绑定：不传 email 先试，若需绑定则提示填邮箱
             try{
-                var pu=await fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:password})});
+                var pu=await fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:password,industry_pack_id:packId})});
                 var pd=await pu.json();
+                if(pd&&pd.industry_pack_id) packId=pd.industry_pack_id;
                 if(!pd.success){ showAlert(pd.message||'登录失败：用户名或口令错误','error'); busy(false); return; }
                 pendingUser=username; pendingPw=password;
                 if(pd.activated){ showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); busy(false); return; }
@@ -193,11 +196,12 @@ try{
             var em=document.getElementById('email').value.trim();
             if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ showAlert('邮箱格式不正确，请检查后重试','error'); return; }
             try{
-                var r=await fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('username').value.trim(),password:document.getElementById('password').value,email:em})});
+                var r=await fetch('/api/pack-users/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('username').value.trim(),password:document.getElementById('password').value,email:em,industry_pack_id:packId})});
                 var d=await r.json();
+                if(d&&d.industry_pack_id) packId=d.industry_pack_id;
                 if(!d.success){ showAlert(d.message||'失败','error'); return; }
                 if(d.activated){ showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); return; }
-                if(d.email_sent){ document.getElementById('codeGroup').style.display='block'; showAlert('验证码已发送到 '+em+'，请查收','success'); startCodeCountdown(); }
+                if(d.email_sent){ document.getElementById('codeGroup').style.display='block'; showAlert('验证码已发送到 '+em+'，请查收（15 分钟内有效；重复发送的验证码相同，用哪一封都可以）','success'); startCodeCountdown(); }
                 else if(d.dev_code){ document.getElementById('codeGroup').style.display='block'; showAlert('测试模式验证码：'+d.dev_code,'success'); startCodeCountdown(); }
                 else { showAlert(d.message||'请绑定邮箱后重新发送','error'); }
             }catch(err){ showAlert('网络错误','error'); }
@@ -206,8 +210,9 @@ try{
         document.getElementById('verifyBtn').addEventListener('click', async function(){
             var code=document.getElementById('verifyCode').value.trim();
             if(!pendingUser){ showAlert('请先提交用户名口令','error'); return; }
+            if(!/^\d{6}$/.test(code)){ showAlert('请输入邮件里的 6 位数字验证码（当前输入：'+(code||'空')+'）','error'); return; }
             try{
-                var v=await fetch('/api/pack-users/login/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:pendingUser,code:code})});
+                var v=await fetch('/api/pack-users/login/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:pendingUser,code:code,industry_pack_id:packId})});
                 var vd=await v.json();
                 if(!vd.success){ showAlert(vd.message||'验证码错误','error'); return; }
                 if(vd.step==='change_password'){
@@ -227,7 +232,7 @@ try{
             if(np!==np2){ pm.textContent='两次输入不一致'; pm.style.color='#f87171'; return; }
             if(!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(np)){ pm.textContent='口令需字母+数字且至少6位'; pm.style.color='#f87171'; return; }
             try{
-                var c=await fetch('/api/pack-users/login/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:pendingUser,old_password:pendingPw,new_password:np})});
+                var c=await fetch('/api/pack-users/login/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:pendingUser,old_password:pendingPw,new_password:np,industry_pack_id:packId})});
                 var cd=await c.json();
                 if(cd.success){ pm.textContent='改密成功，登录中…'; pm.style.color='#4ade80'; showAlert('登录成功，正在跳转…','success'); setTimeout(function(){location.href='/';},500); }
                 else { pm.textContent=cd.message||'改密失败'; pm.style.color='#f87171'; }

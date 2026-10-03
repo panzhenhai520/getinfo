@@ -117,6 +117,24 @@ def source_scan_window_key(source: Dict, *, epoch_seconds: Optional[float] = Non
     return f"source:{digest}:{int(timestamp // bucket_seconds)}"
 
 
+def _attention_watch_queries(industry_pack_id: str, limit: int = 6) -> List[str]:
+    """周报「下周关注」生成的追踪词 → 本轮的额外搜索词（专门盯这几条线索）。
+
+    只负责"多搜几个词"，不参与任何门禁：搜到的 URL 依旧走候选门禁 → 抓正文 →
+    分类 → 主题归属，与既有链路完全一致。
+    """
+    try:
+        from pack_attention import active_watch_keywords
+        keywords = active_watch_keywords(industry_pack_id, limit=limit)
+    except Exception as exc:
+        print(f"⚠️ 读取本周追踪词失败，跳过（{exc}）")
+        return []
+    if not keywords:
+        return []
+    print("🎯 本周追踪词进入搜索采集: %s" % "、".join(keywords))
+    return [f"{keyword} 最新" for keyword in keywords]
+
+
 def _is_preferred_serp_language(item: Dict) -> bool:
     """A defensive result-level check in addition to Google's ``lr`` filter."""
     preference = str(config.SERPAPI_RESULT_LANGUAGE or "zh").casefold()
@@ -831,7 +849,10 @@ class IntelLightScanner:
 
         if include_serpapi and config.SERPAPI_ENABLED and self.serpapi.configured:
             run_started = time.monotonic()
-            queries = list(pack.get("serpapi_queries") or [])
+            # 追踪词优先：周报「下周关注」生成的注意力方向是本周期最该主动搜的线索，
+            # 排在静态查询前面，保证被 SERPAPI_MAX_QUERIES_PER_RUN 截断时不会被挤掉。
+            watch_queries = _attention_watch_queries(industry_pack_id)
+            queries = watch_queries + list(pack.get("serpapi_queries") or [])
             # 重点品牌动态查询（采品牌新闻），与静态查询合并后截断
             queries += [f"{b} 新闻" for b in (pack.get("brands") or [])[:12]]
             queries = queries[: config.SERPAPI_MAX_QUERIES_PER_RUN]
@@ -923,7 +944,9 @@ class IntelLightScanner:
         # 模式：separate=每个关键词各搜一次（结果更全）；merged=多词 OR 合并成一次（省额度）。
         if config.TAVILY_ENABLED and self.tavily.configured:
             run_started = time.monotonic()
-            queries = list(pack.get("serpapi_queries") or [])[: config.SEARCH_KEYWORDS_PER_PACK]
+            # 追踪词同样进 Tavily：与 SerpAPI 对称，保证"上周追踪"的线索一定有搜索覆盖
+            queries = (_attention_watch_queries(industry_pack_id)
+                       + list(pack.get("serpapi_queries") or []))[: config.SEARCH_KEYWORDS_PER_PACK]
             # 主题级查询词（为"文章少的窄主题"单独配置，见行业包 manifest.topic_search_queries）：
             # 每个主题现在存 3 个搜索词（列表），取这 3 个词拼成一条查询（不再按一行拆分）；
             # 兼容旧格式（单个字符串）。按【当天日期】轮转取 SEARCH_TOPIC_QUERIES_PER_RUN 个主题

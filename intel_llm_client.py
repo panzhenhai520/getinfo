@@ -740,6 +740,91 @@ class IntelLLMClient:
             result.setdefault(s, s)
         return result
 
+    def extract_attention_keywords(self, directions: List[Dict], industry_pack: Dict) -> Dict[int, List[str]]:
+        """周报「下周关注」线索 → 追踪关键词，返回 {条目序号(从1开始): [关键词]}。
+
+        这是"关键词跟随周报动态变化"的取词环节：线索是自然语言（例如"关注头部厂商
+        的量产节奏"），直接切词会切出"关注/头部/节奏"这类没用的词，所以让 LLM 归一化成
+        可检索的实体/事件词。未配置或失败时返回 {}，由 pack_attention 走规则兜底。
+        """
+        if not directions:
+            return {}
+        if not config.INTEL_LLM_ENABLED or self.provider != "local" or not self.configured:
+            return {}
+        pack_name = str((industry_pack or {}).get("name") or (industry_pack or {}).get("id") or "")
+        known = []
+        for field in ("brands", "core_keywords", "trend_keywords"):
+            known += [str(item) for item in ((industry_pack or {}).get(field) or [])][:30]
+        directions_desc = "\n".join(
+            "%d. 线索：%s%s" % (
+                index,
+                str(item.get("direction") or "")[:60],
+                ("；说明：" + str(item.get("reason") or "")[:120]) if item.get("reason") else "",
+            )
+            for index, item in enumerate(directions[:8], start=1)
+        )
+        prompt = (
+            "下面是「%s」行业周报里列出的『下周关注』线索。请为每条线索提取 3~6 个"
+            "**能专门盯住这条线索的检索词**（具体实体名、机构名、技术名、产品名、事件短语）。\n"
+            "硬性要求：① 不要用行业通用词（行业名本身、AI、大模型、机器人、市场、政策这类"
+            "命中全库的词），它们盯不住任何东西；② 不要出现『关注/跟踪/趋势/进展/情况』这类空词；"
+            "③ 优先使用下面给出的行业既有词表里的写法；④ 不同线索之间不要重复用词。\n"
+            "行业既有词表（供参考，可用可不用）：%s\n\n"
+            "线索：\n%s\n\n"
+            "只输出 JSON：{\"directions\":[{\"index\":1,\"keywords\":[\"词1\",\"词2\"]}]}；"
+            "无法判断的线索给空数组。"
+            % (pack_name, "、".join(dict.fromkeys(known))[:600], directions_desc)
+        )
+        payload = {
+            "model": self._local_runtime()["model_id"],
+            "messages": [
+                {"role": "system", "content": "你是行业情报分析助手，只返回合法 JSON，不输出推理过程。"},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+            "max_tokens": 1200,
+            "temperature": 0.0,
+            "enable_thinking": False,
+        }
+        runtime = self._local_runtime()
+        with self._semaphore:
+            response = self._request_local(runtime, payload, timeout_seconds=120)
+        body = response.json()
+        choices = body.get("choices") if isinstance(body, dict) else None
+        message = choices[0].get("message") if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+        content = str(message.get("content") or "").strip()
+        if content.startswith("```"):
+            content = re.sub(r"^```(?:json)?\s*", "", content)
+            content = re.sub(r"\s*```$", "", content)
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", content, re.S)
+            if not match:
+                return {}
+            try:
+                data = json.loads(match.group(0))
+            except json.JSONDecodeError:
+                return {}
+        rows = data.get("directions") if isinstance(data, dict) else data
+        if not isinstance(rows, list):
+            return {}
+        result: Dict[int, List[str]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            try:
+                index = int(row.get("index") or 0)
+            except (TypeError, ValueError):
+                continue
+            keywords = row.get("keywords") or []
+            if index <= 0 or not isinstance(keywords, list):
+                continue
+            cleaned = [str(word).strip() for word in keywords if str(word).strip()]
+            if cleaned:
+                result[index] = cleaned[:8]
+        return result
+
     def suggest_topic_keywords(self, other_events: List[Dict], fixed_topics: List[Dict]) -> Dict[str, List[str]]:
         """LLM 检查'其它'桶事件，建议补充 fixed_topic keywords（同义词）。
 

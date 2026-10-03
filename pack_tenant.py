@@ -123,6 +123,119 @@ def _ensure(cursor=None):
         ensure_pack_tables(cursor)
 
 
+def ensure_pack_user_uniqueness() -> Dict:
+    """幂等迁移：清理重复包用户行，并补齐唯一约束。
+
+    老库的 pack_users 若是早于 UNIQUE 声明的 DDL 建表，`CREATE TABLE IF NOT EXISTS`
+    不会再补约束，于是可能残留重复行（同包同名 / 同邮箱），导致登录查找串到别的行。
+    本函数：① 按 (industry_pack_id, username) 去重，保留“最有价值”的一行
+    （优先 activated=1，其次仍持有验证码，最后取 id 最大）；② 按非空 email 去重；
+    ③ 用唯一索引补齐约束（唯一索引在 SQLite/PostgreSQL 都可用）。
+    返回 {"removed": 删除行数, "indexes_added": [...]}。
+    """
+    _ensure()
+    removed = 0
+    added = []
+    with sqlite_db.lock:
+        cur = sqlite_db.connection.cursor()
+        cur.execute("SELECT * FROM pack_users ORDER BY id")
+        rows = [dict(r) for r in cur.fetchall()]
+
+        def _score(r):
+            return (
+                1 if int(r.get('activated') or 0) == 1 else 0,
+                1 if str(r.get('email_verify_code') or '') else 0,
+                1 if str(r.get('email') or '').strip() else 0,
+                int(r.get('id') or 0),
+            )
+
+        drop_ids = []
+        groups = {}
+        for r in rows:
+            groups.setdefault(
+                (str(r.get('industry_pack_id') or ''), str(r.get('username') or '')), []
+            ).append(r)
+        for items in groups.values():
+            if len(items) <= 1:
+                continue
+            keep = max(items, key=_score)
+            drop_ids += [int(r['id']) for r in items if int(r['id']) != int(keep['id'])]
+
+        by_email = {}
+        for r in rows:
+            email = str(r.get('email') or '').strip()
+            if email:
+                by_email.setdefault(email, []).append(r)
+        for items in by_email.values():
+            if len(items) <= 1:
+                continue
+            keep = max(items, key=_score)
+            for r in items:
+                rid = int(r['id'])
+                if rid != int(keep['id']) and rid not in drop_ids:
+                    drop_ids.append(rid)
+
+        for rid in drop_ids:
+            try:
+                cur.execute("DELETE FROM pack_users WHERE id=?", (rid,))
+                removed += 1
+            except Exception:
+                pass
+        sqlite_db.connection.commit()
+
+        for ddl in (
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_pack_users_pack_username"
+            " ON pack_users(industry_pack_id, username)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_pack_users_email"
+            " ON pack_users(email) WHERE email<>''",
+        ):
+            try:
+                cur.execute(ddl)
+                sqlite_db.connection.commit()
+                added.append(ddl.split(' ')[5])
+            except Exception:
+                try:
+                    sqlite_db.connection.rollback()
+                except Exception:
+                    pass
+        cur.close()
+    return {"removed": removed, "indexes_added": added}
+
+
+_pack_uniqueness_done = False
+
+
+def ensure_pack_user_uniqueness_once() -> None:
+    """每个进程只跑一次的唯一性迁移（幂等；失败只记录，不影响登录）。"""
+    global _pack_uniqueness_done
+    if _pack_uniqueness_done:
+        return
+    _pack_uniqueness_done = True
+    try:
+        result = ensure_pack_user_uniqueness()
+        if result.get("removed"):
+            print(f"[pack-user] 唯一性迁移：清理重复包用户 {result['removed']} 行")
+    except Exception as exc:
+        print(f"[pack-user] 包用户唯一性迁移失败（忽略）: {exc}")
+
+
+def delete_pack_users(industry_pack_id: str) -> int:
+    """删除指定行业包下的全部包用户（用于清理误建/失效租户用户）。返回删除行数。"""
+    _ensure()
+    pack = str(industry_pack_id or '').strip()
+    if not pack:
+        raise ValueError('缺 industry_pack_id')
+    with sqlite_db.lock:
+        cur = sqlite_db.connection.cursor()
+        cur.execute("SELECT COUNT(*) AS n FROM pack_users WHERE industry_pack_id=?", (pack,))
+        _r = cur.fetchone()
+        before = int((dict(_r) if _r else {}).get('n') or 0)
+        cur.execute("DELETE FROM pack_users WHERE industry_pack_id=?", (pack,))
+        sqlite_db.connection.commit()
+        cur.close()
+    return before
+
+
 # ----------------------------------------------------------------------
 # 身份
 # ----------------------------------------------------------------------
@@ -474,20 +587,12 @@ def _set_session_user(user_id: Optional[int]) -> None:
 
 
 def login_pack_user(username: str, password: str, industry_pack_id: str = '') -> Dict:
-    """包用户登录：用户名+口令校验（行业包限定），成功写 session.pack_user_id。"""
+    """包用户登录：用户名+口令校验（传入 industry_pack_id 时限定行业包），成功写 session.pack_user_id。"""
     _ensure()
     if not username or not password:
         raise ValueError('用户名/口令不能为空')
     pw_hash = hashlib.sha256(f'{username}:{password}'.encode('utf-8')).hexdigest()
-    with sqlite_db.lock:
-        cur = sqlite_db.connection.cursor()
-        cur.execute(
-            "SELECT * FROM pack_users WHERE username=? AND password_hash=?",
-            (str(username), pw_hash),
-        )
-        _row = cur.fetchone()
-        row = dict(_row) if _row else None
-        cur.close()
+    row = _find_user_row(username, pw_hash, industry_pack_id)
     if not row:
         raise ValueError('用户名或口令错误')
     if str(row.get('status')) != 'active':
@@ -550,17 +655,42 @@ def _now_str() -> str:
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+# 邮箱验证码有效期（分钟）。邮件投递 + 用户切设备/手输通常要几分钟，
+# 5 分钟过短，容易出现“收到邮件但已过期/提示验证码错误”的失败。
+EMAIL_VERIFY_TTL_MINUTES = 15
+
+
 def _random_code() -> str:
     return ''.join(_secrets.choice('123456789') for _ in range(6))
 
 
-def _find_user_row(username, password_hash=None):
+def _find_user_row(username, password_hash=None, industry_pack_id='', prefer_pending_code=False):
+    """按用户名查找用户行（可选按行业包限定），结果确定性。
+
+    同名用户可以合法存在于不同行业包（UNIQUE 是 (industry_pack_id, username)），
+    因此必须避免“同名多行时写在一行、读在另一行”：
+      · prefer_pending_code=True（校验验证码阶段）优先取仍持有 email_verify_code 的行，
+        即发码时写入的那一行；
+      · 其余情况按 id 倒序（最新创建优先）。
+    传入 industry_pack_id 时进一步限定到该行业包。
+    """
+    sql = "SELECT * FROM pack_users WHERE username=?"
+    params = [str(username)]
+    pack = str(industry_pack_id or '').strip()
+    if pack:
+        sql += " AND industry_pack_id=?"
+        params.append(pack)
+    if password_hash:
+        sql += " AND password_hash=?"
+        params.append(password_hash)
+    if prefer_pending_code:
+        sql += " ORDER BY (CASE WHEN email_verify_code<>'' THEN 0 ELSE 1 END), id DESC"
+    else:
+        sql += " ORDER BY id DESC"
+    sql += " LIMIT 1"
     with sqlite_db.lock:
         cur = sqlite_db.connection.cursor()
-        if password_hash:
-            cur.execute("SELECT * FROM pack_users WHERE username=? AND password_hash=?", (str(username), password_hash))
-        else:
-            cur.execute("SELECT * FROM pack_users WHERE username=?", (str(username),))
+        cur.execute(sql, tuple(params))
         _r = cur.fetchone()
         row = dict(_r) if _r else None
         cur.close()
@@ -596,7 +726,12 @@ def send_email_verify_code(email: str, code: str) -> bool:
         if host:
             from email.mime.text import MIMEText
             from email.utils import formataddr
-            msg = MIMEText(f'您的登录验证码是 {code}，5 分钟内有效。\n\n若这不是您本人操作，请忽略本邮件。', 'plain', 'utf-8')
+            msg = MIMEText(
+                f'您的登录验证码是 {code}，{EMAIL_VERIFY_TTL_MINUTES} 分钟内有效。\n\n'
+                '提示：若您收到多封验证码邮件，里面的验证码相同，使用任意一封均可。\n'
+                '若这不是您本人操作，请忽略本邮件。',
+                'plain', 'utf-8',
+            )
             msg['Subject'] = '灵蹊智能 - 账号登录验证码'
             msg['From'] = formataddr(('灵蹊智能', str(getattr(config, 'SMTP_USER', '') or host)))
             msg['To'] = email
@@ -625,26 +760,31 @@ def send_email_verify_code(email: str, code: str) -> bool:
         return False
 
 
-def begin_login(username: str, password: str, email: str = '') -> Dict:
+def begin_login(username: str, password: str, email: str = '', industry_pack_id: str = '') -> Dict:
     """登录：校验口令。已激活用户直接写 session 登录；未激活用户需绑定邮箱→发验证码。
-    若传入 email 则绑定到该用户（邮箱验证绑定）。"""
+    若传入 email 则绑定到该用户（邮箱验证绑定）。
+    industry_pack_id：多租户登录页所属行业包，传入后按该包限定查找，避免跨包同名误命中。"""
     _ensure()
+    ensure_pack_user_uniqueness_once()
     if not username or not password:
         raise ValueError('用户名/口令不能为空')
     pw_hash = hashlib.sha256(f'{username}:{password}'.encode('utf-8')).hexdigest()
-    row = _find_user_row(username, pw_hash)
+    row = _find_user_row(username, pw_hash, industry_pack_id)
     if not row:
         raise ValueError('用户名或口令错误')
+    _row_pack = str(row.get('industry_pack_id') or '')
     _ensure_authorized(row)
     # 已激活：直接登录，无需再发验证码
     if int(row.get('activated') or 0) == 1:
         _set_session_user(int(row['id']))
         _update_user(int(row['id']), last_login_at=_now_str())
         return {'user_id': int(row['id']), 'username': str(row.get('username')), 'email': str(row.get('email')),
+                'industry_pack_id': _row_pack,
                 'activated': True, 'step': 'done', 'verification_required': False}
     # 未激活：需绑定邮箱。未提供合法邮箱则不发送（仅提示需绑定）；提供则绑定并发送验证码。
     if not (email and _re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', str(email))):
         return {'user_id': int(row['id']), 'username': str(row.get('username')), 'email': str(row.get('email') or ''),
+                'industry_pack_id': _row_pack,
                 'activated': False, 'step': 'email_verify', 'need_email': True,
                 'must_change_password': bool(row.get('must_change_password')), 'verification_required': True,
                 'email_sent': False, 'dev_code': None, 'message': '请绑定邮箱'}
@@ -658,10 +798,16 @@ def begin_login(username: str, password: str, email: str = '') -> Dict:
             raise ValueError('邮箱已注册，请勿重复注册')
         cur.close()
     _update_user(int(row['id']), email=mail_to)
-    code = _random_code()
     from datetime import datetime as _dt
     from datetime import timedelta as _td
-    exp = (_dt.strptime(_now_str()[:19], '%Y-%m-%d %H:%M:%S') + _td(minutes=5)).strftime('%Y-%m-%d %H:%M:%S')
+    _now19 = _now_str()[:19]
+    # 重发时若上一枚验证码仍在有效期内 → 复用同一枚。
+    # 这样新旧邮件里的码完全一致，用户拿哪一封都能登录，
+    # 从根上消除"用了重发前那封邮件里的码 → 验证码错误"这一失败模式。
+    _prev_code = str(row.get('email_verify_code') or '')
+    _prev_exp = str(row.get('email_verify_expires') or '')[:19]
+    code = _prev_code if (_prev_code and _prev_exp >= _now19) else _random_code()
+    exp = (_dt.strptime(_now19, '%Y-%m-%d %H:%M:%S') + _td(minutes=EMAIL_VERIFY_TTL_MINUTES)).strftime('%Y-%m-%d %H:%M:%S')
     with sqlite_db.lock:
         cur = sqlite_db.connection.cursor()
         cur.execute("UPDATE pack_users SET email_verify_code=?, email_verify_expires=?, updated_at=? WHERE id=?",
@@ -669,22 +815,27 @@ def begin_login(username: str, password: str, email: str = '') -> Dict:
         sqlite_db.connection.commit(); cur.close()
     _sent = send_email_verify_code(mail_to, code)
     return {'user_id': int(row['id']), 'username': str(row.get('username')), 'email': mail_to,
+            'industry_pack_id': _row_pack,
             'activated': False, 'step': 'email_verify', 'need_email': True,
             'must_change_password': bool(row.get('must_change_password')), 'verification_required': True,
             'email_sent': _sent, 'dev_code': code if not _sent else None}  # 未配置SMTP时把验证码给前端显示，生产应配置SMTP
 
 
-def verify_email_code(username: str, code: str) -> Dict:
-    """登录第二步：校验邮箱验证码；首次登录则返回需强制改密，否则写 session 完成登录。"""
+def verify_email_code(username: str, code: str, industry_pack_id: str = '') -> Dict:
+    """登录第二步：校验邮箱验证码；首次登录则返回需强制改密，否则写 session 完成登录。
+    industry_pack_id 与 begin_login 保持一致；查询优先取仍持有验证码的那一行，
+    保证读到的是发码时写入的行（同名多行也不会串行）。"""
     _ensure()
-    row = _find_user_row(username)
+    row = _find_user_row(username, None, industry_pack_id, prefer_pending_code=True)
     if not row:
         raise ValueError('用户不存在')
     stored = str(row.get('email_verify_code') or '')
-    if not stored or stored != str(code):
-        raise ValueError('验证码错误')
+    if not stored:
+        raise ValueError('请先点击「发送验证码」获取验证码，再输入并登录')
+    if stored != str(code):
+        raise ValueError('验证码错误：请核对邮件里的 6 位数字（重复发送不会更换验证码）')
     if str(row.get('email_verify_expires') or '')[:19] and str(row.get('email_verify_expires'))[:19] < _now_str()[:19]:
-        raise ValueError('验证码已过期')
+        raise ValueError(f'验证码已过期（有效期 {EMAIL_VERIFY_TTL_MINUTES} 分钟），请重新点击「发送验证码」')
     _update_user(int(row['id']), email_verify_code='', email_verify_expires='', activated=1)
     _ensure_expire_at(int(row['id']))  # 首次激活：按注册日期+授权天数写授权到期时间
     if bool(row.get('must_change_password')):
@@ -696,10 +847,10 @@ def verify_email_code(username: str, code: str) -> Dict:
     return {'step': 'done', 'user_id': int(row['id']), 'username': str(row.get('username'))}
 
 
-def complete_password_change(username: str, old_password: str, new_password: str) -> Dict:
+def complete_password_change(username: str, old_password: str, new_password: str, industry_pack_id: str = '') -> Dict:
     """首次登录强制改密：校验原口令，新口令需字母+数字组合，改密后写 session 完成登录。"""
     _ensure()
-    row = _find_user_row(username)
+    row = _find_user_row(username, None, industry_pack_id, prefer_pending_code=False)
     if not row:
         raise ValueError('用户不存在')
     if hashlib.sha256(f'{username}:{old_password}'.encode('utf-8')).hexdigest() != str(row.get('password_hash')):

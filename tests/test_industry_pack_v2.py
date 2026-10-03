@@ -367,7 +367,8 @@ class IndustryPackV2Test(unittest.TestCase):
                 "show_financial_news": False,
                 "show_market_index_cards": False,
                 "show_watched_stock_cards": False,
-                "show_spatiotemporal_map": True,
+                # 缺省不再开时空信息图：新包/老包未声明时首页走资讯流 Dashboard
+                "show_spatiotemporal_map": False,
             },
         )
         self.assertEqual(loader.effective_pack_set("root")[1]["pack_version"], "1.0.0")

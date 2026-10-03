@@ -1033,6 +1033,7 @@ def ensure_intel_candidate_tables(cursor) -> None:
     for _fn in (
         ensure_intel_topic_search_test_tables,
         ensure_intel_topic_tables,
+        ensure_pack_attention_tables,
         ensure_intel_evidence_tables,
         ensure_user_gate_tables,
     ):
@@ -1141,7 +1142,7 @@ def ensure_intel_topic_tables(cursor) -> None:
             topic_key TEXT NOT NULL,
             topic_name TEXT NOT NULL,
             topic_source TEXT NOT NULL DEFAULT 'fixed'
-                CHECK (topic_source IN ('fixed', 'automatic')),
+                CHECK (topic_source IN ('fixed', 'automatic', 'watch')),
             keywords_json TEXT NOT NULL DEFAULT '[]',
             summary TEXT NOT NULL DEFAULT '',
             summary_source TEXT NOT NULL DEFAULT 'rule',
@@ -1222,6 +1223,47 @@ def ensure_intel_topic_tables(cursor) -> None:
         cursor.execute("DROP TABLE _intel_topic_articles_old")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_intel_topic_articles_article ON intel_topic_articles(article_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_intel_topic_articles_topic_score ON intel_topic_articles(topic_id, association_score DESC)")
+
+
+def ensure_pack_attention_tables(cursor) -> None:
+    """注意力方向：把周报「下周关注」的线索固化成可跟踪、可回收的盯防项。
+
+    背景：周报每周自动生成，其中「下周关注」列出 3~5 条值得继续跟踪的线索。
+    这些线索是**动态**的（每周都变），不能塞进 fixed_topics（那是人工维护的固定主题，
+    改一次要草稿→发布→激活），所以单独一张表按周保存：
+
+    * 每条线索一行（direction=线索标题，keywords_json=从线索里抽出的盯防词）；
+    * 盯防词同时用于：① 建一张动态主题卡「本周盯防 · 第N周」把命中文章挂上去；
+      ② 进入搜索采集的查询词，主动搜这些线索；
+    * 下一份周报生成时把上一周的行标为 closed 并结算 hit_count，便于回看
+      「上周那几条线索最后命中了几篇」。
+    """
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS pack_attention_directions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            industry_pack_id TEXT NOT NULL,
+            week_key TEXT NOT NULL,
+            week_label TEXT NOT NULL DEFAULT '',
+            report_id INTEGER,
+            report_title TEXT NOT NULL DEFAULT '',
+            direction TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            keywords_json TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'active',
+            source TEXT NOT NULL DEFAULT 'report',
+            hit_count INTEGER NOT NULL DEFAULT 0,
+            closed_at TEXT,
+            created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            UNIQUE(industry_pack_id, week_key, direction)
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pack_attention_pack_status "
+        "ON pack_attention_directions(industry_pack_id, status, week_key DESC)"
+    )
 
 
 def ensure_intel_evidence_tables(cursor) -> None:

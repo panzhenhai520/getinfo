@@ -14,7 +14,7 @@ import re
 import threading
 from datetime import datetime
 import config
-from utils import coerce_int, get_china_time
+from utils import coerce_int, get_china_time, strip_url_presentation_params
 from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlparse
 from url_validation_helper import normalize_task_url, validate_http_url
@@ -1603,6 +1603,16 @@ class SQLiteDatabase:
                     _clean_title = re.sub(r'^\s*[\[【]\s*图\s*[\]】]\s*', '', _raw_title)
                     if _clean_title != _raw_title:
                         article_data['title'] = _clean_title
+
+                    # URL 语言参数清洗（最终入库闸门）：X 等站点把 ?lang=xx 写进链接后，
+                    # 抓到的是界面语言版本，标题会混进印地语/保加利亚语等外文（看着像乱码），
+                    # 同一篇文章也会被当成不同 URL。入库前统一剥掉这类语言/展示参数。
+                    _raw_url = str(article_data.get('url') or '')
+                    _clean_url = strip_url_presentation_params(_raw_url)
+                    if _clean_url != _raw_url:
+                        article_data['url'] = _clean_url
+                        if str(article_data.get('canonical_url') or '') == _raw_url:
+                            article_data['canonical_url'] = _clean_url
 
                     # Final ingestion guard: every crawler path must provide
                     # at least one keyword hit.  This protects the article

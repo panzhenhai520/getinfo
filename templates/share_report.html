@@ -55,7 +55,7 @@ h1 { font-size: 21px; line-height: 1.45; margin-bottom: 12px; }
     <span>覆盖 {{ report.article_count }} 篇文章</span>
   </div>
   <div class="content" id="reportContent"></div>
-  <script type="text/plain" id="excerptSrc">{{ excerpt }}</script>
+  <div id="excerptSrc" hidden>{{ excerpt }}</div>
   <div class="share-box">
     <p>长按识别二维码，查看完整 AI 周报</p>
     <img class="qr" src="/share/report/{{ report.id }}/qr.png" alt="周报二维码">

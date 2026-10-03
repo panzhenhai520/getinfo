@@ -40,9 +40,28 @@ $Excludes = @(
   '--exclude=./node_modules', '--exclude=./.venv', '--exclude=./venv',
   '--exclude=./.env', '--exclude=./.env.*', '--exclude=./*.tar', '--exclude=./*.tar.gz',
   '--exclude=./.tmp-*', '--exclude=./*.zip', '--exclude=./*.tar.*', '--exclude=./*.tgz',
-  '--exclude=./*.db', '--exclude=./*.log', '--exclude=./_askpass*.cmd',
-  '--exclude=./_prod_*.txt', '--exclude=./_host_compose.yml'
+  '--exclude=./*.db', '--exclude=./*.log'
 )
+# 仓库根目录下的本机临时件（_server_main.py、_tmp_*.py、截图/dump、_askpass*.cmd…）不进镜像。
+# 但它们不能写进上面的 $Excludes：Windows 自带 bsdtar 3.5.2 的 --exclude 既匹配完整路径、
+# 也匹配文件名，`--exclude=./_*` 会把 templates/_dashboard_nav.html 这类子目录文件一起排掉
+# （实测；漏掉它会让所有页面 include 失败）。所以根目录改为「显式枚举要打包的顶层条目」。
+$RootSkipNames = @(
+  '.git', '__pycache__', 'data', 'deploy-data', 'crawl_results', 'crawl_logs', 'auth_storage',
+  '.postgres_deps', 'industry_pack_backups', 'vendor', 'node_modules', '.venv', 'venv'
+)
+$RootSkipSuffixes = @('.tar', '.tar.gz', '.tgz', '.zip', '.db', '.log')
+$RootEntries = @()
+foreach ($item in (Get-ChildItem -Force -LiteralPath $RepoRoot)) {
+  $name = $item.Name
+  if ($name.StartsWith('_')) { continue }
+  if ($name.StartsWith('.tmp-')) { continue }
+  if ($name -eq '.env' -or $name.StartsWith('.env.')) { continue }
+  if ($RootSkipNames -contains $name) { continue }
+  if (@($RootSkipSuffixes | Where-Object { $name.EndsWith($_) }).Count -gt 0) { continue }
+  $RootEntries += './' + $name
+}
+if (-not $RootEntries) { throw '打包条目为空，已中止' }
 
 function Set-SshAuth {
   if (-not (Test-Path $AskPass)) { throw "缺少 $AskPass（SSH 免交互密码脚本）" }
@@ -64,7 +83,7 @@ function Invoke-Ssh([string]$Command) {
 # 断点续传上传。scp 不支持续传：链路慢时（实测过 ~10 KB/s，5MB 要 ~500 秒）
 # 一旦被超时打断就只剩一个残包，重跑还得从头再传。这里改为 ssh 标准输入分片追加：
 # 每片传完核对远端字节数，中断后重跑自动从已收到的字节数继续。
-function Send-FileResumable([string]$LocalPath, [string]$RemotePath, [int]$ChunkBytes = 1048576) {
+function Send-FileChunks([string]$LocalPath, [string]$RemotePath, [int]$ChunkBytes = 1048576) {
   $size = (Get-Item $LocalPath).Length
   $raw = (& $Ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $ProdHost "stat -c %s '$RemotePath' 2>/dev/null || echo 0") | Select-Object -Last 1
   $have = if ($raw -match '^\d+$') { [int64]$raw } else { 0 }
@@ -134,6 +153,27 @@ function Send-FileResumable([string]$LocalPath, [string]$RemotePath, [int]$Chunk
   Write-Host ("    ✅ 上传完整（{0} 字节）" -f $size)
 }
 
+# 上传后必须整包校验：链路抖动时会出现「远端字节数与本地完全一致、内容却已损坏」
+# （实测 tar 解包报 gzip: invalid compressed data--format violated），而分片回读只核对
+# 字节数，于是下次重跑会信以为真地跳过上传，把坏包直接送进构建。这里补一次全量 sha256
+# 比对，不一致就删掉重传（最多 3 次），把「静默坏包」挡在构建之前。
+function Send-FileResumable([string]$LocalPath, [string]$RemotePath, [int]$ChunkBytes = 1048576) {
+  $localHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $LocalPath).Hash.ToLower()
+  for ($attempt = 1; $attempt -le 3; $attempt++) {
+    Send-FileChunks $LocalPath $RemotePath $ChunkBytes
+    $raw = (& $Ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $ProdHost "sha256sum '$RemotePath' | cut -d' ' -f1") | Select-Object -Last 1
+    $remoteHash = if ($raw -match '^[0-9a-f]{64}$') { $raw.Trim() } else { '' }
+    if ($remoteHash -eq $localHash) {
+      Write-Host '    ✅ 整包 sha256 校验通过'
+      return
+    }
+    $shown = if ($remoteHash) { $remoteHash.Substring(0, 12) } else { '读取失败' }
+    Write-Host ("    远端整包哈希不一致（{0} vs {1}），丢弃后重传（第 {2}/3 次）" -f $shown, $localHash.Substring(0, 12), $attempt)
+    Invoke-Ssh "rm -f '$RemotePath'" | Out-Null
+  }
+  throw ("上传校验失败（连续 3 次哈希不一致）：{0}" -f $RemotePath)
+}
+
 Set-SshAuth
 New-Item -ItemType Directory -Path $Staging -Force | Out-Null
 
@@ -142,7 +182,7 @@ Write-Host '=== [1/5] 打包本机源码（排除数据卷/密钥） ===' -Foreg
 $tarball = Join-Path $Staging 'src.tar.gz'
 Push-Location $RepoRoot
 try {
-  & tar -czf $tarball @Excludes .
+  & tar -czf $tarball @Excludes @RootEntries
   if ($LASTEXITCODE -ne 0) { throw 'tar 打包失败' }
 } finally { Pop-Location }
 $mb = [math]::Round((Get-Item $tarball).Length / 1MB, 2)

@@ -70,7 +70,9 @@ DASHBOARD_CAPABILITY_DEFAULTS = {
     "show_financial_news": False,
     "show_market_index_cards": False,
     "show_watched_stock_cards": False,
-    "show_spatiotemporal_map": True,
+    # 新建行业包默认走资讯流首页；时空信息图需要显式写 true 才开启。
+    # （旧默认 True 会让所有新包一建好就进地图模式，与现有资讯类包的形态不一致）
+    "show_spatiotemporal_map": False,
 }
 DASHBOARD_CAPABILITY_FIELDS = tuple(DASHBOARD_CAPABILITY_DEFAULTS)
 SHARED_FINANCIAL_PACK_ID = "financial_markets"

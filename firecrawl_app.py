@@ -1209,7 +1209,7 @@ def index():
         return redirect(url_for('select_pack'))
     identity = active_industry_identity()
     if (
-        not identity.get('show_spatiotemporal_map', True)
+        not identity.get('show_spatiotemporal_map', False)
         and request.args.get('home_view') == 'map'
     ):
         return redirect(url_for('index', home_view='dashboard'))

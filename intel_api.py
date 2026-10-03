@@ -893,6 +893,70 @@ def industry_pack_draft(pack_id: str):
         return _error(str(exc), 400, request_id=request_id)
 
 
+@intel_bp.route("/industry-packs/<pack_id>/import-markdown", methods=["POST"])
+@admin_required
+def import_industry_pack_markdown(pack_id: str):
+    """从 markdown 配置文件导入信源/关键词/主题到行业包草稿。
+
+    提交方式二选一：
+      · multipart/form-data：字段 file（.md 文件），可选 apply / replace_sources；
+      · application/json：{"text": "...", "apply": false, "replace_sources": false}
+    apply=False（默认）只返回解析预览，不改动草稿；apply=True 合并进草稿并保存。
+    """
+    from industry_pack_markdown import merge_into_pack, parse_industry_pack_markdown
+
+    request_id = _request_id()
+    try:
+        normalized_id = _managed_industry_pack_id(pack_id)
+        upload = request.files.get("file")
+        data = request.get_json(silent=True) or {}
+        if upload is not None:
+            text = upload.read().decode("utf-8", "replace")
+            form = request.form or {}
+            apply_now = str(form.get("apply") or "").strip().lower() in ("1", "true", "yes", "on")
+            replace_sources = str(form.get("replace_sources") or "").strip().lower() in ("1", "true", "yes", "on")
+        else:
+            text = str(data.get("text") or "")
+            apply_now = bool(data.get("apply"))
+            replace_sources = bool(data.get("replace_sources"))
+        if not text.strip():
+            raise ValueError("未收到 markdown 内容（file 或 text 均为空）")
+
+        parsed = parse_industry_pack_markdown(text)
+        payload = {
+            "success": True,
+            "request_id": request_id,
+            "industry_pack_id": normalized_id,
+            "counts": parsed["counts"],
+            "warnings": parsed["warnings"],
+            "parsed": {k: v for k, v in parsed.items() if k not in ("counts", "warnings")},
+            "applied": False,
+        }
+        if apply_now:
+            draft = industry_pack_admin_service.get_or_create_draft(
+                normalized_id, actor=_admin_actor()
+            )
+            merged = merge_into_pack(
+                draft.get("manifest") or {}, parsed, replace_sources=replace_sources
+            )
+            saved = industry_pack_admin_service.save_draft(
+                normalized_id,
+                merged,
+                expected_revision=int(draft.get("revision") or 1),
+                actor=_admin_actor(),
+            )
+            payload["applied"] = True
+            payload["draft"] = saved
+            payload["diff"] = industry_pack_admin_service.diff(
+                normalized_id, saved["manifest"]
+            )
+        return jsonify(payload)
+    except (IndustryPackError, ValueError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception as exc:
+        return _error(f"markdown 导入失败: {exc}", 500, request_id=request_id)
+
+
 @intel_bp.route("/industry-packs/<pack_id>/draft/validate", methods=["POST"])
 @admin_required
 def validate_industry_pack_draft(pack_id: str):
@@ -1053,6 +1117,82 @@ def activate_pack_version(pack_id: str):
         return jsonify({"success": True, "request_id": request_id, "active_version_id": version_id})
     except Exception as exc:
         return _error(str(exc)[:200], 500, request_id=request_id)
+
+
+# ── 注意力方向（周报「下周关注」→ 追踪关键词 → 动态主题）─────────────────
+# 关键词跟随周报动态变化：每周周报生成后自动解析「下周关注」，抽出追踪词落库，
+# 并建一张动态主题卡「上周追踪」把命中文章挂上去（主题只有一张、跨周复用）。
+# 这里提供面板读取、手动重跑、手动收口三个接口。
+
+
+@intel_bp.route("/industry-packs/<pack_id>/attention", methods=["GET"])
+@admin_required
+def industry_pack_attention(pack_id: str):
+    """面板数据：本周追踪主题 + 各条线索的追踪词与命中数。"""
+    request_id = _request_id()
+    try:
+        normalized_id = _managed_industry_pack_id(pack_id)
+        from pack_attention import list_directions, summary_for_pack
+        return jsonify({
+            "success": True,
+            "request_id": request_id,
+            "summary": summary_for_pack(normalized_id),
+            "directions": list_directions(normalized_id),
+        })
+    except (IndustryPackError, ValueError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("注意力方向加载失败", 500, request_id=request_id)
+
+
+@intel_bp.route("/industry-packs/<pack_id>/attention/sync", methods=["POST"])
+@admin_required
+def sync_industry_pack_attention(pack_id: str):
+    """手动重跑：从指定（默认最近一份）周报重新解析「下周关注」并刷新追踪项/动态主题。"""
+    request_id = _request_id()
+    try:
+        normalized_id = _managed_industry_pack_id(pack_id)
+        data = request.get_json(silent=True) or {}
+        report_id = coerce_int(data.get("report_id"), 0, 1)
+        if not report_id:
+            from pack_report import list_pack_reports
+            reports = list_pack_reports(normalized_id, limit=1)
+            if not reports:
+                raise ValueError("该行业包还没有周报，先在「信源管理 → AI 周报」生成一份")
+            report_id = int(reports[0]["id"])
+        from pack_attention import sync_from_report
+        result = sync_from_report(normalized_id, int(report_id))
+        return jsonify({"success": True, "request_id": request_id, "result": result})
+    except (IndustryPackError, ValueError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception as exc:
+        return _error("注意力方向同步失败：%s" % str(exc)[:200], 500, request_id=request_id)
+
+
+@intel_bp.route("/industry-packs/<pack_id>/attention/close", methods=["POST"])
+@admin_required
+def close_industry_pack_attention(pack_id: str):
+    """收口线索：传 direction_id 收口单条；不传则收口该包当前全部 active 线索。"""
+    request_id = _request_id()
+    try:
+        normalized_id = _managed_industry_pack_id(pack_id)
+        data = request.get_json(silent=True) or {}
+        direction_id = coerce_int(data.get("direction_id"), 0, 1)
+        from pack_attention import close_direction, list_directions
+        if direction_id:
+            changed = close_direction(normalized_id, int(direction_id))
+            if not changed:
+                raise ValueError("线索不存在或已收口")
+            return jsonify({"success": True, "request_id": request_id, "closed": 1})
+        closed = 0
+        for row in list_directions(normalized_id):
+            if str(row.get("status")) == "active":
+                closed += 1 if close_direction(normalized_id, int(row["id"])) else 0
+        return jsonify({"success": True, "request_id": request_id, "closed": closed})
+    except (IndustryPackError, ValueError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("注意力方向收口失败", 500, request_id=request_id)
 
 
 # ── 主题搜索词测试 ──────────────────────────────────────────────
@@ -3647,13 +3787,58 @@ def list_intel_sources():
         return _error("市场资讯来源查询失败", 500, request_id=request_id)
 
 
+def check_rss_source(url: str, *, limit: int = 5) -> dict:
+    """抓取并校验一个 RSS 订阅 URL（走生产 RSS 链路）。
+
+    返回 dict：{'ok': bool, 'empty': bool, 'entry_count': int, 'message': str, ...}
+    · ok=False 表示不可用（HTTP/Content-Type/XML 不合规），message 说明原因；
+    · ok=True 且 empty=True 表示订阅可访问但是空 feed（没有任何 item）。
+    不抛异常，便于接口与测试复用。
+    """
+    from intel_light_scanner import RSSScanner
+    from rss_feed_contract import RSSFeedContractError, parse_rss_feed
+
+    try:
+        response = RSSScanner().http_client.get(
+            str(url),
+            headers={"Accept": "application/rss+xml, application/xml, text/xml"},
+        )
+        items = parse_rss_feed(response, limit=limit)
+    except RSSFeedContractError as exc:
+        return {"ok": False, "empty": False, "entry_count": 0, "message": f"RSS 不可用：{exc}"}
+    except Exception as exc:
+        return {
+            "ok": False, "empty": False, "entry_count": 0,
+            "message": f"RSS 抓取失败：{str(exc)[:160]}",
+        }
+
+    content_type = str(getattr(response, "content_type", "") or "")
+    bytes_len = len(bytes(getattr(response, "content", b"") or b""))
+    if not items:
+        return {
+            "ok": True, "empty": True, "entry_count": 0,
+            "content_type": content_type, "bytes": bytes_len,
+            "message": "RSS 可访问且是合法 XML，但当前不含任何条目（该订阅很可能已停更/为空 feed），抓不到内容请改用网站类型或换源。",
+        }
+    first = items[0] or {}
+    return {
+        "ok": True, "empty": False, "entry_count": len(items),
+        "content_type": content_type, "bytes": bytes_len,
+        "sample_title": first.get("title") or "",
+        "sample_url": first.get("url") or "",
+        "published_at": first.get("published_at") or "",
+        "message": f"RSS 校验通过：返回 {len(items)} 条，最新「{first.get('published_at') or '未知时间'}」。",
+    }
+
+
 @intel_bp.route("/sources/check-learn", methods=["POST"])
 @login_required
 def source_check_learn():
-    """阶段4：信源「检查」一键学习 —— 输 URL 自动抓列表页、选样例、学模板、存模型。
+    """信源「检查」：按来源类型分流，避免对 RSS 跑网站结构学习。
 
-    成功：{success, site_key, sample_count, title_avg_len, samples}
-    失败（结构不支持/抓取失败/SSRF）：4xx {success:false, message}
+    · source_type=rss：走生产 RSS 链路抓取 + rss_feed_contract 校验，
+      返回条目数/最新时间/样例；feed 可访问但没有条目时给出明确提示（而不是报"结构不支持"）。
+    · website / list_page：仍执行一键学习（抓列表页→选样例→学模板→存模型）。
     """
     request_id = _request_id()
     try:
@@ -3661,10 +3846,41 @@ def source_check_learn():
         url = str(data.get("url") or "").strip()
         if not url:
             raise ValueError("url 不能为空")
+        kind = str(data.get("source_type") or "").strip().lower()
+        if kind not in ("rss", "website", "list_page"):
+            lowered = url.lower()
+            looks_rss = (
+                lowered.endswith((".xml", ".rss", ".atom"))
+                or "/rss" in lowered
+                or "feed" in lowered
+            )
+            kind = "rss" if looks_rss else "website"
+
+        if kind == "rss":
+            result = check_rss_source(url)
+            if not result.get("ok"):
+                return _error(result.get("message") or "RSS 不可用", 400, request_id=request_id)
+            return jsonify(
+                {
+                    "success": True,
+                    "request_id": request_id,
+                    "kind": "rss",
+                    "empty": bool(result.get("empty")),
+                    "entry_count": int(result.get("entry_count") or 0),
+                    "content_type": result.get("content_type", ""),
+                    "bytes": result.get("bytes", 0),
+                    "sample_title": result.get("sample_title", ""),
+                    "sample_url": result.get("sample_url", ""),
+                    "published_at": result.get("published_at", ""),
+                    "message": result.get("message", ""),
+                }
+            )
+
         from sqlite_database import sqlite_db
         from site_scraper_models import learn_site_model
+
         result = learn_site_model(sqlite_db, url)
-        return jsonify({"success": True, "request_id": request_id, **result})
+        return jsonify({"success": True, "request_id": request_id, "kind": "site", **result})
     except ValueError as exc:
         return _error(str(exc), 400, request_id=request_id)
     except Exception as exc:

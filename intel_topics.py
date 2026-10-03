@@ -19,6 +19,7 @@ from intel_classifier import (
 )
 from intel_contracts import parse_time_range, utc_text
 from intel_database import ARTICLE_TIME_SQL
+from pack_attention import WATCH_ASSIGNMENT_METHOD
 from sqlite_database import sqlite_db
 from utils import coerce_int
 
@@ -280,9 +281,13 @@ class IntelTopicService:
                         # 先清除该文章在其它主题的关联，确保只在最优主题出现。
                         # 手工发文/编辑写入的 manual 关联保留：topic_cluster 不得清除
                         # 编辑者显式指定的主题归属（否则手动文章每次重建后从主题卡消失）。
+                        # watch_keyword 关联同样保留：周报「下周关注」生成的「本周盯防」主题
+                        # 是叠加层（一篇文章可以既属于领域主题、又被本周盯防盯上），
+                        # 聚类不得把它从盯防卡里抹掉。
                         cursor.execute(
-                            "DELETE FROM intel_topic_articles WHERE article_id=? AND assignment_method!='manual'",
-                            (int(article["article_id"]),),
+                            "DELETE FROM intel_topic_articles WHERE article_id=? "
+                            "AND assignment_method NOT IN ('manual', ?)",
+                            (int(article["article_id"]), WATCH_ASSIGNMENT_METHOD),
                         )
                         evidence = {
                             "keywords": keyword_hits,

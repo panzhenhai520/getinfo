@@ -199,6 +199,10 @@ def publish_manual_article(db, draft_id: int, *, created_by: str = "") -> Dict:
 
     title = str(draft.get("title") or "").strip()
     url = str(draft.get("url") or "").strip() or f"manual://{draft_id}"
+    # 编辑者常从浏览器直接复制链接，可能带上界面语言参数（如 x.com/…?lang=zh），
+    # 与爬虫入库闸门保持一致：这里也剥掉，避免同一文章因语言参数重复。
+    from utils import strip_url_presentation_params
+    url = strip_url_presentation_params(url)
     domain = (urlparse(url).hostname or "manual").casefold()
     now = _now_str()
     today = now[:10]

@@ -1712,7 +1712,8 @@ def login_pack_user_endpoint():
     data = request.json or {}
     try:
         r = begin_login(str(data.get('username') or '').strip(), str(data.get('password') or ''),
-                        str(data.get('email') or '').strip())
+                        str(data.get('email') or '').strip(),
+                        str(data.get('industry_pack_id') or '').strip())
         return jsonify({'success': True, **r})
     except Exception as exc:
         return jsonify({'success': False, 'message': str(exc)[:200]}), 400
@@ -1724,7 +1725,8 @@ def login_pack_user_verify():
     from pack_tenant import verify_email_code
     data = request.json or {}
     try:
-        r = verify_email_code(str(data.get('username') or '').strip(), str(data.get('code') or '').strip())
+        r = verify_email_code(str(data.get('username') or '').strip(), str(data.get('code') or '').strip(),
+                              str(data.get('industry_pack_id') or '').strip())
         return jsonify({'success': True, **r})
     except Exception as exc:
         return jsonify({'success': False, 'message': str(exc)[:200]}), 400
@@ -1740,6 +1742,7 @@ def login_pack_user_change_password():
             str(data.get('username') or '').strip(),
             str(data.get('old_password') or ''),
             str(data.get('new_password') or ''),
+            str(data.get('industry_pack_id') or '').strip(),
         )
         return jsonify({'success': True, **r})
     except Exception as exc:

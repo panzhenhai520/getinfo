@@ -769,7 +769,7 @@ def _synthesize_chat_history(cleaned: list[dict], pack_context: str = '') -> dic
 def mapindex_page():
     identity = active_industry_identity()
     if (
-        not identity.get('show_spatiotemporal_map', True)
+        not identity.get('show_spatiotemporal_map', False)
         and request.args.get('home_view') == 'map'
     ):
         return redirect(url_for('mapindex.mapindex_page', home_view='dashboard'))

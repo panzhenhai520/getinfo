@@ -553,9 +553,6 @@ class IndustryPackAdminService:
                 "tie_break_order": ["trend", "event", "other"],
             },
             "serpapi_queries": [],
-            # 首页默认走【主题卡 Dashboard】而不是时空地图。
-            # 否则新建行业包（未设该字段）激活后，用户登录看到的是一张与深色皮肤不匹配的地图页 ✗
-            "show_spatiotemporal_map": False,
             # 聚合调度（仅 admin 可改）：默认低频 —— 定点聚合、不做持续高频派发。
             # allow_continuous_dispatch=False 时由 worker 只按 daily_times 派发；
             # 搜索完成后 / 信源同步后 / 页面手动 这三类事件触发不受影响（避免 URL 积压不抓）。
@@ -590,7 +587,9 @@ class IndustryPackAdminService:
                 "show_financial_news": True,
                 "show_market_index_cards": False,
                 "show_watched_stock_cards": False,
-                "show_spatiotemporal_map": True,
+                # 首页默认走【主题卡 Dashboard】而不是时空地图：新建行业包激活后
+                # 直接进入资讯流首页；需要地图的包在管理页显式勾选（写 true）。
+                "show_spatiotemporal_map": False,
             },
             "ragflow_policy": {
                 "upload_crawled_articles": False,

@@ -148,28 +148,78 @@
 
 <script>
 const PACK = '{{ active_industry_pack.id }}' || '';
-let currentReportId = null, currentReportTitle = '', currentReportMarkdown = '';
+let currentReportId = null, currentReportTitle = '', currentReportMarkdown = '', currentReport = null;
+const REPORTS = {};
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-// 分享当前周报：优先系统分享面板，其次剪贴板，最后弹出手动复制（与文章分享一致）
+function markShareDone(btn,text){
+  if(!btn) return;
+  const old = btn.innerHTML;
+  btn.innerHTML = `<i class="fa fa-check"></i> ${text || '已复制'}`;
+  setTimeout(() => { btn.innerHTML = old; }, 2000);
+}
+// 复制文本：优先 Clipboard API，失败退回 execCommand（微信内置浏览器兼容）
+async function copyText(text){
+  try { if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); return true; } } catch(error){}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy'); document.body.removeChild(ta); return ok;
+  } catch(error){ return false; }
+}
+// 分享当前周报：优先系统分享面板（Safari「分享 → 微信」）；
+// 微信内置浏览器不支持 navigator.share，改为弹面板：复制链接 + 二维码，长按保存后发群/朋友圈
 async function shareCurrentReport(btn){
   const id = currentReportId;
-  if(!id) return;
+  if(!id){ alert('请先选择一份报告'); return; }
   const url = location.origin + '/share/report/' + id;
   const shareTitle = currentReportTitle || document.title;
-  const markDone = (text) => {
-    if(!btn) return;
-    const old = btn.innerHTML;
-    btn.innerHTML = `<i class="fa fa-check"></i> ${text || '已复制'}`;
-    setTimeout(() => { btn.innerHTML = old; }, 2000);
-  };
-  if(navigator.share){
-    try { await navigator.share({ title: shareTitle, text: shareTitle, url }); markDone('已唤起分享'); return; }
+  const inWeChat = /MicroMessenger/i.test(navigator.userAgent);
+  if(!inWeChat && navigator.share){
+    try { await navigator.share({ title: shareTitle, text: shareTitle, url }); markShareDone(btn,'已唤起分享'); return; }
     catch(error){ if(error && error.name === 'AbortError') return; }
   }
-  try {
-    if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(url); markDone('已复制'); return; }
-  } catch(error) {}
-  prompt('复制以下链接分享到微信：', url);
+  if(await copyText(url) && !inWeChat){ markShareDone(btn,'链接已复制'); }
+  openSharePanel(url, inWeChat);
+}
+function openSharePanel(url, inWeChat){
+  const old = document.getElementById('reportSharePanel'); if(old) old.remove();
+  const box = document.createElement('div');
+  box.id = 'reportSharePanel';
+  box.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;padding:0';
+  box.innerHTML =
+    '<div style="background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:18px 18px 24px;box-sizing:border-box">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+    +   '<strong style="font-size:16px;color:#111827">分享这份周报</strong>'
+    +   '<button type="button" id="sharePanelClose" style="border:0;background:transparent;font-size:18px;color:#94a3b8;cursor:pointer"><i class="fa fa-times"></i></button>'
+    + '</div>'
+    + '<p id="sharePanelTip" style="font-size:12px;color:#6b7280;margin:8px 0 12px"></p>'
+    + '<div style="display:flex;gap:8px;align-items:center">'
+    +   '<input id="sharePanelUrl" readonly value="' + esc(url) + '" style="flex:1;min-width:0;font-size:12px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:8px;color:#334155;background:#f8fafc">'
+    +   '<button type="button" class="btn" id="sharePanelCopy"><i class="fa fa-copy"></i> 复制链接</button>'
+    + '</div>'
+    + '<div style="text-align:center;margin-top:14px">'
+    +   '<img src="/share/report/' + encodeURIComponent(currentReportId) + '/qr.png" alt="周报二维码" style="width:170px;height:170px;display:block;margin:0 auto;border:1px solid #eef2f5;border-radius:10px">'
+    +   '<p style="font-size:12px;color:#6b7280;margin-top:8px">长按二维码保存到相册，或直接把链接粘贴到微信发送</p>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(box);
+  const tip = box.querySelector('#sharePanelTip');
+  tip.textContent = inWeChat
+    ? '微信里请点右上角「…」→ 转发给朋友 / 分享到朋友圈；也可复制链接粘贴发送'
+    : '发给微信好友：复制链接后粘贴，或长按下方二维码保存';
+  const close = () => box.remove();
+  box.querySelector('#sharePanelClose').onclick = close;
+  box.addEventListener('click', e => { if(e.target === box) close(); });
+  box.querySelector('#sharePanelCopy').onclick = async (e) => {
+    const btn = e.currentTarget;
+    const ok = await copyText(url);
+    if(!ok) { const input = box.querySelector('#sharePanelUrl'); input.focus(); input.select(); }
+    btn.innerHTML = ok ? '<i class="fa fa-check"></i> 已复制' : '<i class="fa fa-copy"></i> 请长按选择';
+    setTimeout(() => { btn.innerHTML = '<i class="fa fa-copy"></i> 复制链接'; }, 2000);
+  };
+  const input = box.querySelector('#sharePanelUrl');
+  input.addEventListener('click', () => input.select());
 }
 // 选择引用到AI助手：把周报正文带回首页并拉起AI助手对话窗
 function quoteReportToAssistant(){
@@ -198,11 +248,32 @@ function pvMeta(r){
   parts.push(r.article_count?('覆盖 '+r.article_count+' 篇文章'):'');
   return parts.filter(Boolean).join(' · ');
 }
+// 取报告正文：手机网络抖动时单次 fetch 很容易直接失败，这里最多重试 3 次（400ms/800ms 退避）
+async function fetchReportMarkdown(id){
+  const url = '/api/pack-reports/' + encodeURIComponent(id) + '/markdown?industry_pack_id=' + encodeURIComponent(PACK);
+  let lastError = null;
+  for(let i = 0; i < 3; i++){
+    try{
+      const resp = await fetch(url, {cache:'no-store'});
+      if(resp.ok) return await resp.text();
+      const err = new Error('服务返回 ' + resp.status);
+      // 4xx（除超时/限流）是确定性错误，重试无意义
+      if(resp.status >= 400 && resp.status < 500 && resp.status !== 408 && resp.status !== 429) throw Object.assign(err, {fatal:true});
+      lastError = err;
+    }catch(e){
+      if(e && e.fatal) throw e;
+      lastError = e;
+    }
+    if(i < 2) await new Promise(r => setTimeout(r, 400 * (i + 1)));
+  }
+  throw lastError || new Error('网络异常');
+}
 async function selectReport(r){
   const prev=document.querySelector('.report-item.active'); if(prev)prev.classList.remove('active');
   const el=document.getElementById('ri-'+r.id); if(el)el.classList.add('active');
   currentReportId = r.id;
   currentReportTitle = r.title||'报告';
+  currentReport = r;
   document.getElementById('pvTitle').textContent=currentReportTitle;
   document.getElementById('pvSub').textContent=pvMeta(r);
   // 手机：进入详情视图（隐藏列表，避免同一屏标题出现两次）
@@ -212,9 +283,7 @@ async function selectReport(r){
   }
   const body=document.getElementById('pvBody');  body.innerHTML='<div class="empty"><i class="fa fa-spinner fa-spin"></i>加载中…</div>';
   try{
-    const resp=await fetch('/api/pack-reports/'+encodeURIComponent(r.id)+'/markdown?industry_pack_id='+encodeURIComponent(PACK),{cache:'no-store'});
-    if(!resp.ok){ body.innerHTML='<div class="empty"><i class="fa fa-file-lines"></i>报告内容加载失败</div>'; return; }
-    const txt=await resp.text();
+    const txt = await fetchReportMarkdown(r.id);
     // 面板头部与左侧列表已各展示一次报告标题；正文首个 H1 与标题重复，剔除后再渲染
     let clean=txt;
     clean=clean.replace(/^\s*#\s+[^\n]*\n?/, '');
@@ -225,8 +294,17 @@ async function selectReport(r){
     if(typeof marked!=='undefined'){ marked.setOptions({breaks:true,gfm:true}); html=marked.parse(clean); }
     else html='<pre style="white-space:pre-wrap">'+esc(clean)+'</pre>';
     body.innerHTML='<div class="md-preview">'+html+'</div>';
-  }catch(e){ body.innerHTML='<div class="empty"><i class="fa fa-file-lines"></i>预览加载失败</div>'; }
+  }catch(e){
+    // 失败时给出原因和重试入口（手机上列表已隐藏，不能让用户卡死在这一屏）
+    body.innerHTML='<div class="empty"><i class="fa fa-triangle-exclamation"></i>预览加载失败'
+      +'<p style="font-size:12px;margin-top:8px;color:#94a3b8">'+esc((e&&e.message)||'网络异常')+'</p>'
+      +'<p style="margin-top:16px"><button type="button" class="btn" onclick="retryCurrentReport()"><i class="fa fa-rotate-right"></i> 重试</button>'
+      +' <button type="button" class="btn" onclick="backToReportList()">返回列表</button></p></div>';
+  }
 }
+function retryCurrentReport(){ if(currentReport) selectReport(currentReport); }
+// 列表点击入口：只传 id，报告对象从 REPORTS 取，避免把 JSON 塞进 onclick 属性（标题含引号会破坏内联脚本）
+function selectReportById(id){ const r = REPORTS[id]; if(r) selectReport(r); }
 (async function load(){
   try{
     const d=await api('/api/pack-reports?industry_pack_id='+encodeURIComponent(PACK));
@@ -237,8 +315,9 @@ async function selectReport(r){
       return;
     }
     document.getElementById('reportsList').innerHTML=reps.map(r=>{
+      REPORTS[r.id]=r;
       const srcBadge = r.source==='test' ? '<span class="badge test">测试</span>' : '<span class="badge scheduled">定期</span>';
-      return '<div class="report-item" id="ri-'+r.id+'" onclick="selectReport('+JSON.stringify(r).replace(/"/g,'&quot;')+')">'
+      return '<div class="report-item" id="ri-'+r.id+'" onclick="selectReportById('+r.id+')">'
         +'<div style="flex:1"><div class="title">'+esc(r.title)+'</div><div class="meta"><span>'+esc(r.time_start||'')+' ~ '+esc(r.time_end||'')+'</span>'
         +'<span>生成 '+esc(r.generated_at||'')+'</span>'
         +'<span>'+(r.article_count||0)+' 篇</span>'

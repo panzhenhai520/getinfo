@@ -42,7 +42,10 @@ def _included(path: Path) -> bool:
     name = path.name
     if name in EXCLUDED_NAMES:
         return False
-    if name.startswith("_askpass") or name.startswith("_prod_") or name.startswith("_host_compose"):
+    # 仓库根目录下以 _ 开头的都是本机临时件（_server_main.py、_tmp_*.py、_prod_src/、截图/dump 等），
+    # 与 deploy-to-prod.ps1「根目录只打包非 _ 开头的顶层条目」对齐；
+    # 子目录里的 _dashboard_nav.html 不受影响。
+    if relative.parts and relative.parts[0].startswith("_"):
         return False
     if name == ".env" or name.startswith(".env."):
         return False

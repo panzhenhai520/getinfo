@@ -694,8 +694,21 @@ document.addEventListener('DOMContentLoaded', function(){
               <button class="action" type="button" onclick="validateDraft()">验证全部配置</button>
               <button class="action" type="button" onclick="saveDraft()">保存草稿</button>
               <button class="action" type="button" onclick="publishDraft()">发布新版本</button>
+              <button class="action" type="button" onclick="openMarkdownImport()">导入markdown信源文件</button>
+              <input id="markdownFileInput" type="file" accept=".md,.markdown,.txt,text/markdown" class="hidden" onchange="handleMarkdownFile(this)">
               <button id="switchButton" class="action hidden" type="button" onclick="switchPack()">激活此行业包</button>
               <button id="deleteButton" class="action hidden" type="button" onclick="openDeleteDialog()">删除行业包</button>
+            </div>
+            <div id="markdownImportPanel" class="hidden" style="margin-top:10px;padding:12px 14px;border:1px solid var(--admin-line);border-radius:8px;background:#fff">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+                <b style="font-size:13px">Markdown 信源配置导入</b>
+                <button class="action" type="button" onclick="closeMarkdownImport()">关闭</button>
+              </div>
+              <div id="markdownImportBody" class="muted" style="margin-top:8px;font-size:13px;line-height:1.7">请选择 .md 文件。</div>
+              <div style="margin-top:10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <label style="font-size:12px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="mdReplaceSources"> 整体替换信源（不勾选则与现有信源合并去重）</label>
+                <button class="action" type="button" id="mdApplyBtn" onclick="applyMarkdownImport()" disabled>合并到草稿</button>
+              </div>
             </div>
             <div id="switchWindow" class="switch-window hidden" aria-label="激活与初始化采集">
               <p class="field-note"><b>激活此行业包</b>会依次完成：把本包信源落地到运行时并建立「信源↔行业包」关联 → 提交一次初始化采集 → 该包从此真正可采集。<br>
@@ -717,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <button class="tab-button active" type="button" role="tab" data-tab="overview" onclick="setTab('overview')">基础设置</button>
           <button class="tab-button" type="button" role="tab" data-tab="keywords" onclick="setTab('keywords')">关键词门控</button>
           <button class="tab-button" type="button" role="tab" data-tab="topics" onclick="setTab('topics')">内部主题</button>
+          <button class="tab-button" type="button" role="tab" data-tab="attention" onclick="setTab('attention')">注意力方向</button>
           <button class="tab-button" type="button" role="tab" data-tab="sources" onclick="setTab('sources')">来源管理</button>
           <button class="tab-button" type="button" role="tab" data-tab="releases" onclick="setTab('releases')">版本与生命周期</button>
           <button class="tab-button" type="button" role="tab" data-tab="remote" onclick="setTab('remote')">分布式服务设置</button>
@@ -814,6 +828,18 @@ document.addEventListener('DOMContentLoaded', function(){
           <div class="keyword-note" style="margin:0 0 12px"><div class="help-rule"><b>主题级搜索词打通规则：</b>① 搜索词里的实词，要同步放进「关键词门控 → 核心/扩展关键词」门禁，否则搜到也会被拦掉；② 这里填了搜索词的主题，每天搜索时按日期轮转、每轮取 3 条，留空则该主题只靠信源自然采集。</div></div>
           <div class="topic-head"><span class="topic-head-help">主题 key<button type="button" class="help-tip" onclick="showKeywordHelp(event,'topicKey')" aria-label="查看说明">?</button></span><span>显示名称</span><span class="topic-head-help">归属关键词<button type="button" class="help-tip" onclick="showKeywordHelp(event,'topicKeywords')" aria-label="查看说明">?</button></span><span class="topic-head-help">发现搜索词<button type="button" class="help-tip" onclick="showKeywordHelp(event,'topicSearchQuery')" aria-label="查看说明">?</button></span><span>操作</span></div>
           <div id="topics"></div>
+        </section>
+
+        <section class="tab-panel" data-panel="attention">
+          <div class="section-head">
+            <div><h3>注意力方向</h3><p>由周报「下周关注」自动生成：周报出完后把它列出的线索抽成追踪关键词，在首页建一张动态主题卡「上周追踪」（只有一张、每周覆盖），并把这些词放进搜索采集主动搜；下一份周报生成时自动收口上一周并结算命中数。</p></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="action secondary" type="button" onclick="syncAttention()">从最近周报重新抽取</button>
+              <button class="action secondary" type="button" onclick="closeAllAttention()">全部收口</button>
+            </div>
+          </div>
+          <div class="keyword-note" style="margin:0 0 12px"><div class="help-rule" id="attentionSummary">选择行业包后显示当前追踪情况。</div></div>
+          <div id="attentionDirections" class="release-body muted">正在加载…</div>
         </section>
 
         <section class="tab-panel" data-panel="sources">
@@ -1143,6 +1169,107 @@ function setTab(name) {
     window.scrollTo(0, 0);
   } catch (_) { /* 滚动失败不影响切换 */ }
   if (name === 'remote') loadRemoteConfig();
+  if (name === 'attention') loadAttention();
+}
+
+// ── 注意力方向（周报「下周关注」→ 追踪关键词 → 动态主题）──
+// 每周周报出完后自动生成，这里只做展示与手动重跑/收口。
+async function loadAttention(){
+  const box = document.getElementById('attentionDirections');
+  if(!box) return;
+  if(!selected){ box.textContent = '请先选择一个行业包。'; return; }
+  box.textContent = '正在加载…';
+  try{
+    const r = await fetch('/api/intel/industry-packs/'+encodeURIComponent(selected)+'/attention', {cache:'no-store'});
+    const d = await r.json();
+    if(!d.success) throw new Error(d.error || '加载失败');
+    renderAttention(d);
+  }catch(e){
+    box.textContent = '加载失败：' + (e.message || e);
+  }
+}
+function renderAttention(d){
+  const box = document.getElementById('attentionDirections');
+  const summary = document.getElementById('attentionSummary');
+  const s = d.summary || {};
+  const rows = d.directions || [];
+  if(summary){
+    summary.textContent = s.week_key
+      ? ('当前追踪：' + s.topic_name + '（' + s.active_count + ' 条线索，命中合计 ' + s.total_hits
+         + ' 篇）｜动态主题 key：' + s.topic_key + '（首页主题卡会自动出现这张）')
+      : '还没有追踪线索：先生成一份周报，周报「下周关注」里列的线索会自动变成追踪词并建动态主题。';
+  }
+  if(!rows.length){ box.innerHTML = '<div class="muted">暂无注意力方向。</div>'; return; }
+  box.innerHTML = rows.map(row => {
+    const keywords = (row.keywords || []).map(k =>
+      '<span style="display:inline-block;background:#eef2f5;border:1px solid #dbe5e7;border-radius:999px;'
+      + 'padding:1px 9px;font-size:12px;margin:0 6px 6px 0">' + esc(k) + '</span>').join('');
+    const active = String(row.status) === 'active';
+    return '<div style="border-top:1px solid var(--dashboard-line);padding:10px 0">'
+      + '<div style="display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap">'
+      +   '<strong>' + esc(row.direction) + '</strong>'
+      +   '<span class="muted" style="font-size:12px">' + esc(row.week_label || row.week_key) + ' · 命中 '
+      +     Number(row.hit_count || 0) + ' 篇 · ' + (active
+              ? '<span style="color:#0f766e;font-weight:600">追踪中</span>'
+              : '<span style="color:#94a3b8">已收口</span>') + '</span>'
+      + '</div>'
+      + (row.reason ? '<div class="muted" style="font-size:12px;margin:4px 0">' + esc(row.reason) + '</div>' : '')
+      + '<div style="margin:6px 0 0">' + (keywords || '<span class="muted" style="font-size:12px">未抽出追踪词</span>') + '</div>'
+      + (active
+          ? '<div style="margin-top:6px"><button class="action secondary" type="button" onclick="closeAttention('
+            + Number(row.id) + ')">收口这条</button></div>'
+          : '')
+      + '</div>';
+  }).join('');
+}
+async function syncAttention(){
+  if(!selected) return;
+  setStatus('正在从最近一份周报重新抽取追踪关键词…');
+  try{
+    const r = await fetch('/api/intel/industry-packs/'+encodeURIComponent(selected)+'/attention/sync',
+                          {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+    const d = await r.json();
+    if(!d.success) throw new Error(d.error || '同步失败');
+    const result = d.result || {};
+    if(result.topic){
+      setStatus('已更新：' + (result.week_label || result.week_key || '') + ' 共 '
+                + ((result.directions || []).length) + ' 条线索，动态主题「' + result.topic.name
+                + '」挂 ' + result.topic.article_count + ' 篇');
+    } else {
+      setStatus('未更新：' + (result.reason || '没有可解析的「下周关注」'), true);
+    }
+    loadAttention();
+  }catch(e){
+    setStatus('同步失败：' + (e.message || e), true);
+  }
+}
+async function closeAttention(id){
+  if(!selected || !id) return;
+  try{
+    const r = await fetch('/api/intel/industry-packs/'+encodeURIComponent(selected)+'/attention/close',
+                          {method:'POST', headers:{'Content-Type':'application/json'},
+                           body: JSON.stringify({direction_id: Number(id)})});
+    const d = await r.json();
+    if(!d.success) throw new Error(d.error || '收口失败');
+    setStatus('已收口 1 条线索');
+    loadAttention();
+  }catch(e){
+    setStatus('收口失败：' + (e.message || e), true);
+  }
+}
+async function closeAllAttention(){
+  if(!selected) return;
+  if(!confirm('收口该行业包当前全部「追踪中」线索？（已收口的线索仍保留在列表里便于回看）')) return;
+  try{
+    const r = await fetch('/api/intel/industry-packs/'+encodeURIComponent(selected)+'/attention/close',
+                          {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+    const d = await r.json();
+    if(!d.success) throw new Error(d.error || '收口失败');
+    setStatus('已收口 ' + Number(d.closed || 0) + ' 条线索');
+    loadAttention();
+  }catch(e){
+    setStatus('收口失败：' + (e.message || e), true);
+  }
 }
 
 // ── 分布式服务设置 ──
@@ -1306,7 +1433,7 @@ function sourceRow(source = {}) {
     <label class="source-enabled" title="是否启用"><input data-key="is_enabled" aria-label="启用来源" type="checkbox" ${source.is_enabled === false ? '' : 'checked'}></label>
     <span class="source-validation" title="${esc(source.error || statusLabel)}"><span class="status-chip ${statusClass}">${esc(statusLabel)}</span></span>
     <div class="source-actions">
-      <button class="icon-button source-learn-button" type="button" aria-label="检查学习" title="检查学习：自动抓取列表页、挑选样例并学习标题/链接提取模板，之后爬取该站自动应用">
+      <button class="icon-button source-learn-button" type="button" aria-label="检查信源" title="检查信源：RSS 类型抓取并校验订阅条目；网站/列表页类型自动抓列表页、学习标题/链接提取模板并在爬取时应用">
         <i class="fa fa-flask"></i>
       </button>
       <button class="icon-button source-smart-button" type="button" aria-label="智能探测替代 URL" aria-describedby="sourceSmartTooltip" title="${sourceSmartTooltipText}" data-tooltip="${sourceSmartTooltipText}" ${smartRepairStatuses.has(status) ? '' : 'hidden'}>
@@ -1348,13 +1475,14 @@ function addSource(source = {}) {
   var sc=$('sources'); if(sc && sc.lastElementChild){ try{ sc.lastElementChild.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(e){} }
 }
 
-// ── 阶段4：信源「检查」一键学习（自动抓取→选样例→学模板→存储；爬取时自动应用）──
+// ── 信源「检查」：RSS 走订阅校验；网站/列表页走一键学习（抓列表页→选样例→学模板→存储）──
 async function learnSourceTemplate(row) {
   const button = row.querySelector('.source-learn-button');
   const name = row.querySelector('[data-key="name"]').value.trim() || '未命名信源';
   const url = row.querySelector('[data-key="url"]').value.trim();
+  const sourceType = (row.querySelector('[data-key="source_type"]').value || 'website').toLowerCase();
   if (!/^https?:\/\//i.test(url)) {
-    setStatus('检查学习需要有效的 http(s) URL，请先填写来源 URL。');
+    setStatus('检查需要有效的 http(s) URL，请先填写来源 URL。', true);
     return;
   }
   if (button) { button.disabled = true; button.classList.add('is-busy'); }
@@ -1362,11 +1490,19 @@ async function learnSourceTemplate(row) {
     const payload = await api('/api/intel/sources/check-learn', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({url}),
+      body: JSON.stringify({url, source_type: sourceType}),
     });
+    if (payload.kind === 'rss') {
+      if (payload.empty) {
+        setStatus(`「${name}」RSS 检查：可访问（${payload.content_type || '未知类型'}，${payload.bytes || 0} 字节），但没有任何条目 — 该订阅很可能已停更，请换源或改用「网站」类型。`, true);
+      } else {
+        setStatus(`「${name}」RSS 检查通过：返回 ${payload.entry_count} 条，最新「${payload.published_at || '未知时间'}」，样例《${payload.sample_title || ''}》。`);
+      }
+      return;
+    }
     setStatus(`「${name}」检查学习完成：自动学到 ${payload.sample_count} 条标题/链接模板（标题平均 ${payload.title_avg_len} 字），此后爬取该站将自动应用模型提取。`);
   } catch (error) {
-    setStatus(`「${name}」检查学习失败：${error.message}`);
+    setStatus(`「${name}」检查失败：${error.message}`, true);
   } finally {
     if (button) { button.disabled = false; button.classList.remove('is-busy'); }
   }
@@ -2445,6 +2581,106 @@ async function selectPack(id) {
     setStatus(error.message, true);
   } finally {
     $('packLoading').classList.add('hidden');
+  }
+}
+
+// ---- Markdown 信源配置导入（信源 / 关键词 / 主题）----
+let markdownImportText = '';
+
+const MD_COUNT_LABELS = [
+  ['core_keywords', '核心关键词'], ['expanded_keywords', '扩展关键词'],
+  ['trend_keywords', '趋势关键词'], ['event_keywords', '事件关键词'],
+  ['anchor_keywords', '锚点/备案机构'], ['brands', '重点品牌'],
+  ['trend_topics', '趋势主题'], ['serpapi_queries', '搜索发现查询'],
+  ['fixed_topics', '内部主题标签'], ['default_sources', '信源'],
+];
+
+function openMarkdownImport() {
+  const input = $('markdownFileInput');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+function closeMarkdownImport() {
+  const panel = $('markdownImportPanel');
+  if (panel) panel.classList.add('hidden');
+  markdownImportText = '';
+  const btn = $('mdApplyBtn');
+  if (btn) btn.disabled = true;
+}
+
+function readMarkdownFile(file) {
+  if (file && typeof file.text === 'function') return file.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('读取失败'));
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+async function handleMarkdownFile(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const panel = $('markdownImportPanel');
+  const body = $('markdownImportBody');
+  const btn = $('mdApplyBtn');
+  if (panel) panel.classList.remove('hidden');
+  if (btn) btn.disabled = true;
+  body.textContent = '正在解析 ' + file.name + ' …';
+  try {
+    markdownImportText = await readMarkdownFile(file);
+  } catch (error) {
+    body.textContent = '读取文件失败：' + error.message;
+    return;
+  }
+  try {
+    const payload = await api(`/api/intel/industry-packs/${selected}/import-markdown`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: markdownImportText}),
+    });
+    const counts = payload.counts || {};
+    const warnings = payload.warnings || [];
+    const summary = MD_COUNT_LABELS
+      .map(([key, label]) => `${esc(label)} <b>${Number(counts[key] || 0)}</b>`)
+      .join(' · ');
+    let html = `<div>已解析 <b>${esc(file.name)}</b>：${summary}</div>`;
+    if (warnings.length) {
+      html += `<div style="color:#b45309;margin-top:6px">提示：${esc(warnings.join('；'))}</div>`;
+    }
+    const usable = Number(counts.default_sources || 0) + Number(counts.core_keywords || 0) + Number(counts.fixed_topics || 0);
+    if (!usable) {
+      html += '<div style="color:#b91c1c;margin-top:6px">未解析到关键词、主题或信源，请检查文件是否包含「一、关键词门控 / 二、内部主题标签 / 三、来源管理」结构。</div>';
+    } else {
+      html += '<div class="muted" style="margin-top:6px">确认无误后点「合并到草稿」，再按需「保存草稿」或「发布新版本」。</div>';
+      if (btn) btn.disabled = false;
+    }
+    body.innerHTML = html;
+  } catch (error) {
+    body.textContent = '解析失败：' + error.message;
+  }
+}
+
+async function applyMarkdownImport() {
+  if (!markdownImportText) return;
+  const replaceSources = Boolean($('mdReplaceSources') && $('mdReplaceSources').checked);
+  const btn = $('mdApplyBtn');
+  if (btn) btn.disabled = true;
+  setStatus('正在把 markdown 合并到草稿…');
+  try {
+    const payload = await api(`/api/intel/industry-packs/${selected}/import-markdown`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({text: markdownImportText, apply: true, replace_sources: replaceSources}),
+    });
+    renderDraft(payload);
+    const counts = payload.counts || {};
+    setStatus(`已合并到草稿：信源 ${Number(counts.default_sources || 0)}、锚点/备案机构 ${Number(counts.anchor_keywords || 0)}、内部主题 ${Number(counts.fixed_topics || 0)}、搜索词 ${Number(counts.serpapi_queries || 0)}。请检查后保存草稿或发布新版本。`);
+    await loadCards();
+  } catch (error) {
+    setStatus(`合并失败：${error.message}`, true);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

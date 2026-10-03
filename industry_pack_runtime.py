@@ -133,7 +133,8 @@ def _identity_from_pack(pack_id: str) -> dict:
         "name": str(pack.get("name") or pack_id),
         "pack_version": str(pack.get("pack_version") or ""),
         "activation_id": "",
-        "show_spatiotemporal_map": bool(capabilities.get("show_spatiotemporal_map", True)),
+        # 与 industry_packs.DASHBOARD_CAPABILITY_DEFAULTS 一致：缺省不开时空信息图
+        "show_spatiotemporal_map": bool(capabilities.get("show_spatiotemporal_map", False)),
     }
 
 
@@ -176,7 +177,7 @@ def active_industry_identity() -> dict:
             "pack_version": str(primary.get("pack_version") or ""),
             "activation_id": str(snapshot.get("active_industry_activation_id") or ""),
             "show_spatiotemporal_map": bool(
-                capabilities.get("show_spatiotemporal_map", True)
+                capabilities.get("show_spatiotemporal_map", False)
             ),
         }
     except Exception:
@@ -189,7 +190,7 @@ def active_industry_identity() -> dict:
                 "pack_version": str(pack.get("pack_version") or ""),
                 "activation_id": "",
                 "show_spatiotemporal_map": bool(
-                    capabilities.get("show_spatiotemporal_map", True)
+                    capabilities.get("show_spatiotemporal_map", False)
                 ),
             }
         except Exception:

@@ -622,7 +622,7 @@ def get_spacetime_points():
             activation_id = str(_sp_identity.get('activation_id') or '')
             _sp_pack_name = str(_sp_identity.get('name') or industry_pack_id)
             _sp_pack_version = str(_sp_identity.get('pack_version') or '')
-            _sp_map_enabled = bool(_sp_identity.get('show_spatiotemporal_map', True))
+            _sp_map_enabled = bool(_sp_identity.get('show_spatiotemporal_map', False))
         except Exception:
             active = active_industry_composition_service.snapshot()
             industry_pack_id = str(active['active_industry_pack_id'])
