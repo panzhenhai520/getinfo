@@ -41,6 +41,31 @@ def _digest(value) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def _stream_text_pieces(text: str, *, chunk_size: int = 96):
+    source = str(text or "")
+    if not source:
+        return
+    for block in source.splitlines(keepends=True):
+        if not block:
+            continue
+        pieces = []
+        start = 0
+        for index, char in enumerate(block):
+            if char in "。！？!?；;\n" and index + 1 - start >= 24:
+                pieces.append(block[start:index + 1])
+                start = index + 1
+        if start < len(block):
+            rest = block[start:]
+            while len(rest) > chunk_size:
+                pieces.append(rest[:chunk_size])
+                rest = rest[chunk_size:]
+            if rest:
+                pieces.append(rest)
+        for piece in pieces:
+            if piece:
+                yield piece
+
+
 @dataclass
 class QaStageFailure(RuntimeError):
     public_error: QaPublicError
@@ -217,13 +242,16 @@ class QaOrchestrator:
                         )
                 if stage == "synthesis" and str(output.get("answer") or "") and not context.get("_answer_delta_streamed"):
                     answer = str(output.get("answer") or "")
-                    for offset in range(0, len(answer), 240):
+                    offset = 0
+                    for piece in _stream_text_pieces(answer):
                         self._emit(
                             run_id,
                             "answer_delta",
                             stage,
-                            {"delta": answer[offset:offset + 240], "offset": offset},
+                            {"delta": piece, "offset": offset, "source": "synthesis_fallback"},
                         )
+                        offset += len(piece)
+                        time.sleep(0.025)
             except QaStageFailure as exc:
                 public = exc.public_error
                 if exc.degradable and stage in DEGRADABLE_STAGES and run.get("mode") != "fast":

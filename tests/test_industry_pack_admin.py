@@ -76,6 +76,7 @@ class IndustryPackAdminServiceTest(unittest.TestCase):
             created["manifest"]["ragflow_policy"],
             {
                 "upload_crawled_articles": False,
+                "qa_retrieval_enabled": False,
                 "knowledge_base_key": "news",
             },
         )

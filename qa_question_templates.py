@@ -52,7 +52,7 @@ def render_question_plan_answer(plan: Mapping) -> str:
             "overlap": "交集问题",
             "conflict": "冲突核验问题",
         }.get(str(plan.get("relationship") or ""), "相关问题")
-    lines = ["【问题分析思路：】"]
+    lines = ["【问题分析思路】"]
     if count <= 1:
         subquestions = [item for item in plan.get("subquestions") or [] if isinstance(item, Mapping)]
         first = str(subquestions[0].get("text") or "").strip() if subquestions else ""

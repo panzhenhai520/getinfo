@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Mapping
 
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_level1_result, validate_level2_result
@@ -108,6 +109,71 @@ def _dedupe_evidence(items: list[dict], limit: int) -> list[dict]:
         if len(result) >= limit:
             break
     return result
+
+
+def _filter_rag_evidence_relevance(
+    question: str,
+    evidence: list[Mapping],
+    *,
+    plan: Mapping | None = None,
+    limit: int | None = None,
+) -> tuple[list[dict], dict]:
+    # 通用相关性闸门：交给 qa_relevance 的严格判定——标题命中问题实词，
+    # 或正文前若干字符内多次命中；付费墙/免责声明这类噪声片段直接丢弃。
+    # 服务器原实现是"命中>=2个词，或命中1个词且相似度>=0.25"，判据偏松：
+    # 长文档正文里偶然提到一次、或命中一个泛词就会被当成相关证据带进证据包。
+    accepted, audit = filter_relevant_evidence(
+        question,
+        [dict(item) for item in evidence or []],
+        plan=plan,
+    )
+    if not (audit.get("terms") or []):
+        # 问题里抽不出实词时不做过滤，与原实现 not_applicable 行为一致
+        kept = [dict(item) for item in evidence[: limit or len(evidence)]]
+        return kept, {"generic_relevance_filter": "not_applicable", "terms": []}
+    accepted.sort(
+        key=lambda item: (
+            len(item.get("relevance_hits") or []),
+            float(item.get("score") or 0),
+            int(item.get("authority_level") or 1),
+        ),
+        reverse=True,
+    )
+    cap = limit if limit is not None else len(accepted)
+    return accepted[:cap], {
+        "generic_relevance_filter": "applied",
+        "terms": list(audit.get("terms") or [])[:20],
+        "excluded_irrelevant": list(audit.get("excluded") or [])[:50],
+        "kept": len(accepted),
+        "reason": str(audit.get("reason") or ""),
+    }
+
+
+def _gate_rag_evidence(
+    question: str,
+    evidence: list[Mapping],
+    *,
+    plan: Mapping | None = None,
+    limit: int | None = None,
+) -> tuple[list[dict], dict]:
+    policy_filtered, policy_audit = filter_and_rank_policy_evidence(
+        question,
+        evidence,
+        plan=plan,
+        limit=limit,
+    )
+    if policy_audit.get("policy_filter") == "applied":
+        return policy_filtered, {
+            "policy": policy_audit,
+            "generic_relevance": {"generic_relevance_filter": "skipped_policy_filter_applied"},
+        }
+    generic_filtered, generic_audit = _filter_rag_evidence_relevance(
+        question,
+        policy_filtered,
+        plan=plan,
+        limit=limit,
+    )
+    return generic_filtered, {"policy": policy_audit, "generic_relevance": generic_audit}
 
 
 def _evidence_anchored_level1_fallback(message: str, evidence: list[dict], queries: list[str]) -> dict:
@@ -535,6 +601,14 @@ def build_qa_stage_handlers(
         client = ragflow_client_factory(policy)
         return policy, client, QaRagflowResearchService(client)
 
+    def _kb_not_configured(context) -> bool:
+        """本包有没有可用知识库：没配就根本不要碰 RAGFlow（连熔断状态都不动）。"""
+        try:
+            policy = policy_resolver.resolve(str(context["run"].get("industry_pack_id") or ""))
+        except Exception:
+            return True
+        return not (str(policy.ragflow_kb_id or "").strip() and str(policy.ragflow_app_id or "").strip())
+
     def level2_retrieval(context):
         run = context["run"]
         plan_output = context["outputs"]["plan"]
@@ -548,7 +622,11 @@ def build_qa_stage_handlers(
             }
         flags = feature_flags.snapshot()
         if not flags.get("level2_enabled"):
+            # 开关关掉 = 只走一级（平台文章库）检索，连 RAGFlow 都不调用
             return _rag_retrieval_fallback(level1, "enhancement_disabled")
+        if _kb_not_configured(context):
+            # 没配知识库同样只走一级；不算故障，也不动 ragflow 熔断计数
+            return _rag_retrieval_fallback(level1, "kb_not_configured")
         try:
             resilience.circuit_before("ragflow")
             policy, client, service = _research_service(context)
@@ -581,12 +659,24 @@ def build_qa_stage_handlers(
             if cached is not None:
                 cached["health"] = health
                 cached["cache"] = {"hit": True, "kb_version": kb_version}
-                cached["rag_mode"] = "RAG增强检索" if cached.get("evidence") else "RAG检索"
-                cached["enhanced"] = bool(cached.get("evidence"))
+                gated_evidence, gate_audit = _gate_rag_evidence(
+                    _planned_question(context),
+                    list(cached.get("evidence") or []),
+                    plan=plan_output,
+                    limit=policy.max_evidence,
+                )
+                cached["evidence"] = gated_evidence
+                cached["excluded"] = {**dict(cached.get("excluded") or {}), "retrieval_gate": gate_audit}
+                cached["stats"] = {**dict(cached.get("stats") or {}), "adopted": len(gated_evidence)}
+                if not gated_evidence:
+                    resilience.circuit_success("ragflow")
+                    return _rag_retrieval_fallback(level1, "enhancement_no_relevant_evidence")
+                cached["rag_mode"] = "RAG增强检索"
+                cached["enhanced"] = True
                 if callable(emit_stage_event):
                     emit_stage_event("stage_progress", {
-                        "message": f"命中RAG增强检索缓存，已取得 {len(cached.get('evidence') or [])} 条增强证据。",
-                        "evidence": list(cached.get("evidence") or [])[:6],
+                        "message": f"命中RAG增强检索缓存，已通过相关性过滤保留 {len(gated_evidence)} 条增强证据。",
+                        "evidence": gated_evidence[:6],
                     })
                 resilience.circuit_success("ragflow")
                 return cached
@@ -604,40 +694,19 @@ def build_qa_stage_handlers(
                 database,
                 kb_id=str(policy.ragflow_kb_id or ""),
             )
-            filtered_evidence, policy_audit = filter_and_rank_policy_evidence(
+            filtered_evidence, gate_audit = _gate_rag_evidence(
                 _planned_question(context),
                 list(result.get("evidence") or []),
                 plan=plan_output,
                 limit=policy.max_evidence,
             )
-            # 二级相关性闸门（qa_relevance）：知识库里没有这条问题的答案时，知识库照样会返回
-            # "看起来最像"的片段（实测会把付费墙样板文字/别的行业的片段当成证据引用）。
-            # 这种情况宁可整批丢掉二级证据、只用一级（平台文章库）证据，也不能带偏答案。
-            filtered_evidence, relevance_audit = filter_relevant_evidence(
-                _planned_question(context),
-                filtered_evidence,
-                plan=plan_output,
-            )
             result["evidence"] = filtered_evidence
-            result["excluded"] = {
-                **dict(result.get("excluded") or {}),
-                "policy": policy_audit,
-                "relevance": relevance_audit,
-            }
+            result["excluded"] = {**dict(result.get("excluded") or {}), "retrieval_gate": gate_audit}
             result["stats"] = {**dict(result.get("stats") or {}), "adopted": len(filtered_evidence)}
             result["health"] = health
-            if not filtered_evidence:
-                # 二级无相关证据：退回一级证据继续，不算失败（可用 QA_LEVEL2_MIN_TERM_HITS /
-                # QA_LEVEL2_MIN_SCORE 调松紧）
-                if callable(emit_stage_event):
-                    emit_stage_event("stage_progress", {
-                        "message": "知识库里没有与本次问题相关的片段，本次只用平台文章库证据。",
-                        "relevance": relevance_audit,
-                    })
-                return _rag_retrieval_fallback(level1, relevance_audit.get("reason") or "level2_no_relevant_evidence")
             result["cache"] = {"hit": False, "kb_version": kb_version}
-            result["rag_mode"] = "RAG增强检索" if result.get("evidence") else "RAG检索"
-            result["enhanced"] = bool(result.get("evidence"))
+            result["rag_mode"] = "RAG增强检索" if filtered_evidence else "RAG检索"
+            result["enhanced"] = bool(filtered_evidence)
             if callable(emit_stage_event):
                 emit_stage_event("stage_progress", {
                     "message": f"RAG增强检索已取得 {len(filtered_evidence)} 条证据，正在进入交叉核验。",
@@ -649,6 +718,8 @@ def build_qa_stage_handlers(
                 int(kb_status.get("total") or 0) == 0 or int(kb_status.get("parsing") or 0) > 0
             ):
                 return _rag_retrieval_fallback(level1, "enhancement_kb_empty_or_parsing")
+            if not result.get("evidence"):
+                return _rag_retrieval_fallback(level1, "enhancement_no_relevant_evidence")
             resilience.cache_put(
                 cache_key, result, namespace="level2_retrieval",
                 pack_id=str(run.get("industry_pack_id") or ""), kb_version=kb_version,

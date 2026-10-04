@@ -37,6 +37,7 @@
   },
   "ragflow_policy": {
     "upload_crawled_articles": true,
+    "qa_retrieval_enabled": true,
     "knowledge_base_key": "news"
   },
   "core_keywords": [

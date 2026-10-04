@@ -17,6 +17,7 @@ from urllib.parse import urlparse, urlsplit, urlunsplit
 import config
 from intel_contracts import DEFAULT_INDUSTRY_PACK_ID, INTERNAL_CATEGORIES
 from source_authority import SourceAuthorityError, normalize_manifest_source
+from ragflow_kb_registry import normalize_kb_key
 
 try:
     from opencc import OpenCC
@@ -76,7 +77,6 @@ DASHBOARD_CAPABILITY_DEFAULTS = {
 }
 DASHBOARD_CAPABILITY_FIELDS = tuple(DASHBOARD_CAPABILITY_DEFAULTS)
 SHARED_FINANCIAL_PACK_ID = "financial_markets"
-RAGFLOW_KNOWLEDGE_BASE_KEYS = {"news"}
 
 
 class IndustryPackError(ValueError):
@@ -257,7 +257,9 @@ def _validate_ragflow_policy(pack: Dict) -> None:
         policy = {}
     if not isinstance(policy, dict):
         raise IndustryPackError("ragflow_policy must be an object")
-    unknown = sorted(set(policy) - {"upload_crawled_articles", "knowledge_base_key"})
+    unknown = sorted(
+        set(policy) - {"upload_crawled_articles", "knowledge_base_key", "qa_retrieval_enabled"}
+    )
     if unknown:
         raise IndustryPackError(
             "ragflow_policy contains unsupported fields: " + ", ".join(unknown)
@@ -267,14 +269,21 @@ def _validate_ragflow_policy(pack: Dict) -> None:
         raise IndustryPackError(
             "ragflow_policy.upload_crawled_articles must be boolean"
         )
-    knowledge_base_key = str(policy.get("knowledge_base_key") or "news").strip()
-    if knowledge_base_key not in RAGFLOW_KNOWLEDGE_BASE_KEYS:
+    qa_retrieval_enabled = policy.get("qa_retrieval_enabled", False)
+    if not isinstance(qa_retrieval_enabled, bool):
         raise IndustryPackError(
-            "ragflow_policy.knowledge_base_key currently only supports news"
+            "ragflow_policy.qa_retrieval_enabled must be boolean"
         )
+    try:
+        knowledge_base_key = normalize_kb_key(str(policy.get("knowledge_base_key") or "news"))
+    except ValueError as exc:
+        raise IndustryPackError(
+            "ragflow_policy.knowledge_base_key must match ^[a-z0-9][a-z0-9_-]{0,63}$"
+        ) from exc
     pack["ragflow_policy"] = {
         "upload_crawled_articles": enabled,
         "knowledge_base_key": knowledge_base_key,
+        "qa_retrieval_enabled": qa_retrieval_enabled,
     }
 
 
@@ -470,6 +479,30 @@ class IndustryPackLoader:
             raise IndustryPackError("industry pack path escapes config directory")
         return path
 
+    def _merge_seed_runtime_defaults(self, pack_id: str, raw: Dict) -> Dict:
+        """已发布 manifest 里缺新开关时，用种子包补默认值。
+
+        已发布的内容永远优先，这里只避免"老版本的 family_office 包在管理员重新发布前，
+        把新引入的问答增强检索开关悄悄变成关闭"。
+        """
+
+        result = copy.deepcopy(raw)
+        policy = result.get("ragflow_policy")
+        if not isinstance(policy, dict) or "qa_retrieval_enabled" in policy:
+            return result
+        try:
+            with open(self._path_for_id(pack_id), "r", encoding="utf-8") as handle:
+                seed = json.load(handle)
+        except (OSError, json.JSONDecodeError, IndustryPackError):
+            return result
+        seed_policy = seed.get("ragflow_policy")
+        if not isinstance(seed_policy, dict) or "qa_retrieval_enabled" not in seed_policy:
+            return result
+        policy = dict(policy)
+        policy["qa_retrieval_enabled"] = bool(seed_policy.get("qa_retrieval_enabled"))
+        result["ragflow_policy"] = policy
+        return result
+
     def has_seed_pack(self, pack_id: str) -> bool:
         """Return whether an installation-owned manifest exists for this ID."""
 
@@ -501,7 +534,12 @@ class IndustryPackLoader:
         published = self._published_manifest(pack_id) if use_published else None
         if published:
             raw, digest = published
-            cache_token = ("published", str(digest))
+            raw = self._merge_seed_runtime_defaults(pack_id, raw)
+            cache_token = (
+                "published",
+                str(digest),
+                json.dumps(raw.get("ragflow_policy") or {}, sort_keys=True),
+            )
             with self._lock:
                 cached = self._cache.get(pack_id)
                 if cached and cached[0] == cache_token:

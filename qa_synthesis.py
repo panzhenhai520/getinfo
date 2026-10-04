@@ -633,7 +633,7 @@ def _question_plan_intro(question: str) -> str:
     categories = [item for item in plan.get("主题聚类") or [] if isinstance(item, Mapping)]
     outline = [str(item) for item in (plan.get("动态回答模板") or plan.get("回答大纲") or []) if str(item).strip()]
     strategy = _public_text(plan.get("回答策略") or "")
-    lines = ["【问题分析思路：】"]
+    lines = ["【问题分析思路】"]
     if count <= 1:
         first = str(subquestions[0].get("text") or "").strip() if subquestions else ""
         lines.append(f"- 已识别为 1 个单一问题{f'：{first}' if first else ''}。")
@@ -666,7 +666,7 @@ def _question_plan_intro(question: str) -> str:
 def _prepend_question_plan_intro(answer: str, question: str) -> str:
     intro = _question_plan_intro(question)
     text = str(answer or "").strip()
-    if not intro or text.startswith("【问题分析思路：】") or text.startswith("问题拆解与回答计划："):
+    if not intro or text.startswith("【问题分析思路】") or text.startswith("【问题分析思路：】") or text.startswith("问题拆解与回答计划："):
         return text
     return intro + "\n\n" + text
 
@@ -1075,14 +1075,26 @@ class QaFinalSynthesizer:
         if token_callback:
             raw_parts = []
             answer_delta = _JsonAnswerDeltaExtractor()
+            streamed_buffer = []
+            structured_answer_stream = False
             for content in _stream_openai_json_content(profile, messages, timeout=90):
                 raw_parts.append(content)
                 delta = answer_delta.feed(content)
                 if delta:
-                    token_callback(delta)
+                    streamed_buffer.append(delta)
+                    probe = "".join(streamed_buffer).lstrip()
+                    if probe.startswith(("{", "[")):
+                        structured_answer_stream = True
+                    if not structured_answer_stream:
+                        token_callback(delta)
             tail = answer_delta.flush()
             if tail:
-                token_callback(tail)
+                streamed_buffer.append(tail)
+                probe = "".join(streamed_buffer).lstrip()
+                if probe.startswith(("{", "[")):
+                    structured_answer_stream = True
+                if not structured_answer_stream:
+                    token_callback(tail)
             raw = "".join(raw_parts)
         else:
             raw = self.model_client(profile, messages, timeout=90)

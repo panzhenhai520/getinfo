@@ -149,7 +149,8 @@
       "required": ["upload_crawled_articles", "knowledge_base_key"],
       "properties": {
         "upload_crawled_articles": {"type": "boolean"},
-        "knowledge_base_key": {"type": "string", "enum": ["news"]}
+        "qa_retrieval_enabled": {"type": "boolean"},
+        "knowledge_base_key": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"}
       },
       "additionalProperties": false
     }

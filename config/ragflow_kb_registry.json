@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "default_key": "news",
+  "knowledge_bases": {
+    "news": {
+      "label": "新闻与行业资料知识库",
+      "enabled": true,
+      "kb_id": "",
+      "legacy_config_field": "ragflow_kb_id",
+      "env": ["RAGFLOW_KB_ID", "FINANCIAL_RAGFLOW_KB_ID"],
+      "purposes": ["article_upload", "qa_retrieval"],
+      "allowed_pack_ids": ["*"],
+      "allow_requested_kb_id": true
+    }
+  }
+}

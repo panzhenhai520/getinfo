@@ -8,6 +8,9 @@ import os
 from dataclasses import asdict, dataclass
 from typing import Callable, Mapping
 
+from industry_packs import industry_pack_loader
+from ragflow_kb_registry import resolve_ragflow_kb_id
+
 
 @dataclass(frozen=True)
 class QaPolicy:
@@ -57,7 +60,18 @@ class QaPolicyResolver:
         if not pack_id:
             raise QaPolicyError("industry_pack_id is required")
         runtime = self._runtime(pack_id)
-        kb_id = str(runtime.get("ragflow_kb_id") or os.getenv("RAGFLOW_KB_ID", "")).strip()
+        try:
+            pack = industry_pack_loader.load(pack_id)
+            ragflow_policy = dict(pack.get("ragflow_policy") or {})
+        except Exception:
+            ragflow_policy = {}
+        kb_key = str(ragflow_policy.get("knowledge_base_key") or "news").strip()
+        kb_id = resolve_ragflow_kb_id(
+            kb_key,
+            industry_pack_id=pack_id,
+            purpose="qa_retrieval",
+            runtime_kb_id=str(runtime.get("ragflow_kb_id") or "").strip(),
+        )
         app_id = str(runtime.get("ragflow_app_id") or os.getenv("RAGFLOW_LLM_APP_ID", "")).strip()
         return QaPolicy(
             industry_pack_id=pack_id,
@@ -88,7 +102,7 @@ class QaPolicyResolver:
         if not policy.ragflow_app_id:
             missing.append("ragflow_app_id")
         if missing:
-            raise QaPolicyError("二级研究配置缺失: " + ", ".join(missing))
+            raise QaPolicyError("增强检索配置缺失: " + ", ".join(missing))
         return policy
 
 

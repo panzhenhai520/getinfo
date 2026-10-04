@@ -27,6 +27,16 @@ _STOP_TERMS = {
     "相关", "方面", "主要", "目前", "现在", "以及", "还有", "这个", "那个", "哪些方面",
 }
 _SPLIT = re.compile(r"[^\w\u4e00-\u9fff]+")
+# 中文没有空格：计划里抽不出实体时（问的是本包词表以外的东西），整句会被当成一个超长
+# "词"而被丢掉，闸门等于没开——实测量子计算的问题会把家族办公室的片段按 0.55 的相似度
+# 全放进来。所以这种情况下退化成"按字切 n 元组"当实词用。
+_CJK_RUN = re.compile(r"[\u4e00-\u9fff]{2,}")
+# n 元组里出现这些字，说明它多半是虚词组合（"有哪些""最近的"），不能当实词
+_FUNCTION_CHARS = set(
+    "的了是有在和与及或吗呢吧啊哪什么怎样为何如此这那我你他她它们就都也还要会能可以"
+    "对把被给让从到向于而并且但只更最很太再又已将该等一二三不没无个些种次年月日时点分"
+    "多几来去上下里外中前后"
+)
 # 知识库片段里的噪声标记：命中这些说明片段不是正文（付费墙说明、导航、页脚等）
 _NOISE_MARKERS = (
     "请务必在总结开头增加这段话", "本文由第三方AI", "不代表", "推荐点击链接阅读原文",
@@ -86,7 +96,22 @@ def strong_similarity() -> float:
     return max(0.0, _env_float("QA_LEVEL2_STRONG_SCORE", 0.85))
 
 
-def question_terms(question: str, plan: Mapping | None = None) -> set:
+def _cjk_ngrams(text: str, sizes: tuple = (2, 3)) -> set:
+    """按字切 n 元组当实词（只在抽不到实体时兜底用）。"""
+    terms = set()
+    for run in _CJK_RUN.findall(str(text or "")):
+        for size in sizes:
+            for index in range(0, len(run) - size + 1):
+                gram = run[index:index + size]
+                if any(char in _FUNCTION_CHARS for char in gram):
+                    continue
+                if gram in _STOP_TERMS:
+                    continue
+                terms.add(gram)
+    return terms
+
+
+def question_terms(question: str, plan: Mapping | None = None, *, allow_ngram_fallback: bool = True) -> set:
     """从问题 + 计划里抽"实词"：计划里的实体优先。
 
     注意两点经验：
@@ -94,6 +119,8 @@ def question_terms(question: str, plan: Mapping | None = None) -> set:
       会回显这句话，导致"每条都命中"——所以整句只在很短（<=8 字）时才当词用，
       中文实词主要来自计划里的 entities / queries。
     * 结果里不包含停用词与单字（单字命中太泛，等于没过滤）。
+    * 计划里一个实词都抽不到时（问的是本包词表以外的东西），退回按字切 n 元组；
+      这种词可信度低，调用方应把命中门槛抬高（见 filter_relevant_evidence）。
     """
     terms = set()
 
@@ -117,6 +144,8 @@ def question_terms(question: str, plan: Mapping | None = None) -> set:
     for token in _SPLIT.split(str(question or "")):
         if len(token) <= 8:
             add(token)
+    if not terms and allow_ngram_fallback:
+        terms |= _cjk_ngrams(question)
     return terms
 
 
@@ -133,13 +162,16 @@ def _item_text(item: Mapping) -> str:
     return normalize_intel_text(" ".join(parts))
 
 
-def evidence_hits(terms: Iterable[str], item: Mapping) -> list:
+def evidence_hits(terms: Iterable[str], item: Mapping, *, title_only: bool = False) -> list:
     """该证据命中了哪些问题实词。
 
     标题命中即算；正文只在开头 lead_chars 内出现 >= min_term_occurrences 次才算，
     避免"相关阅读清单里提了一次"就被当成相关证据。
+    `title_only` 用于兜底 n 元组词（可信度低）：只认标题命中。
     """
     title = normalize_intel_text(str(item.get("title") or ""))
+    if title_only:
+        return [term for term in terms if term and term in title]
     lead = normalize_intel_text(str(item.get("content_excerpt") or "")[:lead_chars()])
     need = min_term_occurrences()
     hits = []
@@ -171,7 +203,11 @@ def filter_relevant_evidence(
 
     审计信息带 `kept` / `dropped` / `reason` / `terms`，便于排查"为什么这次没走二级"。
     """
-    terms = question_terms(question, plan)
+    plan_terms = question_terms(question, plan, allow_ngram_fallback=False)
+    terms = plan_terms or question_terms(question, plan)
+    # 兜底的 n 元组可信度低（"商业""订单"这种两字词在别的行业文章里也会出现），
+    # 只认标题命中；计划给的是本包实体，正文前段多次命中也算。
+    title_only = not plan_terms
     need_hits = min_term_hits() if min_hits is None else max(1, int(min_hits))
     score_floor = min_similarity() if min_score is None else float(min_score)
     strong_floor = strong_similarity()
@@ -180,7 +216,7 @@ def filter_relevant_evidence(
     for raw in evidence or []:
         item = dict(raw)
         noise = _noise_reason(item)
-        hits = evidence_hits(terms, item)
+        hits = evidence_hits(terms, item, title_only=title_only)
         try:
             score = float(item.get("score") or 0.0)
         except (TypeError, ValueError):
@@ -203,12 +239,14 @@ def filter_relevant_evidence(
                         "reason": "no_question_term_overlap", "term_hits": hits, "score": score})
     audit = {
         "terms": sorted(terms)[:20],
+        "term_source": "plan" if plan_terms else "ngram_fallback",
         "min_term_hits": need_hits,
         "min_score": score_floor,
         "strong_score": strong_floor,
         "kept": len(kept),
         "dropped": len(dropped),
         "reason": "" if kept else "level2_no_relevant_evidence",
+        "excluded": dropped[:50],
         "samples": dropped[:5],
     }
     return kept, audit

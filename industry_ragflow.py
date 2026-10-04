@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Optional
 
 from industry_packs import IndustryPackLoader, industry_pack_loader
+from ragflow_kb_registry import resolve_ragflow_kb_id
 
 
 def industry_ragflow_policy(
@@ -43,18 +44,9 @@ def resolve_industry_ragflow_kb_id(
     )
     if not policy["upload_crawled_articles"]:
         return ""
-    if policy["knowledge_base_key"] != "news":
-        return ""
-    try:
-        from chat_api import _load_config
-
-        configured_news_id = str(_load_config().get("ragflow_kb_id") or "").strip()
-    except Exception:
-        configured_news_id = ""
-    if configured_news_id:
-        return configured_news_id
-    # Existing family-office schedules can still carry the concrete historical
-    # News KB id. New industry packs fail closed when News is not configured.
-    if policy["industry_pack_id"] == "family_office":
-        return str(requested_kb_id or "").strip()
-    return ""
+    return resolve_ragflow_kb_id(
+        policy["knowledge_base_key"],
+        industry_pack_id=policy["industry_pack_id"],
+        purpose="article_upload",
+        requested_kb_id=str(requested_kb_id or "").strip(),
+    )

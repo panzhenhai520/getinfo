@@ -75,5 +75,45 @@ class RelevanceFilterTest(unittest.TestCase):
         self.assertEqual(hits, [])
 
 
+class NgramFallbackTest(unittest.TestCase):
+    """计划里抽不出实体时（问的是本包词表以外的东西）的兜底判定。"""
+
+    def test_long_question_falls_back_to_cjk_ngrams(self):
+        terms = question_terms("量子计算芯片最近的商业化订单有哪些？", {"entities": [], "queries": []})
+        self.assertIn("量子", terms)
+        self.assertIn("芯片", terms)
+        # 虚词组合不能当实词
+        self.assertNotIn("哪些", terms)
+        self.assertNotIn("有哪", terms)
+
+    def test_fallback_is_title_only_so_other_industry_fragments_are_dropped(self):
+        # 实测数据：家族办公室知识库里按 0.54~0.58 相似度返回的跑偏片段
+        noise = [
+            _item("别让旧思维毁掉你的财富！高净值人群投资心智升级指南",
+                  "商业模式的讨论。家族财富管理与商业机会。" * 20, score=0.551),
+            _item("对谈单一家办总裁：科技新贵如何做家办？",
+                  "科技新贵的商业布局与家族传承。" * 20, score=0.577),
+        ]
+        kept, audit = filter_relevant_evidence("量子计算芯片最近的商业化订单有哪些？", noise,
+                                               plan={"entities": [], "queries": []})
+        self.assertEqual(kept, [])
+        self.assertEqual(audit["reason"], "level2_no_relevant_evidence")
+        self.assertEqual(audit["term_source"], "ngram_fallback")
+
+    def test_fallback_keeps_title_hit(self):
+        item = _item("量子计算芯片商业化订单落地", "该公司披露了首批订单。", score=0.6)
+        kept, audit = filter_relevant_evidence("量子计算芯片最近的商业化订单有哪些？", [item],
+                                               plan={"entities": [], "queries": []})
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(audit["reason"], "")
+
+    def test_plan_terms_keep_body_occurrence_rule(self):
+        # 计划给的是本包实体，正文前段多次命中也算（不要求标题命中）
+        item = _item("某行业观察", "具身智能落地加快。具身智能进入量产阶段。", score=0.4)
+        kept, _ = filter_relevant_evidence("具身智能最近的进展有哪些？", [item],
+                                           plan={"entities": ["具身智能"]})
+        self.assertEqual(len(kept), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

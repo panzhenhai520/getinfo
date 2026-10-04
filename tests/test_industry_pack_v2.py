@@ -111,6 +111,7 @@ class IndustryPackV2Test(unittest.TestCase):
             primary["ragflow_policy"],
             {
                 "upload_crawled_articles": True,
+                "qa_retrieval_enabled": True,
                 "knowledge_base_key": "news",
             },
         )
@@ -118,6 +119,7 @@ class IndustryPackV2Test(unittest.TestCase):
             loader.load("ai_news")["ragflow_policy"],
             {
                 "upload_crawled_articles": False,
+                "qa_retrieval_enabled": False,
                 "knowledge_base_key": "news",
             },
         )
