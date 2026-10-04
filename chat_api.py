@@ -2282,6 +2282,7 @@ def _legacy_request_via_unified_qa(data):
 
 
 @chat_bp.route('/api/chat/send', methods=['POST'])
+@login_required
 def send_chat_message():
     data = request.json or {}
     # 统一 QA 接管（AI 助手）：开启时所有问答都进入同一套「问题拆解 → 检索 → 综合」链路，

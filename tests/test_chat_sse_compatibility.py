@@ -56,6 +56,15 @@ class ChatSSECompatibilityTest(unittest.TestCase):
         semantic_patcher = patch.object(chat_api, "_semantic_would_run", return_value=False)
         semantic_patcher.start()
         self.addCleanup(semantic_patcher.stop)
+        # /api/chat/send 带 @login_required（统一 QA 网关按登录身份归属问答 run，
+        # 否则 /api/qa/v1/runs/<id>/cancel 会因归属不一致 404）：这里直接给一个管理员会话
+        auth_patcher = patch(
+            "decorators.user_db.verify_session",
+            return_value={"user_id": 1, "username": "tester", "role": "admin"},
+        )
+        auth_patcher.start()
+        self.addCleanup(auth_patcher.stop)
+        self.client.set_cookie("localhost", "session_token", "test-session-token")
         self.payload = {
             "model": "local",
             "topic": "general",
