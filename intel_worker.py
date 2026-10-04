@@ -141,7 +141,11 @@ class IntelWorker:
             "dynamic_convert": self._handle_dynamic_convert,
             "pack_report": self._handle_pack_report,
             "task_cleanup": self._handle_task_cleanup,
+            # 统一 QA（AI 助手）：网关把问答落成 qa.run 作业，worker 侧用 qa_runtime
+            # 惰性装配 orchestrator，在 web 请求之外跑「拆解→检索→综合」全链路。
+            "qa.run": self._handle_qa_run,
         }
+        self._context_handler_types.add("qa.run")
         _financial_enabled = bool(
             getattr(config, "FINANCIAL_INTELLIGENCE_ENABLED", False)
             or getattr(config, "TRADING_AGENTS_ENABLED", False)
@@ -885,6 +889,19 @@ class IntelWorker:
         """终态任务自动清理：删除保留期之前的 completed/failed/cancelled 任务与失效候选。"""
         from task_retention import cleanup_terminal_records
         return {"success": True, **cleanup_terminal_records(self.repository.db)}
+
+    def _handle_qa_run(self, payload: Dict, context) -> Dict:
+        """跑一次统一 QA：在 web 请求之外执行，并尊重作业租约的取消信号。"""
+        run_id = str((payload or {}).get("run_id") or "").strip()
+        if not run_id:
+            return {"success": False, "retryable": False, "error": "run_id is required"}
+        from qa_runtime import get_qa_orchestrator
+
+        cancel_event = getattr(context, "cancel_event", None)
+        return get_qa_orchestrator().execute(
+            run_id,
+            external_cancel=cancel_event.is_set if cancel_event is not None else None,
+        )
 
     def _handle_industry_revalidate(self, payload: Dict) -> Dict:
         """Re-run the new anchor gate and hide historic off-topic articles."""

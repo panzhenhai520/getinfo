@@ -1667,6 +1667,20 @@ def save_my_ai_settings():
                       llm_base_url=str(data.get('llm_base_url') or '').strip(),
                       llm_model=str(data.get('llm_model') or '').strip(),
                       llm_timeout=int(data.get('llm_timeout') or 0))
+    # 统一 QA（AI 助手）另有一套按 owner 隔离的设置存储，问答链路读的是它：
+    # 这里顺带写一份，失败不影响原有保存结果（旧链路仍用上面的 pack 用户设置）。
+    try:
+        from industry_pack_runtime import active_industry_identity
+        from qa_settings import QaSettingsService
+        from sqlite_database import sqlite_db
+
+        QaSettingsService(sqlite_db).save(
+            data,
+            owner_user_id=f"pack:{uid}",
+            industry_pack_id=str(active_industry_identity().get('id') or ''),
+        )
+    except Exception as _qa_exc:
+        print("⚠️ 统一 QA 设置保存失败（不影响本用户设置）: %s" % str(_qa_exc)[:200])
     return jsonify({'success': True})
 
 
@@ -2162,9 +2176,115 @@ def test_chat_connection():
 # ─────────────────────────────────────────────
 # POST /api/chat/send  (SSE 流式响应)
 # ─────────────────────────────────────────────
+def _unified_qa_available(data) -> bool:
+    """这次问答是否交给统一 QA 网关。
+
+    开关见 qa_flags（UNIFIED_QA_ENABLED / UNIFIED_QA_GETINFO_UI_ENABLED，默认都开）。
+    任何一步不可用（模块缺失、身份取不到、开关关闭）都返回 False，
+    由调用方回落到本文件原有的金融/通用链路——保证上线过程中问答不断。
+    """
+    try:
+        from qa_flags import QaFeatureFlags
+        from qa_gateway import _identity
+        from sqlite_database import sqlite_db
+
+        owner, authorized_pack = _identity()
+        requested = re.sub(r"[^A-Za-z0-9_-]", "", str((data or {}).get("industry_pack_id") or ""))[:80]
+        flags = QaFeatureFlags(sqlite_db).evaluate(
+            owner_user_id=owner,
+            industry_pack_id=authorized_pack or requested,
+            origin="getinfo_ui",
+        )
+        return bool(flags.get("allowed"))
+    except Exception as exc:
+        print("⚠️ 统一 QA 不可用，回落原有问答链路: %s" % str(exc)[:200])
+        return False
+
+
+def _legacy_request_via_unified_qa(data):
+    """旧前端请求 → 统一 QA 网关：只做协议适配，不直接调模型或检索。
+
+    QA 事件经 qa_event_to_legacy 转回旧 SSE 事件格式，所以现有前端不用改。
+    """
+    from qa_gateway import QaGatewayError, _identity, get_qa_gateway_service
+    from qa_legacy_adapter import legacy_request_to_qa, qa_event_to_legacy
+
+    owner, authorized_pack = _identity()
+    requested_pack = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("industry_pack_id") or ""))[:80]
+    if not authorized_pack and not requested_pack:
+        from industry_pack_runtime import active_industry_identity
+
+        requested_pack = str(active_industry_identity().get("id") or "")
+    payload = legacy_request_to_qa(data, industry_pack_id=authorized_pack or requested_pack)
+    service = get_qa_gateway_service()
+    try:
+        run, _created = service.create_run(
+            payload,
+            owner_user_id=owner,
+            authorized_pack_id=authorized_pack,
+            idempotency_key=str(request.headers.get("Idempotency-Key") or f"legacy-{uuid.uuid4().hex}"),
+            trusted_origin="getinfo_ui",
+        )
+    except QaGatewayError as exc:
+        error_message = str(exc)
+        error_code = str(exc.code)
+        error_status = int(getattr(exc, "status", 400) or 400)
+
+        def _error_stream():
+            yield f"data: {json.dumps({'type': 'error', 'message': error_message, 'code': error_code}, ensure_ascii=False, separators=(',', ':'))}\n\n"
+
+        return Response(
+            stream_with_context(_error_stream()),
+            status=error_status,
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @stream_with_context
+    def _stream():
+        cursor = 0
+        error_seen = False
+        done_seen = False
+        while True:
+            emitted = False
+            for qa_item in service.events(run["id"], owner_user_id=owner, after=cursor):
+                cursor = max(cursor, int(qa_item.get("event_id") or 0))
+                emitted = True
+                error_seen = error_seen or qa_item.get("type") == "error"
+                done_seen = done_seen or qa_item.get("type") == "done"
+                legacy_item = qa_event_to_legacy(qa_item)
+                yield f"data: {json.dumps(legacy_item, ensure_ascii=False, separators=(',', ':'))}\n\n"
+            current = service.get_run(run["id"], owner_user_id=owner)
+            if current and current.get("status") == "completed" and not done_seen:
+                final_answer = current.get("final_answer") or {}
+                fallback_done = {
+                    "type": "done",
+                    "run_id": run["id"],
+                    "event_id": cursor + 1,
+                    "stage": "completed",
+                    "payload": {"status": "completed", "final_answer": final_answer},
+                }
+                done_seen = True
+                yield f"data: {json.dumps(qa_event_to_legacy(fallback_done), ensure_ascii=False, separators=(',', ':'))}\n\n"
+            if error_seen or (current and current.get("status") in {"completed", "failed", "cancelled"}):
+                break
+            if not emitted:
+                yield ": unified-qa keep-alive\n\n"
+                time.sleep(0.25)
+
+    return Response(
+        _stream(), mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-QA-Run-ID": run["id"]},
+    )
+
+
 @chat_bp.route('/api/chat/send', methods=['POST'])
 def send_chat_message():
     data = request.json or {}
+    # 统一 QA 接管（AI 助手）：开启时所有问答都进入同一套「问题拆解 → 检索 → 综合」链路，
+    # 事件经 qa_event_to_legacy 转回旧格式，前端无需同步改动；不可用时自动回落旧链路。
+    if _unified_qa_available(data):
+        return _legacy_request_via_unified_qa(data)
     # Stable in-process seam for later financial routing.  Task 3.1 always
     # returns legacy_chat, so the public request and SSE response stay intact.
     route_plan = chat_route_orchestrator.plan(data)

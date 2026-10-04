@@ -1,0 +1,23 @@
+{% if plan.is_followup -%}
+这是承接前文的追问，我已把省略对象还原为“{{ plan.context_focus }}”。
+{%- elif plan.question_count | int <= 1 -%}
+已识别为 1 个单一问题：{{ plan.subquestions[0].text if plan.subquestions else "当前问题" }}。我会先查权威资料，再给出证据约束的结论。
+{%- elif plan.relationship == "progressive" -%}
+已识别为 {{ plan.question_count }} 个递进问题：{% for item in plan.subquestions[:4] %}
+{{ loop.index }}. {{ item.text }}{% endfor %}
+我会按“依据 → 影响 → 应对”的顺序回答，先检索官方原文，再补充官方解读和专业材料。
+{%- elif plan.relationship == "parallel" -%}
+已识别为 {{ plan.question_count }} 个并列问题。我会先合并同类项，再按主题分组回答，避免重复检索和重复结论。
+{%- elif plan.relationship == "causal" -%}
+已识别为 {{ plan.question_count }} 个因果相关问题。我会先确认事实依据，再分析原因、影响和传导路径。
+{%- elif plan.relationship == "comparison" -%}
+已识别为 {{ plan.question_count }} 个比较问题。我会先建立比较维度，再逐项核验证据和差异。
+{%- elif plan.relationship == "parent_child" -%}
+已识别为多个总分相关问题。我会先给出总览，再按政策内容、适用对象、申报征管、行业影响和风险应对分组回答。
+{%- elif plan.relationship == "overlap" -%}
+已识别为 {{ plan.question_count }} 个交集问题。我会先界定共同范围，只回答同时满足条件的部分。
+{%- elif plan.relationship == "conflict" -%}
+已识别为 {{ plan.question_count }} 个冲突核验问题。我会先列出不同口径，再按来源权威性、时间和适用范围裁决。
+{%- else -%}
+已识别为 {{ plan.question_count }} 个相关问题。我会先合并同类项，再按主题分组回答。
+{%- endif %}

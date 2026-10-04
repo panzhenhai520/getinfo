@@ -61,6 +61,8 @@ from auth_management_api import auth_bp
 from user_management_api import user_bp
 from chat_api import chat_bp
 from intel_api import intel_bp
+# 统一 QA（AI 助手）网关蓝图：/api/qa/v1/*，见 qa_gateway.py
+from qa_gateway import qa_bp
 from user_database import UserDatabase
 try:
     import newspaper
@@ -312,7 +314,15 @@ def require_login_for_app():
         return None
     if path in ('/login', '/api/user/login', '/api/system/health', '/api/system/version',
                 '/favicon.ico', '/pack-console',
-                '/api/intel/mobile/themes'):
+                '/api/intel/mobile/themes',
+                # RAGFlow BFF 拿不到 getinfo 浏览器会话，只有这一个交换端点例外，
+                # 它由短时效、绑定 nonce 的 HMAC 断言保护；随后的 /api/qa/v1/* 一律
+                # 需要这个交换出来的 bridge cookie。
+                '/api/qa/v1/bridge/exchange'):
+        return None
+    # 让 RAGFlow bridge 会话进入 QA 蓝图自己的严格鉴权装饰器（qa_access_required 会校验
+    # 签名、有效期、nonce/吊销状态与知识库范围）——只带 cookie 本身不授予任何权限。
+    if path.startswith('/api/qa/v1/') and request.cookies.get('qa_bridge_session'):
         return None
     # 文章分享落地页：微信好友免登录查看全文（只读单篇文章，无其他数据暴露）
     if path.startswith('/share/article/') or path.startswith('/share/report/'):
@@ -711,6 +721,8 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(intel_bp)
+# 统一 QA（AI 助手）：/api/qa/v1/* 运行记录、事件流、设置与 bridge 会话
+app.register_blueprint(qa_bp)
 # AI 周报（通用 LLM 总结 + 提示词设置 + 报告查看）
 from pack_report import pack_report_bp  # noqa: E402
 app.register_blueprint(pack_report_bp)

@@ -52,6 +52,9 @@ LONG_FINANCIAL_JOB_TYPES: Tuple[str, ...] = (
     "financial_research",
     "financial_verify",
     "paper_backtest",
+    # 统一 QA（AI 助手）要跑模型调用 + RAGFlow 检索，必须和长任务同一条隔离泳道：
+    # 只在 IntelWorker 上注册 handler 不够——supervisor 只认领这里列出的作业类型。
+    "qa.run",
 )
 
 ALL_ISOLATED_WORKER_JOB_TYPES = frozenset(
