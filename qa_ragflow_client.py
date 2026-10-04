@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 import uuid
 from typing import Mapping
@@ -23,6 +24,14 @@ class QaRagflowError(RuntimeError):
 
 class QaRagflowProtocolError(QaRagflowError):
     pass
+
+
+def _int_env(name: str, default: int, low: int, high: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(low, min(high, value))
 
 
 def _records(payload, *keys) -> list:
@@ -59,7 +68,8 @@ class QaRagflowResearchClient:
         self.api_key = str(api_key or "")
         self.app_id = str(app_id or "")
         self.kb_id = str(kb_id or "")
-        self.timeout_seconds = max(5, min(300, int(timeout_seconds or 90)))
+        cap = _int_env("QA_RAG_ENHANCEMENT_REQUEST_TIMEOUT_SECONDS", 25, 5, 90)
+        self.timeout_seconds = max(5, min(cap, int(timeout_seconds or 90)))
         self.retries = max(0, min(3, int(retries or 0)))
         self.session = session or requests.Session()
         self.proxies = proxies
@@ -78,7 +88,7 @@ class QaRagflowResearchClient:
 
     def _request(self, method: str, path: str, **kwargs):
         if not self.configured:
-            raise QaRagflowError("RAGFlow 深度研究未完整配置", retryable=False)
+            raise QaRagflowError("RAG增强检索未完整配置", retryable=False)
         request_id = str(kwargs.pop("request_id", "") or uuid.uuid4().hex)
         max_retries = max(0, min(3, int(kwargs.pop("max_retries", self.retries))))
         last_error = None
@@ -98,14 +108,14 @@ class QaRagflowResearchClient:
                         self.sleep(min(2.0, 0.25 * (2**attempt)))
                         continue
                     raise QaRagflowError(
-                        "RAGFlow 深度研究服务繁忙或暂不可用",
+                        "RAG增强检索服务繁忙或暂不可用",
                         status_code=status,
                         retryable=True,
                         request_id=request_id,
                     )
                 if status in {401, 403}:
                     raise QaRagflowError(
-                        "RAGFlow 服务凭据无效或无权访问研究助手",
+                        "RAG增强检索服务凭据无效或无权访问研究助手",
                         status_code=status,
                         retryable=False,
                         request_id=request_id,
@@ -126,11 +136,11 @@ class QaRagflowResearchClient:
             except requests.HTTPError as exc:
                 status = int(getattr(exc.response, "status_code", 0) or 0)
                 raise QaRagflowError(
-                    "RAGFlow 请求失败", status_code=status, retryable=status >= 500,
+                    "RAG增强检索请求失败", status_code=status, retryable=status >= 500,
                     request_id=request_id,
                 ) from exc
         raise QaRagflowError(
-            "无法连接 RAGFlow 深度研究服务", retryable=True, request_id=request_id,
+            "无法连接 RAG增强检索服务", retryable=True, request_id=request_id,
         ) from last_error
 
     @staticmethod
@@ -138,22 +148,31 @@ class QaRagflowResearchClient:
         try:
             payload = response.json()
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise QaRagflowProtocolError("RAGFlow 返回了无法解析的数据", request_id=request_id) from exc
+            raise QaRagflowProtocolError("RAG增强检索返回了无法解析的数据", request_id=request_id) from exc
         if not isinstance(payload, dict):
-            raise QaRagflowProtocolError("RAGFlow 返回格式无效", request_id=request_id)
+            raise QaRagflowProtocolError("RAG增强检索返回格式无效", request_id=request_id)
         code = payload.get("code")
         if code not in (None, 0, "0"):
-            raise QaRagflowError("RAGFlow 研究请求未成功", retryable=True, request_id=request_id)
+            raise QaRagflowError("RAG增强检索请求未成功", retryable=True, request_id=request_id)
         return payload
 
     def health_check(self) -> dict:
         if not self.configured:
             return {"ready": False, "configured": False, "app_found": False, "kb_found": False}
         try:
-            app_response, app_request = self._request("GET", "/api/v1/chats", params={"id": self.app_id, "page": 1, "page_size": 100})
+            health_timeout = _int_env("QA_RAG_ENHANCEMENT_HEALTH_TIMEOUT_SECONDS", 6, 3, 20)
+            app_response, app_request = self._request(
+                "GET", "/api/v1/chats",
+                params={"id": self.app_id, "page": 1, "page_size": 100},
+                timeout=health_timeout,
+            )
             apps = _records(self._json(app_response, app_request), "chats", "items", "records")
             app = next((dict(item) for item in apps if str(item.get("id")) == self.app_id), None)
-            kb_response, kb_request = self._request("GET", "/api/v1/datasets", params={"id": self.kb_id, "page": 1, "page_size": 100})
+            kb_response, kb_request = self._request(
+                "GET", "/api/v1/datasets",
+                params={"id": self.kb_id, "page": 1, "page_size": 100},
+                timeout=health_timeout,
+            )
             datasets = _records(self._json(kb_response, kb_request), "datasets", "items", "records")
             dataset = next((dict(item) for item in datasets if str(item.get("id")) == self.kb_id), None)
             bound_ids = []
@@ -193,7 +212,7 @@ class QaRagflowResearchClient:
             data = data[0] if data else {}
         session_id = str((data or {}).get("id") or (data or {}).get("session_id") or "")
         if not session_id:
-            raise QaRagflowProtocolError("RAGFlow 未返回研究会话 ID", request_id=request_id)
+            raise QaRagflowProtocolError("RAG增强检索未返回研究会话 ID", request_id=request_id)
         return {"session_id": session_id, "request_id": request_id}
 
     def search_dataset(self, query: str, *, top_n: int = 8, threshold: float = 0.2) -> dict:
@@ -210,6 +229,7 @@ class QaRagflowResearchClient:
         }
         response, request_id = self._request(
             "POST", f"/api/v1/datasets/{self.kb_id}/search", json=body,
+            timeout=_int_env("QA_RAG_ENHANCEMENT_SEARCH_TIMEOUT_SECONDS", 10, 4, 30),
         )
         payload = self._json(response, request_id)
         data = payload.get("data") or {}
@@ -229,6 +249,7 @@ class QaRagflowResearchClient:
         response, request_id = self._request(
             "GET", f"/api/v1/datasets/{self.kb_id}/documents",
             params={"page": 1, "page_size": 50},
+            timeout=_int_env("QA_RAG_ENHANCEMENT_HEALTH_TIMEOUT_SECONDS", 6, 3, 20),
         )
         payload = self._json(response, request_id)
         data = payload.get("data") or {}
@@ -258,7 +279,8 @@ class QaRagflowResearchClient:
             body = {"assistant_id": self.app_id, "prompt": str(prompt), "max_tokens": 1800}
             path = "/v1/unified_qa/research"
         response, request_id = self._request(
-            "POST", path, json=body, timeout=self.timeout_seconds,
+            "POST", path, json=body,
+            timeout=_int_env("QA_RAG_ENHANCEMENT_RESEARCH_TIMEOUT_SECONDS", min(self.timeout_seconds, 15), 6, 300),
             stream=bool(stream), max_retries=0,
         )
         if stream:
@@ -270,7 +292,7 @@ class QaRagflowResearchClient:
         data = data if isinstance(data, Mapping) else payload
         answer = str(data.get("answer") or data.get("content") or "")
         if not answer:
-            raise QaRagflowProtocolError("RAGFlow Assistant 未返回研究报告", request_id=request_id)
+            raise QaRagflowProtocolError("RAG增强检索未返回研究报告", request_id=request_id)
         return {
             "answer": answer,
             "reference": data.get("reference") or payload.get("reference") or {},
@@ -304,7 +326,7 @@ class QaRagflowResearchClient:
             session_id = str(data.get("session_id") or session_id)
         answer = "".join(parts)
         if not answer:
-            raise QaRagflowProtocolError("RAGFlow 流式响应未包含答案", request_id=request_id)
+            raise QaRagflowProtocolError("RAG增强检索流式响应未包含答案", request_id=request_id)
         return {"answer": answer, "reference": reference, "request_id": request_id, "session_id": session_id}
 
 

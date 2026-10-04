@@ -180,6 +180,50 @@ services:
       retries: 5
       start_period: 60s
 
+  # 统一 QA（AI 助手）单独一条泳道：要跑模型调用 + RAGFlow 增强检索，属长任务，
+  # 和 core 泳道（classification / candidate_dispatch / embed_articles 等批处理）
+  # 抢 CPU 会互相拖慢，所以独立容器、独立进程。
+  # 对应 financial_resource_isolation.QA_WORKER_JOB_TYPES；
+  # intel_worker_supervisor 只启动 core/long 两条泳道，不再包含 qa.run。
+  qa-worker:
+    image: firecrawlapp-crawler:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firecrawl-qa-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "intel_worker.py", "--no-periodic-scheduler", "--job-type", "qa.run"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Hong_Kong
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: collectinfo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      RAGFLOW_LLM_ENABLED: "false"
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   redis:
     image: redis:7-alpine
     container_name: firecrawl-redis

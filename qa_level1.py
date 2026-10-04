@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Callable, Mapping
 
@@ -18,6 +19,14 @@ from qa_orchestrator import QaStageFailure
 _FENCE_RE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.I | re.S)
 _CLAIM_TYPES = {"current_fact", "historical_fact", "interpretation", "forecast", "background"}
 _STATUSES = {"unverified", "confirmed", "corrected", "qualified", "conflicted", "insufficient_evidence"}
+
+
+def _int_env(name: str, default: int, low: int, high: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(low, min(high, value))
 
 
 def extract_json_object(value) -> dict:
@@ -151,6 +160,7 @@ class OpenAIJsonModelClient:
                     "schema": {"type": "object", "additionalProperties": True},
                 },
             }
+        effective_timeout = max(1, int(timeout or 90))
         response = self.session.post(
             f"{safe_base.rstrip('/')}/chat/completions",
             headers=headers,
@@ -167,12 +177,12 @@ class OpenAIJsonModelClient:
                 "think": False,
                 "num_ctx": 16384,
                 "max_tokens": (
-                    (1600 if timeout >= 80 else 1000)
+                    (900 if effective_timeout >= 15 else 600)
                     if profile.provider_id == "local" else 2048
                 ),
                 "response_format": response_format,
             },
-            timeout=timeout,
+            timeout=(4, effective_timeout),
             proxies=proxies,
         )
         response.raise_for_status()
@@ -244,7 +254,10 @@ class QaLevel1Generator:
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
     def generate(self, *, question: str, plan: Mapping, evidence: list[dict], profile) -> dict:
-        raw = self.model_client(profile, self._messages(question, plan, evidence), timeout=90)
+        is_local = str(getattr(profile, "provider_id", "") or "").casefold() == "local"
+        first_timeout = _int_env("QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", 8, 4, 300) if is_local else 90
+        repair_timeout = _int_env("QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS", 5, 3, 120) if is_local else 60
+        raw = self.model_client(profile, self._messages(question, plan, evidence), timeout=first_timeout)
         last_error = None
         for attempt in range(2):
             try:
@@ -257,7 +270,7 @@ class QaLevel1Generator:
                 raw = self.model_client(
                     profile,
                     self._messages(question, plan, evidence, repair_error=str(exc), prior=str(raw)),
-                    timeout=60,
+                    timeout=repair_timeout,
                 )
         raise QaContractError(f"一级结构化输出校验失败: {last_error}")
 

@@ -41,7 +41,7 @@ def _digest(value) -> str:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
-def _stream_text_pieces(text: str, *, chunk_size: int = 96):
+def _stream_text_pieces(text: str, *, chunk_size: int = 42):
     source = str(text or "")
     if not source:
         return
@@ -51,7 +51,7 @@ def _stream_text_pieces(text: str, *, chunk_size: int = 96):
         pieces = []
         start = 0
         for index, char in enumerate(block):
-            if char in "。！？!?；;\n" and index + 1 - start >= 24:
+            if char in "。！？!?；;\n" and index + 1 - start >= 14:
                 pieces.append(block[start:index + 1])
                 start = index + 1
         if start < len(block):
@@ -251,7 +251,7 @@ class QaOrchestrator:
                             {"delta": piece, "offset": offset, "source": "synthesis_fallback"},
                         )
                         offset += len(piece)
-                        time.sleep(0.025)
+                        time.sleep(0.018)
             except QaStageFailure as exc:
                 public = exc.public_error
                 if exc.degradable and stage in DEGRADABLE_STAGES and run.get("mode") != "fast":

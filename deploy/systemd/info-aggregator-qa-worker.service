@@ -1,0 +1,20 @@
+[Unit]
+Description=Info Aggregator Unified QA Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=timebot
+Group=timebot
+WorkingDirectory=/home/timebot/app
+Environment=PYTHONUNBUFFERED=1
+Environment=DATABASE_PATH=/home/timebot/app/data/crawler_articles.db
+EnvironmentFile=-/home/timebot/app/.env
+ExecStart=/usr/bin/python3 /home/timebot/app/intel_worker.py --no-periodic-scheduler --job-type qa.run
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

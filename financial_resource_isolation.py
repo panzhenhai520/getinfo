@@ -44,6 +44,7 @@ CORE_WORKER_JOB_TYPES: Tuple[str, ...] = (
     "dynamic_convert",
     "pack_report",
     "task_cleanup",
+    "ragflow_reconcile",
     "financial_snapshot",
     "market_overview",
 )
@@ -52,13 +53,14 @@ LONG_FINANCIAL_JOB_TYPES: Tuple[str, ...] = (
     "financial_research",
     "financial_verify",
     "paper_backtest",
-    # 统一 QA（AI 助手）要跑模型调用 + RAGFlow 检索，必须和长任务同一条隔离泳道：
-    # 只在 IntelWorker 上注册 handler 不够——supervisor 只认领这里列出的作业类型。
+)
+
+QA_WORKER_JOB_TYPES: Tuple[str, ...] = (
     "qa.run",
 )
 
 ALL_ISOLATED_WORKER_JOB_TYPES = frozenset(
-    CORE_WORKER_JOB_TYPES + LONG_FINANCIAL_JOB_TYPES
+    CORE_WORKER_JOB_TYPES + LONG_FINANCIAL_JOB_TYPES + QA_WORKER_JOB_TYPES
 )
 
 _SAFE_PROVIDER_ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")

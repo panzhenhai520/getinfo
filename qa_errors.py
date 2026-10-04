@@ -108,12 +108,16 @@ def classify_qa_error(
         )
     if isinstance(exc, requests.exceptions.Timeout) or "timed out" in text or "timeout" in text:
         code = "RESEARCH_TIMEOUT" if stage.startswith("level2") else "NETWORK_UNREACHABLE"
-        message = "RAGFlow 深度研究超时，可以保留一级结果并重试二级研究。" if code == "RESEARCH_TIMEOUT" else f"连接 {provider} 超时，请检查网络后重试。"
+        message = (
+            "RAG增强检索响应超时，系统已保留现有证据并继续生成回答。"
+            if code == "RESEARCH_TIMEOUT"
+            else f"{provider} 响应较慢，系统将自动改用证据约束结果继续。"
+        )
         return QaPublicError(code, message, True, provider, stage, (QaAction("重试当前阶段", action="retry_stage"),))
     if "ragflow" in text:
         return QaPublicError(
             "RAGFLOW_UNAVAILABLE",
-            "RAGFlow 深度知识库暂不可用，系统将保留一级结果。",
+            "RAG增强检索暂不可用，系统将保留现有证据继续回答。",
             True,
             provider,
             stage,

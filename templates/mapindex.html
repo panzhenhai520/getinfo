@@ -2054,9 +2054,9 @@
             background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,.46) 45%, transparent 68%);
             animation: planButtonShine 1.9s linear infinite;
         }
-        .message-content.plan-thinking > p:first-child,
-        .message-content.plan-thinking > ul:first-of-type,
-        .message-content.plan-thinking > ol:first-of-type {
+        .message-content.plan-thinking:not([data-plan-animation-done="true"]) > p:first-child,
+        .message-content.plan-thinking:not([data-plan-animation-done="true"]) > ul:first-of-type,
+        .message-content.plan-thinking:not([data-plan-animation-done="true"]) > ol:first-of-type {
             color: transparent;
             background: linear-gradient(105deg, #315b46 15%, #0f7b61 35%, #e9fff5 48%, #0f7b61 61%, #315b46 85%);
             background-size: 260% 100%;
@@ -2085,6 +2085,21 @@
             background-clip: text;
             -webkit-text-fill-color: transparent;
             animation: planTextShine 1.55s linear infinite;
+        }
+        .chat-stream-body {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+        .message-content[data-plan-animation-done="true"] {
+            animation: none;
+        }
+        .message-content[data-plan-animation-done="true"] > p:first-child,
+        .message-content[data-plan-animation-done="true"] > ul:first-of-type,
+        .message-content[data-plan-animation-done="true"] > ol:first-of-type {
+            color: inherit;
+            background: none;
+            -webkit-text-fill-color: currentColor;
+            animation: none;
         }
         .message.answer.message-has-table{width:100%;max-width:100%;padding-right:0}.chat-table-scroll{width:100%;overflow-x:auto;margin:12px 0;border:1px solid #4e8068;border-radius:8px;background:#fff;box-shadow:0 2px 8px rgba(31,90,64,.08)}.chat-table-scroll table{width:100%;min-width:820px;border-collapse:separate;border-spacing:0;font-size:14px;line-height:1.55;white-space:normal}.chat-table-scroll th,.chat-table-scroll td{padding:11px 13px;vertical-align:top;text-align:left;border-right:1px solid #a9c3b4;border-bottom:1px solid #a9c3b4;word-break:break-word}.chat-table-scroll th{position:sticky;top:0;z-index:1;background:#dcece2;color:#173d2b;font-weight:800}.chat-table-scroll tr:nth-child(even) td{background:#f6faf7}.chat-table-scroll th:last-child,.chat-table-scroll td:last-child{border-right:0}.chat-table-scroll tbody tr:last-child td{border-bottom:0}.chat-table-scroll::-webkit-scrollbar{height:9px}.chat-table-scroll::-webkit-scrollbar-thumb{background:#789988;border-radius:999px}
         .qa-insight-drawer {
@@ -2145,8 +2160,9 @@
         }
         .qa-citation-link:hover,
         .qa-citation-link.is-active {
-            color: #0f4d3d;
-            background: rgba(29, 127, 104, 0.22);
+            color: #083f31;
+            background: linear-gradient(135deg, #fff4a8 0%, #bdf4d6 100%);
+            box-shadow: 0 0 0 2px rgba(245, 184, 0, 0.32), 0 3px 10px rgba(23, 32, 29, 0.12);
         }
         .qa-insight-card {
             display: grid;
@@ -2157,8 +2173,19 @@
             background: #fff;
         }
         .qa-insight-card.is-active {
-            border-color: rgba(29, 127, 104, 0.5);
-            box-shadow: 0 0 0 2px rgba(29, 127, 104, 0.1);
+            border-color: #f0b429;
+            background: linear-gradient(90deg, rgba(255, 246, 184, 0.96), rgba(238, 255, 246, 0.98));
+            box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.22), 0 10px 24px rgba(23, 32, 29, 0.12);
+            position: relative;
+            animation: qaCitationPulse 1.2s ease-out 1;
+        }
+        .qa-insight-card.is-active::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            border-radius: 6px 0 0 6px;
+            background: #f0b429;
         }
         .qa-insight-card-title {
             color: #234b39;
@@ -2174,6 +2201,11 @@
         }
         .qa-insight-card a:hover {
             text-decoration: underline;
+        }
+        @keyframes qaCitationPulse {
+            0% { transform: translateY(0); box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.42), 0 10px 24px rgba(23, 32, 29, 0.12); }
+            42% { transform: translateY(-1px); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.18), 0 14px 30px rgba(23, 32, 29, 0.16); }
+            100% { transform: translateY(0); box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.22), 0 10px 24px rgba(23, 32, 29, 0.12); }
         }
         .generated-file-actions {
             display: flex;
@@ -6807,6 +6839,12 @@
             return structuredAnswerJsonToMarkdown(cleaned) || cleaned;
         }
 
+        function isQuestionPlanOnlyText(text) {
+            const value = cleanChatUiText(text || '').trim();
+            if (!/^【问题分析思路】/.test(value)) return false;
+            return !/(已完成|核心结论|分问题回答|风险拆解|依据、分析与核验|最终回答|一、|二、)/.test(value);
+        }
+
         function setStatus(text) {
             document.getElementById('chatStatus').textContent = cleanChatUiText(text || '');
         }
@@ -6914,6 +6952,7 @@
         function startInlineAnswerProgress(node, message = '继续检索和生成回答', event = null) {
             if (!node) return;
             node._answerProgressActive = true;
+            node._answerProgressStartedAt = Date.now();
             updateInlineAnswerProgress(node, message, event);
             if (node._answerProgressTimer) return;
             node._answerProgressTimer = setInterval(() => {
@@ -6929,11 +6968,24 @@
         function stopInlineAnswerProgress(node) {
             if (!node) return;
             node._answerProgressActive = false;
+            node._answerProgressStartedAt = 0;
             if (node._answerProgressTimer) {
                 clearInterval(node._answerProgressTimer);
                 node._answerProgressTimer = null;
             }
             node.querySelector('[data-answer-progress]')?.remove();
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms || 0))));
+        }
+
+        async function stopInlineAnswerProgressAfterMinimum(node, minimumMs = 700) {
+            if (!node || !node._answerProgressActive) return;
+            const startedAt = Number(node._answerProgressStartedAt || 0);
+            const elapsed = startedAt ? Date.now() - startedAt : minimumMs;
+            if (elapsed < minimumMs) await delay(minimumMs - elapsed);
+            stopInlineAnswerProgress(node);
         }
 
         function collapseSupersededPlanNode(node, adjustmentText = '') {
@@ -6955,7 +7007,7 @@
         }
 
         function showPlanControlActions(node, question, planText) {
-            if (!node || node.querySelector('.chat-plan-actions')) return;
+            if (!node || node.querySelector('[data-plan-actions="true"]')) return;
             node.dataset.planAwaitingAction = 'true';
             node.classList.remove('plan-thinking');
             const bar = document.createElement('div');
@@ -7234,9 +7286,9 @@
                 const sentences = block.match(/[^。！？!?；;：:\n]+[。！？!?；;：:]?\s*|\n+/g) || [block];
                 sentences.forEach(sentence => {
                     let rest = sentence;
-                    while (rest.length > 56) {
-                        parts.push(rest.slice(0, 56));
-                        rest = rest.slice(56);
+                    while (rest.length > 6) {
+                        parts.push(rest.slice(0, 6));
+                        rest = rest.slice(6);
                     }
                     if (rest) parts.push(rest);
                 });
@@ -7288,6 +7340,63 @@
                 };
                 tick();
                 if (index < pieces.length) timer = setInterval(tick, intervalMs);
+            });
+        }
+
+        function appendAssistantDelta(node, delta, options = {}) {
+            const piece = String(delta || '');
+            const onUpdate = typeof options.onUpdate === 'function' ? options.onUpdate : null;
+            if (!node || !piece) {
+                const existing = normalizeAssistantAnswerText(node?._fullAssistantContent || '');
+                if (onUpdate) onUpdate(existing);
+                return Promise.resolve(existing);
+            }
+            if (node.dataset.streamFrozen === 'true') {
+                const existing = normalizeAssistantAnswerText(node._fullAssistantContent || node.textContent || '');
+                if (onUpdate) onUpdate(existing);
+                return Promise.resolve(existing);
+            }
+            const existing = String(node._fullAssistantContent || '');
+            const next = existing + piece;
+            node._fullAssistantContent = next;
+            let host = node.querySelector('[data-streaming-answer="true"]');
+            if (!host) {
+                host = document.createElement('div');
+                host.className = 'chat-stream-body';
+                host.dataset.streamingAnswer = 'true';
+                const actions = node.querySelector('[data-plan-actions="true"]');
+                const progress = node.querySelector('[data-answer-progress="true"]');
+                if (progress) node.insertBefore(host, progress);
+                else if (actions && actions.nextSibling) node.insertBefore(host, actions.nextSibling);
+                else node.appendChild(host);
+            }
+            const intervalMs = Math.max(18, Number(options.intervalMs || 32));
+            const chars = Array.from(piece);
+            const streamParts = [];
+            for (let start = 0; start < chars.length; start += 6) {
+                streamParts.push(chars.slice(start, start + 6).join(''));
+            }
+            if (!streamParts.length) streamParts.push(piece);
+            let index = 0;
+            return new Promise(resolve => {
+                let timer = null;
+                const tick = () => {
+                    const text = streamParts[index++] || '';
+                    if (text) host.appendChild(document.createTextNode(text));
+                    const visible = existing + streamParts.slice(0, index).join('');
+                    node._fullAssistantContent = visible;
+                    if (onUpdate) onUpdate(visible);
+                    const messagesBox = document.getElementById('messages');
+                    if (messagesBox) messagesBox.scrollTop = messagesBox.scrollHeight;
+                    if (index >= streamParts.length) {
+                        node._fullAssistantContent = next;
+                        if (onUpdate) onUpdate(next);
+                        if (timer) clearInterval(timer);
+                        resolve(next);
+                    }
+                };
+                tick();
+                if (index < streamParts.length) timer = setInterval(tick, intervalMs);
             });
         }
 
@@ -7400,8 +7509,11 @@
         function renderAssistantContent(node, content) {
             const uiContent = normalizeAssistantAnswerText(content || '');
             node._fullAssistantContent = uiContent;
+            const preservedPlanActions = node.querySelector('[data-plan-actions="true"]');
+            if (preservedPlanActions) preservedPlanActions.remove();
             const planIsAwaitingAction = node.dataset.planAwaitingAction === 'true';
-            node.classList.toggle('plan-thinking', /【问题分析思路：?】/.test(uiContent) && !planIsAwaitingAction);
+            const planAnimationDone = node.dataset.planAnimationDone === 'true';
+            node.classList.toggle('plan-thinking', /【问题分析思路：?】/.test(uiContent) && !planIsAwaitingAction && !planAnimationDone);
             const pages = splitAnswerPages(uiContent);
             const previousPage = Number(node._answerPageIndex || 0);
             const activePage = Math.max(0, Math.min(previousPage, pages.length - 1));
@@ -7416,6 +7528,9 @@
             });
             if (tables.length) node.closest('.message')?.classList.add('message-has-table');
             renderAnswerPaginationControls(node, pages, activePage);
+            if (preservedPlanActions && node.dataset.planAwaitingAction === 'true') {
+                node.appendChild(preservedPlanActions);
+            }
             const blocks = extractGeneratedFileBlocks(uiContent);
             if (!blocks.length) {
                 renderInlineAnswerProgress(node);
@@ -8002,8 +8117,31 @@
 
         function activateQaCitationLinks(container, result) {
             if (!container || !result?.citation_map) return;
+            container.querySelector('[data-streaming-answer="true"]')?.normalize();
+            container.normalize();
             const citationMap = result.citation_map || {};
             const evidenceIndex = qaEvidenceIndex(result.evidence);
+            const citationRef = (label) => {
+                const raw = String(label || '');
+                const numeric = raw.replace(/^\[/, '').replace(/\]$/, '');
+                return citationMap[raw] || citationMap[numeric] || citationMap[`[${numeric}]`] || '';
+            };
+            const activateRef = (ref, citation = '') => {
+                const safeRef = String(ref || '');
+                if (!safeRef) return;
+                const drawer = container.querySelector('.qa-insight-drawer');
+                if (drawer) drawer.open = true;
+                container.querySelectorAll('.qa-citation-link.is-active,.qa-insight-card.is-active').forEach(el => el.classList.remove('is-active'));
+                container.querySelectorAll(`.qa-citation-link[data-ref="${CSS.escape(safeRef)}"]`).forEach(el => el.classList.add('is-active'));
+                if (citation) {
+                    container.querySelectorAll(`.qa-citation-link[data-citation="${CSS.escape(String(citation))}"]`).forEach(el => el.classList.add('is-active'));
+                }
+                const target = container.querySelector(`.qa-insight-card[data-ref="${CSS.escape(safeRef)}"]`);
+                if (target) {
+                    target.classList.add('is-active');
+                    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            };
             const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
                 acceptNode(node) {
                     if (!/\[\d+\]/.test(node.nodeValue || '')) return NodeFilter.FILTER_REJECT;
@@ -8011,29 +8149,31 @@
                     return NodeFilter.FILTER_ACCEPT;
                 }
             });
+            if (container.dataset.qaCitationDelegated !== 'true') {
+                container.dataset.qaCitationDelegated = 'true';
+                container.addEventListener('click', event => {
+                    const button = event.target?.closest?.('.qa-citation-link[data-ref]');
+                    if (!button || !container.contains(button)) return;
+                    event.preventDefault();
+                    activateRef(button.dataset.ref, button.dataset.citation);
+                });
+            }
             const nodes = [];
             while (walker.nextNode()) nodes.push(walker.currentNode);
             nodes.forEach(node => {
                 const frag = document.createDocumentFragment();
                 String(node.nodeValue || '').split(/(\[\d+\])/g).forEach(part => {
-                    if (/^\[\d+\]$/.test(part) && citationMap[part]) {
+                    const ref = /^\[\d+\]$/.test(part) ? citationRef(part) : '';
+                    if (ref) {
                         const button = document.createElement('button');
                         button.type = 'button';
                         button.className = 'qa-citation-link';
                         button.dataset.citation = part;
-                        button.dataset.ref = citationMap[part];
-                        button.title = qaEvidenceTitle(evidenceIndex[citationMap[part]], citationMap[part]);
+                        button.dataset.ref = ref;
+                        button.title = qaEvidenceTitle(evidenceIndex[ref], ref);
                         button.textContent = part;
                         button.addEventListener('click', () => {
-                            const drawer = container.querySelector('.qa-insight-drawer');
-                            if (drawer) drawer.open = true;
-                            container.querySelectorAll('.qa-citation-link.is-active,.qa-insight-card.is-active').forEach(el => el.classList.remove('is-active'));
-                            button.classList.add('is-active');
-                            const target = container.querySelector(`.qa-insight-card[data-ref="${CSS.escape(button.dataset.ref)}"]`);
-                            if (target) {
-                                target.classList.add('is-active');
-                                target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                            }
+                            activateRef(button.dataset.ref, button.dataset.citation);
                         });
                         frag.appendChild(button);
                     } else {
@@ -8108,17 +8248,20 @@
             container.appendChild(drawer);
             drawer.querySelectorAll('.qa-citation-link[data-ref]').forEach(button => {
                 button.addEventListener('click', () => {
-                    const target = drawer.querySelector(`.qa-insight-card[data-ref="${CSS.escape(button.dataset.ref)}"]`);
+                    const safeRef = String(button.dataset.ref || '');
+                    if (!safeRef) return;
+                    drawer.open = true;
+                    container.querySelectorAll('.qa-insight-card.is-active,.qa-citation-link.is-active').forEach(el => el.classList.remove('is-active'));
+                    container.querySelectorAll(`.qa-citation-link[data-ref="${CSS.escape(safeRef)}"]`).forEach(el => el.classList.add('is-active'));
+                    const target = drawer.querySelector(`.qa-insight-card[data-ref="${CSS.escape(safeRef)}"]`);
                     if (target) {
-                        drawer.open = true;
-                        drawer.querySelectorAll('.qa-insight-card.is-active,.qa-citation-link.is-active').forEach(el => el.classList.remove('is-active'));
-                        button.classList.add('is-active');
                         target.classList.add('is-active');
                         target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
                 });
             });
             activateQaCitationLinks(container, result);
+            setTimeout(() => activateQaCitationLinks(container, result), 0);
         }
 
         function collectQaPairs() {
@@ -8784,7 +8927,7 @@
             const submitButton = document.querySelector('#chatForm .send-button');
             const qaButton = document.getElementById('qaSaveOpenBtn');
             const modelDisplayName = getActiveModelDisplayName();
-            setStatus(`正在等待${modelDisplayName}响应...`);
+            setStatus('正在分析问题并准备检索...');
             input.disabled = true;
             if (submitButton) submitButton.disabled = true;
             if (qaButton) qaButton.disabled = true;
@@ -8795,7 +8938,7 @@
             state.retrievedArticles = [];
             renderRetrievalSources();
             const answerNode = appendMessage('assistant', '');
-            updateChatProgress(answerNode, `正在等待${modelDisplayName}响应...`, 'thinking');
+            updateChatProgress(answerNode, '分析问题：识别意图、子问题和回答边界', 'thinking', { stage: 'plan' });
             const adjustmentContext = state.pendingPlanAdjustment;
             const adjustmentIsAgreement = adjustmentContext && isPlanAgreementInput(question);
             const isAdjustmentRequest = Boolean(adjustmentContext && !adjustmentIsAgreement);
@@ -8941,15 +9084,38 @@
                                     clearChatProgress(answerNode);
                                     setStatus('正在生成回复...');
                                 }
-                                queuedAnswerText = mergeAssistantChunk(queuedAnswerText || answer, event.content || '');
-                                const targetAnswer = queuedAnswerText;
-                                const showPlanAfterRender = !isAdjustmentRequest && (event.data?.source === 'question_plan' || event.stage === 'plan');
-                                chunkRenderQueue = chunkRenderQueue.then(() => streamAssistantAnswer(answerNode, targetAnswer, {
-                                    intervalMs: event.data?.source === 'question_plan' ? 18 : 14,
-                                    onUpdate: value => { answer = value; },
-                                })).then(() => {
-                                    if (showPlanAfterRender) showPlanControlActions(answerNode, question, answer);
-                                });
+                                const source = event.data?.source || '';
+                                const isPlanChunk = source === 'question_plan' || event.stage === 'plan';
+                                const incoming = event.content || '';
+                                if (isPlanChunk) {
+                                    queuedAnswerText = mergeAssistantChunk(queuedAnswerText || answer, incoming);
+                                    const targetAnswer = queuedAnswerText;
+                                    const showPlanAfterRender = !isAdjustmentRequest;
+                                    chunkRenderQueue = chunkRenderQueue.then(() => streamAssistantAnswer(answerNode, targetAnswer, {
+                                        intervalMs: 30,
+                                        onUpdate: value => { answer = value; },
+                                    })).then(() => {
+                                        answerNode.dataset.planAnimationDone = 'true';
+                                        answerNode.classList.remove('plan-thinking');
+                                        if (showPlanAfterRender) showPlanControlActions(answerNode, question, answer);
+                                        startInlineAnswerProgress(
+                                            answerNode,
+                                            '正在按问题分析思路继续：检索证据、整理引用并生成正文',
+                                            { stage: 'level1_retrieval' }
+                                        );
+                                    });
+                                } else {
+                                    answerNode.dataset.planAnimationDone = 'true';
+                                    answerNode.classList.remove('plan-thinking');
+                                    queuedAnswerText = mergeAssistantChunk(queuedAnswerText || answer, incoming);
+                                    chunkRenderQueue = chunkRenderQueue.then(async () => {
+                                        await stopInlineAnswerProgressAfterMinimum(answerNode, 700);
+                                        return appendAssistantDelta(answerNode, incoming, {
+                                            intervalMs: 32,
+                                            onUpdate: value => { answer = value; },
+                                        });
+                                    });
+                                }
                             } else if (event.type === 'status' || event.type === 'searching') {
                                 const message = chatEventProgressMessage(event);
                                 setStatus(message);
@@ -9024,7 +9190,7 @@
                 stopInlineAnswerProgress(answerNode);
                 if (!answer && qaFinalResult?.answer) {
                     answer = await streamAssistantAnswer(answerNode, qaFinalResult.answer, {
-                        intervalMs: 38,
+                        intervalMs: 12,
                         onUpdate: value => { answer = value; },
                     });
                 } else if (qaFinalResult?.answer && cleanChatUiText(answer) !== cleanChatUiText(qaFinalResult.answer)) {
@@ -9034,10 +9200,15 @@
                         const tail = finalAnswerText.slice(currentAnswerText.length);
                         if (tail) {
                             answer = await streamAssistantAnswer(answerNode, currentAnswerText + tail, {
-                                intervalMs: 24,
+                                intervalMs: 10,
                                 onUpdate: value => { answer = value; },
                             });
                         }
+                    } else if (isQuestionPlanOnlyText(currentAnswerText)) {
+                        answer = await streamAssistantAnswer(answerNode, `${currentAnswerText}\n\n${finalAnswerText}`, {
+                            intervalMs: 10,
+                            onUpdate: value => { answer = value; },
+                        });
                     } else if (!currentAnswerText.includes(finalAnswerText.slice(0, Math.min(80, finalAnswerText.length)))) {
                         // Keep the already streamed response stable. The final object is still used
                         // for citations and evidence drawers, but it should not visually replace text
@@ -9046,10 +9217,14 @@
                     }
                 }
                 clearChatProgress(answerNode);
-                // 流式输出结束：自动折叠来源面板，需要时点击头部展开
+                answerNode.dataset.planAnimationDone = 'true';
+                answerNode.classList.remove('plan-thinking');
+                // 本机：流式输出结束自动折叠来源面板，需要时点头部展开
                 collapseSourcePanels();
                 answerNode.classList.remove('waiting');
-                renderAssistantContent(answerNode, answer);
+                if (!answerNode.querySelector('[data-streaming-answer="true"]')) {
+                    renderAssistantContent(answerNode, answer);
+                }
                 appendFinancialReportLinks(answerNode, reportRefs);
                 appendQaInsightDrawer(answerNode, qaFinalResult);
                 const uiAnswer = cleanChatUiText(answer);

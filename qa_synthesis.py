@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import ast
 from datetime import datetime, timezone
@@ -19,6 +20,14 @@ _REFUSAL_RE = re.compile(r"(抱歉|无法|不能|拒绝|sorry|cannot|can't|unabl
 _RISK_RE = re.compile(r"(风险|冲击|影响|应对|调整|合规|家族办公室|家族信托|离岸信托|规避|反避税|申报|税务)", re.I)
 _RAG_PROVIDER_RE = re.compile(r"RAGFlow", re.I)
 _POLICY_QA_RE = re.compile(r"(公告|政策|法规|办法|条例|通知|个税|个人所得税|征管|离岸信托|境外信托)", re.I)
+
+
+def _int_env(name: str, default: int, low: int, high: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(low, min(high, value))
 
 
 class _JsonAnswerDeltaExtractor:
@@ -130,11 +139,16 @@ def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int =
     }
     if response_format:
         payload["response_format"] = response_format
+    is_local = str(profile.provider_id or "").casefold() == "local"
+    read_timeout = (
+        _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 8, 4, 300)
+        if is_local else int(timeout or 90)
+    )
     response = requests.post(
         f"{safe_base.rstrip('/')}/chat/completions",
         headers=headers,
         json=payload,
-        timeout=timeout,
+        timeout=(5, read_timeout),
         proxies=proxies,
         stream=True,
     )
@@ -856,8 +870,7 @@ def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: 
             lines.append(f"- {area}：{risk.get('impact')} 应对：{risk.get('response')}{suffix}")
             if len(seen_areas) >= 5:
                 break
-    answer = _pin_official_citation("\n".join(lines), evidence, citation_map)
-    return _prepend_question_plan_intro(answer, question)
+    return _pin_official_citation("\n".join(lines), evidence, citation_map)
 
 
 def _evidence_by_ref(evidence: list[Mapping]) -> dict[str, Mapping]:
@@ -1080,7 +1093,11 @@ class QaFinalSynthesizer:
             answer_delta = _JsonAnswerDeltaExtractor()
             streamed_buffer = []
             structured_answer_stream = False
-            for content in _stream_openai_json_content(profile, messages, timeout=90):
+            stream_timeout = (
+                _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 8, 4, 300)
+                if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 90
+            )
+            for content in _stream_openai_json_content(profile, messages, timeout=stream_timeout):
                 raw_parts.append(content)
                 delta = answer_delta.feed(content)
                 if delta:
@@ -1100,7 +1117,11 @@ class QaFinalSynthesizer:
                     token_callback(tail)
             raw = "".join(raw_parts)
         else:
-            raw = self.model_client(profile, messages, timeout=90)
+            raw_timeout = (
+                _int_env("QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS", 12, 5, 300)
+                if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 90
+            )
+            raw = self.model_client(profile, messages, timeout=raw_timeout)
         if _is_model_refusal(raw):
             item = {
                 "stage": "synthesis",
@@ -1132,7 +1153,10 @@ class QaFinalSynthesizer:
                         question=question, graph=graph, level1=level1, level2=level2,
                         degradation=degradation, repair_error=str(exc), prior=str(raw),
                     ),
-                    timeout=80,
+                    timeout=(
+                        _int_env("QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS", 6, 3, 120)
+                        if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 80
+                    ),
                 )
                 if _is_model_refusal(raw):
                     item = {
@@ -1204,7 +1228,7 @@ class QaFinalSynthesizer:
                 citation_map=citation_map, models=models,
             )
         else:
-            answer = _prepend_question_plan_intro(answer, question)
+            answer = str(answer or "").strip()
         conflicts = list(graph.get("conflicts") or [])
         if official_only:
             conflicts = _filter_conflicts_to_refs(conflicts, evidence_refs)

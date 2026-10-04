@@ -7,6 +7,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
+import time
 from typing import Mapping
 
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_level1_result, validate_level2_result
@@ -27,6 +29,9 @@ from qa_retrieval import ArticleRetriever, default_web_search_service
 from qa_storage import QaStore
 from qa_flags import QaFeatureFlags
 from qa_resilience import QaCircuitOpen, QaPersistentResilience
+
+_PREWARM_LOCK = threading.Lock()
+_PREWARM_LAST: dict[str, float] = {}
 
 
 def _make_adjustment_parser(provider_registry):
@@ -147,8 +152,8 @@ def _filter_rag_evidence_relevance(
     limit: int | None = None,
 ) -> tuple[list[dict], dict]:
     # 通用相关性闸门交给 qa_relevance：标题命中问题实词，或正文前若干字符内多次命中；
-    # 付费墙/免责声明与社媒活动类片段直接丢弃。他们那版判据偏松（命中一个泛词且相似度
-    # >=0.2 就收），实测会把家族办公室的无关片段按 0.55 的相似度带进证据包。
+    # 付费墙/免责声明与社媒活动类片段直接丢弃。服务器那版是"命中>=3 词，或命中>=2 词且
+    # 相似度>=0.2"，实测仍会把无关片段按 0.55 的相似度带进证据包。
     accepted, audit = filter_relevant_evidence(
         question,
         [dict(item) for item in evidence or []],
@@ -440,6 +445,48 @@ def build_qa_stage_handlers(
                 proxies=config.get_ragflow_proxies() if hasattr(config, "get_ragflow_proxies") else None,
             )
 
+    def _prewarm_synthesis_provider(context, *, reason: str = "plan") -> None:
+        run = context.get("run") or {}
+        provider_id = str(run.get("synthesis_provider_id") or "local")
+        if provider_id != "local":
+            return
+        try:
+            profile = provider_registry.resolve(
+                "synthesis", provider_id,
+                owner_user_id=str(run.get("owner_user_id") or ""),
+                industry_pack_id=str(run.get("industry_pack_id") or ""),
+            )
+        except Exception:
+            return
+        base_url = str(getattr(profile, "base_url", "") or "").rstrip("/")
+        model_id = str(getattr(profile, "model_id", "") or "")
+        if not base_url or not model_id:
+            return
+        key = f"{provider_id}:{base_url}:{model_id}"
+        now = time.time()
+        with _PREWARM_LOCK:
+            if now - _PREWARM_LAST.get(key, 0) < 180:
+                return
+            _PREWARM_LAST[key] = now
+
+        def _worker() -> None:
+            try:
+                import requests
+
+                headers = {"Content-Type": "application/json"}
+                api_key = str(getattr(profile, "api_key", "") or "")
+                if api_key:
+                    headers["Authorization"] = f"Bearer {api_key}"
+                requests.get(
+                    f"{base_url}/models",
+                    headers=headers,
+                    timeout=2,
+                )
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, name=f"qa-prewarm-{reason}", daemon=True).start()
+
     def plan(context):
         result = planner.plan(context["request"])
         question_plan = result.get("question_plan") if isinstance(result.get("question_plan"), Mapping) else {}
@@ -447,6 +494,8 @@ def build_qa_stage_handlers(
         if callable(emit_stage_event) and question_plan:
             message = render_question_plan_status(question_plan)
             emit_stage_event("stage_progress", {"message": message, "question_plan": question_plan})
+            emit_stage_event("stage_progress", {"message": "正在检查本地 LLM 可用性；若响应过慢，将自动改用证据约束结果继续。", "stage": "prewarm"})
+        _prewarm_synthesis_provider(context, reason="plan")
         return result
 
     def _planned_question(context) -> str:
@@ -682,13 +731,17 @@ def build_qa_stage_handlers(
                 dependency_id=f"provider:{profile.provider_id}" if profile is not None else "",
             )
         except QaCircuitOpen as exc:
-            raise QaStageFailure(
-                QaPublicError(
-                    "PROVIDER_CIRCUIT_OPEN", str(exc), True,
-                    str(getattr(profile, "provider_id", "model")), "level1_draft",
-                    (QaAction("稍后重试当前阶段", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
-                )
-            ) from exc
+            public = QaPublicError(
+                "PROVIDER_CIRCUIT_OPEN",
+                "本地模型当前响应过慢，系统已先用检索证据整理初步结论并继续后续核验。",
+                True,
+                str(getattr(profile, "provider_id", "model")), "level1_draft",
+                (QaAction("稍后重试当前阶段", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
+            )
+            result = degrade_to_evidence_draft(
+                public,
+                dependency_id=f"provider:{profile.provider_id}" if profile is not None else "",
+            )
         except Exception as exc:
             if profile is not None:
                 resilience.circuit_failure(f"provider:{profile.provider_id}")

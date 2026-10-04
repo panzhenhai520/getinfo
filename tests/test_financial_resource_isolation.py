@@ -16,6 +16,7 @@ from financial_resource_isolation import (
     ArtifactIOTimeout,
     CORE_WORKER_JOB_TYPES,
     LONG_FINANCIAL_JOB_TYPES,
+    QA_WORKER_JOB_TYPES,
     ProviderAdmissionController,
     ProviderCooldown,
     validate_worker_lane_partition,
@@ -43,6 +44,8 @@ class FinancialResourceIsolationTest(unittest.TestCase):
         partition = validate_worker_lane_partition(ALL_ISOLATED_WORKER_JOB_TYPES)
         self.assertTrue(partition["valid"])
         self.assertFalse(set(CORE_WORKER_JOB_TYPES) & set(LONG_FINANCIAL_JOB_TYPES))
+        self.assertFalse(set(QA_WORKER_JOB_TYPES) & set(CORE_WORKER_JOB_TYPES))
+        self.assertFalse(set(QA_WORKER_JOB_TYPES) & set(LONG_FINANCIAL_JOB_TYPES))
         commands = worker_lane_commands(
             python_executable="python-fixture",
             worker_script=Path("/tmp/intel_worker.py"),
@@ -55,6 +58,9 @@ class FinancialResourceIsolationTest(unittest.TestCase):
         for job_type in LONG_FINANCIAL_JOB_TYPES:
             self.assertIn(job_type, commands["long_financial"])
             self.assertNotIn(job_type, commands["core"])
+        for job_type in QA_WORKER_JOB_TYPES:
+            self.assertNotIn(job_type, commands["core"])
+            self.assertNotIn(job_type, commands["long_financial"])
 
     def test_slow_research_lane_does_not_block_rss_lane(self):
         temp_dir = tempfile.TemporaryDirectory()
