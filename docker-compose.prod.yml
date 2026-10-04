@@ -186,6 +186,64 @@ services:
       retries: 5
       start_period: 60s
 
+  # 统一 QA（AI 助手）独立泳道：要跑模型调用 + RAGFlow 增强检索，属长任务。
+  # 单独容器是为了不和 core 泳道（classification / candidate_dispatch /
+  # embed_articles / trend_aggregate 等批处理）抢 CPU；intel-worker 的 supervisor
+  # 只启动 core/long 两条泳道，不再认领 qa.run
+  # （见 financial_resource_isolation.QA_WORKER_JOB_TYPES）。
+  # ⚠️ 必须与"含 qa_* 模块"的镜像同一批发布：qa.run 已从 long 泳道移出，
+  #    只更新代码不起这个容器，用户提问会一直停在 queued；反之只起容器不更新代码，
+  #    long 泳道会和它同时抢 qa.run。
+  qa-worker:
+    image: collectinfo-web:latest
+    container_name: collectinfo-qa-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "intel_worker.py", "--no-periodic-scheduler", "--job-type", "qa.run"]
+    # QA 是突发型负载（一次问答 1 个作业），限核避免拖慢 web 与 core 泳道；
+    # 可用 .env 里的 QA_WORKER_CPUS 调整。
+    deploy:
+      resources:
+        limits:
+          cpus: '${QA_WORKER_CPUS:-3}'
+    logging:
+      driver: json-file
+      options:
+        max-size: "30m"
+        max-file: "5"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Hong_Kong
+      PYTHONPATH: /app:/app/agent_reach_tool
+      DATABASE_TYPE: postgres
+      DATABASE_FALLBACK_TO_SQLITE: "false"
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-collectinfo}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SQLITE_BACKUP_PATH: /app/data/crawler_articles.db
+      DATABASE_PATH: /app/data/crawler_articles.db
+      CRAWL_RESULTS_DIR: /app/crawl_results
+      RAGFLOW_LLM_ENABLED: "false"
+      INTEL_WORKER_POLL_SECONDS: "5"
+    volumes:
+      - ./data:/app/data
+      - ./crawl_results:/app/crawl_results
+      - ./crawl_logs:/app/crawl_logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "tools/check_intel_worker_health.py", "--database", "/app/data/crawler_articles.db"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   redis:
     image: redis:7-alpine
     container_name: collectinfo-redis
