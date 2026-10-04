@@ -1580,9 +1580,9 @@
             position: fixed;
             top: 0;
             right: 0;
-            width: 66.666vw;
-            min-width: 760px;
-            max-width: 96vw;
+            width: 100vw;
+            min-width: 0;
+            max-width: 100vw;
             /* dvh 跟随真实可视视口（手机地址栏/软键盘收起底部），避免输入区被挤出屏幕下沿 */
             height: 100vh;
             height: 100dvh;
@@ -1622,7 +1622,7 @@
             /* 消息列高度受约束，超长消息在内部滚动，不把底部输入区顶出屏幕 */
             grid-template-rows: minmax(0, 1fr);
         }
-        .chat-drawer.history-open .chat-body { grid-template-columns: 360px 1fr; }
+        .chat-drawer.history-open .chat-body { grid-template-columns: 300px minmax(0, 1fr); }
         .session-list {
             position: relative;
             display: none;
@@ -1737,7 +1737,7 @@
             min-width: 0;
             min-height: 0;
             overflow: auto;
-            padding: 18px 22px;
+            padding: 18px clamp(16px, 3vw, 38px);
             font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
         .history-context-banner {
@@ -1751,7 +1751,7 @@
             line-height: 1.55;
         }
         .message {
-            max-width: 82%;
+            max-width: 86%;
             margin-bottom: 16px;
             padding: 10px 12px;
             border-radius: 8px;
@@ -1767,7 +1767,7 @@
         }
         .message.answer {
             margin-right: auto;
-            max-width: 90%;
+            max-width: 96%;
             display: grid;
             grid-template-columns: 34px 1fr;
             gap: 9px;
@@ -1816,6 +1816,142 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        .message-content.progress-host {
+            width: min(560px, 100%);
+            white-space: normal;
+        }
+        .chat-progress-panel {
+            width: 100%;
+            border: 1px solid rgba(29, 127, 104, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.72);
+            box-shadow: 0 8px 22px rgba(23, 32, 29, 0.06);
+            color: #25483b;
+            overflow: hidden;
+        }
+        .chat-progress-panel[open] {
+            background: rgba(255, 255, 255, 0.92);
+        }
+        .chat-progress-panel summary {
+            min-height: 38px;
+            display: grid;
+            grid-template-columns: 20px minmax(0, 1fr) 16px;
+            gap: 8px;
+            align-items: center;
+            padding: 0 10px;
+            cursor: pointer;
+            list-style: none;
+        }
+        .chat-progress-panel summary::-webkit-details-marker {
+            display: none;
+        }
+        .chat-progress-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(29, 127, 104, 0.18);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 850ms linear infinite;
+        }
+        .chat-progress-viewport {
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .chat-progress-marquee {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 100%;
+            animation: chatProgressMarquee 8s linear infinite;
+        }
+        .chat-progress-label {
+            flex-shrink: 0;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0;
+            animation: chatProgressGlow 1.25s ease-in-out infinite;
+        }
+        .chat-progress-text {
+            min-width: 0;
+            color: #315b46;
+            font-size: 13px;
+            font-weight: 700;
+            background: linear-gradient(100deg, #315b46 0%, #315b46 36%, #0f8a68 50%, #315b46 64%, #315b46 100%);
+            background-size: 240% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: chatProgressTextShine 2.2s linear infinite;
+        }
+        .chat-progress-chevron {
+            color: var(--muted);
+            font-size: 12px;
+            transition: transform 0.15s ease;
+        }
+        .chat-progress-panel[open] .chat-progress-chevron {
+            transform: rotate(180deg);
+        }
+        .chat-progress-details {
+            display: grid;
+            gap: 6px;
+            padding: 0 10px 10px 38px;
+            border-top: 1px solid rgba(29, 127, 104, 0.12);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .chat-progress-live {
+            display: grid;
+            gap: 3px;
+            padding: 7px 8px;
+            border: 1px solid rgba(29, 127, 104, 0.14);
+            border-radius: 7px;
+            background: rgba(29, 127, 104, 0.055);
+        }
+        .chat-progress-live strong {
+            color: #17634f;
+            font-weight: 800;
+        }
+        .chat-progress-live span {
+            min-width: 0;
+            color: #315b46;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+            background: linear-gradient(100deg, #315b46 0%, #315b46 36%, #0f8a68 50%, #315b46 64%, #315b46 100%);
+            background-size: 240% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: chatProgressTextShine 2.2s linear infinite;
+        }
+        .chat-progress-step {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2px;
+            min-width: 0;
+        }
+        .chat-progress-step strong {
+            color: #315b46;
+            font-weight: 800;
+        }
+        .chat-progress-step span {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        @keyframes chatProgressMarquee {
+            0%, 14% { transform: translateX(0); }
+            86%, 100% { transform: translateX(calc(-1 * var(--progress-travel, 0px))); }
+        }
+        @keyframes chatProgressGlow {
+            0%, 100% { color: var(--accent); text-shadow: 0 0 0 rgba(29, 127, 104, 0); }
+            50% { color: #0f6c51; text-shadow: 0 0 10px rgba(29, 127, 104, 0.34); }
+        }
+        @keyframes chatProgressTextShine {
+            0% { background-position: 160% 0; }
+            100% { background-position: -80% 0; }
+        }
         .message-content h1,
         .message-content h2,
         .message-content h3 {
@@ -1845,7 +1981,200 @@
             padding: 0;
             background: transparent;
         }
+        .chat-answer-page-tools {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(29, 127, 104, 0.14);
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .chat-answer-page-tools button,
+        .chat-plan-actions button {
+            border: 1px solid rgba(29, 127, 104, 0.24);
+            border-radius: 7px;
+            background: #fff;
+            color: #265b46;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 6px 9px;
+        }
+        .chat-answer-page-tools button:disabled {
+            opacity: .45;
+            cursor: default;
+        }
+        .chat-plan-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+            padding: 9px;
+            border: 1px solid rgba(29, 127, 104, 0.18);
+            border-radius: 8px;
+            background: rgba(244, 247, 243, 0.82);
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .chat-plan-actions textarea {
+            width: 100%;
+            min-height: 74px;
+            resize: vertical;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            padding: 8px;
+            font: inherit;
+            font-size: 13px;
+        }
+        .chat-plan-actions[data-plan-actions="true"] {
+            border-color: rgba(29, 127, 104, 0.36);
+            background: rgba(236, 247, 240, 0.94);
+            box-shadow: 0 0 0 1px rgba(29, 127, 104, 0.08), 0 10px 28px rgba(29, 127, 104, 0.10);
+        }
+        .chat-plan-actions[data-plan-actions="true"] button {
+            position: relative;
+            overflow: hidden;
+            color: #174934;
+            border-color: rgba(29, 127, 104, 0.42);
+            animation: planActionPulse 1.7s ease-in-out infinite;
+        }
+        .chat-plan-actions[data-plan-actions="true"] button[data-plan-continue] {
+            background: #1d7f68;
+            color: #fff;
+        }
+        .chat-plan-actions[data-plan-actions="true"] button::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-120%);
+            background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,.46) 45%, transparent 68%);
+            animation: planButtonShine 1.9s linear infinite;
+        }
+        .message-content.plan-thinking > p:first-child,
+        .message-content.plan-thinking > ul:first-of-type,
+        .message-content.plan-thinking > ol:first-of-type {
+            color: transparent;
+            background: linear-gradient(105deg, #315b46 15%, #0f7b61 35%, #e9fff5 48%, #0f7b61 61%, #315b46 85%);
+            background-size: 260% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: planTextShine 1.55s linear infinite;
+        }
+        @keyframes planTextShine {
+            0% { background-position: 160% 0; }
+            100% { background-position: -80% 0; }
+        }
+        @keyframes planButtonShine {
+            0% { transform: translateX(-120%); }
+            100% { transform: translateX(120%); }
+        }
+        @keyframes planActionPulse {
+            0%, 100% { box-shadow: 0 0 0 rgba(29, 127, 104, 0); }
+            50% { box-shadow: 0 0 0 3px rgba(29, 127, 104, 0.16); }
+        }
+        .chat-plan-actions[data-answer-progress="true"] span {
+            color: transparent;
+            background: linear-gradient(105deg, #315b46 15%, #0f7b61 35%, #e9fff5 48%, #0f7b61 61%, #315b46 85%);
+            background-size: 260% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: planTextShine 1.55s linear infinite;
+        }
         .message.answer.message-has-table{width:100%;max-width:100%;padding-right:0}.chat-table-scroll{width:100%;overflow-x:auto;margin:12px 0;border:1px solid #4e8068;border-radius:8px;background:#fff;box-shadow:0 2px 8px rgba(31,90,64,.08)}.chat-table-scroll table{width:100%;min-width:820px;border-collapse:separate;border-spacing:0;font-size:14px;line-height:1.55;white-space:normal}.chat-table-scroll th,.chat-table-scroll td{padding:11px 13px;vertical-align:top;text-align:left;border-right:1px solid #a9c3b4;border-bottom:1px solid #a9c3b4;word-break:break-word}.chat-table-scroll th{position:sticky;top:0;z-index:1;background:#dcece2;color:#173d2b;font-weight:800}.chat-table-scroll tr:nth-child(even) td{background:#f6faf7}.chat-table-scroll th:last-child,.chat-table-scroll td:last-child{border-right:0}.chat-table-scroll tbody tr:last-child td{border-bottom:0}.chat-table-scroll::-webkit-scrollbar{height:9px}.chat-table-scroll::-webkit-scrollbar-thumb{background:#789988;border-radius:999px}
+        .qa-insight-drawer {
+            margin-top: 12px;
+            border: 1px solid rgba(29, 127, 104, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.82);
+            overflow: hidden;
+            white-space: normal;
+        }
+        .qa-insight-drawer summary {
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 10px;
+            color: #315b46;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 800;
+            list-style: none;
+        }
+        .qa-insight-drawer summary::-webkit-details-marker { display: none; }
+        .qa-insight-drawer-body {
+            display: grid;
+            gap: 10px;
+            padding: 0 10px 10px;
+            border-top: 1px solid rgba(29, 127, 104, 0.12);
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--muted);
+        }
+        .qa-insight-section strong {
+            display: block;
+            margin: 8px 0 4px;
+            color: #315b46;
+        }
+        .qa-insight-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+        .qa-insight-list li {
+            margin: 4px 0;
+            overflow-wrap: anywhere;
+        }
+        .qa-citation-link {
+            display: inline-flex;
+            align-items: center;
+            border: 0;
+            border-radius: 4px;
+            padding: 0 3px;
+            margin: 0 1px;
+            color: #176f58;
+            background: rgba(29, 127, 104, 0.1);
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .qa-citation-link:hover,
+        .qa-citation-link.is-active {
+            color: #0f4d3d;
+            background: rgba(29, 127, 104, 0.22);
+        }
+        .qa-insight-card {
+            display: grid;
+            gap: 3px;
+            padding: 7px 8px;
+            border: 1px solid rgba(29, 127, 104, 0.14);
+            border-radius: 6px;
+            background: #fff;
+        }
+        .qa-insight-card.is-active {
+            border-color: rgba(29, 127, 104, 0.5);
+            box-shadow: 0 0 0 2px rgba(29, 127, 104, 0.1);
+        }
+        .qa-insight-card-title {
+            color: #234b39;
+            font-weight: 700;
+        }
+        .qa-insight-card-meta {
+            color: #6b7a70;
+            font-size: 12px;
+        }
+        .qa-insight-card a {
+            color: #176f58;
+            text-decoration: none;
+        }
+        .qa-insight-card a:hover {
+            text-decoration: underline;
+        }
         .generated-file-actions {
             display: flex;
             flex-wrap: wrap;
@@ -2189,7 +2518,7 @@
             position: relative;
             flex: 1;
             min-width: 0;
-            padding: 16px 8px 4px;
+            padding: 2px 0;
             overflow-x: auto;
             overflow-y: hidden;
             scrollbar-width: thin;
@@ -2199,11 +2528,14 @@
             grid-template-columns: repeat(var(--model-count, 1), minmax(36px, 1fr));
             gap: 5px;
             min-width: max-content;
-            align-items: end;
+            align-items: center;
         }
         .model-icon {
-            border: 0;
-            background: transparent;
+            min-width: 54px;
+            min-height: 38px;
+            border: 1px solid transparent;
+            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.7);
             color: var(--muted);
             cursor: pointer;
             display: grid;
@@ -2217,6 +2549,7 @@
             transition: opacity 0.15s ease, filter 0.15s ease, color 0.15s ease;
         }
         .model-icon.active {
+            border-color: rgba(29, 127, 104, 0.45);
             color: var(--accent);
             opacity: 1;
             filter: none;
@@ -2234,11 +2567,7 @@
             text-overflow: ellipsis;
         }
         .model-slider-rail {
-            position: relative;
-            height: 16px;
-            margin: 4px 0 0;
-            border-radius: 999px;
-            background: rgba(23, 32, 29, 0.1);
+            display: none;
         }
         .model-slider-input {
             position: absolute;
@@ -2508,7 +2837,10 @@
         @media (prefers-reduced-motion: reduce) {
             .intel-section-body,
             .dashboard-category-toggle,
-            .dashboard-category-toggle svg { animation: none !important; transition-duration: 1ms !important; }
+            .dashboard-category-toggle svg,
+            .chat-progress-spinner,
+            .chat-progress-marquee,
+            .chat-progress-label { animation: none !important; transition-duration: 1ms !important; }
         }
     </style>
     <link rel="stylesheet" href="/static/css/responsive.css?v=17">
@@ -2634,6 +2966,7 @@
                 <div class="chat-title" id="chatTitle">AI助手</div>
                 <div class="chat-actions">
                     <button class="icon-button" id="backToChat" type="button" title="返回聊天"><i class="fa fa-arrow-left"></i></button>
+                    <button class="icon-button" id="newChatSessionTop" type="button" title="新会话" aria-label="新会话"><i class="fa fa-plus"></i></button>
                     <button class="icon-button" id="toggleHistory" type="button" title="查看历史会话"><i class="fa fa-history"></i><span class="sr-only">历史会话</span></button>
                     <button class="icon-button" id="closeChat" type="button" title="关闭"><i class="fa fa-chevron-right"></i></button>
                 </div>
@@ -2766,6 +3099,11 @@
             searchLinks: [],
             retrievedArticles: [],
             selectedSessionIds: new Set(),
+            currentQaRunId: '',
+            chatStreamController: null,
+            chatStreamSerial: 0,
+            pendingPlanAdjustment: null,
+            answerPageSize: 3600,
             worldMap: null,
             detailCloseTimer: null,
             detailHovering: false,
@@ -6360,6 +6698,7 @@
             const toggle = document.getElementById('chatToggle');
             drawer.classList.toggle('open', open);
             if (!open) drawer.classList.remove('article-quote-open');
+            if (open) drawer.classList.remove('history-open');
             toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
             if (open) syncChatHomeContext();
         }
@@ -6405,6 +6744,10 @@
         });
         // 兜底：主脚本若因故未绑定，页面尾部的独立脚本也会把面板打开（见 body 末尾）
         document.getElementById('toggleHistory').dataset.bound = '1';
+        document.getElementById('newChatSessionTop').addEventListener('click', async () => {
+            await newSession();
+            document.getElementById('chatInput')?.focus();
+        });
         document.getElementById('backToChat').addEventListener('click', () => {
             closeHistoryPanel();
         });
@@ -6414,8 +6757,538 @@
             if (drawer) drawer.classList.remove('history-open');
         }
 
+        function cleanChatUiText(text) {
+            return String(text || '')
+                .replace(/RAGFlow\s*二级召回/g, 'RAG增强召回')
+                .replace(/RAGFlow\s*深度检索/g, 'RAG增强检索')
+                .replace(/RAGFlow/gi, 'RAG增强检索')
+                .replace(/RAG检索增强/g, 'RAG增强检索')
+                .replace(/RAG增强检索\s*(news\s*)?知识库/gi, 'RAG增强检索知识库')
+                .replace(/RAG增强检索\s*二级研究/g, 'RAG增强检索')
+                .replace(/降级摘要/g, '证据锚定摘要')
+                .replace(/一级模型返回格式异常[^。；]*[。；]?/g, '资料已按证据锚定方式整理。')
+                .replace(/一级分析未稳定返回结构化结果[^。；]*[。；]?/g, '资料已按证据锚定方式整理。')
+                .replace(/[^。；]*研究模型格式未完全通过校验[^。；]*[。；]?/g, '已完成证据召回，并按证据锚定方式整理。')
+                .replace(/证据锚定摘要。?\s*现返回严格引用证据的证据锚定摘要。?/g, '证据锚定摘要。')
+                .replace(/连接\s*local\s*超时，请检查网络后重试。?/g, '综合模型响应超时，已改用证据约束重组。');
+        }
+
+        function structuredAnswerJsonToMarkdown(value) {
+            const raw = String(value || '').trim();
+            if (!raw || !/^[\[{]/.test(raw) || !/"(sections|claims|citations|conflicts)"\s*:/.test(raw)) return '';
+            let parsed = null;
+            try { parsed = JSON.parse(raw); } catch (error) { return ''; }
+            const lines = [];
+            if (typeof parsed.summary === 'string' && parsed.summary.trim()) {
+                lines.push('**核心结论**', '', parsed.summary.trim());
+            }
+            const sections = Array.isArray(parsed.sections) ? parsed.sections : [];
+            sections.forEach(section => {
+                if (!section || typeof section !== 'object') return;
+                const title = cleanChatUiText(section.title || '').trim();
+                const content = cleanChatUiText(section.content || '').trim();
+                if (!content) return;
+                if (lines.length) lines.push('');
+                lines.push(`**${title || '分析'}**`, '', content);
+            });
+            const conflicts = Array.isArray(parsed.conflicts) ? parsed.conflicts : [];
+            const meaningfulConflicts = conflicts
+                .map(item => cleanChatUiText(item?.rationale || item?.subject || ''))
+                .filter(Boolean)
+                .slice(0, 3);
+            if (meaningfulConflicts.length) {
+                lines.push('', '**需核验事项**', '', ...meaningfulConflicts.map(item => `- ${item}`));
+            }
+            return lines.join('\n');
+        }
+
+        function normalizeAssistantAnswerText(text) {
+            const cleaned = cleanChatUiText(text || '');
+            return structuredAnswerJsonToMarkdown(cleaned) || cleaned;
+        }
+
         function setStatus(text) {
-            document.getElementById('chatStatus').textContent = text || '';
+            document.getElementById('chatStatus').textContent = cleanChatUiText(text || '');
+        }
+
+        function classifyChatProgress(message, fallback = 'thinking') {
+            const text = String(message || '');
+            if (/检索|搜索|知识库|资料|来源|证据|召回|retriev|search/i.test(text)) return 'retrieving';
+            return fallback;
+        }
+
+        function formatChatProgressLabel(phase) {
+            return phase === 'retrieving' ? 'Retrieving' : 'Thinking';
+        }
+
+        function compactProgressTitle(value, max = 22) {
+            const text = cleanChatUiText(value || '').replace(/\s+/g, ' ').trim();
+            if (!text) return '';
+            return text.length > max ? `${text.slice(0, max)}...` : text;
+        }
+
+        function mergeAssistantChunk(current, chunk) {
+            const existing = String(current || '');
+            const incoming = cleanChatUiText(chunk || '');
+            if (!incoming) return existing;
+            if (!existing) return normalizeAssistantAnswerText(incoming);
+            if (incoming.startsWith(existing)) return normalizeAssistantAnswerText(incoming);
+            if (existing.endsWith(incoming)) return existing;
+            const existingTrimmed = existing.trimEnd();
+            const incomingTrimmed = incoming.trimStart();
+            if (existingTrimmed && incomingTrimmed && incomingTrimmed.startsWith(existingTrimmed)) {
+                return normalizeAssistantAnswerText(incomingTrimmed);
+            }
+            return normalizeAssistantAnswerText(existing + incoming);
+        }
+
+        function boundedChatMessages(messages, maxMessages = 16, maxChars = 16000) {
+            const source = Array.isArray(messages) ? messages : [];
+            const selected = [];
+            let remaining = Math.max(1000, Number(maxChars || 16000));
+            for (let index = source.length - 1; index >= 0; index -= 1) {
+                const item = source[index] || {};
+                const role = String(item.role || '');
+                if (!['user', 'assistant'].includes(role)) continue;
+                let content = cleanChatUiText(item.content || '');
+                if (!content) continue;
+                if (content.length > remaining) content = content.slice(-remaining);
+                selected.push({ role, content });
+                remaining -= content.length;
+                if (selected.length >= maxMessages || remaining <= 0) break;
+            }
+            return selected.reverse();
+        }
+
+        function isPlanAgreementInput(text) {
+            const clean = String(text || '').replace(/\s+/g, '').replace(/[，。！？!?,.;；、]/g, '').toLowerCase();
+            if (!clean) return false;
+            const agreement = [
+                '同意', '可以', '继续', '按你的思路', '按此思路', '按这个思路', '听你的',
+                '你看着办', '你决定', '照你的来', '按你说的', '就这样', '没问题',
+                'ok', 'okay', 'yes', 'goahead', 'continue'
+            ];
+            return agreement.some(item => clean === item || clean.includes(item));
+        }
+
+        async function cancelCurrentQaRun(reason = '用户调整回答思路', runId = state.currentQaRunId) {
+            if (state.chatStreamController) {
+                try { state.chatStreamController.abort(); } catch (error) {}
+                state.chatStreamController = null;
+            }
+            if (!runId) return;
+            try {
+                await fetch(`/api/qa/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason }),
+                });
+            } catch (error) {
+                console.warn('cancel qa run failed', error);
+            }
+        }
+
+        function renderInlineAnswerProgress(node) {
+            if (!node || !node._answerProgressActive) return;
+            let bar = node.querySelector('[data-answer-progress]');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.className = 'chat-plan-actions';
+                bar.dataset.answerProgress = 'true';
+                bar.innerHTML = '<span data-answer-progress-text>继续生成中...</span>';
+                node.appendChild(bar);
+            }
+            const text = bar.querySelector('[data-answer-progress-text]');
+            if (text) text.textContent = node._answerProgressText || '继续生成中...';
+        }
+
+        function updateInlineAnswerProgress(node, message = '', event = null) {
+            if (!node || !node._answerProgressActive) return;
+            const variants = chatProgressVariants(event, message || '继续生成中', classifyChatProgress(message || '继续生成中'));
+            node._answerProgressVariants = variants.length ? variants : ['继续检索证据：正在筛选可引用来源'];
+            node._answerProgressIndex = 0;
+            node._answerProgressText = node._answerProgressVariants[0];
+            renderInlineAnswerProgress(node);
+        }
+
+        function startInlineAnswerProgress(node, message = '继续检索和生成回答', event = null) {
+            if (!node) return;
+            node._answerProgressActive = true;
+            updateInlineAnswerProgress(node, message, event);
+            if (node._answerProgressTimer) return;
+            node._answerProgressTimer = setInterval(() => {
+                if (!node._answerProgressActive) return;
+                const variants = node._answerProgressVariants || [];
+                if (!variants.length) return;
+                node._answerProgressIndex = ((node._answerProgressIndex || 0) + 1) % variants.length;
+                node._answerProgressText = variants[node._answerProgressIndex];
+                renderInlineAnswerProgress(node);
+            }, 1850);
+        }
+
+        function stopInlineAnswerProgress(node) {
+            if (!node) return;
+            node._answerProgressActive = false;
+            if (node._answerProgressTimer) {
+                clearInterval(node._answerProgressTimer);
+                node._answerProgressTimer = null;
+            }
+            node.querySelector('[data-answer-progress]')?.remove();
+        }
+
+        function collapseSupersededPlanNode(node, adjustmentText = '') {
+            if (!node) return;
+            node.dataset.streamFrozen = 'true';
+            node.dataset.planAwaitingAction = 'false';
+            node.dataset.adjustmentPaused = 'false';
+            clearChatProgress(node);
+            stopInlineAnswerProgress(node);
+            const text = cleanChatUiText(adjustmentText || '').trim();
+            node.innerHTML = `<div class="chat-plan-actions"><span>${escapeHtml(text ? `原计划已暂停，正在按调整思路重新生成：${text}` : '原计划已暂停，正在按新思路重新生成。')}</span></div>`;
+            node.closest('.message')?.classList.add('message-superseded');
+        }
+
+        function collapsePausedPlanNodes(adjustmentText = '') {
+            document.querySelectorAll('#messages .message.answer .message-content[data-adjustment-paused="true"], #messages .message.answer .message-content[data-plan-awaiting-action="true"]').forEach(node => {
+                collapseSupersededPlanNode(node, adjustmentText);
+            });
+        }
+
+        function showPlanControlActions(node, question, planText) {
+            if (!node || node.querySelector('.chat-plan-actions')) return;
+            node.dataset.planAwaitingAction = 'true';
+            node.classList.remove('plan-thinking');
+            const bar = document.createElement('div');
+            bar.className = 'chat-plan-actions';
+            bar.dataset.planActions = 'true';
+            bar.innerHTML = `
+                <span>系统会按上述思路继续生成，你也可以先调整。</span>
+                <button type="button" data-plan-continue>按此思路继续</button>
+                <button type="button" data-plan-adjust>调整思路</button>
+            `;
+            bar.querySelector('[data-plan-continue]').addEventListener('click', () => {
+                bar.remove();
+                startInlineAnswerProgress(node, '已按当前思路继续：正在检索证据并生成回答', { stage: 'level1_retrieval' });
+                setStatus('已按当前思路继续生成');
+            });
+            bar.querySelector('[data-plan-adjust]').addEventListener('click', async () => {
+                const pausedRunId = state.currentQaRunId || '';
+                state.pendingPlanAdjustment = { question, planText: cleanChatUiText(planText || ''), runId: pausedRunId, node };
+                state.chatStreamSerial += 1;
+                if (state.chatStreamController) {
+                    try { state.chatStreamController.abort(); } catch (error) {}
+                    state.chatStreamController = null;
+                }
+                node.dataset.streamFrozen = 'true';
+                node.dataset.planAwaitingAction = 'false';
+                node.dataset.adjustmentPaused = 'true';
+                clearChatProgress(node);
+                stopInlineAnswerProgress(node);
+                state.isStreaming = false;
+                const input = document.getElementById('chatInput');
+                const submitButton = document.querySelector('#chatForm .send-button');
+                const qaButton = document.getElementById('qaSaveOpenBtn');
+                input.disabled = false;
+                if (submitButton) submitButton.disabled = false;
+                if (qaButton) qaButton.disabled = false;
+                input.placeholder = '请补充你希望调整的回答思路，然后发送';
+                input.value = '';
+                input.focus();
+                bar.innerHTML = '<span>已暂停当前输出；请输入调整意见，发送后会按新思路重新组织答案。</span>';
+                setStatus('已暂停当前输出，等待调整思路');
+            });
+            node.appendChild(bar);
+        }
+
+        function chatEvidenceHint(event) {
+            const articles = Array.isArray(event?.articles) ? event.articles : [];
+            const snippets = Array.isArray(event?.snippets) ? event.snippets : [];
+            const evidence = Array.isArray(event?.data?.result?.evidence)
+                ? event.data.result.evidence
+                : (Array.isArray(event?.data?.evidence) ? event.data.evidence : []);
+            const items = articles.length ? articles : (evidence.length ? evidence : snippets);
+            const count = items.length;
+            const titles = items
+                .map(item => compactProgressTitle(item?.title || item?.name || item?.source || item?.href || item?.url))
+                .filter(Boolean)
+                .slice(0, 2);
+            if (!count && !titles.length) return '';
+            const countText = count ? `已看到 ${count} 条候选资料` : '已看到候选资料';
+            return titles.length ? `${countText}：${titles.join('、')}` : countText;
+        }
+
+        function chatProgressVariants(event, message, phase) {
+            const stage = event?.stage || event?.data?.stage || event?.data?.current_stage || '';
+            const hint = chatEvidenceHint(event);
+            const base = cleanChatUiText(message || '').trim();
+            const variantsByStage = {
+                plan: [
+                    '拆解问题：识别公告号、主题词、时间和回答边界',
+                    '规划路径：先找官方原文，再补官方解读和专业分析',
+                    '建立约束：后续结论必须绑定可点击引用',
+                ],
+                level1_retrieval: [
+                    '检索政策库：优先查官方原文、官方解读和法规号',
+                    '筛选来源：压低历史问答、媒体背景和弱相关材料',
+                    '定位证据：按公告号、标题、发布机关和关键词匹配',
+                ],
+                level1_draft: [
+                    '整理证据：抽取来源等级、发布日期、标题和可引用片段',
+                    '清洗材料：合并重复片段，剔除泛家办和社媒背景',
+                    '生成证据图：把每条结论绑定到具体资料',
+                ],
+                level2_retrieval: [
+                    'RAG增强召回：围绕公告号、离岸信托、个人所得税扩展片段',
+                    '补充上下文：查找配套征管、专业解读和相邻条文',
+                    '重排片段：官方原文优先，专业解读只作补充',
+                ],
+                level2_research: [
+                    '交叉核验：比对官方原文、征管口径和专业观点',
+                    '多跳分析：从适用对象推到申报、风险和应对动作',
+                    '标记缺口：无法由证据确认的内容不写成确定结论',
+                ],
+                conflict_review: [
+                    '冲突核验：检查数值、时间、适用范围是否互相矛盾',
+                    '裁决来源：官方原文优先，解读材料不得覆盖原文',
+                    '过滤噪音：没有实质冲突时不展示空泛冲突提示',
+                ],
+                synthesis: [
+                    '组织回答：按核心结论、风险拆解、应对建议生成',
+                    '约束措辞：只使用证据包内的信息，不扩写无依据判断',
+                    '压缩表达：保留重点，把依据放入可展开面板',
+                ],
+                citation_validation: [
+                    '引用校验：确认 [1] 指向官方原文',
+                    '映射检查：标题和编号都要能跳到对应资料',
+                    '最终核对：避免引用指到无关文章或弱相关材料',
+                ],
+                completed: ['回答生成完成：正在收尾并刷新引用面板'],
+            };
+            const variants = variantsByStage[stage] || [];
+            const result = [...variants];
+            if (hint) result.unshift(hint);
+            if (base && !result.includes(base)) result.unshift(base);
+            if (!result.length) {
+                return phase === 'retrieving'
+                    ? ['检索资料：正在查找可引用来源', '筛选证据：按权威性和相关性排序', '整理片段：准备生成证据包']
+                    : ['分析问题：正在组织推理路径', '核验证据：检查结论是否有依据', '生成回答：整理为可读结论'];
+            }
+            return result.slice(0, 6);
+        }
+
+        function resetProgressMarquee(panel) {
+            const viewport = panel?.querySelector('.chat-progress-viewport');
+            const marquee = panel?.querySelector('.chat-progress-marquee');
+            if (!viewport || !marquee) return;
+            requestAnimationFrame(() => {
+                const travel = Math.max(0, marquee.scrollWidth - viewport.clientWidth);
+                marquee.style.setProperty('--progress-travel', `${travel}px`);
+                marquee.style.animation = 'none';
+                marquee.offsetHeight;
+                marquee.style.animation = '';
+            });
+        }
+
+        function setChatProgressLine(panel, text) {
+            if (!panel) return;
+            const clean = cleanChatUiText(text || '').trim();
+            panel.querySelector('.chat-progress-text').textContent = clean;
+            const live = panel.querySelector('.chat-progress-live span');
+            if (live) live.textContent = clean;
+            resetProgressMarquee(panel);
+        }
+
+        function startChatProgressTicker(panel) {
+            if (!panel || panel._progressTicker) return;
+            panel._progressTicker = setInterval(() => {
+                const variants = panel._progressVariants || [];
+                if (!variants.length) return;
+                panel._progressVariantIndex = ((panel._progressVariantIndex || 0) + 1) % variants.length;
+                setChatProgressLine(panel, variants[panel._progressVariantIndex]);
+            }, 1850);
+        }
+
+        function stopChatProgressTicker(panel) {
+            if (panel?._progressTicker) {
+                clearInterval(panel._progressTicker);
+                panel._progressTicker = null;
+            }
+        }
+
+        function attachChatProgressHover(panel) {
+            if (!panel || panel._hoverAutoBound) return;
+            panel._hoverAutoBound = true;
+            panel.addEventListener('mouseenter', () => {
+                if (panel._hoverCloseTimer) {
+                    clearTimeout(panel._hoverCloseTimer);
+                    panel._hoverCloseTimer = null;
+                }
+                panel.open = true;
+            });
+            panel.addEventListener('mouseleave', () => {
+                if (panel._hoverCloseTimer) clearTimeout(panel._hoverCloseTimer);
+                panel._hoverCloseTimer = setTimeout(() => {
+                    panel.open = false;
+                    panel._hoverCloseTimer = null;
+                }, 180);
+            });
+            panel.addEventListener('focusin', () => {
+                if (panel._hoverCloseTimer) {
+                    clearTimeout(panel._hoverCloseTimer);
+                    panel._hoverCloseTimer = null;
+                }
+                panel.open = true;
+            });
+            panel.addEventListener('focusout', () => {
+                if (panel._hoverCloseTimer) clearTimeout(panel._hoverCloseTimer);
+                panel._hoverCloseTimer = setTimeout(() => {
+                    if (!panel.contains(document.activeElement)) panel.open = false;
+                    panel._hoverCloseTimer = null;
+                }, 180);
+            });
+        }
+
+        function updateChatProgress(node, message, phase = '', event = null) {
+            if (!node) return;
+            const text = cleanChatUiText(message || '').trim() || '正在思考...';
+            const resolvedPhase = phase || classifyChatProgress(text);
+            const stageKey = `${event?.stage || event?.data?.stage || event?.data?.current_stage || resolvedPhase}:${text}`;
+            const nowMs = Date.now();
+            if (node._lastProgressKey === stageKey && nowMs - (node._lastProgressAt || 0) < 8000) return;
+            node._lastProgressKey = stageKey;
+            node._lastProgressAt = nowMs;
+            node.classList.add('progress-host');
+            node.classList.remove('waiting');
+            let panel = node.querySelector('[data-chat-progress-panel]');
+            if (!panel) {
+                panel = document.createElement('details');
+                panel.className = 'chat-progress-panel';
+                panel.dataset.chatProgressPanel = 'true';
+                panel.innerHTML = `
+                    <summary aria-label="查看当前思考进展">
+                        <span class="chat-progress-spinner" aria-hidden="true"></span>
+                        <span class="chat-progress-viewport">
+                            <span class="chat-progress-marquee">
+                                <span class="chat-progress-label"></span>
+                                <span class="chat-progress-text"></span>
+                            </span>
+                        </span>
+                        <i class="fa fa-chevron-down chat-progress-chevron" aria-hidden="true"></i>
+                    </summary>
+                    <div class="chat-progress-details"></div>
+                `;
+                node.innerHTML = '';
+                node.appendChild(panel);
+            }
+            attachChatProgressHover(panel);
+            const variants = chatProgressVariants(event, text, resolvedPhase);
+            panel._progressVariants = variants;
+            panel._progressVariantIndex = 0;
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const items = panel._progressItems || [];
+            if (!items.length || items[items.length - 1].text !== text) {
+                items.push({ phase: resolvedPhase, text, time: now });
+                panel._progressItems = items.slice(-8);
+            }
+            panel.querySelector('.chat-progress-label').textContent = formatChatProgressLabel(resolvedPhase);
+            setChatProgressLine(panel, variants[0] || text);
+            const liveText = escapeHtml(variants[0] || text);
+            const historyHtml = (panel._progressItems || [])
+                .map(item => `
+                    <div class="chat-progress-step">
+                        <strong>${escapeHtml(formatChatProgressLabel(item.phase))}</strong>
+                        <span>${escapeHtml(item.text)} · ${escapeHtml(item.time)}</span>
+                    </div>
+                `).join('');
+            panel.querySelector('.chat-progress-details').innerHTML = `
+                <div class="chat-progress-live">
+                    <strong>当前动作</strong>
+                    <span>${liveText}</span>
+                </div>
+                <div class="chat-progress-step">
+                    <strong>阶段记录</strong>
+                </div>
+                ${historyHtml}
+            `;
+            setChatProgressLine(panel, variants[0] || text);
+            startChatProgressTicker(panel);
+        }
+
+        function clearChatProgress(node) {
+            if (!node) return;
+            stopChatProgressTicker(node.querySelector('[data-chat-progress-panel]'));
+            node.classList.remove('progress-host', 'waiting');
+        }
+
+        function splitAnswerForStreaming(text) {
+            const source = normalizeAssistantAnswerText(text || '');
+            if (!source) return [];
+            const parts = [];
+            const blocks = source.split(/(\n{2,})/);
+            blocks.forEach(block => {
+                if (!block) return;
+                if (/^\n+$/.test(block)) {
+                    parts.push(block);
+                    return;
+                }
+                const sentences = block.match(/[^。！？!?；;：:\n]+[。！？!?；;：:]?\s*|\n+/g) || [block];
+                sentences.forEach(sentence => {
+                    let rest = sentence;
+                    while (rest.length > 56) {
+                        parts.push(rest.slice(0, 56));
+                        rest = rest.slice(56);
+                    }
+                    if (rest) parts.push(rest);
+                });
+            });
+            return parts.filter(Boolean);
+        }
+
+        function streamAssistantAnswer(node, fullText, options = {}) {
+            const text = normalizeAssistantAnswerText(fullText || '');
+            const onUpdate = typeof options.onUpdate === 'function' ? options.onUpdate : null;
+            if (!node || !text) return Promise.resolve('');
+            if (node.dataset.streamFrozen === 'true') {
+                const existing = normalizeAssistantAnswerText(node._fullAssistantContent || node.textContent || '');
+                if (onUpdate) onUpdate(existing);
+                return Promise.resolve(existing);
+            }
+            const existing = normalizeAssistantAnswerText(node._fullAssistantContent || '');
+            let current = '';
+            let streamTarget = text;
+            if (existing && text === existing) {
+                if (onUpdate) onUpdate(text);
+                return Promise.resolve(text);
+            }
+            if (existing && text.startsWith(existing)) {
+                current = existing;
+                streamTarget = text.slice(existing.length);
+            }
+            const pieces = splitAnswerForStreaming(streamTarget);
+            if (!pieces.length) {
+                renderAssistantContent(node, text);
+                if (onUpdate) onUpdate(text);
+                return Promise.resolve(text);
+            }
+            let index = 0;
+            const intervalMs = Number(options.intervalMs || 42);
+            return new Promise(resolve => {
+                let timer = null;
+                const tick = () => {
+                    const piece = pieces[index++];
+                    current += piece || '';
+                    renderAssistantContent(node, current);
+                    if (onUpdate) onUpdate(current);
+                    const messagesBox = document.getElementById('messages');
+                    if (messagesBox) messagesBox.scrollTop = messagesBox.scrollHeight;
+                    if (index >= pieces.length) {
+                        if (timer) clearInterval(timer);
+                        resolve(current);
+                    }
+                };
+                tick();
+                if (index < pieces.length) timer = setInterval(tick, intervalMs);
+            });
         }
 
         function escapeHtml(text) {
@@ -6436,6 +7309,57 @@
             } catch (error) {
                 return safeText.replace(/\n/g, '<br>');
             }
+        }
+
+        function splitAnswerPages(text, pageSize = state.answerPageSize || 3600) {
+            const source = String(text || '');
+            const size = Math.max(1200, Number(pageSize || 3600));
+            if (source.length <= size) return [source];
+            const pages = [];
+            let cursor = 0;
+            while (cursor < source.length) {
+                let end = Math.min(source.length, cursor + size);
+                if (end < source.length) {
+                    const windowText = source.slice(cursor, end);
+                    const breakAt = Math.max(
+                        windowText.lastIndexOf('\n\n'),
+                        windowText.lastIndexOf('\n'),
+                        windowText.lastIndexOf('。'),
+                        windowText.lastIndexOf('；'),
+                        windowText.lastIndexOf(';')
+                    );
+                    if (breakAt > Math.floor(size * 0.55)) end = cursor + breakAt + 1;
+                }
+                pages.push(source.slice(cursor, end));
+                cursor = end;
+            }
+            return pages.length ? pages : [''];
+        }
+
+        function renderAnswerPaginationControls(node, pages, activeIndex) {
+            if (!node || pages.length <= 1) return;
+            const tools = document.createElement('div');
+            tools.className = 'chat-answer-page-tools';
+            const prev = document.createElement('button');
+            prev.type = 'button';
+            prev.textContent = '上一页';
+            prev.disabled = activeIndex <= 0;
+            const next = document.createElement('button');
+            next.type = 'button';
+            next.textContent = activeIndex >= pages.length - 1 ? '已到末页' : '下一页';
+            next.disabled = activeIndex >= pages.length - 1;
+            const label = document.createElement('span');
+            label.textContent = `第 ${activeIndex + 1}/${pages.length} 页 · 共 ${node._fullAssistantContent.length} 字`;
+            prev.addEventListener('click', () => {
+                node._answerPageIndex = Math.max(0, (node._answerPageIndex || 0) - 1);
+                renderAssistantContent(node, node._fullAssistantContent || '');
+            });
+            next.addEventListener('click', () => {
+                node._answerPageIndex = Math.min(pages.length - 1, (node._answerPageIndex || 0) + 1);
+                renderAssistantContent(node, node._fullAssistantContent || '');
+            });
+            tools.append(prev, next, label);
+            node.appendChild(tools);
         }
 
         function appendMessage(role, content) {
@@ -6474,7 +7398,15 @@
         }
 
         function renderAssistantContent(node, content) {
-            node.innerHTML = renderMarkdown(content || '');
+            const uiContent = normalizeAssistantAnswerText(content || '');
+            node._fullAssistantContent = uiContent;
+            const planIsAwaitingAction = node.dataset.planAwaitingAction === 'true';
+            node.classList.toggle('plan-thinking', /【问题分析思路：?】/.test(uiContent) && !planIsAwaitingAction);
+            const pages = splitAnswerPages(uiContent);
+            const previousPage = Number(node._answerPageIndex || 0);
+            const activePage = Math.max(0, Math.min(previousPage, pages.length - 1));
+            node._answerPageIndex = activePage;
+            node.innerHTML = renderMarkdown(pages[activePage] || '');
             const tables = [...node.querySelectorAll('table')];
             tables.forEach(table => {
                 const wrapper = document.createElement('div');
@@ -6483,8 +7415,12 @@
                 wrapper.appendChild(table);
             });
             if (tables.length) node.closest('.message')?.classList.add('message-has-table');
-            const blocks = extractGeneratedFileBlocks(content || '');
-            if (!blocks.length) return;
+            renderAnswerPaginationControls(node, pages, activePage);
+            const blocks = extractGeneratedFileBlocks(uiContent);
+            if (!blocks.length) {
+                renderInlineAnswerProgress(node);
+                return;
+            }
             const actions = document.createElement('div');
             actions.className = 'generated-file-actions';
             blocks.forEach(block => {
@@ -6495,6 +7431,7 @@
                 actions.appendChild(button);
             });
             node.appendChild(actions);
+            renderInlineAnswerProgress(node);
         }
 
         async function saveGeneratedChatFile(button, block) {
@@ -6924,6 +7861,266 @@
             container.appendChild(actions);
         }
 
+        function chatStageLabel(stage) {
+            const labels = {
+                plan: '问题规划',
+                level1_retrieval: '资料检索',
+                level1_draft: '证据整理',
+                level2_retrieval: 'RAG增强召回',
+                level2_research: '交叉核验',
+                conflict_review: '冲突与缺口核验',
+                synthesis: '综合回答',
+                citation_validation: '引用校验',
+                completed: '完成',
+            };
+            return labels[stage] || stage || '处理中';
+        }
+
+        function chatEventProgressMessage(event) {
+            const stage = event.stage || event.data?.stage || event.data?.current_stage || '';
+            const label = chatStageLabel(stage);
+            const rawMessage = event.message || event.data?.message || '';
+            if (rawMessage) return cleanChatUiText(rawMessage);
+            if (event.type === 'search_done') return '资料检索完成，正在整理可引用证据';
+            if (event.type === 'retrieval') return `${label}：正在筛选证据片段`;
+            if (event.type === 'research_status') return `${label}：正在进行交叉核验`;
+            if (stage) return chatProgressVariants(event, '', classifyChatProgress(label))[0] || `${label}：正在处理`;
+            return '正在分析问题并组织回答';
+        }
+
+        function captureQaResult(event) {
+            const data = event?.data || {};
+            if (event?.final_answer) return event.final_answer;
+            if (event?.result?.answer || event?.result?.citation_map || event?.result?.evidence) return event.result;
+            if (data.final_answer) return data.final_answer;
+            if (data.result?.answer || data.result?.citation_map || data.result?.evidence) return data.result;
+            return null;
+        }
+
+        function preferCompleteQaResult(current, incoming) {
+            if (!incoming) return current;
+            if (!current) return incoming;
+            const currentScore =
+                (Array.isArray(current.evidence) ? current.evidence.length : 0) +
+                Object.keys(current.citation_map || {}).length +
+                (Array.isArray(current.citations) ? current.citations.length : 0);
+            const incomingScore =
+                (Array.isArray(incoming.evidence) ? incoming.evidence.length : 0) +
+                Object.keys(incoming.citation_map || {}).length +
+                (Array.isArray(incoming.citations) ? incoming.citations.length : 0);
+            if (incomingScore >= currentScore) return incoming;
+            return current;
+        }
+
+        function qaSourceLabel(item) {
+            const meta = item?.metadata || {};
+            const type = item?.doc_type || item?.source_role || meta.doc_type || meta.source_role || item?.source_type || '';
+            if (/official_policy|policy_original|official/.test(type)) return '官方原文';
+            if (/interpretation/.test(type)) return '官方解读';
+            if (/commentary|article/.test(type)) return '解读材料';
+            if (/ragflow|chunk|kb|knowledge/i.test(type)) return 'RAG增强检索片段';
+            return cleanChatUiText(type || '证据');
+        }
+
+        function qaEvidenceIndex(evidence) {
+            const index = {};
+            (Array.isArray(evidence) ? evidence : []).forEach(item => {
+                const ref = String(item?.evidence_ref || '');
+                if (ref) index[ref] = item;
+            });
+            return index;
+        }
+
+        function qaEvidenceTitle(item, fallback = '依据') {
+            const meta = item?.metadata || {};
+            return cleanChatUiText(
+                item?.title || meta.title || item?.doc_no || meta.doc_no ||
+                item?.source_url || meta.source_url || item?.evidence_ref || fallback
+            );
+        }
+
+        function qaEvidenceIdentity(item) {
+            const meta = item?.metadata || {};
+            const title = qaEvidenceTitle(item, '').replace(/\s+/g, '').toLowerCase();
+            const docNo = String(item?.doc_no || meta.doc_no || '').replace(/\s+/g, '').toLowerCase();
+            const issuer = String(item?.issuer || meta.issuer || '').replace(/\s+/g, '').toLowerCase();
+            const source = qaSourceLabel(item);
+            if (source === '官方原文' && (docNo || title)) return `official:${issuer}:${docNo}:${title}`;
+            const url = qaEvidenceUrl(item).toLowerCase();
+            if (url) return `url:${url}`;
+            return title ? `title:${title}` : String(item?.evidence_ref || '');
+        }
+
+        function qaUniqueEvidence(items) {
+            const result = [];
+            const seen = new Set();
+            (Array.isArray(items) ? items : []).forEach(item => {
+                const key = qaEvidenceIdentity(item);
+                if (key && seen.has(key)) return;
+                if (key) seen.add(key);
+                result.push(item);
+            });
+            return result;
+        }
+
+        function qaEvidenceUrl(item) {
+            const meta = item?.metadata || {};
+            const url = String(item?.source_url || meta.source_url || item?.url || meta.url || '');
+            return /^https?:\/\//i.test(url) ? url : '';
+        }
+
+        function qaMeaningfulConflict(conflict) {
+            const text = conflict?.summary || conflict?.reason || conflict?.rationale || conflict?.subject || conflict?.claim || conflict?.verdict || '';
+            let clean = cleanChatUiText(text).trim();
+            clean = clean.replace(/（?裁决规则\s*qa-adjudication-v\d+）?/gi, '').trim();
+            if (!clean || clean === '发现待核验事项') return '';
+            if (/来源权威等级差异明确|优先采用主张\s*[A-Za-z0-9_.:-]+|受限解释保留/.test(clean)) {
+                return '不同资料的权威性不一样：回答已优先采用官方原文或更权威来源；专业解读和背景材料只作为参考，不直接当作政策结论。';
+            }
+            clean = clean.replace(/\b(?:l[12]|claim|finding|evidence)[-_][A-Za-z0-9_.:-]+\b/gi, '相关说法');
+            if (/未对冲突数值取平均|权威性、时间和适用范围不足以确定唯一口径/.test(clean)) {
+                return '不同资料的说法还不能互相印证，回答时已优先采用官方原文；解读材料只作为参考，不当作确定结论。';
+            }
+            if (/专业解释或预测差异|不能用来源等级静默替代/.test(clean)) {
+                return '专业文章之间存在解读角度差异，不能直接判定谁对谁错；需要回到官方原文或后续官方口径核验。';
+            }
+            return clean;
+        }
+
+        function qaUniqueMeaningfulConflicts(conflicts) {
+            const seen = new Set();
+            const result = [];
+            (Array.isArray(conflicts) ? conflicts : []).forEach(conflict => {
+                const text = qaMeaningfulConflict(conflict);
+                const key = text.replace(/\s+/g, '');
+                if (!text || seen.has(key)) return;
+                seen.add(key);
+                result.push(text);
+            });
+            return result;
+        }
+
+        function activateQaCitationLinks(container, result) {
+            if (!container || !result?.citation_map) return;
+            const citationMap = result.citation_map || {};
+            const evidenceIndex = qaEvidenceIndex(result.evidence);
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    if (!/\[\d+\]/.test(node.nodeValue || '')) return NodeFilter.FILTER_REJECT;
+                    if (node.parentElement?.closest('.qa-insight-drawer, button, a')) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            nodes.forEach(node => {
+                const frag = document.createDocumentFragment();
+                String(node.nodeValue || '').split(/(\[\d+\])/g).forEach(part => {
+                    if (/^\[\d+\]$/.test(part) && citationMap[part]) {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = 'qa-citation-link';
+                        button.dataset.citation = part;
+                        button.dataset.ref = citationMap[part];
+                        button.title = qaEvidenceTitle(evidenceIndex[citationMap[part]], citationMap[part]);
+                        button.textContent = part;
+                        button.addEventListener('click', () => {
+                            const drawer = container.querySelector('.qa-insight-drawer');
+                            if (drawer) drawer.open = true;
+                            container.querySelectorAll('.qa-citation-link.is-active,.qa-insight-card.is-active').forEach(el => el.classList.remove('is-active'));
+                            button.classList.add('is-active');
+                            const target = container.querySelector(`.qa-insight-card[data-ref="${CSS.escape(button.dataset.ref)}"]`);
+                            if (target) {
+                                target.classList.add('is-active');
+                                target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }
+                        });
+                        frag.appendChild(button);
+                    } else {
+                        frag.appendChild(document.createTextNode(part));
+                    }
+                });
+                node.parentNode.replaceChild(frag, node);
+            });
+        }
+
+        function appendQaInsightDrawer(container, result) {
+            if (!container || !result || container.querySelector('.qa-insight-drawer')) return;
+            const evidence = Array.isArray(result.evidence) ? result.evidence : [];
+            const conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
+            const reasons = Array.isArray(result.degradation_reasons) ? result.degradation_reasons : [];
+            const citationMap = result.citation_map || {};
+            const evidenceIndex = qaEvidenceIndex(evidence);
+            const riskDive = result.sections?.risk_deep_dive || {};
+            const risks = Array.isArray(riskDive.risks) ? riskDive.risks : [];
+            if (!evidence.length && !conflicts.length && !reasons.length && !Object.keys(citationMap).length && !risks.length) return;
+            const sortedCitationEntries = Object.entries(citationMap).sort((a, b) => {
+                const left = Number(String(a[0]).replace(/\D/g, '')) || 0;
+                const right = Number(String(b[0]).replace(/\D/g, '')) || 0;
+                return left - right;
+            });
+            const citationItems = sortedCitationEntries.slice(0, 40).map(([key, ref]) => {
+                const item = evidenceIndex[String(ref)] || {};
+                const title = qaEvidenceTitle(item, String(ref));
+                const label = /^\[\d+\]$/.test(String(key)) ? String(key) : `[${key}]`;
+                const source = qaSourceLabel(item);
+                const url = qaEvidenceUrl(item);
+                const titleHtml = url
+                    ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
+                    : escapeHtml(title);
+                return `<li><button type="button" class="qa-citation-link" data-ref="${escapeHtml(String(ref))}" data-citation="${escapeHtml(label)}">${escapeHtml(label)}</button> ${escapeHtml(source)}：${titleHtml}</li>`;
+            }).join('');
+            const citedRefs = new Set(sortedCitationEntries.map(([, ref]) => String(ref)));
+            const evidenceForDrawer = [
+                ...evidence.filter(item => citedRefs.has(String(item.evidence_ref || ''))),
+                ...evidence.filter(item => !citedRefs.has(String(item.evidence_ref || ''))),
+            ];
+            const uniqueEvidenceForDrawer = qaUniqueEvidence(evidenceForDrawer).slice(0, 60);
+            const evidenceItems = uniqueEvidenceForDrawer.map((item, index) => {
+                const title = qaEvidenceTitle(item, `证据 ${index + 1}`);
+                const ref = String(item.evidence_ref || '');
+                const url = qaEvidenceUrl(item);
+                const meta = [qaSourceLabel(item), item.published_at || item.metadata?.publish_date || '', ref].filter(Boolean).join(' · ');
+                const titleHtml = url
+                    ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
+                    : escapeHtml(title);
+                return `<li class="qa-insight-card" data-ref="${escapeHtml(ref)}"><span class="qa-insight-card-title">${titleHtml}</span><span class="qa-insight-card-meta">${escapeHtml(cleanChatUiText(meta))}</span></li>`;
+            }).join('');
+            const riskItems = risks.slice(0, 5).map(risk => {
+                const labels = Array.isArray(risk.citation_labels) ? risk.citation_labels.join(' ') : '';
+                return `<li class="qa-insight-card"><span class="qa-insight-card-title">${escapeHtml(cleanChatUiText(risk.area || '风险点'))}</span><span>${escapeHtml(cleanChatUiText(risk.impact || ''))}</span><span>应对：${escapeHtml(cleanChatUiText(risk.response || ''))} ${escapeHtml(labels)}</span></li>`;
+            }).join('');
+            const reasonItems = reasons.slice(0, 6).map(reason => `<li>${escapeHtml(cleanChatUiText(reason))}</li>`).join('');
+            const conflictItems = qaUniqueMeaningfulConflicts(conflicts).slice(0, 5).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+            const drawer = document.createElement('details');
+            drawer.className = 'qa-insight-drawer';
+            drawer.open = true;
+            drawer.innerHTML = `
+                <summary><i class="fa fa-folder-open-o" aria-hidden="true"></i><span>依据、分析与核验</span></summary>
+                <div class="qa-insight-drawer-body">
+                    ${citationItems ? `<div class="qa-insight-section"><strong>引用映射</strong><ol class="qa-insight-list">${citationItems}</ol></div>` : ''}
+                    ${evidenceItems ? `<div class="qa-insight-section"><strong>证据</strong><ol class="qa-insight-list">${evidenceItems}</ol></div>` : ''}
+                    ${riskItems ? `<div class="qa-insight-section"><strong>风险深研</strong><ol class="qa-insight-list">${riskItems}</ol></div>` : ''}
+                    ${reasonItems ? `<div class="qa-insight-section"><strong>分析状态</strong><ul class="qa-insight-list">${reasonItems}</ul></div>` : ''}
+                    ${conflictItems ? `<div class="qa-insight-section"><strong>冲突与缺口</strong><ul class="qa-insight-list">${conflictItems}</ul></div>` : ''}
+                </div>
+            `;
+            container.appendChild(drawer);
+            drawer.querySelectorAll('.qa-citation-link[data-ref]').forEach(button => {
+                button.addEventListener('click', () => {
+                    const target = drawer.querySelector(`.qa-insight-card[data-ref="${CSS.escape(button.dataset.ref)}"]`);
+                    if (target) {
+                        drawer.open = true;
+                        drawer.querySelectorAll('.qa-insight-card.is-active,.qa-citation-link.is-active').forEach(el => el.classList.remove('is-active'));
+                        button.classList.add('is-active');
+                        target.classList.add('is-active');
+                        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                });
+            });
+            activateQaCitationLinks(container, result);
+        }
+
         function collectQaPairs() {
             const pairs = [];
             const messages = (state.chatMessages || []).slice(state.loadedHistoryMessageCount || 0);
@@ -6946,7 +8143,7 @@
                     throw new Error(data.error || data.message || `知识库加载失败 HTTP ${response.status}`);
                 }
                 if (data.configured === false) {
-                    throw new Error(data.message || 'RAGFlow 尚未配置');
+                    throw new Error(data.message || '知识库尚未配置');
                 }
                 const datasets = Array.isArray(data.datasets) ? data.datasets : [];
                 select.innerHTML = '<option value="">请选择知识库</option>';
@@ -6963,7 +8160,7 @@
                     const option = document.createElement('option');
                     option.value = '';
                     option.disabled = true;
-                    option.textContent = data.message || 'RAGFlow 已连接，但没有知识库';
+                    option.textContent = data.message || '知识库已连接，但没有可选知识库';
                     select.appendChild(option);
                 }
                 const savedKb = state.chatConfig?.ragflow_kb_id || '';
@@ -7564,10 +8761,10 @@
         }
         document.getElementById('chatForm').addEventListener('submit', async event => {
             event.preventDefault();
-            if (state.isStreaming) return;
+            if (state.isStreaming && !state.pendingPlanAdjustment) return;
             if (!state.sessionId) await newSession();
             const input = document.getElementById('chatInput');
-            const question = input.value.trim();
+            let question = input.value.trim();
             if (!question) return;
             // 点【发送】的模型选择策略：
             // 1) 勾选过「记住默认选择」→ 永不再弹；
@@ -7577,8 +8774,13 @@
                 openModelSelect(question);
                 return;
             }
+            if (question.length > 12000) {
+                question = question.slice(0, 12000);
+                setStatus('输入较长，已自动截取最近 12000 字发送');
+            }
             input.value = '';
             state.isStreaming = true;
+            const streamSerial = ++state.chatStreamSerial;
             const submitButton = document.querySelector('#chatForm .send-button');
             const qaButton = document.getElementById('qaSaveOpenBtn');
             const modelDisplayName = getActiveModelDisplayName();
@@ -7593,12 +8795,30 @@
             state.retrievedArticles = [];
             renderRetrievalSources();
             const answerNode = appendMessage('assistant', '');
-            answerNode.classList.add('waiting');
-            answerNode.textContent = `正在等待${modelDisplayName}响应...`;
+            updateChatProgress(answerNode, `正在等待${modelDisplayName}响应...`, 'thinking');
+            const adjustmentContext = state.pendingPlanAdjustment;
+            const adjustmentIsAgreement = adjustmentContext && isPlanAgreementInput(question);
+            const isAdjustmentRequest = Boolean(adjustmentContext && !adjustmentIsAgreement);
+            if (adjustmentContext) {
+                collapseSupersededPlanNode(adjustmentContext?.node, question);
+                collapsePausedPlanNodes(question);
+            }
+            if (isAdjustmentRequest) {
+                clearChatProgress(answerNode);
+                updateChatProgress(answerNode, '正在套用你的调整思路：筛选子问题并重新组织答案', 'thinking', { stage: 'plan' });
+                setStatus('正在套用你的调整思路');
+            }
+            state.pendingPlanAdjustment = null;
+            input.placeholder = '输入问题';
             let answer = '';
             let firstChunkReceived = false;
             let searchLinks = [];
             let reportRefs = [];
+            let qaFinalResult = null;
+            let qaAnswerStreamStarted = false;
+            let qaAnswerStreamDone = Promise.resolve();
+            let chunkRenderQueue = Promise.resolve();
+            let queuedAnswerText = '';
             let streamCompleted = false;
             let financialRouteSeen = false;
             let financialRouteKey = '';
@@ -7607,34 +8827,79 @@
                 state.historyContextPending && state.loadedHistoryContext.length,
             );
             try {
+                if (adjustmentContext) {
+                    await cancelCurrentQaRun('用户提交调整思路，按新计划重新生成', adjustmentContext?.runId || state.currentQaRunId);
+                }
+                if (isAdjustmentRequest) {
+                    setStatus('已收到调整，正在按新思路重新组织答案');
+                }
                 const requestPayload = {
                     session_id: state.sessionId,
                     model: state.activeModel,
                     topic: currentChatTopic(),
                     industry_pack_id: state.intelIndustryPackId,
-                    messages: state.modelChatMessages,
+                    messages: boundedChatMessages(state.modelChatMessages, 16, 16000),
                     web_search: state.webSearch,
                     user_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     sse_features: ['financial-sse-v1'],
                 };
+                if (adjustmentContext) {
+                    if (adjustmentIsAgreement) {
+                        requestPayload.question = [
+                            `原始问题：${adjustmentContext.question || ''}`,
+                            `此前回答计划：${adjustmentContext.planText || ''}`,
+                            `用户确认：${question || '按此思路继续'}`,
+                            '请沿用此前问题分析思路继续生成答案，不要把用户确认语当作新的研究问题。',
+                        ].join('\n\n');
+                        requestPayload.history_context = [
+                            ...(Array.isArray(requestPayload.history_context) ? requestPayload.history_context : []),
+                            { role: 'user', content: adjustmentContext.question || '' },
+                            { role: 'assistant', content: adjustmentContext.planText || '' },
+                            { role: 'user', content: `确认继续：${question || '按此思路继续'}` },
+                        ];
+                        setStatus('已识别为确认继续，将沿用原思路生成');
+                    } else {
+                        requestPayload.question = [
+                            `原始问题：${adjustmentContext.question || ''}`,
+                            `此前回答计划：${adjustmentContext.planText || ''}`,
+                            `用户调整意见：${question}`,
+                            '请先理解用户调整意见，重新生成问题分析思路，再按新思路继续回答。',
+                        ].join('\n\n');
+                        requestPayload.history_context = [
+                            ...(Array.isArray(requestPayload.history_context) ? requestPayload.history_context : []),
+                            { role: 'user', content: adjustmentContext.question || '' },
+                            { role: 'assistant', content: adjustmentContext.planText || '' },
+                            { role: 'user', content: `调整思路：${question}` },
+                        ];
+                    }
+                }
                 if (historyContextAttached) {
-                    requestPayload.history_context = state.loadedHistoryContext;
+                    requestPayload.history_context = [
+                        ...(Array.isArray(requestPayload.history_context) ? requestPayload.history_context : []),
+                        ...boundedChatMessages(state.loadedHistoryContext, 24, 24000),
+                    ];
                     requestPayload.history_source_session_id = state.loadedHistorySessionId;
                 }
                 while (!streamCompleted) {
+                    const controller = new AbortController();
+                    state.chatStreamController = controller;
                     const response = await fetch('/api/chat/send', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestPayload),
+                        signal: controller.signal,
                     });
+                    state.currentQaRunId = response.headers.get('X-QA-Run-ID') || state.currentQaRunId || '';
                     if (!response.ok || !response.body) {
-                        // 优先显示后端的可操作提示（如"行业包已切换，请刷新页面"），而不是笼统的状态码
-                        let chatErr = `聊天接口异常：${response.status}`;
+                        let detail = '';
                         try {
-                            const errData = await response.json();
-                            if (errData && (errData.message || errData.error)) chatErr = errData.message || errData.error;
+                            const raw = await response.text();
+                            const match = raw.match(/data:\s*(\{[^\n]+\})/);
+                            const parsed = match ? JSON.parse(match[1]) : JSON.parse(raw);
+                            detail = parsed?.message || parsed?.error?.message || parsed?.error || '';
                         } catch (_) {}
-                        throw new Error(chatErr);
+                        if (!detail && response.status === 429) detail = '服务器网关限流，请稍后重试。';
+                        throw new Error(detail || `聊天接口异常：${response.status}`);
                     }
                     if (historyContextAttached && state.historyContextPending) {
                         markLoadedHistoryContextConsumed();
@@ -7653,21 +8918,45 @@
                             const payload = part.slice(5).trim();
                             if (!payload) return;
                             const event = JSON.parse(payload);
+                            if (streamSerial !== state.chatStreamSerial) return;
+                            if (event.qa_run_id) state.currentQaRunId = event.qa_run_id;
                             if (streamCompleted && event.type !== 'done') return;
+                            const maybeQaResult = captureQaResult(event);
+                            if (maybeQaResult) {
+                                qaFinalResult = preferCompleteQaResult(qaFinalResult, maybeQaResult);
+                                if (!firstChunkReceived && !qaAnswerStreamStarted && maybeQaResult.answer) {
+                                    qaAnswerStreamStarted = true;
+                                    firstChunkReceived = true;
+                                    clearChatProgress(answerNode);
+                                    setStatus('正在生成回复...');
+                                    qaAnswerStreamDone = streamAssistantAnswer(answerNode, maybeQaResult.answer, {
+                                        intervalMs: 38,
+                                        onUpdate: value => { answer = value; },
+                                    });
+                                }
+                            }
                             if (event.type === 'chunk') {
                                 if (!firstChunkReceived) {
                                     firstChunkReceived = true;
-                                    answerNode.classList.remove('waiting');
+                                    clearChatProgress(answerNode);
                                     setStatus('正在生成回复...');
                                 }
-                                answer += event.content || '';
-                                renderAssistantContent(answerNode, answer);
+                                queuedAnswerText = mergeAssistantChunk(queuedAnswerText || answer, event.content || '');
+                                const targetAnswer = queuedAnswerText;
+                                const showPlanAfterRender = !isAdjustmentRequest && (event.data?.source === 'question_plan' || event.stage === 'plan');
+                                chunkRenderQueue = chunkRenderQueue.then(() => streamAssistantAnswer(answerNode, targetAnswer, {
+                                    intervalMs: event.data?.source === 'question_plan' ? 18 : 14,
+                                    onUpdate: value => { answer = value; },
+                                })).then(() => {
+                                    if (showPlanAfterRender) showPlanControlActions(answerNode, question, answer);
+                                });
                             } else if (event.type === 'status' || event.type === 'searching') {
-                                const message = event.message || '正在等待模型响应...';
+                                const message = chatEventProgressMessage(event);
                                 setStatus(message);
                                 if (!firstChunkReceived) {
-                                    answerNode.classList.add('waiting');
-                                    answerNode.textContent = message;
+                                    updateChatProgress(answerNode, message, classifyChatProgress(message), event);
+                                } else {
+                                    updateInlineAnswerProgress(answerNode, message, event);
                                 }
                             } else if (event.type === 'route') {
                                 financialRouteSeen = true;
@@ -7675,9 +8964,10 @@
                                 setStatus(`已路由到金融能力：${event.route_destination || event.intent || '金融研究'}`);
                             } else if (event.type === 'clarification' || event.type === 'research_status') {
                                 financialRouteSeen = true;
-                                const message = event.message || event.question || '正在处理金融研究';
+                                const message = chatEventProgressMessage(event) || event.question || '正在处理金融研究';
                                 setStatus(message);
-                                if (!firstChunkReceived) answerNode.textContent = message;
+                                if (!firstChunkReceived) updateChatProgress(answerNode, message, classifyChatProgress(message), event);
+                                else updateInlineAnswerProgress(answerNode, message, event);
                             } else if (event.type === 'sources') {
                                 financialRouteSeen = true;
                                 searchLinks = (event.sources || []).map(item => item.url).filter(Boolean);
@@ -7687,11 +8977,19 @@
                                 financialRouteSeen = true;
                                 reportRefs = event.reports || [];
                             } else if (event.type === 'search_done') {
+                                const message = chatEventProgressMessage(event);
                                 searchLinks = (event.snippets || []).map(item => item.href).filter(Boolean);
                                 state.searchLinks = searchLinks;
                                 renderSearchSources();
+                                setStatus(message);
+                                if (!firstChunkReceived) updateChatProgress(answerNode, message, 'retrieving', event);
+                                else updateInlineAnswerProgress(answerNode, message, event);
                             } else if (event.type === 'retrieval') {
-                                // 本次回答参考的库内文章（主题 + 原文链接）
+                                const message = chatEventProgressMessage(event);
+                                setStatus(message);
+                                if (!firstChunkReceived) updateChatProgress(answerNode, message, 'retrieving', event);
+                                else updateInlineAnswerProgress(answerNode, message, event);
+                                // 本机：记录本次回答参考的库内文章（主题 + 原文链接），供检索抽屉使用
                                 state.retrievedArticles = event.articles || [];
                                 renderRetrievalSources();
                             } else if (event.type === 'done') {
@@ -7708,20 +9006,55 @@
                         answer = '';
                         firstChunkReceived = false;
                         reportRefs = [];
-                        answerNode.classList.add('waiting');
-                        answerNode.textContent = '金融数据流连接中断，正在恢复...';
+                        updateChatProgress(answerNode, '金融数据流连接中断，正在恢复...', 'thinking');
                         setStatus('金融数据流连接中断，正在恢复...');
                         continue;
                     }
-                    if (!streamCompleted) throw new Error('聊天数据流连接中断，未收到完成标记');
+                    if (!streamCompleted) {
+                        if (qaFinalResult?.answer || answer) {
+                            streamCompleted = true;
+                            setStatus('连接已结束，正在整理已收到的回答');
+                        } else {
+                            throw new Error('聊天数据流连接中断，未收到完成标记');
+                        }
+                    }
                 }
+                await chunkRenderQueue;
+                await qaAnswerStreamDone;
+                stopInlineAnswerProgress(answerNode);
+                if (!answer && qaFinalResult?.answer) {
+                    answer = await streamAssistantAnswer(answerNode, qaFinalResult.answer, {
+                        intervalMs: 38,
+                        onUpdate: value => { answer = value; },
+                    });
+                } else if (qaFinalResult?.answer && cleanChatUiText(answer) !== cleanChatUiText(qaFinalResult.answer)) {
+                    const finalAnswerText = cleanChatUiText(qaFinalResult.answer);
+                    const currentAnswerText = cleanChatUiText(answer);
+                    if (finalAnswerText.startsWith(currentAnswerText)) {
+                        const tail = finalAnswerText.slice(currentAnswerText.length);
+                        if (tail) {
+                            answer = await streamAssistantAnswer(answerNode, currentAnswerText + tail, {
+                                intervalMs: 24,
+                                onUpdate: value => { answer = value; },
+                            });
+                        }
+                    } else if (!currentAnswerText.includes(finalAnswerText.slice(0, Math.min(80, finalAnswerText.length)))) {
+                        // Keep the already streamed response stable. The final object is still used
+                        // for citations and evidence drawers, but it should not visually replace text
+                        // the user has just watched stream in.
+                        answer = currentAnswerText;
+                    }
+                }
+                clearChatProgress(answerNode);
                 // 流式输出结束：自动折叠来源面板，需要时点击头部展开
                 collapseSourcePanels();
                 answerNode.classList.remove('waiting');
                 renderAssistantContent(answerNode, answer);
                 appendFinancialReportLinks(answerNode, reportRefs);
-                state.chatMessages.push({ role: 'assistant', content: answer });
-                state.modelChatMessages.push({ role: 'assistant', content: answer });
+                appendQaInsightDrawer(answerNode, qaFinalResult);
+                const uiAnswer = cleanChatUiText(answer);
+                state.chatMessages.push({ role: 'assistant', content: uiAnswer });
+                state.modelChatMessages.push({ role: 'assistant', content: uiAnswer });
                 await fetch('/api/chat/history/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -7730,7 +9063,7 @@
                         model_id: state.activeModel,
                         topic: currentChatTopic(),
                         question,
-                        answer,
+                        answer: uiAnswer,
                         financial_route_key: financialRouteKey,
                         industry_pack_id: state.intelIndustryPackId,
                     }),
@@ -7745,10 +9078,19 @@
                 }
                 setStatus('');
             } catch (error) {
+                if (streamSerial !== state.chatStreamSerial) return;
+                if (error?.name === 'AbortError') {
+                    clearChatProgress(answerNode);
+                    stopInlineAnswerProgress(answerNode);
+                    setStatus('已停止生成，等待调整思路');
+                    return;
+                }
+                clearChatProgress(answerNode);
+                stopInlineAnswerProgress(answerNode);
+                const errorText = cleanChatUiText(error.message || '聊天生成失败');
                 // 异常结束同样折叠来源面板
                 collapseSourcePanels();
                 answerNode.classList.remove('waiting');
-                const errorText = error.message || '聊天生成失败';
                 answerNode.textContent = errorText;
                 setStatus(errorText);
                 state.chatMessages.push({ role: 'assistant', content: errorText });
@@ -7767,12 +9109,16 @@
                     }),
                 }).catch(() => {});
             } finally {
-                state.isStreaming = false;
-                input.disabled = false;
-                if (submitButton) submitButton.disabled = false;
-                if (qaButton) qaButton.disabled = false;
-                input.focus();
-                await loadSessions();
+                if (streamSerial === state.chatStreamSerial) {
+                    state.isStreaming = false;
+                    state.chatStreamController = null;
+                    state.currentQaRunId = '';
+                    input.disabled = false;
+                    if (submitButton) submitButton.disabled = false;
+                    if (qaButton) qaButton.disabled = false;
+                    input.focus();
+                    await loadSessions();
+                }
             }
         });
 
