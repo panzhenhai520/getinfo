@@ -872,7 +872,11 @@ class SQLiteDatabase:
             "CREATE INDEX IF NOT EXISTS idx_keyword_delete_jobs_keyword ON keyword_delete_jobs(keyword)",
             "CREATE INDEX IF NOT EXISTS idx_article_ragflow_article ON article_ragflow_documents(article_id)",
             "CREATE INDEX IF NOT EXISTS idx_article_ragflow_kb_doc ON article_ragflow_documents(kb_id, document_id)",
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_article_ragflow_unique_doc ON article_ragflow_documents(kb_id, document_id) WHERE document_id IS NOT NULL AND TRIM(document_id) != ''"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_article_ragflow_unique_doc ON article_ragflow_documents(kb_id, document_id) WHERE document_id IS NOT NULL AND TRIM(document_id) != ''",
+            # 政策检索用（统一 QA）：按文档类型/文号/来源 URL 过滤
+            "CREATE INDEX IF NOT EXISTS idx_article_ragflow_doc_type ON article_ragflow_documents(doc_type)",
+            "CREATE INDEX IF NOT EXISTS idx_article_ragflow_doc_no ON article_ragflow_documents(doc_no)",
+            "CREATE INDEX IF NOT EXISTS idx_article_ragflow_source_url ON article_ragflow_documents(source_url)"
         ]
         
         if cursor is None:
@@ -1154,9 +1158,57 @@ class SQLiteDatabase:
                 error_message TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                -- 政策文档元数据（统一 QA 的政策检索按这些列过滤，见 qa_retrieval / qa_policy_evidence）
+                doc_type TEXT DEFAULT '',
+                issuer TEXT DEFAULT '',
+                doc_no TEXT DEFAULT '',
+                article_no TEXT DEFAULT '',
+                policy_title TEXT DEFAULT '',
+                publish_date TEXT DEFAULT '',
+                effective_date TEXT DEFAULT '',
+                source_url TEXT DEFAULT '',
+                authority_level INTEGER DEFAULT 0,
+                metadata_json TEXT DEFAULT '',
                 FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE SET NULL
             )
         """)
+        self._ensure_article_ragflow_policy_columns(cursor)
+
+    @staticmethod
+    def _ensure_article_ragflow_policy_columns(cursor) -> None:
+        """老库补列：article_ragflow_documents 的政策元数据列与索引。
+
+        统一 QA（AI 助手）的政策检索会 `COALESCE(ard.doc_type,'')` 这类过滤，
+        缺列会直接 UndefinedColumn 让问答失败，所以老库必须补上。
+        PG / SQLite 都不支持 ADD COLUMN IF NOT EXISTS 的通用写法，逐个 try 即可（已存在就跳过）。
+        """
+        for name, ddl in (
+            ("doc_type", "TEXT DEFAULT ''"),
+            ("issuer", "TEXT DEFAULT ''"),
+            ("doc_no", "TEXT DEFAULT ''"),
+            ("article_no", "TEXT DEFAULT ''"),
+            ("policy_title", "TEXT DEFAULT ''"),
+            ("publish_date", "TEXT DEFAULT ''"),
+            ("effective_date", "TEXT DEFAULT ''"),
+            ("source_url", "TEXT DEFAULT ''"),
+            ("authority_level", "INTEGER DEFAULT 0"),
+            ("metadata_json", "TEXT DEFAULT ''"),
+        ):
+            try:
+                cursor.execute(
+                    "ALTER TABLE article_ragflow_documents ADD COLUMN %s %s" % (name, ddl)
+                )
+            except Exception:
+                continue  # 列已存在
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_article_ragflow_doc_type ON article_ragflow_documents(doc_type)",
+            "CREATE INDEX IF NOT EXISTS idx_article_ragflow_doc_no ON article_ragflow_documents(doc_no)",
+            "CREATE INDEX IF NOT EXISTS idx_article_ragflow_source_url ON article_ragflow_documents(source_url)",
+        ):
+            try:
+                cursor.execute(index_sql)
+            except Exception:
+                continue
 
     def _resolve_task_source(self, cursor, task_id: str) -> Tuple[str, Optional[str]]:
         """Return a user-facing task name and schedule id for an exact task id."""
