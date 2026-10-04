@@ -93,22 +93,50 @@ def _default_semantic_search(question: str, *, allowed_ids: set, limit: int):
 
 
 def _dedupe_evidence(items: list[dict], limit: int) -> list[dict]:
-    result, refs, urls, article_ids = [], set(), set(), set()
+    result, refs, urls, article_ids, fingerprints = [], set(), set(), set(), set()
     for item in items:
         ref = str(item.get("evidence_ref") or "")
         url = str(item.get("source_url") or "")
         article_id = item.get("article_id")
-        if ref in refs or (article_id and article_id in article_ids) or (url and url in urls):
+        fingerprint_text = " ".join(str(item.get(key) or "") for key in ("title", "content_excerpt", "excerpt", "content"))
+        fingerprint = hashlib.sha256(" ".join(fingerprint_text.casefold().split())[:600].encode("utf-8")).hexdigest()[:24] if fingerprint_text.strip() else ""
+        if (
+            ref in refs
+            or (article_id and article_id in article_ids)
+            or (url and url in urls)
+            or (fingerprint and fingerprint in fingerprints)
+        ):
             continue
         refs.add(ref)
         if url:
             urls.add(url)
         if article_id:
             article_ids.add(article_id)
+        if fingerprint:
+            fingerprints.add(fingerprint)
         result.append(item)
         if len(result) >= limit:
             break
     return result
+
+
+_RAG_RELEVANCE_STOP_TERMS = {
+    "问题", "回答", "资料", "材料", "证据", "检索", "分析", "影响", "具体", "内容",
+    "相关", "行业", "政策", "公告", "法规", "文件", "如何", "什么", "是否", "哪些",
+    "怎么", "为什么", "以及", "关于", "进行", "说明", "解释", "风险", "应对",
+}
+_RAG_NOISE_TERMS = {
+    "instagram", "facebook", "linkedin", "峰会", "论坛", "花絮", "精彩瞬间", "心情",
+    "点赞", "转发", "评论", "活动回顾", "纳斯达克大屏", "获奖", "招聘",
+}
+_GENERIC_FAMILY_OFFICE_TERMS = {
+    "家族办公室", "家办", "family office", "家族信托", "财富传承", "财富规划",
+    "跨境资产配置", "资产保护", "高净值客户", "财富管理",
+}
+_POLICY_DIRECT_TERMS = {
+    "离岸信托", "境外信托", "个人所得税", "个税", "21号", "公告", "税务",
+    "征管", "财政部", "税务总局", "信托个人所得税", "财产装入",
+}
 
 
 def _filter_rag_evidence_relevance(
@@ -118,10 +146,9 @@ def _filter_rag_evidence_relevance(
     plan: Mapping | None = None,
     limit: int | None = None,
 ) -> tuple[list[dict], dict]:
-    # 通用相关性闸门：交给 qa_relevance 的严格判定——标题命中问题实词，
-    # 或正文前若干字符内多次命中；付费墙/免责声明这类噪声片段直接丢弃。
-    # 服务器原实现是"命中>=2个词，或命中1个词且相似度>=0.25"，判据偏松：
-    # 长文档正文里偶然提到一次、或命中一个泛词就会被当成相关证据带进证据包。
+    # 通用相关性闸门交给 qa_relevance：标题命中问题实词，或正文前若干字符内多次命中；
+    # 付费墙/免责声明与社媒活动类片段直接丢弃。他们那版判据偏松（命中一个泛词且相似度
+    # >=0.2 就收），实测会把家族办公室的无关片段按 0.55 的相似度带进证据包。
     accepted, audit = filter_relevant_evidence(
         question,
         [dict(item) for item in evidence or []],
@@ -143,6 +170,7 @@ def _filter_rag_evidence_relevance(
     return accepted[:cap], {
         "generic_relevance_filter": "applied",
         "terms": list(audit.get("terms") or [])[:20],
+        "term_source": str(audit.get("term_source") or ""),
         "excluded_irrelevant": list(audit.get("excluded") or [])[:50],
         "kept": len(accepted),
         "reason": str(audit.get("reason") or ""),
@@ -174,6 +202,89 @@ def _gate_rag_evidence(
         limit=limit,
     )
     return generic_filtered, {"policy": policy_audit, "generic_relevance": generic_audit}
+
+
+def _material_cleaning_config(plan: Mapping | None) -> Mapping:
+    plan = plan if isinstance(plan, Mapping) else {}
+    question_plan = plan.get("question_plan") if isinstance(plan.get("question_plan"), Mapping) else {}
+    config = question_plan.get("material_cleaning") if isinstance(question_plan.get("material_cleaning"), Mapping) else {}
+    return config if config.get("enabled") else {}
+
+
+def _plan_text_terms(plan: Mapping | None) -> set[str]:
+    plan = plan if isinstance(plan, Mapping) else {}
+    values: list[str] = []
+    question_plan = plan.get("question_plan") if isinstance(plan.get("question_plan"), Mapping) else {}
+    for item in question_plan.get("subquestions") or []:
+        if isinstance(item, Mapping):
+            values.append(str(item.get("text") or ""))
+    for item in question_plan.get("categories") or []:
+        if isinstance(item, Mapping):
+            values.append(str(item.get("label") or ""))
+    anchors = plan.get("policy_anchors") if isinstance(plan.get("policy_anchors"), Mapping) else {}
+    for key in ("strong_terms", "doc_nos", "titles", "issuers"):
+        values.extend(str(item or "") for item in anchors.get(key) or [])
+    blob = " ".join(values).casefold()
+    terms = {term.casefold() for term in _POLICY_DIRECT_TERMS if term.casefold() in blob}
+    terms.update(
+        term for term in re.findall(r"[\u4e00-\u9fff]{2,12}|[a-z0-9][a-z0-9_\-]{2,}", blob, flags=re.I)
+        if term not in _RAG_RELEVANCE_STOP_TERMS and not re.fullmatch(r"\d+", term)
+    )
+    return {term for term in terms if term}
+
+
+def _clean_material_evidence(
+    question: str,
+    evidence: list[Mapping],
+    *,
+    plan: Mapping | None = None,
+    limit: int | None = None,
+) -> tuple[list[dict], dict]:
+    cleaning = _material_cleaning_config(plan)
+    if not cleaning:
+        cap = limit if limit is not None else len(evidence)
+        return [dict(item) for item in evidence[:cap]], {"material_cleaning": "not_applicable"}
+
+    direct_terms = {term.casefold() for term in _POLICY_DIRECT_TERMS if term.casefold() in str(question or "").casefold()}
+    direct_terms.update(_plan_text_terms(plan))
+    kept: list[dict] = []
+    excluded: list[dict] = []
+    for raw in evidence:
+        item = dict(raw)
+        blob = " ".join(
+            str(item.get(key) or "")
+            for key in ("title", "source_url", "content_excerpt", "excerpt", "content")
+        ).casefold()
+        noise_hits = [term for term in _RAG_NOISE_TERMS if term in blob]
+        generic_hits = [term for term in _GENERIC_FAMILY_OFFICE_TERMS if term.casefold() in blob]
+        direct_hits = [term for term in direct_terms if term and term in blob]
+        reason = ""
+        if cleaning.get("exclude_social_media") and noise_hits:
+            reason = "material_cleaning_social_media_or_event_noise"
+        elif cleaning.get("exclude_generic_background") and generic_hits and not direct_hits:
+            reason = "material_cleaning_generic_family_office_background"
+        if reason:
+            excluded.append({
+                "evidence_ref": item.get("evidence_ref"),
+                "title": item.get("title"),
+                "reason": reason,
+                "noise_hits": noise_hits[:8],
+                "generic_hits": generic_hits[:8],
+            })
+            continue
+        kept.append(item)
+
+    cap = limit if limit is not None else len(kept)
+    if cleaning.get("dedupe_repeated_fragments"):
+        kept = _dedupe_evidence(kept, cap)
+    else:
+        kept = kept[:cap]
+    return kept, {
+        "material_cleaning": "applied",
+        "instruction": str(cleaning.get("instruction") or "")[:240],
+        "kept": len(kept),
+        "excluded_material_noise": excluded[:50],
+    }
 
 
 def _evidence_anchored_level1_fallback(message: str, evidence: list[dict], queries: list[str]) -> dict:
@@ -359,6 +470,7 @@ def build_qa_stage_handlers(
             "用户调整意见": question_plan.get("user_adjustment"),
             "用户确认": question_plan.get("user_confirmation"),
             "主题聚类": question_plan.get("categories"),
+            "材料清洗": question_plan.get("material_cleaning"),
             "检索策略": question_plan.get("retrieval_strategy"),
             "回答大纲": question_plan.get("answer_outline"),
             "动态回答模板": question_plan.get("answer_template"),
@@ -448,11 +560,19 @@ def build_qa_stage_handlers(
             plan=retrieval_plan,
             limit=cap,
         )
+        evidence, material_audit = _clean_material_evidence(
+            _planned_question(context),
+            evidence,
+            plan=retrieval_plan,
+            limit=cap,
+        )
         stats = dict(local.get("stats") or {})
         stats.update({"web_adopted": len(external.get("evidence") or []), "adopted": len(evidence)})
         if policy_audit.get("policy_filter") == "applied":
             stats["policy_source_roles"] = policy_audit.get("source_roles") or {}
             stats["policy_noise_excluded"] = len(policy_audit.get("excluded_policy_noise") or [])
+        if material_audit.get("material_cleaning") == "applied":
+            stats["material_noise_excluded"] = len(material_audit.get("excluded_material_noise") or [])
         if callable(emit_stage_event):
             emit_stage_event("stage_progress", {
                 "message": f"已筛出 {len(evidence)} 条候选证据，正在按权威性和相关性排序。",
@@ -462,7 +582,7 @@ def build_qa_stage_handlers(
         result = {
             "queries": list(retrieval_plan.get("queries") or []),
             "evidence": evidence,
-            "excluded": {**dict(local.get("excluded") or {}), "policy": policy_audit},
+            "excluded": {**dict(local.get("excluded") or {}), "policy": policy_audit, "material_cleaning": material_audit},
             "stats": stats,
             "search_status": external.get("status"),
             "search_providers": external.get("providers") or [],
@@ -665,9 +785,24 @@ def build_qa_stage_handlers(
                     plan=plan_output,
                     limit=policy.max_evidence,
                 )
+                gated_evidence, material_audit = _clean_material_evidence(
+                    _planned_question(context),
+                    gated_evidence,
+                    plan=plan_output,
+                    limit=policy.max_evidence,
+                )
                 cached["evidence"] = gated_evidence
-                cached["excluded"] = {**dict(cached.get("excluded") or {}), "retrieval_gate": gate_audit}
-                cached["stats"] = {**dict(cached.get("stats") or {}), "adopted": len(gated_evidence)}
+                cached["excluded"] = {
+                    **dict(cached.get("excluded") or {}),
+                    "policy": gate_audit.get("policy") or {},
+                    "generic_relevance": gate_audit.get("generic_relevance") or {},
+                    "material_cleaning": material_audit,
+                    "retrieval_gate": gate_audit,
+                }
+                cached_stats = {**dict(cached.get("stats") or {}), "adopted": len(gated_evidence)}
+                if material_audit.get("material_cleaning") == "applied":
+                    cached_stats["material_noise_excluded"] = len(material_audit.get("excluded_material_noise") or [])
+                cached["stats"] = cached_stats
                 if not gated_evidence:
                     resilience.circuit_success("ragflow")
                     return _rag_retrieval_fallback(level1, "enhancement_no_relevant_evidence")
@@ -700,9 +835,24 @@ def build_qa_stage_handlers(
                 plan=plan_output,
                 limit=policy.max_evidence,
             )
+            filtered_evidence, material_audit = _clean_material_evidence(
+                _planned_question(context),
+                filtered_evidence,
+                plan=plan_output,
+                limit=policy.max_evidence,
+            )
             result["evidence"] = filtered_evidence
-            result["excluded"] = {**dict(result.get("excluded") or {}), "retrieval_gate": gate_audit}
-            result["stats"] = {**dict(result.get("stats") or {}), "adopted": len(filtered_evidence)}
+            result["excluded"] = {
+                **dict(result.get("excluded") or {}),
+                "policy": gate_audit.get("policy") or {},
+                "generic_relevance": gate_audit.get("generic_relevance") or {},
+                "material_cleaning": material_audit,
+                "retrieval_gate": gate_audit,
+            }
+            result_stats = {**dict(result.get("stats") or {}), "adopted": len(filtered_evidence)}
+            if material_audit.get("material_cleaning") == "applied":
+                result_stats["material_noise_excluded"] = len(material_audit.get("excluded_material_noise") or [])
+            result["stats"] = result_stats
             result["health"] = health
             result["cache"] = {"hit": False, "kb_version": kb_version}
             result["rag_mode"] = "RAG增强检索" if filtered_evidence else "RAG检索"

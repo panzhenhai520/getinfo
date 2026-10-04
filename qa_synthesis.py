@@ -388,6 +388,9 @@ def _public_conflict_summary(item: Mapping) -> str:
     conflict_type = str(item.get("conflict_type") or "")
     text = str(item.get("summary") or item.get("reason") or item.get("rationale") or "").strip()
     text = re.sub(r"（?裁决规则\s*qa-adjudication-v\d+）?", "", text).strip()
+    if re.search(r"来源权威等级差异明确|优先采用主张\s*[A-Za-z0-9_.:-]+|受限解释保留", text):
+        return "不同资料的权威性不一样：回答已优先采用官方原文或更权威来源；专业解读和背景材料只作为参考，不直接当作政策结论。"
+    text = re.sub(r"\b(?:l[12]|claim|finding|evidence)[-_][A-Za-z0-9_.:-]+\b", "相关说法", text, flags=re.I)
     if text:
         return text[:240]
     if conflict_type == "method_difference":

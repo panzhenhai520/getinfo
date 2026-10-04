@@ -197,8 +197,7 @@ def _adjudicate(kind: str, left: Mapping, right: Mapping, evidence_by_ref: Mappi
         return "unresolved", "专业文章之间存在解读角度差异，不能直接判定谁对谁错；需要回到官方原文或后续官方口径核验。"
     left_auth, right_auth = _claim_authority(left, evidence_by_ref), _claim_authority(right, evidence_by_ref)
     if abs(left_auth - right_auth) >= 2:
-        preferred = left if left_auth > right_auth else right
-        return "resolved", f"来源权威等级差异明确，优先采用主张 {preferred.get('claim_id')}；另一说法作为受限解释保留。"
+        return "resolved", "一边来自更权威的来源，另一边只是解读或背景材料；回答时以前者为准，后者只作为参考，不单独作为结论依据。"
     if kind == "method_difference":
         return "unresolved", "不同资料里的数字、税率、期限或计算口径不一致，不能取平均值；需要以官方原文或最新官方口径为准。"
     return "unresolved", "不同资料的说法还不能互相印证，回答时应优先采用官方原文；解读材料只作为参考，不当作确定结论。"

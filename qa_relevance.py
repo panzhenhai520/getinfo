@@ -42,6 +42,13 @@ _NOISE_MARKERS = (
     "请务必在总结开头增加这段话", "本文由第三方AI", "不代表", "推荐点击链接阅读原文",
     "版权所有", "免责声明", "订阅", "登录后查看",
 )
+# 社媒/活动类噪声（取自服务器版 qa_pipeline 的 _RAG_NOISE_TERMS）：这类文章即便标题
+# 里有本包词，也是活动花絮、点赞转发帖，不是可用证据。只看标题，避免正文里偶然出现
+# "评论/转发"把正常文章误判成噪声。
+_TITLE_NOISE_MARKERS = (
+    "instagram", "facebook", "linkedin", "峰会", "论坛", "花絮", "精彩瞬间", "心情",
+    "点赞", "转发", "评论", "活动回顾", "纳斯达克大屏", "获奖", "招聘",
+)
 
 
 def _env_float(name: str, default: float) -> float:
@@ -188,6 +195,10 @@ def _noise_reason(item: Mapping) -> str:
     for marker in _NOISE_MARKERS:
         if normalize_intel_text(marker) in text:
             return "kb_noise_fragment"
+    title = normalize_intel_text(str(item.get("title") or "")).casefold()
+    for marker in _TITLE_NOISE_MARKERS:
+        if marker in title:
+            return "kb_social_or_event_noise"
     return ""
 
 

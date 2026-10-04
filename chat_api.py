@@ -2231,13 +2231,16 @@ def _legacy_request_via_unified_qa(data):
         error_status = int(getattr(exc, "status", 400) or 400)
 
         def _error_stream():
-            yield f"data: {json.dumps({'type': 'error', 'message': error_message, 'code': error_code}, ensure_ascii=False, separators=(',', ':'))}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': error_message, 'code': error_code, 'status': error_status}, ensure_ascii=False, separators=(',', ':'))}\n\n"
 
+        # 用 200 返回错误事件：非 200 时浏览器读不到响应体，前端只能显示"接口异常"，
+        # 真实原因（限流、并发上限等）就丢了；真实状态码放在 X-QA-Error-Status 头里。
         return Response(
             stream_with_context(_error_stream()),
-            status=error_status,
+            status=200,
             mimetype="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no",
+                     "X-QA-Error-Status": str(error_status)},
         )
 
     @stream_with_context

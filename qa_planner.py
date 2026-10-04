@@ -182,6 +182,46 @@ def _normalize_adjustment_patch(patch: object, subquestions: list[dict]) -> dict
     }
 
 
+def _rule_based_adjustment_patch(adjustment: str, subquestions: list[dict]) -> dict:
+    target_ids = _adjustment_target_ids(adjustment, subquestions)
+    if target_ids:
+        return {
+            "operation": "filter",
+            "target_subquestions": target_ids,
+            "answer_template": [],
+            "answer_strategy": "用户明确要求只回答选定子问题，已直接筛选对应问题继续回答。",
+            "format": "",
+            "exclude_sections": [],
+        }
+    text = str(adjustment or "")
+    if any(word in text for word in ("同意", "继续", "按此思路", "按这个思路", "听你的", "你看着办")):
+        return {
+            "operation": "confirm",
+            "target_subquestions": [],
+            "answer_template": [],
+            "answer_strategy": "",
+            "format": "",
+            "exclude_sections": [],
+        }
+    return {}
+
+
+def _material_cleaning_from_adjustment(adjustment: str) -> dict:
+    text = str(adjustment or "")
+    if not any(word in text for word in ("清洗材料", "清理材料", "剔除", "去掉", "过滤", "合并重复", "重复片段", "社媒", "泛家办", "背景")):
+        return {}
+    exclude_social = any(word in text.casefold() for word in ("社媒", "社交媒体", "instagram", "facebook", "linkedin", "小红书", "微博"))
+    exclude_generic = any(word in text for word in ("泛家办", "泛泛", "背景", "无关家办", "通用家办"))
+    dedupe = any(word in text for word in ("合并重复", "重复片段", "去重", "重复"))
+    return {
+        "enabled": True,
+        "dedupe_repeated_fragments": bool(dedupe or "清洗材料" in text),
+        "exclude_social_media": bool(exclude_social or "清洗材料" in text),
+        "exclude_generic_background": bool(exclude_generic or "清洗材料" in text),
+        "instruction": _clean_query(text)[:240],
+    }
+
+
 def _valid_adjustment_template_item(value: str) -> bool:
     text = str(value or "").strip()
     if len(text) < 4:
@@ -243,6 +283,16 @@ def _apply_adjustment_to_plan(plan: dict, adjustment: str, *, forced_target_ids:
             result["answer_template"] = _preferred_structure_from_adjustment(text, str(result.get("relationship") or "single"), categories)
         result["answer_outline"] = result["answer_template"]
         result["answer_strategy"] = str((patch or {}).get("answer_strategy") or "") or "用户调整为只回答选定子问题，已从原计划中筛选对应问题继续回答。"
+        result["adjustment_operation"] = operation
+        cleaning = _material_cleaning_from_adjustment(text)
+        if cleaning:
+            result["material_cleaning"] = cleaning
+            result["answer_strategy"] = "用户调整为只回答选定子问题，并要求先清洗材料：合并重复片段，剔除泛背景和社媒噪声。"
+            template = list(result.get("answer_template") or [])
+            if not any("清洗" in item or "筛选" in item for item in template):
+                template.insert(0, "先清洗证据，只保留与选定问题直接相关的材料")
+            result["answer_template"] = template[:6]
+            result["answer_outline"] = result["answer_template"]
     else:
         categories = list(result.get("categories") or [])
         patch_template = list((patch or {}).get("answer_template") or [])
@@ -268,6 +318,17 @@ def _apply_adjustment_to_plan(plan: dict, adjustment: str, *, forced_target_ids:
             result["answer_strategy"] = "用户调整为补充说明，回答时保留原问题并增加用户要求的内容。"
         else:
             result["answer_strategy"] = "用户已调整答题思路，回答时保留原问题上下文并按新思路组织。"
+        cleaning = _material_cleaning_from_adjustment(text)
+        if cleaning:
+            result["material_cleaning"] = cleaning
+            if operation == "augment":
+                operation = "exclude"
+            result["answer_strategy"] = "用户要求先清洗材料，回答时合并重复片段并剔除泛背景、社媒噪声。"
+            template = list(result.get("answer_template") or [])
+            if not any("清洗" in item or "筛选" in item for item in template):
+                template.insert(0, "先清洗证据，只保留直接相关材料")
+            result["answer_template"] = template[:6]
+            result["answer_outline"] = result["answer_template"]
         result["adjustment_operation"] = operation
         result["user_adjustment"] = text
     result["retrieval_strategy"] = _retrieval_strategy(
@@ -511,8 +572,9 @@ class QaQueryPlanner:
             question_plan["user_confirmation"] = planning_meta.get("user_confirmation")
             if planning_meta.get("user_adjustment"):
                 adjustment_text = str(planning_meta.get("user_adjustment") or "")
-                patch = {}
-                if self.adjustment_parser is not None:
+                subquestions = list(question_plan.get("subquestions") or [])
+                patch = _rule_based_adjustment_patch(adjustment_text, subquestions)
+                if not patch and self.adjustment_parser is not None:
                     try:
                         parsed_patch = self.adjustment_parser({
                             "original_question": planning_meta.get("original_question") or question,
@@ -521,7 +583,7 @@ class QaQueryPlanner:
                             "history": messages[-6:],
                             "request": dict(request_payload),
                         })
-                        patch = _normalize_adjustment_patch(parsed_patch, list(question_plan.get("subquestions") or []))
+                        patch = _normalize_adjustment_patch(parsed_patch, subquestions)
                     except Exception:
                         patch = {}
                 question_plan = _apply_plan_patch_to_plan(question_plan, adjustment_text, patch) if patch else _apply_adjustment_to_plan(question_plan, adjustment_text)
