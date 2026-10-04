@@ -119,11 +119,23 @@ class QaGatewayService:
             if self.store.count_active_runs() >= system_limit:
                 raise QaGatewayError("问答服务当前繁忙，请稍后重试。", code="SYSTEM_CONCURRENCY_LIMIT", status=503)
 
-        policy = (
-            self.policy_resolver.resolve(normalized["industry_pack_id"])
-            if normalized["mode"] == "fast"
-            else self.policy_resolver.require_research_ready(normalized["industry_pack_id"])
-        )
+        # 二级检索（RAGFlow 知识库）的取用策略：
+        #   ① 知识库没配（RAGFLOW_KB_ID / 包的 settings_json.ragflow_kb_id / RAGFLOW_LLM_APP_ID 都为空）
+        #      → **不再拒绝这次问答**，照常建 run，level2_retrieval 会因 health_check 不 ready
+        #      自动降级为"只用一级（平台文章库）证据"；
+        #   ② 知识库配了但检索不到相关片段 → 由 qa_relevance 闸门整批丢弃二级证据，
+        #      同样只用一级证据（见 qa_pipeline.level2_retrieval）；
+        #   ③ 想彻底不挂知识库 → 设 UNIFIED_QA_LEVEL2_ENABLED=false（或 admin 热开关
+        #      qa_feature_flags.level2_enabled），连检索都不会发起。
+        if normalized["mode"] == "fast":
+            policy = self.policy_resolver.resolve(normalized["industry_pack_id"])
+        else:
+            try:
+                policy = self.policy_resolver.require_research_ready(normalized["industry_pack_id"])
+            except QaPolicyError as exc:
+                policy = self.policy_resolver.resolve(normalized["industry_pack_id"])
+                print("ℹ️ 二级研究配置缺失（%s），本次问答降级为只用一级证据: %s"
+                      % (exc, normalized["industry_pack_id"]))
         try:
             providers = self.provider_registry.resolve_run_roles(
                 normalized["draft_provider"], policy, owner_user_id=owner_user_id

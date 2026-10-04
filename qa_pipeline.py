@@ -18,6 +18,7 @@ from qa_policy_evidence import filter_and_rank_policy_evidence, normalize_policy
 from qa_provider_registry import QaProviderRegistry
 from qa_question_templates import render_question_plan_status
 from qa_ragflow_client import QaRagflowResearchClient
+from qa_relevance import filter_relevant_evidence
 from qa_reasoning import build_claim_evidence_graph
 from qa_research import QaRagflowResearchService, enrich_ragflow_evidence_from_database, insufficient_level2_result
 from qa_synthesis import QaFinalSynthesizer, fallback_final_answer
@@ -609,10 +610,31 @@ def build_qa_stage_handlers(
                 plan=plan_output,
                 limit=policy.max_evidence,
             )
+            # 二级相关性闸门（qa_relevance）：知识库里没有这条问题的答案时，知识库照样会返回
+            # "看起来最像"的片段（实测会把付费墙样板文字/别的行业的片段当成证据引用）。
+            # 这种情况宁可整批丢掉二级证据、只用一级（平台文章库）证据，也不能带偏答案。
+            filtered_evidence, relevance_audit = filter_relevant_evidence(
+                _planned_question(context),
+                filtered_evidence,
+                plan=plan_output,
+            )
             result["evidence"] = filtered_evidence
-            result["excluded"] = {**dict(result.get("excluded") or {}), "policy": policy_audit}
+            result["excluded"] = {
+                **dict(result.get("excluded") or {}),
+                "policy": policy_audit,
+                "relevance": relevance_audit,
+            }
             result["stats"] = {**dict(result.get("stats") or {}), "adopted": len(filtered_evidence)}
             result["health"] = health
+            if not filtered_evidence:
+                # 二级无相关证据：退回一级证据继续，不算失败（可用 QA_LEVEL2_MIN_TERM_HITS /
+                # QA_LEVEL2_MIN_SCORE 调松紧）
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "知识库里没有与本次问题相关的片段，本次只用平台文章库证据。",
+                        "relevance": relevance_audit,
+                    })
+                return _rag_retrieval_fallback(level1, relevance_audit.get("reason") or "level2_no_relevant_evidence")
             result["cache"] = {"hit": False, "kb_version": kb_version}
             result["rag_mode"] = "RAG增强检索" if result.get("evidence") else "RAG检索"
             result["enhanced"] = bool(result.get("evidence"))
