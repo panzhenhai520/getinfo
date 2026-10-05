@@ -189,7 +189,8 @@ def financial_product_capabilities(
         "show_financial_news": False,
         "show_market_index_cards": False,
         "show_watched_stock_cards": False,
-        "show_spatiotemporal_map": True,
+        # 时空地图首页已下线：任何行业包都不再有地图首页
+        "show_spatiotemporal_map": False,
     }
     pack_reason = "enabled"
     try:
@@ -206,7 +207,7 @@ def financial_product_capabilities(
                 key: bool(
                     declared_dashboard_capabilities.get(
                         key,
-                        key == "show_spatiotemporal_map",
+                        False,
                     )
                 )
                 for key in dashboard_capabilities

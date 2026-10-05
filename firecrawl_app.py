@@ -1220,11 +1220,9 @@ def index():
     if _admin_pack_choice_needed():
         return redirect(url_for('select_pack'))
     identity = active_industry_identity()
-    if (
-        not identity.get('show_spatiotemporal_map', False)
-        and request.args.get('home_view') == 'map'
-    ):
-        return redirect(url_for('index', home_view='dashboard'))
+    # 时空地图首页已下线：首页固定渲染主题驾驶舱，home_view 参数不再有意义。
+    if request.args.get('home_view') == 'map':
+        return redirect(url_for('index'))
     return render_template(
         'mapindex.html',
         financial_workspace=False,

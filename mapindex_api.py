@@ -781,11 +781,9 @@ def _synthesize_chat_history(cleaned: list[dict], pack_context: str = '') -> dic
 @login_required
 def mapindex_page():
     identity = active_industry_identity()
-    if (
-        not identity.get('show_spatiotemporal_map', False)
-        and request.args.get('home_view') == 'map'
-    ):
-        return redirect(url_for('mapindex.mapindex_page', home_view='dashboard'))
+    # 时空地图首页已下线：首页固定渲染主题驾驶舱，home_view 参数不再有意义。
+    if request.args.get('home_view') == 'map':
+        return redirect(url_for('mapindex.mapindex_page'))
     return render_template(
         'mapindex.html',
         financial_workspace=False,

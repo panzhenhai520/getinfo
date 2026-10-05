@@ -33,7 +33,7 @@
     "show_financial_news": true,
     "show_market_index_cards": false,
     "show_watched_stock_cards": false,
-    "show_spatiotemporal_map": true
+    "show_spatiotemporal_map": false
   },
   "ragflow_policy": {
     "upload_crawled_articles": false,

@@ -3104,7 +3104,7 @@
     <link rel="stylesheet" href="/static/css/responsive.css?v=17">
     <link rel="stylesheet" href="/static/css/article-detail-modal.css">
 </head>
-<body data-home-view="{{ 'dashboard' if financial_workspace or not active_industry_pack.show_spatiotemporal_map else 'map' }}" data-show-spatiotemporal-map="{{ 'true' if active_industry_pack.show_spatiotemporal_map else 'false' }}" data-financial-workspace="{{ 'true' if financial_workspace else 'false' }}" data-industry-pack-id="{{ active_industry_pack.id }}" data-industry-name="{{ active_industry_pack.name }}" data-is-admin="{{ 'true' if is_admin else 'false' }}">
+<body data-home-view="dashboard" data-show-spatiotemporal-map="false" data-financial-workspace="{{ 'true' if financial_workspace else 'false' }}" data-industry-pack-id="{{ active_industry_pack.id }}" data-industry-name="{{ active_industry_pack.name }}" data-is-admin="{{ 'true' if is_admin else 'false' }}">
     <main class="mapindex-shell">
         <canvas id="mapCanvas"></canvas>
 
@@ -6654,12 +6654,13 @@
         }
 
         function setHomeView(view, options = {}) {
-            if (view === 'map') syncMapDetailCardSizeFromDashboard();
-            state.homeView = view === 'map' ? 'map' : 'dashboard';
+            // 时空地图首页已下线：首页固定为主题驾驶舱，任何 'map' 请求都被忽略。
+            void view;
+            state.homeView = 'dashboard';
             document.querySelectorAll('#homeViewSwitch [data-home-view]').forEach(button => {
                 button.classList.toggle('active', button.dataset.homeView === state.homeView);
             });
-            const isMap = state.homeView === 'map';
+            const isMap = false;
             document.getElementById('intelDashboard').classList.toggle('open', !isMap);
             document.getElementById('mapModebar').style.display = isMap ? 'flex' : 'none';
             document.querySelector('.timeline').style.display = isMap ? 'grid' : 'none';
@@ -10480,11 +10481,8 @@
             : '';
         state.financialReportId = IS_FINANCIAL_WORKSPACE && Number(initialIntelParams.get('report_id')) > 0
             ? Number(initialIntelParams.get('report_id')) : null;
-        const spatiotemporalMapEnabled = document.body.dataset.showSpatiotemporalMap !== 'false';
-        state.homeView = IS_FINANCIAL_WORKSPACE || !spatiotemporalMapEnabled
-            ? 'dashboard'
-            : initialIntelParams.get('home_view')
-                || (legacyIntelView && legacyIntelView !== 'map' ? 'dashboard' : 'map');
+        const spatiotemporalMapEnabled = false;   // 时空地图首页已下线，见 body 上的固定 data-home-view
+        state.homeView = 'dashboard';
         initializeFinancialWorkspaceNavigation();
         resizeCanvas();
         renderChatMessages();
