@@ -1546,7 +1546,7 @@ def pack_runtime(pack_id: str) -> Dict:
         'vpn_enrich': str(cfg.get('vpn_enrich') or '') or str(int(_cfg.REMOTE_PIPELINE_ENRICH)),
         'vpn_tts': str(cfg.get('vpn_tts') or '') or str(int(_cfg.REMOTE_PIPELINE_TTS)),
         # LLM（回退全局）
-        'llm_base_url': cfg.get('llm_base_url', '') or gg('INTEL_LLM_BASE_URL', 'http://192.168.0.64:8106/v1'),
+        'llm_base_url': cfg.get('llm_base_url', '') or gg('INTEL_LLM_BASE_URL', 'http://10.88.0.1:8081/v1'),
         'llm_model': cfg.get('llm_model', '') or gg('INTEL_LLM_MODEL', 'deepseek-v4-flash'),
         'llm_api_key': cfg.get('llm_api_key', '') or gg('INTEL_LLM_API_KEY', ''),
         'llm_provider': cfg.get('llm_provider', '') or gg('INTEL_LLM_PROVIDER', 'local'),

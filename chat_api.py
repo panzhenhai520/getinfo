@@ -160,7 +160,7 @@ MODEL_META = {
     },
     'local': {
         'name': '本地 LLM',
-        'base_url': 'http://192.168.0.64:8106/v1',
+        'base_url': 'http://10.88.0.1:8081/v1',
         'default_model': 'deepseek-v4-flash',
         'type': 'openai',
         'default_proxy': False,  # 内网直连，不走代理

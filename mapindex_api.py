@@ -27,7 +27,7 @@ from financial_rollout import rollout_capability_enabled, rollout_capability_rea
 
 mapindex_bp = Blueprint('mapindex', __name__)
 
-LOCAL_LLM_BASE_URL = 'http://192.168.0.64:8106/v1'
+LOCAL_LLM_BASE_URL = 'http://10.88.0.1:8081/v1'
 LOCAL_LLM_MODEL = 'deepseek-v4-flash'
 
 @mapindex_bp.route('/intel-category/<category>')

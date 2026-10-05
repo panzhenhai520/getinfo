@@ -31,7 +31,7 @@ def _resolve_llm(pack_id: str = '') -> tuple[str, str]:
         return rt['llm_base_url'], rt['llm_model']
     except Exception:
         pass
-    base = str(getattr(config, "INTEL_LLM_BASE_URL", "") or "").strip().rstrip("/") or "http://192.168.0.64:8106/v1"
+    base = str(getattr(config, "INTEL_LLM_BASE_URL", "") or "").strip().rstrip("/") or "http://10.88.0.1:8081/v1"
     model = str(getattr(config, "INTEL_LLM_MODEL", "") or "").strip() or "deepseek-v4-flash"
     return base, model
 

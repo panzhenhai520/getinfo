@@ -48,7 +48,7 @@ def _llm_name_topic(words: List[str], docs_text: str, brands: List[str] = None) 
     brands 为行业重点品牌白名单，注入 prompt 锚定真实品牌，杜绝联想编造。"""
     import re
     import requests
-    base_url = getattr(config, "INTEL_LLM_BASE_URL", "") or "http://192.168.0.64:8106/v1"
+    base_url = getattr(config, "INTEL_LLM_BASE_URL", "") or "http://10.88.0.1:8081/v1"
     model = getattr(config, "INTEL_LLM_MODEL", "") or "deepseek-v4-flash"
     brand_hint = ("本行业重点品牌：" + "、".join((brands or [])[:20])
                   + "。命名若涉及品牌，应优先使用以上真实品牌名。\n") if brands else ""
