@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 import re
 from html import escape
@@ -57,6 +58,9 @@ from utils import coerce_int
 from source_authority import authority_registry, source_authority_profiles
 from project_keyword_gate import configured_project_keyword_snapshot
 from industry_collection_runtime import initialize_industry_collection
+
+
+_log = logging.getLogger(__name__)
 
 
 intel_bp = Blueprint("intel", __name__, url_prefix="/api/intel")
@@ -2989,6 +2993,10 @@ def financial_dashboard_feed():
     except (ValueError, IndustryPackError) as exc:
         return _error(str(exc), 400, request_id=request_id)
     except Exception:
+        # 不能只回一句泛化错误：之前这里把异常吞掉又不记日志，
+        # 导致 /api/intel/financial/feed 的 500 完全查不出真因
+        # （容器日志里只有会话校验，没有 traceback）。加 request_id 便于对账。
+        _log.exception("金融行业信息加载失败 request_id=%s", request_id)
         return _error("金融行业信息加载失败", 500, request_id=request_id)
 
 

@@ -270,8 +270,14 @@ class FinancialHealthService:
                 ).fetchall()
             ]
             usage_rows = self.connection.execute(
-                "SELECT service,usage_count FROM intel_api_usage WHERE usage_date=date(?)",
-                (now_text,),
+                # usage_date 在 SQLite 与 PG 里都是 TEXT（'YYYY-MM-DD'）。
+                # 原先写 date(?)：SQLite 下 date() 返回字符串，能比；
+                # PG 下 date() 返回 DATE，与 text 列比较直接报
+                # operator does not exist: text = date ——
+                # 这就是 /api/intel/financial/feed 在生产 PG 上 500 的真因。
+                # 改成截取日期字符串做纯文本比较，两种后端都成立。
+                "SELECT service,usage_count FROM intel_api_usage WHERE usage_date=?",
+                (str(now_text or "")[:10],),
             ).fetchall()
             research_budget_row = self.connection.execute(
                 """SELECT COUNT(*) AS runs,
