@@ -246,8 +246,32 @@ QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS=60
 
 | 端点 | 是什么 | 用途 |
 |---|---|---|
-| `http://10.88.0.1:8081/v1` | **llama.cpp**（`/props` 可自证：`model_alias=qwen3.8-27b-uncensored`、`n_ctx=32768`、`total_slots=2`） | 助手与 QA 的对话模型（**当前唯一在用**） |
-| `http://10.88.0.1:11434` | Ollama 0.30.6（`/api/version` 可自证） | 已弃用；仅 `INTEL_EMBEDDING_BASE_URL` 的 bge-m3 还在用（llama.cpp 未开 `--embeddings`，POST `/v1/embeddings` 返回 501） |
+| `http://10.88.0.1:8081/v1` | **llama.cpp**（`/props` 可自证：`model_alias=qwen3.8-27b-uncensored`、`n_ctx=32768`、`total_slots=2`） | 助手与 QA 的对话模型 |
+| `http://10.88.0.1:8082/v1` | **llama.cpp + `--embeddings`**（`--alias bge-m3`，GPU2，4 slots × 8192 ctx） | 文章向量与语义检索（`INTEL_EMBEDDING_BASE_URL`） |
+| `http://10.88.0.1:11434` | Ollama 0.30.6（`/api/version` 可自证） | **待下线**：仅 RAGFlow 的知识库 embedding（`bge-m3:latest@Ollama`）还在用 |
+| `http://10.88.0.1:11435` | ollama_llama_shim（把 Ollama API 转成 llama.cpp） | voice-project 的 `OLLAMA_BASE_URL` 可指向它，用于彻底摆脱 Ollama |
+
+`10.88.0.0/24` 是走 wg0 的隧道网段（`ip route` 可见），所以这些端口都不在宿主机本地监听，排查时别用 `ss` 找。
+bge-m3 的向量与 Ollama 版本**余弦相似度 0.99997~1.000000**、维度同为 1024，因此换引擎后**存量向量无需重算**。
+
+### Ollama 下线（进行中，尚差 RAGFlow）
+
+`ollama` 还是 systemd 自启服务，而 llama.cpp 两个实例是手工 `setsid nohup` 起的（重启会丢）。
+已在 GPU 机暂存两个单元（**未安装未启用**）：`/root/llama-systemd/llama-chat.service`、`llama-embed.service`。
+
+真正挡住下线的不是 CollectInfo，而是 **RAGFlow**：`rag_flow.tenant_llm` 里仍有 3 条指向 11434，其中
+`bge-m3:latest@Ollama` 是各知识库的 `embd_id`（embedding 模型）。迁移步骤：
+
+1. 在 RAGFlow 增加一条 **OpenAI-API-Compatible** 的 embedding 模型：`bge-m3` → `http://127.0.0.1:8082/v1`；
+2. 先拿 1 个知识库把 `embd_id` 换过去，验证检索命中正常（向量几乎一致，理论无需重新解析）；
+3. 两个 Ollama chat 条目（`gemma431b:latest` / `gemma431b-32k:latest`）删除或改用 8081 的 OpenAI 条目，
+   同时检查 `dialog.llm_id` 是否指向它们；
+4. 全部切换并观察后再 `systemctl stop ollama && systemctl disable ollama`；
+   同时把 `voice-project/.env` 的 `OLLAMA_BASE_URL` 指向 `http://127.0.0.1:11435`（shim），
+   `tools/gpu_status_server.py` 里硬编码的 `/api/ps` 也改成 11435。
+
+回滚：`systemctl enable --now ollama`，并把 `INTEL_EMBEDDING_BASE_URL` 改回 `http://10.88.0.1:11434`、`INTEL_EMBEDDING_MODEL` 改回 `bge-m3:latest`。
+
 
 `10.88.0.0/24` 是走 wg0 的隧道网段（`ip route` 可见），所以这两个端口都不在宿主机本地监听，排查时别用 `ss` 找。
 
