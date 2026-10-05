@@ -2783,9 +2783,8 @@
             scrollbar-width: thin;
         }
         .model-slider-icons {
-            display: grid;
-            grid-template-columns: repeat(var(--model-count, 1), minmax(36px, 1fr));
-            gap: 5px;
+            display: flex;
+            gap: 6px;
             min-width: max-content;
             align-items: center;
         }
@@ -2800,12 +2799,12 @@
             display: grid;
             justify-items: center;
             gap: 2px;
-            padding: 0;
-            font-size: 9px;
+            padding: 4px 6px;
+            font-size: 10px;
             font-weight: 700;
-            opacity: 0.72;
-            filter: none;
-            transition: opacity 0.15s ease, filter 0.15s ease, color 0.15s ease;
+            opacity: 0.62;
+            filter: grayscale(1);
+            transition: opacity 0.15s ease, filter 0.15s ease, color 0.15s ease, border-color 0.15s ease;
         }
         .model-icon.active {
             border-color: rgba(29, 127, 104, 0.45);
@@ -2814,13 +2813,13 @@
             filter: none;
         }
         .model-icon img {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             object-fit: contain;
             display: block;
         }
         .model-icon span {
-            max-width: 44px;
+            max-width: 70px;
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
