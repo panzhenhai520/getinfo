@@ -33,11 +33,13 @@ try:  # opencc 已随项目安装（前端也用它做繁简转换）
     from opencc import OpenCC as _OpenCC
 
     _T2S = _OpenCC("t2s")
+    _S2T = _OpenCC("s2t")
 except Exception:  # pragma: no cover - 环境缺库时退回内置映射
     _T2S = None
+    _S2T = None
 
 # 内置兜底：只覆盖高频异体/繁体字，够在没有 opencc 的环境里救急
-_FALLBACK_T2S = str.maketrans({
+_FALLBACK_MAP = {
     "機": "机", "器": "器", "與": "与", "體": "体", "標": "标", "準": "准",
     "術": "术", "委": "委", "員": "员", "會": "会", "動": "动", "態": "态",
     "業": "业", "務": "务", "資": "资", "訊": "讯", "網": "网", "絡": "络",
@@ -50,8 +52,11 @@ _FALLBACK_T2S = str.maketrans({
     "銷": "销", "購": "购", "買": "买", "賣": "卖", "製": "制", "造": "造",
     "環": "环", "境": "境", "標": "标", "準": "准", "監": "监", "測": "测",
     "疫": "疫", "醫": "医", "藥": "药", "療": "疗", "護": "护", "養": "养",
-    "學": "学", "校": "校", "課": "课", "程": "程", "師": "师", "學": "学",
-})
+    "學": "学", "校": "校", "課": "课", "程": "程", "師": "师",
+}
+
+_FALLBACK_T2S = str.maketrans(_FALLBACK_MAP)
+_FALLBACK_S2T = str.maketrans({v: k for k, v in _FALLBACK_MAP.items()})
 
 # ---------------------------------------------------------------- 实体别名
 # 同一实体的中/英/别名写法。命中任一写法即把整组写法都作为检索词。
@@ -106,6 +111,41 @@ def normalize_text(text: str) -> str:
     value = "".join(chr(ord(ch) - 0xFEE0) if 0xFF01 <= ord(ch) <= 0xFF5E else ch for ch in value)
     value = to_simplified(value)
     return re.sub(r"\s+", " ", value).strip()
+
+
+def to_traditional(text: str) -> str:
+    """简体 → 繁体。用于把简体查询词变出繁体写法，去匹配库里的繁体原文
+    （比把 963 篇文章的正文逐条归一便宜得多，也不动数据）。"""
+    value = str(text or "")
+    if not value:
+        return value
+    if _S2T is not None:
+        try:
+            return _S2T.convert(value)
+        except Exception:
+            pass
+    # 内置兜底：_FALLBACK_MAP 的反向映射（同字多义时有误差，仅作救急）
+    return value.translate(_FALLBACK_S2T)
+
+
+def expand_terms(terms) -> list:
+    """把检索词展开成多写法：原形 + 归一形 + 简体形 + 繁体形 + 实体别名。
+
+    只增不减：任一写法命中即命中，因此不会破坏原有的匹配结果。
+    """
+    out, seen = [], set()
+    for term in terms or []:
+        raw = str(term or "").strip()
+        if not raw:
+            continue
+        forms = [raw, normalize_text(raw), to_simplified(raw), to_traditional(raw)]
+        forms.extend(expand_entity_terms(raw))
+        for form in forms:
+            key = str(form or "").casefold()
+            if form and key not in seen:
+                seen.add(key)
+                out.append(str(form))
+    return out
 
 
 def expand_entity_terms(text: str) -> list:
@@ -218,4 +258,4 @@ def parse_time_window(question: str, now: datetime | None = None) -> dict:
 
 
 __all__ = ["ENTITY_GROUPS", "default_window_days", "expand_entity_terms", "expand_query",
-           "normalize_text", "parse_time_window", "to_simplified"]
+           "expand_terms", "normalize_text", "parse_time_window", "to_simplified", "to_traditional"]

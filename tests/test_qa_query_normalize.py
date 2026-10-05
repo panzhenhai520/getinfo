@@ -50,6 +50,37 @@ class EntityTest(unittest.TestCase):
         self.assertTrue(any("humanoid" in t.lower() for t in pack["search_texts"]))
 
 
+class ExpandTermsTest(unittest.TestCase):
+    def test_simplified_term_gains_traditional_form(self):
+        forms = qn.expand_terms(["人形机器人"])
+        self.assertIn("人形机器人", forms)
+        self.assertIn("人形機器人", forms)
+
+    def test_traditional_article_matches_expanded_simplified_query(self):
+        # 检索链路的本质就是字面匹配：展开后的词表必须能命中繁体标题
+        title = TRAD_TITLE
+        forms = qn.expand_terms(["工信部", "人形机器人", "动态"])
+        self.assertTrue(any(f in title for f in forms),
+                        "展开后仍无任何写法命中繁体标题: %s" % forms)
+
+    def test_expand_terms_only_adds(self):
+        raw = ["工信部", "人形机器人"]
+        forms = qn.expand_terms(raw)
+        for item in raw:
+            self.assertIn(item, forms)
+        self.assertGreater(len(forms), len(raw))
+
+    def test_english_term_gains_chinese_entity(self):
+        forms = qn.expand_terms(["MIIT", "humanoid robot"])
+        joined = " ".join(forms)
+        self.assertIn("工信部", joined)
+        self.assertIn("人形机器人", joined)
+
+    def test_expand_terms_handles_empty_and_garbage(self):
+        self.assertEqual(qn.expand_terms([]), [])
+        self.assertEqual(qn.expand_terms([None, "", "   "]), [])
+
+
 class TimeWindowTest(unittest.TestCase):
     NOW = datetime(2026, 10, 5, tzinfo=timezone.utc)
 

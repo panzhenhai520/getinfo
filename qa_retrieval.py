@@ -778,9 +778,27 @@ class ArticleRetriever:
                 seen_articles.add(article_id)
 
         queries = [str(item) for item in plan.get("queries") or [] if str(item).strip()]
-        query_terms = _terms(queries or [str(plan.get("question") or "")])
-        anchor_terms = _semantic_anchor_terms(queries or [str(plan.get("question") or "")])
-        phrase_terms = _query_phrases(queries or [str(plan.get("question") or "")])
+        _qsrc = queries or [str(plan.get("question") or "")]
+
+        def _expand(terms):
+            """把检索词展开成多写法（简体/繁体/英文别名），只增不减。
+
+            实例：港媒《工信部成立人形機器人與具身智能標準化技術委員會》是繁体，
+            问题多用简体「人形机器人」，原先字面比对命中不了；英文问法（MIIT /
+            humanoid robot）同样命中不了中文原文。这里在查询侧展开多写法，
+            不去逐条归一 963 篇文章的正文（更便宜，也不动数据）。
+            任何异常都退回原词表，行为与以前一致。
+            """
+            try:
+                from qa_query_normalize import expand_terms
+
+                return expand_terms(terms)
+            except Exception:
+                return list(terms)
+
+        query_terms = _expand(_terms(_qsrc))
+        anchor_terms = _expand(_semantic_anchor_terms(_qsrc))
+        phrase_terms = _expand(_query_phrases(_qsrc))
         amount_constraints = []
         for query in queries or [str(plan.get("question") or "")]:
             for item in _amount_constraints(query):
