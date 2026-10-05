@@ -383,10 +383,20 @@ class PostgresCursor:
                 pass
 
         translated = self._add_returning_id(translated)
-        if isinstance(params, dict):
-            self._cursor.execute(translated, params)
-        else:
-            self._cursor.execute(translated, tuple(params) if params is not None else None)
+        implicit_savepoint = None
+        if self._owner is not None:
+            implicit_savepoint = self._owner._prepare_savepoint(translated)
+        try:
+            if isinstance(params, dict):
+                self._cursor.execute(translated, params)
+            else:
+                self._cursor.execute(translated, tuple(params) if params is not None else None)
+        except Exception:
+            if self._owner is not None and implicit_savepoint:
+                self._owner._abort_implicit_savepoint(implicit_savepoint)
+            raise
+        if self._owner is not None:
+            self._owner._finish_savepoint(translated)
         self.lastrowid = getattr(self._cursor, "lastrowid", 0)
         if re.search(r"\bRETURNING\b", translated, re.I):
             row = self._cursor.fetchone()
@@ -457,6 +467,60 @@ class PostgresConnection:
         self._connection.autocommit = True
         self.row_factory = None
         self._table_has_id_cache: dict[str, bool] = {}
+        # SQLite permits SAVEPOINT as the first transaction statement.  In
+        # PostgreSQL a SAVEPOINT requires an active transaction, while this
+        # compatibility connection deliberately runs in autocommit mode so
+        # the rest of the SQLite-oriented application does not leave reads in
+        # long-lived transactions.  Remember savepoints for which we opened a
+        # transaction implicitly and close that transaction when the matching
+        # outer savepoint is released.
+        self._implicit_savepoint_roots: set[str] = set()
+
+    @staticmethod
+    def _savepoint_name(sql: str, action: str) -> str | None:
+        if action == "savepoint":
+            pattern = r"(?is)^\s*SAVEPOINT\s+([A-Za-z_][A-Za-z0-9_]*)\s*;?\s*$"
+        elif action == "release":
+            pattern = r"(?is)^\s*RELEASE(?:\s+SAVEPOINT)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*;?\s*$"
+        else:
+            return None
+        match = re.match(pattern, sql)
+        return match.group(1).lower() if match else None
+
+    def _prepare_savepoint(self, sql: str) -> str | None:
+        name = self._savepoint_name(sql, "savepoint")
+        if not name or not self._connection.autocommit:
+            return None
+        if self._connection.get_transaction_status() != 0:
+            return None
+        raw = self._connection.cursor()
+        try:
+            raw.execute("BEGIN")
+        finally:
+            raw.close()
+        self._implicit_savepoint_roots.add(name)
+        return name
+
+    def _abort_implicit_savepoint(self, name: str) -> None:
+        if name not in self._implicit_savepoint_roots:
+            return
+        raw = self._connection.cursor()
+        try:
+            raw.execute("ROLLBACK")
+        finally:
+            raw.close()
+            self._implicit_savepoint_roots.discard(name)
+
+    def _finish_savepoint(self, sql: str) -> None:
+        name = self._savepoint_name(sql, "release")
+        if not name or name not in self._implicit_savepoint_roots:
+            return
+        raw = self._connection.cursor()
+        try:
+            raw.execute("COMMIT")
+        finally:
+            raw.close()
+            self._implicit_savepoint_roots.discard(name)
 
     def cursor(self) -> PostgresCursor:
         return PostgresCursor(self._connection.cursor(), owner=self)
@@ -636,6 +700,7 @@ class PostgresConnection:
                 self._connection.commit()
         else:
             self._connection.commit()
+        self._implicit_savepoint_roots.clear()
 
     def rollback(self):
         if self._connection.autocommit:
@@ -650,6 +715,7 @@ class PostgresConnection:
                 self._connection.rollback()
         else:
             self._connection.rollback()
+        self._implicit_savepoint_roots.clear()
 
     def close(self):
         self._connection.close()
