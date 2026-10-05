@@ -3,7 +3,11 @@
 (function(){if(!document.getElementById('responsive-css')){var l=document.createElement('link');l.id='responsive-css';l.rel='stylesheet';l.href='/static/css/responsive.css?v=17';document.head.appendChild(l);}})();
 </script>
 <nav class="dashboard-global-nav" aria-label="主导航">
-    <a class="dashboard-brand" href="/">{% if platform_logo %}<img src="{{ platform_logo }}" alt="Logo" class="dashboard-brand-logo">{% endif %}<span class="pb-brand-name">{{ platform_name }}</span></a>
+    {# logo 尺寸必须写成行内 style：本文件里 .dashboard-brand-logo 的规则在第 229 行，
+       而 <img> 在第 6 行，样式尚未解析时浏览器会按图片原始尺寸绘制——
+       租户 logo 常有 512/1024 见方，就会出现「超大 logo 局部」一闪。
+       行内 style 在解析到标签时即刻生效，且与 responsive.css（由 JS 动态插入）无关。 #}
+    <a class="dashboard-brand" href="/">{% if platform_logo %}<img src="{{ platform_logo }}" alt="Logo" class="dashboard-brand-logo" style="display:block;height:44px;width:auto;max-width:180px;object-fit:contain;vertical-align:middle">{% endif %}<span class="pb-brand-name">{{ platform_name }}</span></a>
     <div class="dashboard-stats" id="globalStats"></div>
     <a class="home-link" href="/" title="返回首页"><i class="fa fa-home"></i> 首页</a>
     <a class="trend-link" href="/reports" title="报告"><i class="fa fa-file-alt"></i> 报告</a>
