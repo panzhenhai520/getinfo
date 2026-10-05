@@ -1535,6 +1535,13 @@ def pack_runtime(pack_id: str) -> Dict:
     cfg = get_pack_remote_config(pack_id)
     import config as _cfg
     gg = lambda name, default='': str(getattr(_cfg, name, '') or '') or default
+    # 默认 LLM 接入点按部署形态自适应：连通 RAGFlow 用那台机器的 LLM，否则用本地推理机
+    # （没配 QA_LLM_BASE_URL_* 时就是原来写死的那两个值，且不发出任何探测）
+    try:
+        from qa_llm_router import static_endpoint
+        _llm_base_url, _llm_model = static_endpoint('http://10.88.0.1:8081/v1', 'deepseek-v4-flash')
+    except Exception:
+        _llm_base_url, _llm_model = 'http://10.88.0.1:8081/v1', 'deepseek-v4-flash'
     return {
         # 服务连接
         'server_ip': cfg.get('server_ip', ''), 'server_port': int(cfg.get('server_port', 11236) or 11236),
@@ -1546,8 +1553,8 @@ def pack_runtime(pack_id: str) -> Dict:
         'vpn_enrich': str(cfg.get('vpn_enrich') or '') or str(int(_cfg.REMOTE_PIPELINE_ENRICH)),
         'vpn_tts': str(cfg.get('vpn_tts') or '') or str(int(_cfg.REMOTE_PIPELINE_TTS)),
         # LLM（回退全局）
-        'llm_base_url': cfg.get('llm_base_url', '') or gg('INTEL_LLM_BASE_URL', 'http://10.88.0.1:8081/v1'),
-        'llm_model': cfg.get('llm_model', '') or gg('INTEL_LLM_MODEL', 'deepseek-v4-flash'),
+        'llm_base_url': cfg.get('llm_base_url', '') or gg('INTEL_LLM_BASE_URL') or _llm_base_url,
+        'llm_model': cfg.get('llm_model', '') or gg('INTEL_LLM_MODEL') or _llm_model,
         'llm_api_key': cfg.get('llm_api_key', '') or gg('INTEL_LLM_API_KEY', ''),
         'llm_provider': cfg.get('llm_provider', '') or gg('INTEL_LLM_PROVIDER', 'local'),
         'ragflow_app_id': cfg.get('ragflow_app_id', '') or gg('RAGFLOW_LLM_APP_ID', ''),

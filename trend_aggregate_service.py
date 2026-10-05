@@ -33,6 +33,11 @@ def _resolve_llm(pack_id: str = '') -> tuple[str, str]:
         pass
     base = str(getattr(config, "INTEL_LLM_BASE_URL", "") or "").strip().rstrip("/") or "http://10.88.0.1:8081/v1"
     model = str(getattr(config, "INTEL_LLM_MODEL", "") or "").strip() or "deepseek-v4-flash"
+    try:  # 按部署形态自适应：连通 RAGFlow 用那台的 LLM，否则用本地推理机
+        from qa_llm_router import static_endpoint
+        base, model = static_endpoint(base, model)
+    except Exception:
+        pass
     return base, model
 
 

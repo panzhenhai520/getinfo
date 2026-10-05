@@ -267,6 +267,38 @@ def _normalize_local_base_url(base_url: str) -> str:
     return url
 
 
+def _adaptive_local_endpoint(model_cfg: dict, meta: dict) -> tuple:
+    """部署级 LLM 端点自适应：按是否连通 RAGFlow 决定本地 provider 用哪台机器的 LLM。
+
+    同一份代码在两类机器上跑：只有本地推理机的（无 RAGFlow）与带 RAGFlow 知识库的
+    （LLM 在 RAGFlow 那台）。这里把代码里写死的默认接入点换成按连通性选择，
+    包级 / 用户级覆盖仍然优先（它们在后面才生效）。没配 QA_LLM_BASE_URL_* 时
+    原样返回，行为与以前完全一致，且不会发出任何探测。
+    """
+    try:
+        from qa_llm_router import resolve_llm_endpoint
+
+        base_url, model_id, source = resolve_llm_endpoint(
+            str(model_cfg.get('base_url', meta['base_url']) or ''),
+            str(model_cfg.get('model_id', meta['default_model']) or ''),
+            api_key=str(model_cfg.get('api_key') or '').strip(),
+        )
+    except Exception:
+        return model_cfg, meta
+    if source == 'configured' or not base_url:
+        return model_cfg, meta
+    if base_url == str(model_cfg.get('base_url', meta['base_url']) or '').rstrip('/') \
+            and model_id == str(model_cfg.get('model_id', meta['default_model']) or '').strip():
+        return model_cfg, meta
+    new_cfg = dict(model_cfg)
+    new_cfg['base_url'] = base_url
+    new_cfg['model_id'] = model_id
+    new_meta = dict(meta)
+    new_meta['base_url'] = base_url
+    new_meta['default_model'] = model_id
+    return new_cfg, new_meta
+
+
 def get_chat_model_runtime_config(model_id: str = 'local') -> dict:
     """Return one trusted server-side model configuration for shared callers."""
     normalized_id = str(model_id or '').strip().casefold()
@@ -275,6 +307,9 @@ def get_chat_model_runtime_config(model_id: str = 'local') -> dict:
     cfg = _load_config()
     meta = MODEL_META[normalized_id]
     model_cfg = cfg.get('models', {}).get(normalized_id, {})
+    if normalized_id == 'local':
+        # 先定部署级默认端点（RAGFlow 那台 / 本地推理机），再由包级、用户级覆盖改写
+        model_cfg, meta = _adaptive_local_endpoint(model_cfg, meta)
     api_key = str(model_cfg.get('api_key') or '').strip()
     # 多租户：当前包用户若有自己的该模型密钥则优先（按 pack_user 隔离，不共用全局密钥）
     try:

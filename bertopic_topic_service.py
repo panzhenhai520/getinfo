@@ -48,8 +48,13 @@ def _llm_name_topic(words: List[str], docs_text: str, brands: List[str] = None) 
     brands 为行业重点品牌白名单，注入 prompt 锚定真实品牌，杜绝联想编造。"""
     import re
     import requests
-    base_url = getattr(config, "INTEL_LLM_BASE_URL", "") or "http://10.88.0.1:8081/v1"
-    model = getattr(config, "INTEL_LLM_MODEL", "") or "deepseek-v4-flash"
+    base_url = str(getattr(config, "INTEL_LLM_BASE_URL", "") or "").strip().rstrip("/") or "http://10.88.0.1:8081/v1"
+    model = str(getattr(config, "INTEL_LLM_MODEL", "") or "").strip() or "deepseek-v4-flash"
+    try:  # 按部署形态自适应：连通 RAGFlow 用那台的 LLM，否则用本地推理机
+        from qa_llm_router import static_endpoint
+        base_url, model = static_endpoint(base_url, model)
+    except Exception:
+        pass
     brand_hint = ("本行业重点品牌：" + "、".join((brands or [])[:20])
                   + "。命名若涉及品牌，应优先使用以上真实品牌名。\n") if brands else ""
     prompt = (

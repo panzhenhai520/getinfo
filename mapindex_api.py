@@ -27,8 +27,20 @@ from financial_rollout import rollout_capability_enabled, rollout_capability_rea
 
 mapindex_bp = Blueprint('mapindex', __name__)
 
+# 关键词提炼用的本地 LLM：最后兜底值，实际由静态自适应端点决定（见 _local_llm_endpoint）
 LOCAL_LLM_BASE_URL = 'http://10.88.0.1:8081/v1'
 LOCAL_LLM_MODEL = 'deepseek-v4-flash'
+
+
+def _local_llm_endpoint() -> tuple:
+    """按部署形态取本地 LLM 接入点：连通 RAGFlow 用那台的 LLM，否则用本地推理机。"""
+    try:
+        from qa_llm_router import static_endpoint
+
+        return static_endpoint(LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL)
+    except Exception:
+        return LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
+
 
 @mapindex_bp.route('/intel-category/<category>')
 @login_required
@@ -123,16 +135,17 @@ def _start_crawl_task_if_possible(task_id: str, url: str, keywords: str) -> dict
 
 
 def _call_local_llm_for_keywords(text: str) -> dict:
+    base_url, model = _local_llm_endpoint()
     prompt = (
         "请从以下聊天内容中提炼主题词或关键词，输出 JSON 数组，不要解释。\n\n"
         f"{text[:8000]}"
     )
     try:
         resp = requests.post(
-            f'{LOCAL_LLM_BASE_URL}/chat/completions',
+            f'{base_url}/chat/completions',
             headers={'Authorization': 'Bearer x', 'Content-Type': 'application/json'},
             json={
-                'model': LOCAL_LLM_MODEL,
+                'model': model,
                 'messages': [
                     {'role': 'system', 'content': '你是关键词提炼器，只输出 JSON 数组。'},
                     {'role': 'user', 'content': prompt},
