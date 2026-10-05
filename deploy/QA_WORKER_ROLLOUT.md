@@ -240,6 +240,30 @@ QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS=60
 2. 若仍太慢：把助手使用的本地模型换成热态更快的那一个（改
    `/www/CollectInfo_latest_new/data/chat_config.json` 的 `models.local.model_id` 后重启 web）。
 
+### 本地模型自适应（local_model_router）
+
+生产推理机显存只够常驻一个模型（gemma431b-32k / qwen3.8-27b-uncensored 二选一），
+配置里写死的 `model_id` 会和"当前实际加载的"错位。`local_model_router.py` 在解析本地
+provider 时先探测端点，跟随当前可用的那个：
+
+* Ollama `GET /api/ps` → 已加载进显存的模型（判定"当前可用"的依据）
+* 通用 `GET /v1/models` → 已安装列表（拿不到 /api/ps 时的兜底）
+
+规则：配置的模型已在"已加载"里 → 用配置的；已加载里只有一个别的模型 → 跟随它；
+探测失败 / 多模型 / 拿不准 → 原样用配置值。结果按 base_url 缓存 20s（跟着切换走），
+单次探测超时 0.8s。可用 `LOCAL_MODEL_AUTOSELECT=0` 关闭，`LOCAL_MODEL_PROBE_TTL_SECONDS`
+调缓存时长。
+
+排障时先看这三者的关系：
+
+```bash
+curl -s http://10.88.0.1:11434/api/ps | head -c 300          # 端点当前常驻谁
+docker exec collectinfo-web python -c "import json;print(json.load(open('/app/data/chat_config.json'))['models']['local'])"
+docker exec collectinfo-web python -c "import sys;sys.path.insert(0,'/app');from chat_api import get_chat_model_runtime_config as f;print(f('local')['model_id'])"
+```
+
+第三行就是应用实际会用的模型——若与第一行不一致，说明探测没生效（检查容器能否访问该端点）。
+
 未配 RAGFlow 时，`create_run` 会写入 `RAG_ENHANCEMENT_NOT_CONFIGURED` 降级项、二级整段跳过，
 问答仍能完成（只用平台文章库证据）——生产当前就是这个形态；等 RAGFlow 端点与 API Key 就绪后，
 把 `UNIFIED_QA_LEVEL2_ENABLED` 打开即可。
