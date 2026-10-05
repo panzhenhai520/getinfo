@@ -1,10 +1,41 @@
-# 保证 shell/入口脚本在任何机器上都以 LF 检出与打包。
-# 背景：本机 core.autocrlf=true 时 git archive 会把 docker-entrypoint.sh 打成 CRLF，
-# 容器里报 /usr/bin/env: 'sh\r': No such file or directory 并直接 127 退出。
+# 所有会部署到 Linux 生产机的文本文件统一 LF。
+#
+# 背景（两次踩坑）：
+#  1) 只给 *.sh 强制 LF 时，docker-entrypoint.sh 之外的 .py/.html 全被
+#     本机 core.autocrlf=true 下的 git archive 打成 CRLF。Python 能容忍，
+#     但会让「本机 vs 生产机」的逐文件比对充满假阳性（行尾差异被当成内容差异）。
+#  2) 更早一次：docker-entrypoint.sh 变 CRLF → 容器 /usr/bin/env: 'sh\r' → 127 重启循环。
+#
+# 策略：默认文本文件一律 LF 检出与打包；只有 Windows 上执行的脚本保留 CRLF。
+* text=auto eol=lf
+
+# Windows 批处理/PowerShell 需要 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# shell 与容器入口必须 LF（容器里执行）
 *.sh text eol=lf
 *.bash text eol=lf
 Dockerfile text eol=lf
 Dockerfile.* text eol=lf
 *Dockerfile* text eol=lf
-*.bat text eol=crlf
-*.cmd text eol=crlf
+
+# 二进制文件不做任何转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.gguf binary
+*.db binary
+*.sqlite binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
