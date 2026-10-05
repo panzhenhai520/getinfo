@@ -799,6 +799,35 @@ class ArticleRetriever:
         query_terms = _expand(_terms(_qsrc))
         anchor_terms = _expand(_semantic_anchor_terms(_qsrc))
         phrase_terms = _expand(_query_phrases(_qsrc))
+
+        # 时间窗口：把「最近/最新/本周/本月/某年某月」落成明确区间。
+        # 时效是资讯类检索的第一要素，但原先时间词完全不参与检索，
+        # 导致 2026-01-21 的旧文和 2026-10-04 的新文在同一次打分里裸拼。
+        # 这里不做硬过滤（避免窗口判断错误时把答案整个滤空），
+        # 而是给区间内文章加权，并把区间与"是否已扩窗"回报给上层展示。
+        try:
+            from qa_query_normalize import parse_time_window
+
+            _time_window = parse_time_window(" ".join(_qsrc))
+        except Exception:
+            _time_window = {"has_time": False, "days": None, "start": None, "end": None,
+                            "label": "", "source": "none"}
+        window_ids = set()
+
+        def _in_window(row):
+            """文章是否落在时间区间内；无法判断时返回 None（不加权也不计缺失）。"""
+            if not _time_window.get("has_time") or _time_window.get("start") is None:
+                return None
+            raw = str(row.get("publish_date") or row.get("first_crawled") or "")[:10]
+            if len(raw) != 10 or raw[4] != "-":
+                return None
+            try:
+                from datetime import date as _date
+
+                day = _date(int(raw[0:4]), int(raw[5:7]), int(raw[8:10]))
+            except (TypeError, ValueError):
+                return None
+            return _time_window["start"].date() <= day <= _time_window["end"].date()
         amount_constraints = []
         for query in queries or [str(plan.get("question") or "")]:
             for item in _amount_constraints(query):
@@ -854,6 +883,10 @@ class ArticleRetriever:
             )
             if score <= 0:
                 continue
+            in_window = _in_window(row)
+            if in_window:
+                score += 8          # 时效加权：区间内优先，但不排除区间外（配合扩窗）
+                window_ids.add(article_id)
             reasons = []
             if title_phrase_hits:
                 reasons.append("标题短语命中：" + "、".join(title_phrase_hits[:6]))
@@ -871,6 +904,8 @@ class ArticleRetriever:
                 reasons.append("核心词命中：" + "、".join(anchor_hits[:4]))
             if semantic:
                 reasons.append(f"语义相似度 {semantic:.2f}")
+            if in_window:
+                reasons.append("时间在问题指定的范围内")
             ranked.append((score, str(row.get("publish_date") or row.get("first_crawled") or ""), article_id, row, "；".join(reasons) or "正文相关"))
         ranked.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
         cap = max(1, min(int(limit or 12), 30))
@@ -879,11 +914,32 @@ class ArticleRetriever:
                 break
             selected.append(_article_evidence(row, score=score, method="hybrid" if article_id in semantic_scores else "keyword", reason=reason))
             seen_articles.add(article_id)
+        # 扩窗判定：问题带了时间、但区间内一条都没进证据 → 说明区间太窄，
+        # 此时已经退回全部历史资料（因为没做硬过滤），把这件事明确回报给上层，
+        # 由答复或追问告知用户"已扩大到全部历史"，而不是默默给一个过期答案。
+        _tw_out = dict(_time_window)
+        # 对外输出必须是 JSON 安全的：start/end 是 datetime，
+        # 直接放进阶段结果/SSE 事件负载会让序列化失败（实测 level1_retrieval INTERNAL_ERROR）。
+        for _key in ("start", "end"):
+            _value = _tw_out.get(_key)
+            if hasattr(_value, "isoformat"):
+                _tw_out[_key] = _value.isoformat()
+        _adopted_in_window = sum(
+            1 for item in selected if int(item.get("article_id") or 0) in window_ids
+        )
+        _tw_out["in_window_adopted"] = _adopted_in_window
+        _tw_out["expanded"] = bool(_tw_out.get("has_time")) and _adopted_in_window == 0
+        if _tw_out["expanded"]:
+            _tw_out["note"] = (
+                "在 %s 内没有找到直接证据，已自动扩大到全部历史资料"
+                % (_tw_out.get("label") or "指定时间范围")
+            )
         return {
             "queries": queries,
             "evidence": selected,
             "excluded": {**excluded, "page_context": page_denied, "policy_exact": policy_exact_audit},
             "stats": {"eligible": len(rows), "adopted": len(selected), "keyword_candidates": len(ranked)},
+            "time_window": _tw_out,
         }
 
 

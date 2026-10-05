@@ -628,6 +628,21 @@ def build_qa_stage_handlers(
                 "evidence": evidence[:6],
                 "stats": stats,
             })
+        # 时间区间必须明确回写给用户：「最近」到底被解释成哪一段，
+        # 以及区间内找不到证据时是否已经扩窗 —— 不能让用户猜。
+        _time_window = dict(local.get("time_window") or {})
+        if callable(emit_stage_event) and _time_window.get("has_time"):
+            _tw_message = "时间范围：%s" % (_time_window.get("label") or "")
+            if _time_window.get("expanded"):
+                _tw_message += "；" + (_time_window.get("note")
+                                       or "该范围内没有找到直接证据，已扩大到全部历史资料")
+            else:
+                _tw_message += "；在此范围内找到 %s 条证据。" % _time_window.get("in_window_adopted", 0)
+            emit_stage_event("stage_progress", {
+                "message": _tw_message,
+                "time_window": _time_window,
+                "stats": stats,
+            })
         result = {
             "queries": list(retrieval_plan.get("queries") or []),
             "evidence": evidence,
@@ -636,6 +651,7 @@ def build_qa_stage_handlers(
             "search_status": external.get("status"),
             "search_providers": external.get("providers") or [],
             "search_errors": external.get("errors") or [],
+            "time_window": _time_window,
             "cache": {"hit": False, "kb_version": kb_version},
         }
         resilience.cache_put(
