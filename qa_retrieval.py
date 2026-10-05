@@ -554,12 +554,16 @@ class ArticleRetriever:
                        ard.issuer AS policy_issuer, ard.article_no AS policy_article_no,
                        ard.policy_title, ard.effective_date AS policy_effective_date,
                        ard.source_url AS policy_source_url,
-                       COALESCE((SELECT MAX(ega.authority_level)
-                         FROM intel_evidence_group_articles ega
-                         JOIN intel_evidence_groups eg ON eg.id=ega.evidence_group_id
-                         WHERE ega.article_id=a.id AND eg.industry_pack_id=?
-                       ), ard.authority_level, 1) authority_level
+                       COALESCE(egp.authority_level, ard.authority_level, 1) authority_level
                 FROM articles a
+                LEFT JOIN (
+                    SELECT ega.article_id AS article_id,
+                           MAX(ega.authority_level) AS authority_level
+                    FROM intel_evidence_group_articles ega
+                    JOIN intel_evidence_groups eg ON eg.id=ega.evidence_group_id
+                    WHERE eg.industry_pack_id=?
+                    GROUP BY ega.article_id
+                ) egp ON egp.article_id=a.id
                 LEFT JOIN article_intel_classifications c
                   ON c.article_id=a.id AND c.industry_pack_id=?
                 LEFT JOIN article_ragflow_documents ard
@@ -568,6 +572,7 @@ class ArticleRetriever:
                  AND COALESCE(ard.doc_type,'') IN ('official_policy','official_interpretation')
                 WHERE (
                     c.industry_pack_id IS NOT NULL
+                    OR egp.article_id IS NOT NULL
                     OR EXISTS (
                         SELECT 1 FROM content_industry_packs cip
                         WHERE cip.content_type='article'
@@ -575,16 +580,11 @@ class ArticleRetriever:
                           AND cip.industry_pack_id=?
                           AND cip.is_active=1
                     )
-                    OR EXISTS (
-                        SELECT 1 FROM intel_evidence_group_articles ega2
-                        JOIN intel_evidence_groups eg2 ON eg2.id=ega2.evidence_group_id
-                        WHERE ega2.article_id=a.id AND eg2.industry_pack_id=?
-                    )
                 )
                 ORDER BY COALESCE(a.publish_date,a.first_crawled,a.created_at,'') DESC,a.id DESC
                 LIMIT 1000
                 """,
-                (str(pack_id), str(pack_id), str(pack_id), str(pack_id)),
+                (str(pack_id), str(pack_id), str(pack_id)),
             ).fetchall()
         accepted, excluded = [], {"inactive": 0, "stale_activation": 0, "quality_gate": 0, "unsafe_url": 0, "policy_registry": 0}
         seen = set()
