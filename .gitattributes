@@ -1,0 +1,9 @@
+# 保证 shell/入口脚本在任何机器上都以 LF 检出与打包。
+# 背景：本机 core.autocrlf=true 时 git archive 会把 docker-entrypoint.sh 打成 CRLF，
+# 容器里报 /usr/bin/env: 'sh\r': No such file or directory 并直接 127 退出。
+*.sh text eol=lf
+*.bash text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
