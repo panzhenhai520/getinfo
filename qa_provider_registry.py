@@ -77,13 +77,23 @@ class QaProviderRegistry:
         actual = str(runtime.get("provider_id") or normalized_provider).strip().casefold()
         if actual != normalized_provider:
             raise ValueError("provider runtime identity mismatch")
+        base_url = str(runtime.get("base_url") or "").rstrip("/")
+        model_id = str(runtime.get("model_id") or "")
+        if actual == "local" and base_url:
+            # 本地推理机同一时间只常驻一个模型：跟随端点当前加载的那个，
+            # 避免"配置 A / 实际是 B"造成的重新加载与空响应（探测失败即保持原值）。
+            from local_model_router import resolve_local_model_quiet
+
+            model_id = resolve_local_model_quiet(
+                base_url, model_id, api_key=str(runtime.get("api_key") or ""),
+            )
         return QaProviderProfile(
             role=normalized_role,
             provider_id=actual,
             name=str(runtime.get("name") or actual),
             provider_type=str(runtime.get("type") or "openai"),
-            base_url=str(runtime.get("base_url") or "").rstrip("/"),
-            model_id=str(runtime.get("model_id") or ""),
+            base_url=base_url,
+            model_id=model_id,
             api_key=str(runtime.get("api_key") or ""),
             use_proxy=bool(runtime.get("use_proxy", False)),
         )

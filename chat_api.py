@@ -44,6 +44,7 @@ from financial_sse import (
     sources_event,
 )
 from decorators import login_required, admin_required
+from local_model_router import resolve_local_model_quiet
 
 def _get_chat_proxies(use_proxy: bool = False) -> dict:
     """代理解析（用户级隔离）：
@@ -302,6 +303,11 @@ def get_chat_model_runtime_config(model_id: str = 'local') -> dict:
             pass
     if normalized_id == 'local':
         base_url = _normalize_local_base_url(base_url)
+        # 自适应：本地端点当前实际加载的是哪个模型就用哪个。
+        # 生产的本地推理机显存只够常驻一个模型，配置写死 model_id 会出现
+        # "配置 A / 实际加载 B" → 重新加载约 50s 首包超时，或直接返回空内容。
+        # 探测失败/拿不准时原样返回配置值，行为与以前一致。
+        model_id = resolve_local_model_quiet(base_url, model_id, api_key=api_key)
     return {
         'provider_id': normalized_id,
         'name': meta['name'],
