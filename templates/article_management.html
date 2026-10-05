@@ -1109,8 +1109,13 @@
         .chat-bubble-ai th { background:#f8fafc;font-weight:600; }
         /* 流式时不渲染 markdown，完成后再渲染 */
         .chat-bubble-ai.streaming { white-space:pre-wrap; }
-        #chatOverlay,
-        #chatDrawer,
+        /* 这三个元素默认隐藏。注意必须排除 .open 状态：
+           原先写的是 #chatOverlay,#chatDrawer{display:none !important}，
+           ID 选择器 + !important 的权重高过 .chat-drawer.open，
+           导致文章详情里点【引用到AI助手】虽然加上了 .open 类、引用文字也填进了
+           输入框，抽屉却永远不显示（实测 computed display 恒为 none）。 */
+        #chatOverlay:not(.open),
+        #chatDrawer:not(.open),
         .keyword-map-header .compact-action-btn.ai-action {
             display: none !important;
         }
