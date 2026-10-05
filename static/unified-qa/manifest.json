@@ -1,0 +1,25 @@
+{
+  "name": "unified-qa-assistant",
+  "version": "1.0.0+4e5160244bdc",
+  "state_version": "1.0.0",
+  "protocol_version": "qa-sse.v1",
+  "element": "unified-qa-assistant",
+  "entry": "unified-qa.ac8507522e4e.js",
+  "loader": "unified-qa.v1.js",
+  "stylesheet": "unified-qa.a7981157a24e.css",
+  "files": {
+    "unified-qa.ac8507522e4e.js": {
+      "sha256": "ac8507522e4e8c971227a06ccfc424bacc958395a0dc54ecd8045fed00d1e84d",
+      "integrity": "sha256-rIUHUi5OjJcSJ6Bsz8QkusyVg5Wg3FTs2ARf7QDR6E0="
+    },
+    "qa-state.af2cc3967435.js": {
+      "sha256": "af2cc3967435550d2d3d3c1b0debd6ef8ac4150b42a942a1e44d20bdd747a6e8",
+      "integrity": "sha256-ryzDlnQ1VQ0tPTwbDevW74rEFQtCqUKh5E0gvddHpug="
+    },
+    "unified-qa.a7981157a24e.css": {
+      "sha256": "a7981157a24ec99887a0e70f96034f915c4bb1aefe84d5340bc180534dc25aae",
+      "integrity": "sha256-p5gRV6JOyZiHoOcPlgNPkVxLsa7+hNU0C8GAU03CWq4="
+    }
+  },
+  "built_at": "2026-10-02T00:42:45.871Z"
+}

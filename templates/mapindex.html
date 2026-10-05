@@ -1599,6 +1599,11 @@
         }
         .chat-drawer.open { transform: translateX(0); }
         .chat-drawer.article-quote-open { z-index: 1200; }
+        .chat-drawer unified-qa-assistant {
+            display: block;
+            min-height: 0;
+            height: 100%;
+        }
         .chat-head {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -2877,6 +2882,7 @@
     </style>
     <link rel="stylesheet" href="/static/css/responsive.css?v=17">
     <link rel="stylesheet" href="/static/css/article-detail-modal.css">
+    <script type="module" src="/static/unified-qa/unified-qa.v1.js"></script>
 </head>
 <body data-home-view="{{ 'dashboard' if financial_workspace or not active_industry_pack.show_spatiotemporal_map else 'map' }}" data-show-spatiotemporal-map="{{ 'true' if active_industry_pack.show_spatiotemporal_map else 'false' }}" data-financial-workspace="{{ 'true' if financial_workspace else 'false' }}" data-industry-pack-id="{{ active_industry_pack.id }}" data-industry-name="{{ active_industry_pack.name }}" data-is-admin="{{ 'true' if is_admin else 'false' }}">
     <main class="mapindex-shell">
@@ -3003,35 +3009,40 @@
                     <button class="icon-button" id="closeChat" type="button" title="关闭"><i class="fa fa-chevron-right"></i></button>
                 </div>
             </header>
-            <div class="chat-body">
-                <div class="session-list" id="sessionList"></div>
-                <div class="messages" id="messages"></div>
-            </div>
-            <div class="qa-save-panel" id="qaSavePanel">
-                <div class="qa-save-head">
-                    <span><i class="fa fa-save"></i> 加入知识库</span>
-                    <button type="button" onclick="closeQaSavePanel()">×</button>
+            <unified-qa-assistant
+                origin="getinfo_ui"
+                industry-pack="{{ active_industry_pack.id }}"
+            ></unified-qa-assistant>
+            <div hidden aria-hidden="true">
+                <div class="chat-body">
+                    <div class="session-list" id="sessionList"></div>
+                    <div class="messages" id="messages"></div>
                 </div>
-                <div class="qa-save-options">
-                    <label>目标知识库</label>
-                    <select id="qaSaveKbId"><option value="">加载中...</option></select>
-                    <label>解析模式</label>
-                    <select id="qaSaveMethod">
-                        <option value="naive">General / 通用</option>
-                        <option value="qa">问答（Q&A）</option>
-                        <option value="one">整文档</option>
-                    </select>
-                </div>
-                <div class="qa-save-list" id="qaSaveList"></div>
-                <div class="qa-save-actions">
-                    <label class="qa-save-row"><input type="checkbox" id="qaSaveSelectAll" onchange="toggleQaSaveAll(this)"> 全选</label>
-                    <div class="qa-save-row">
-                        <button type="button" onclick="closeQaSavePanel()">取消</button>
-                        <button type="button" class="primary" id="qaSaveConfirmBtn" onclick="confirmQaSaveToKb()">上传并解析</button>
+                <div class="qa-save-panel" id="qaSavePanel">
+                    <div class="qa-save-head">
+                        <span><i class="fa fa-save"></i> 加入知识库</span>
+                        <button type="button" onclick="closeQaSavePanel()">×</button>
+                    </div>
+                    <div class="qa-save-options">
+                        <label>目标知识库</label>
+                        <select id="qaSaveKbId"><option value="">加载中...</option></select>
+                        <label>解析模式</label>
+                        <select id="qaSaveMethod">
+                            <option value="naive">General / 通用</option>
+                            <option value="qa">问答（Q&A）</option>
+                            <option value="one">整文档</option>
+                        </select>
+                    </div>
+                    <div class="qa-save-list" id="qaSaveList"></div>
+                    <div class="qa-save-actions">
+                        <label class="qa-save-row"><input type="checkbox" id="qaSaveSelectAll" onchange="toggleQaSaveAll(this)"> 全选</label>
+                        <div class="qa-save-row">
+                            <button type="button" onclick="closeQaSavePanel()">取消</button>
+                            <button type="button" class="primary" id="qaSaveConfirmBtn" onclick="confirmQaSaveToKb()">上传并解析</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <form class="chat-compose" id="chatForm">
+                <form class="chat-compose" id="chatForm">
                 <div class="search-sources" id="searchSources"></div>
                 <div class="retrieval-trigger" id="retrievalSources"></div>
                 <div class="chat-input-row">
@@ -3051,6 +3062,7 @@
                 </div>
                 <div class="status-line" id="chatStatus"></div>
             </form>
+            </div>
         </aside>
 
         <aside class="retrieval-drawer" id="retrievalDrawer" aria-label="本次回答参考的库内文章">

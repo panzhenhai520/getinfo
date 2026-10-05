@@ -684,13 +684,10 @@ class QaRagflowResearchService:
         if not evidence:
             return insufficient_level2_result(level1, evidence, "RAG增强检索未检索到可核验证据")
         prompt, audit = render_research_context(question=question, level1=level1, evidence=evidence)
-        session = ""
-        try:
-            session = self.client.create_session(name="Unified QA deep research").get("session_id") or ""
-        except Exception:
-            # Some deployed RAGFlow releases create a conversation implicitly.
-            session = ""
-        response = self.client.complete(prompt, session_id=session, stream=False)
+        # Internal research uses the protected stateless endpoint; creating a
+        # RAGFlow chat session here would leak tool runs into the public chat
+        # history list.
+        response = self.client.complete(prompt, session_id="", stream=False)
         raw = response["answer"]
         audit = {
             **audit,
