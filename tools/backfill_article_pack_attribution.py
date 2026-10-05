@@ -87,15 +87,72 @@ def _keyword_packs(article: dict) -> list:
     return hits
 
 
+def _purge_generic(db, *, apply: bool, min_hits: int) -> int:
+    """删除（软删）无任何关键词命中的通用条目。
+
+    判据：活跃 + 无任何包归属 + 对所有行业包的核心/扩展关键词命中数都为 0。
+    这类文章的标题长这样：「普通公司新闻」「行业观察」「银行理财产品收益更新」
+    —— 是占位/测试性质的条目，既不属任何行业，也不该出现在检索池里。
+
+    安全措施：先把待删记录导出成 JSON 备份（id/标题/url/域名/长度/命中词），
+    再做软删除（status='deleted'），随时可回滚；不直接 DELETE。
+    """
+    import json
+    import os
+    import time
+
+    rows = _unattributed_articles(db)
+    victims = []
+    for art in rows:
+        if _keyword_packs(art):
+            continue
+        victims.append(art)
+    print("无归属且零关键词命中的通用条目: %d 篇" % len(victims))
+    for art in victims[:10]:
+        print("   id=%s [%s] %s" % (art["id"], art.get("domain"), str(art.get("title"))[:40]))
+    if not victims:
+        return 0
+    if not apply:
+        print("\n[dry-run] 未删除。确认清单后加 --apply 执行（会先导出备份）。")
+        return len(victims)
+
+    backup = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
+                          "industry_pack_backups",
+                          "purged_generic_articles_%s.json" % time.strftime("%Y%m%d%H%M%S"))
+    os.makedirs(os.path.dirname(backup), exist_ok=True)
+    with open(backup, "w", encoding="utf-8") as fh:
+        json.dump([{k: str(v)[:500] for k, v in art.items()} for art in victims],
+                  fh, ensure_ascii=False, indent=1)
+    print("已导出备份: %s" % os.path.abspath(backup))
+
+    ids = [int(art["id"]) for art in victims]
+    with db.lock:
+        cur = db.connection.cursor()
+        for chunk_start in range(0, len(ids), 200):
+            chunk = ids[chunk_start:chunk_start + 200]
+            marks = ",".join("?" for _ in chunk)
+            cur.execute("UPDATE articles SET status='deleted' WHERE id IN (%s)" % marks, tuple(chunk))
+        db.connection.commit()
+        cur.close()
+    print("已软删除 %d 篇（status='deleted'，可用备份文件回滚）" % len(ids))
+    return len(ids)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="真正入队补全（默认只统计）")
+    parser.add_argument("--purge-generic", action="store_true",
+                        help="删除无归属且零关键词命中的通用条目（先导出备份再软删）")
     parser.add_argument("--min-keyword-hits", type=int, default=2,
                         help="关键词兜底路径的最低命中数（默认 2）")
     parser.add_argument("--limit", type=int, default=0, help="只处理最新的 N 篇（0=全部）")
     args = parser.parse_args(argv)
 
     from sqlite_database import sqlite_db
+
+    if args.purge_generic:
+        _purge_generic(sqlite_db, apply=args.apply, min_hits=args.min_keyword_hits)
+        return 0
 
     rows = _unattributed_articles(sqlite_db)
     if args.limit:

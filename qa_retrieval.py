@@ -580,6 +580,18 @@ class ArticleRetriever:
                           AND cip.industry_pack_id=?
                           AND cip.is_active=1
                     )
+                    -- 未归属任何行业包的文章也要进检索池。
+                    -- 展示链路（「最近关注」走 project_keywords，不接收 industry_pack_id）
+                    -- 会显示这些文章，而检索原先要求有本包分类记录 → 同一篇"页面看得到、
+                    -- AI 搜不到"（实测 id=6910 就是这样被漏掉的）。
+                    -- 放进池子不会污染结果：下面的关键词打分对不相关的文章得 0 分直接丢弃。
+                    OR (
+                        c.industry_pack_id IS NULL
+                        AND NOT EXISTS (
+                            SELECT 1 FROM article_intel_classifications c2
+                            WHERE c2.article_id=a.id AND c2.industry_pack_id IS NOT NULL
+                        )
+                    )
                 )
                 ORDER BY COALESCE(a.publish_date,a.first_crawled,a.created_at,'') DESC,a.id DESC
                 LIMIT 1000
