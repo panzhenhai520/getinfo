@@ -1,5 +1,8 @@
 # 敏感配置
 .env
+# .env 的备份/变体（含密钥，只留在本地）；模板 .env.example 仍要进仓库
+.env.*
+!.env.example
 setup_github.sh
 
 # Python缓存
