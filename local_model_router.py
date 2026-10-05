@@ -118,7 +118,12 @@ def endpoint_urls(base_url: str) -> tuple:
 
 
 def probe_models(base_url: str, *, api_key: str = "", timeout: float | None = None) -> tuple:
-    """返回 (已加载到显存的模型, 端点已安装的模型)。任一失败就是空列表。"""
+    """返回 (已加载到显存的模型, 端点已安装的模型)。
+
+    先问 /v1/models：llama.cpp 这类"一个实例只服务一个模型"的后端只有这一条信息，
+    而且返回唯一模型就足以定案；只有装了多个（Ollama）时才有必要再问 /api/ps
+    判断谁常驻显存——这样在 llama.cpp 上少一次 404 往返。
+    """
     ps_url, models_url = endpoint_urls(base_url)
     if not ps_url and not models_url:
         return [], []
@@ -131,17 +136,18 @@ def probe_models(base_url: str, *, api_key: str = "", timeout: float | None = No
     session.trust_env = False          # 内网端点不要走本机代理
     try:
         try:
-            response = session.get(ps_url, headers=headers, timeout=wait)
-            if response.status_code == 200:
-                loaded = _names(response.json(), "models")
-        except Exception:
-            loaded = []
-        try:
             response = session.get(models_url, headers=headers, timeout=wait)
             if response.status_code == 200:
                 installed = _names(response.json(), "data", "models")
         except Exception:
             installed = []
+        if len(installed) > 1 and ps_url:
+            try:
+                response = session.get(ps_url, headers=headers, timeout=wait)
+                if response.status_code == 200:
+                    loaded = _names(response.json(), "models")
+            except Exception:
+                loaded = []
     finally:
         session.close()
     return loaded, installed

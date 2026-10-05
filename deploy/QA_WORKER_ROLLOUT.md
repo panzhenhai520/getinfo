@@ -240,6 +240,27 @@ QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS=60
 2. 若仍太慢：把助手使用的本地模型换成热态更快的那一个（改
    `/www/CollectInfo_latest_new/data/chat_config.json` 的 `models.local.model_id` 后重启 web）。
 
+### 本地模型端点（2026-10-05 更正：Ollama 已弃用）
+
+生产助手/QA 走的是 **GPU2 上固定运行的 llama.cpp**，不是 Ollama：
+
+| 端点 | 是什么 | 用途 |
+|---|---|---|
+| `http://10.88.0.1:8081/v1` | **llama.cpp**（`/props` 可自证：`model_alias=qwen3.8-27b-uncensored`、`n_ctx=32768`、`total_slots=2`） | 助手与 QA 的对话模型（**当前唯一在用**） |
+| `http://10.88.0.1:11434` | Ollama 0.30.6（`/api/version` 可自证） | 已弃用；仅 `INTEL_EMBEDDING_BASE_URL` 的 bge-m3 还在用（llama.cpp 未开 `--embeddings`，POST `/v1/embeddings` 返回 501） |
+
+`10.88.0.0/24` 是走 wg0 的隧道网段（`ip route` 可见），所以这两个端口都不在宿主机本地监听，排查时别用 `ss` 找。
+
+llama.cpp 的实测表现（对比同机 Ollama）：短上下文 **3.1s**、约 2k 字上下文 **2.3s**；切过去之前用
+Ollama + gemma431b-32k 时一次一级草稿要 159s、综合 172s，切到 llama.cpp 后同一问题整体
+**81s**（草稿 36s、综合 19s），模型侧降级项消失。
+
+配置位置：`data/chat_config.json` 的 `models.local.base_url` / `model_id`
+（改完不用重建容器，文件是挂载进去的）。备份：`data/chat_config.json.bak-llamacpp-<ts>`。
+
+**因此这几条旧建议作废**：不需要 `OLLAMA_KEEP_ALIVE`、不需要靠预热避免"每次冷加载"——
+llama.cpp 常驻模型，慢只可能来自 prompt 体积与模型本身的推理速度。
+
 ### 本地模型自适应（local_model_router）
 
 生产推理机显存只够常驻一个模型（gemma431b-32k / qwen3.8-27b-uncensored 二选一），
