@@ -89,6 +89,122 @@ _ALLOWED_MIME_TYPES = {
     '.html': 'text/html',
 }
 
+
+def _article_id_from_ref(value: object) -> int:
+    match = re.search(r"\barticle:(\d+)\b", str(value or ""), re.IGNORECASE)
+    return int(match.group(1)) if match else 0
+
+
+_EVIDENCE_CRAWL_DROP_LINE_RE = re.compile(
+    r"^(?:"
+    r"广告|Advertisement|Sponsored|赞助|推广|"
+    r"继续浏览后续|继续浏览|继续阅读|继续阅读全文|展开全文|展开更多|"
+    r"阅读全文|查看全文|点击展开|打开APP|下载APP|APP内打开|浏览器打开|"
+    r"登录后继续阅读|注册后继续阅读"
+    r")[\s。:：,，!！…·\-]*$",
+    re.IGNORECASE,
+)
+_EVIDENCE_CRAWL_INLINE_READER_RE = re.compile(
+    r"(?:广告[\s　]*)?(?:"
+    r"继续浏览后续|继续浏览|继续阅读|继续阅读全文|展开全文|展开更多|"
+    r"阅读全文|查看全文|点击展开|打开APP|下载APP|APP内打开|浏览器打开|"
+    r"登录后继续阅读|注册后继续阅读"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _clean_chat_evidence_content(content: object) -> str:
+    """Remove reader overlay leftovers before saving QA evidence articles."""
+
+    text = str(content or "").replace("\r\n", "\n").replace("\r", "\n")
+    if not text.strip():
+        return ""
+
+    try:
+        from smart_article_extractor import clean_extracted_text
+
+        text = clean_extracted_text(text)
+    except Exception:
+        pass
+
+    try:
+        from sqlite_database import clean_article_markdown
+
+        text = clean_article_markdown(text)
+    except Exception:
+        pass
+
+    cleaned_lines = []
+    for raw_line in text.split("\n"):
+        line = re.sub(r"[ \t\u3000]+", " ", str(raw_line or "")).strip()
+        if not line:
+            if cleaned_lines and cleaned_lines[-1]:
+                cleaned_lines.append("")
+            continue
+
+        compact = re.sub(r"\s+", "", line)
+        if _EVIDENCE_CRAWL_DROP_LINE_RE.match(compact):
+            continue
+
+        if len(line) <= 120 and _EVIDENCE_CRAWL_INLINE_READER_RE.search(line):
+            line = _EVIDENCE_CRAWL_INLINE_READER_RE.sub("", line)
+            line = re.sub(r"[ \t\u3000]+", " ", line).strip(" \t。:：,，!！…·-")
+            if not line:
+                continue
+
+        cleaned_lines.append(line)
+
+    cleaned = "\n".join(cleaned_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return cleaned
+
+
+def _maybe_clean_existing_evidence_article(sqlite_db, article: dict) -> dict:
+    if not article:
+        return article
+    article_id = int(article.get("id") or 0)
+    original = str(article.get("content") or "")
+    cleaned = _clean_chat_evidence_content(original)
+    if not article_id or not cleaned or cleaned == original:
+        if cleaned:
+            article = dict(article)
+            article["content"] = cleaned
+        return article
+    try:
+        updated = dict(article)
+        updated["content"] = cleaned
+        updated["extraction_method"] = updated.get("extraction_method") or "qa_evidence_crawl"
+        updated["quality_score"] = updated.get("quality_score") or 80
+        sqlite_db.update_article(article_id, updated)
+        refreshed = sqlite_db.get_article_by_id(article_id)
+        return refreshed or updated
+    except Exception as exc:
+        print(f"[chat] 证据文章清洗回写失败: {_safe_chat_error(exc)}")
+        article = dict(article)
+        article["content"] = cleaned
+        return article
+
+
+def _resolve_chat_article_upload_kb(
+    *,
+    knowledge_base_key: str = "",
+    requested_kb_id: str = "",
+    industry_pack_id: str = "",
+) -> str:
+    try:
+        from ragflow_kb_registry import resolve_ragflow_kb_id
+
+        return resolve_ragflow_kb_id(
+            knowledge_base_key or "news",
+            industry_pack_id=industry_pack_id,
+            purpose="article_upload",
+            requested_kb_id=requested_kb_id,
+        )
+    except Exception:
+        cfg = _load_config()
+        return str(requested_kb_id or cfg.get("ragflow_kb_id") or "").strip()
+
 # 模型元信息（固定不变的部分）
 MODEL_META = {
     'doubao': {
@@ -3674,6 +3790,179 @@ def save_chat_qa_batch():
         'saved_pairs': len(clean_pairs),
         'financial_adjudication': publication_gate or {'financial_review': False},
         'message': f'已生成 {len(clean_pairs)} 组问答并上传解析',
+    })
+
+
+@chat_bp.route('/api/chat/evidence-crawl', methods=['POST'])
+@login_required
+def crawl_chat_evidence_article():
+    """Crawl or reuse one QA evidence item, then upload it to the configured KB."""
+
+    data = request.json or {}
+    title_hint = str(data.get('title') or '').strip()
+    source_url = str(data.get('source_url') or data.get('url') or '').strip()
+    evidence_ref = str(data.get('evidence_ref') or '').strip()
+    source_label = str(data.get('source_label') or '').strip()
+    requested_kb_id = str(data.get('kb_id') or '').strip()
+    kb_key = str(data.get('knowledge_base_key') or 'news').strip() or 'news'
+
+    identity, crossed = _chat_industry_identity(data.get('industry_pack_id') or '')
+    if crossed:
+        return jsonify({'success': False, 'message': '当前用户不能跨行业包写入证据'}), 403
+    industry_pack_id = str(identity.get('id') or '').strip()
+
+    article_id = _article_id_from_ref(evidence_ref)
+    article = None
+    from sqlite_database import sqlite_db
+
+    if article_id:
+        article = sqlite_db.get_article_by_id(article_id)
+        if not article:
+            article_id = 0
+
+    if not article and source_url:
+        article = sqlite_db.get_article_by_url(source_url)
+        if article:
+            article_id = int(article.get('id') or 0)
+
+    if not article and not re.match(r"^https?://", source_url, re.IGNORECASE):
+        return jsonify({
+            'success': False,
+            'message': '该证据没有可爬取的原文 URL，也没有可复用的 article ID',
+        }), 400
+
+    created = False
+    if not article:
+        try:
+            from smart_article_extractor import extract_article_content_from_url
+
+            extract_result = extract_article_content_from_url(
+                source_url,
+                proxies=_get_chat_proxies(False),
+                skip_db_check=True,
+                wait_time=8,
+                timeout=45,
+            )
+        except Exception as exc:
+            return jsonify({
+                'success': False,
+                'message': f'爬取证据原文失败: {_safe_chat_error(exc)}',
+            }), 500
+
+        if not extract_result or not extract_result.get('success'):
+            return jsonify({
+                'success': False,
+                'message': f"爬取证据原文失败: {extract_result.get('error') if isinstance(extract_result, dict) else '未知错误'}",
+            }), 502
+
+        content = _clean_chat_evidence_content(extract_result.get('content'))
+        if len(content) < 50:
+            return jsonify({'success': False, 'message': '爬取到的正文过短，未入库'}), 422
+
+        from urllib.parse import urlparse
+
+        parsed = urlparse(source_url)
+        article_data = {
+            'url': source_url,
+            'title': str(extract_result.get('title') or title_hint or source_url).strip()[:500],
+            'content': content,
+            'domain': parsed.netloc.lower(),
+            'publish_date': extract_result.get('publish_date') or data.get('published_at') or '',
+            'extraction_method': extract_result.get('method') or 'qa_evidence_crawl',
+            'quality_score': int(extract_result.get('score') or 80),
+            'matched_keywords': data.get('matched_keywords') or title_hint or source_label or 'AI助手证据补爬',
+            'matched_keywords_raw': data.get('matched_keywords') or title_hint or source_label or 'AI助手证据补爬',
+            'source_method': 'qa_evidence_crawl',
+            'configured_url': source_url,
+            'resolved_target_url': source_url,
+            'canonical_url': source_url,
+            'source_task_name': f"AI助手证据补爬：{title_hint[:80]}",
+        }
+        article_id = sqlite_db.insert_article(article_data)
+        if not article_id:
+            return jsonify({'success': False, 'message': '证据原文已抓取，但写入文章库失败'}), 500
+        article = sqlite_db.get_article_by_id(article_id) or article_data | {'id': article_id}
+        created = True
+    else:
+        article = _maybe_clean_existing_evidence_article(sqlite_db, article)
+
+    kb_id = _resolve_chat_article_upload_kb(
+        knowledge_base_key=kb_key,
+        requested_kb_id=requested_kb_id,
+        industry_pack_id=industry_pack_id,
+    )
+
+    ragflow_doc = None
+    if kb_id:
+        try:
+            from article_link_extractor import ArticleLinkExtractor
+
+            uploader = ArticleLinkExtractor(db=sqlite_db, enable_smart_validation=False)
+            ragflow_doc = uploader._upload_single_article_to_ragflow({
+                'content': {
+                    'title': article.get('title') or title_hint or '未命名证据',
+                    'content': _clean_chat_evidence_content(article.get('content') or ''),
+                    'url': article.get('url') or source_url,
+                    'domain': article.get('domain') or '',
+                },
+                'db_id': article_id,
+            }, kb_id)
+        except Exception as exc:
+            ragflow_doc = {'status': 'failed', 'uploaded': False, 'error': _safe_chat_error(exc)}
+
+    classification_id = None
+    try:
+        from intel_database import IntelRepository
+        from industry_packs import industry_pack_loader
+
+        repository = IntelRepository(sqlite_db)
+        runtime = repository.active_runtime_context()
+        pack = industry_pack_loader.load(industry_pack_id)
+        article_hash = repository.article_content_hash(article)
+        classification_id = repository.upsert_classification({
+            'article_id': article_id,
+            'industry_pack_id': industry_pack_id,
+            'activation_id': runtime.get('activation_id') or '',
+            'industry_pack_version': str(pack.get('pack_version') or ''),
+            'classifier_version': 'qa-evidence-crawl-v1',
+            'article_content_hash': article_hash,
+            'rule_category': 'other',
+            'rule_confidence': 0.51,
+            'rule_reason': 'AI助手证据补爬：用户确认将引用资料纳入当前行业包',
+            'score_details': {'source': 'qa_evidence_crawl', 'source_label': source_label},
+            'matched_keywords': [value for value in [title_hint, source_label] if value],
+            'final_category': 'other',
+            'final_confidence': 0.51,
+            'final_reason': '补爬证据已归属当前行业包，后续异步分类可刷新精细类别',
+            'result_source': 'qa_evidence_crawl',
+            'fusion_version': 'qa-evidence-crawl-v1',
+        })
+
+        repository.enqueue_classification(article_id, industry_pack_id, force=True)
+    except Exception as exc:
+        print(f"[chat] 证据补爬分类任务入队失败: {_safe_chat_error(exc)}")
+
+    uploaded = bool(ragflow_doc and ragflow_doc.get('uploaded'))
+    if kb_id and not uploaded:
+        status = str((ragflow_doc or {}).get('status') or '')
+        if status == 'skipped_existing':
+            message = '文章已在库中，知识库文档已存在'
+        else:
+            message = f"文章已入库，但上传知识库失败: {(ragflow_doc or {}).get('error') or status or '未知'}"
+    elif uploaded:
+        message = '已爬取入库，并上传到 RAG增强检索知识库解析'
+    else:
+        message = '已写入文章库；当前未配置 RAG增强检索知识库'
+
+    return jsonify({
+        'success': True,
+        'message': message,
+        'article_id': article_id,
+        'created': created,
+        'kb_id': kb_id,
+        'ragflow_doc': ragflow_doc,
+        'classification_id': classification_id,
+        'industry_pack_id': industry_pack_id,
     })
 
 

@@ -53,6 +53,7 @@ _CATEGORY_RULES = [
     ("filing_collection", "申报征管类", re.compile(r"申报|征管|扣缴|期限|宽限|材料|留存|报送|缴纳|纳税", re.I)),
     ("subject_scope", "适用对象类", re.compile(r"适用|对象|主体|范围|哪些人|谁|例外|豁免|排除", re.I)),
     ("policy_content", "政策内容类", re.compile(r"内容|是什么|具体规定|条文|原文|公告|办法|条例|文件", re.I)),
+    ("fact_check", "事实核验类", re.compile(r"已经|是否|有没有|了吗|运行|上线|发布|推出|开始|最新|目前|现在", re.I)),
 ]
 
 
@@ -208,10 +209,10 @@ def _rule_based_adjustment_patch(adjustment: str, subquestions: list[dict]) -> d
 
 def _material_cleaning_from_adjustment(adjustment: str) -> dict:
     text = str(adjustment or "")
-    if not any(word in text for word in ("清洗材料", "清理材料", "剔除", "去掉", "过滤", "合并重复", "重复片段", "社媒", "泛家办", "背景")):
+    if not any(word in text for word in ("清洗材料", "清理材料", "剔除", "去掉", "过滤", "合并重复", "重复片段", "社媒", "泛主题", "泛行业", "泛家办", "背景")):
         return {}
     exclude_social = any(word in text.casefold() for word in ("社媒", "社交媒体", "instagram", "facebook", "linkedin", "小红书", "微博"))
-    exclude_generic = any(word in text for word in ("泛家办", "泛泛", "背景", "无关家办", "通用家办"))
+    exclude_generic = any(word in text for word in ("泛主题", "泛行业", "泛家办", "泛泛", "背景", "无关家办", "通用家办"))
     dedupe = any(word in text for word in ("合并重复", "重复片段", "去重", "重复"))
     return {
         "enabled": True,
@@ -464,7 +465,7 @@ def _question_category(text: str) -> dict:
     for key, label, pattern in _CATEGORY_RULES:
         if pattern.search(str(text or "")):
             return {"key": key, "label": label}
-    return {"key": "other", "label": "其他问题类"}
+    return {"key": "fact_check", "label": "事实核验类"}
 
 
 def _cluster_subquestions(subquestions: list[str]) -> list[dict]:
@@ -476,7 +477,7 @@ def _cluster_subquestions(subquestions: list[str]) -> list[dict]:
             grouped[key] = {"key": key, "label": category["label"], "question_ids": [], "questions": []}
         grouped[key]["question_ids"].append(f"q{index}")
         grouped[key]["questions"].append(text)
-    order = ["policy_content", "subject_scope", "filing_collection", "industry_impact", "risk_response", "evidence_gap", "other"]
+    order = ["policy_content", "subject_scope", "filing_collection", "industry_impact", "risk_response", "evidence_gap", "fact_check", "other"]
     return [grouped[key] for key in order if key in grouped]
 
 
@@ -520,7 +521,9 @@ def _answer_outline(relationship: str, categories: list[dict]) -> list[str]:
     if relationship == "parent_child":
         return ["先给总览", "再按主题分组展开", "问题过多时提示可继续追问细项"]
     labels = [str(item.get("label") or "") for item in categories if item.get("label")]
-    return labels[:6] or ["直接回答当前问题"]
+    if any(str(item.get("key") or "") == "fact_check" for item in categories):
+        return ["核验问题是否属于当前行业包范围", "检索本行业包内的直接证据", "证据不足时明确说明缺口"]
+    return labels[:6] or ["核验事实并基于证据回答"]
 
 
 def _question_plan(question: str, standalone: str, messages: list[dict], *, followup: bool, focus: str) -> dict:

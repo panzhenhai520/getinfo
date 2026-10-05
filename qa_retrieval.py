@@ -21,7 +21,25 @@ _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{1,48}|[\u3400-\u9fff]{2,24}")
 _STOP = {
     "什么", "哪些", "如何", "怎么", "是否", "请问", "介绍", "分析", "一下", "有关",
     "关于", "目前", "当前", "最近", "这个", "那个", "以及", "and", "the", "what",
+    "已经", "了吗", "运行", "开始", "现在", "最新", "有没有", "已经在", "运行了",
 }
+_BROAD_INDUSTRY_TERMS = {
+    "行业", "产业", "市场", "政策", "公告", "法规", "影响", "风险", "应对",
+    "内容", "具体", "资料", "材料", "证据", "检索", "新闻", "资讯", "研究",
+}
+_ANCHOR_NOISE_FRAGMENTS = (
+    "已经", "了吗", "运行", "目前", "现在", "最新", "是否", "什么", "哪些",
+    "如何", "怎么", "有关", "关于",
+)
+_QUERY_TARGET_TERMS = {
+    "哪个", "哪家", "哪个公司", "公司", "企业", "机构", "主体", "对象", "是谁", "什么",
+}
+_AMOUNT_UNIT_TERMS = {"亿元", "亿", "万元", "万", "千元", "人民币", "美元", "港元", "元"}
+_AMOUNT_RE = re.compile(
+    r"(?:(?:近|约|超|逾|超过|累计|合计|达到|获得|完成|融了|融资|募资|投资)\s*)?"
+    r"\d+(?:\.\d+)?\s*(?:亿元|亿|万元|万|千元|人民币|美元|港元|元)",
+    re.I,
+)
 _TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid"}
 _MOJIBAKE_MARKERS = ("Ã", "Â", "å", "ä", "ç", "æ", "è", "é", "ï¼", "ã")
 _POLICY_NOTICE_RE = re.compile(
@@ -167,12 +185,190 @@ def _terms(values: Iterable[str]) -> list[str]:
             if token and token not in _STOP and token not in result:
                 result.append(token)
             if re.fullmatch(r"[\u3400-\u9fff]{4,}", token):
-                for width in (2, 3):
+                for width in (2, 3, 4):
                     for index in range(len(token) - width + 1):
                         part = token[index:index + width]
                         if part not in _STOP and part not in result:
                             result.append(part)
     return result[:120]
+
+
+def _anchor_terms(terms: Iterable[str]) -> list[str]:
+    anchors = []
+    for raw in terms:
+        term = str(raw or "").strip().casefold()
+        if not term or term in _STOP or term in _BROAD_INDUSTRY_TERMS or term in _QUERY_TARGET_TERMS:
+            continue
+        if any(fragment in term for fragment in _ANCHOR_NOISE_FRAGMENTS):
+            continue
+        if re.fullmatch(r"\d+", term):
+            continue
+        if re.fullmatch(r"[\u3400-\u9fff]{2}", term):
+            continue
+        if len(term) < 3:
+            continue
+        if term not in anchors:
+            anchors.append(term)
+    return anchors[:12]
+
+
+def _semantic_anchor_terms(values: Iterable[str]) -> list[str]:
+    anchors = []
+    try:
+        import jieba  # type: ignore
+    except Exception:
+        return anchors
+    for value in values:
+        cutter = getattr(jieba, "lcut", None)
+        raw_tokens = cutter(str(value or "")) if callable(cutter) else list(jieba.cut(str(value or "")))
+        for raw in raw_tokens:
+            term = str(raw or "").strip().casefold()
+            if not term or term in _STOP or term in _BROAD_INDUSTRY_TERMS or term in _QUERY_TARGET_TERMS:
+                continue
+            if any(fragment in term for fragment in _ANCHOR_NOISE_FRAGMENTS):
+                continue
+            if re.fullmatch(r"\d+|[，。！？；、,.!?;:：]+", term):
+                continue
+            if len(term) < 2:
+                continue
+            if term not in anchors:
+                anchors.append(term)
+    return anchors[:12]
+
+
+def _amount_to_yi(value: str) -> float | None:
+    raw = re.sub(r"\s+", "", str(value or "").casefold())
+    match = re.search(r"(\d+(?:\.\d+)?)(亿元|亿|万元|万|千元|人民币|美元|港元|元)", raw)
+    if not match:
+        return None
+    number = float(match.group(1))
+    unit = match.group(2)
+    if unit in {"亿元", "亿"}:
+        return number
+    if unit in {"万元", "万"}:
+        return number / 10000
+    if unit == "千元":
+        return number / 100000
+    return number / 100000000
+
+
+def _amount_constraints(value: str) -> list[dict]:
+    compact = re.sub(r"\s+", "", str(value or "").casefold())
+    constraints = []
+    seen = set()
+    for match in _AMOUNT_RE.finditer(compact):
+        raw = match.group(0)
+        amount = _amount_to_yi(raw)
+        if amount is None:
+            continue
+        approximate = bool(re.match(r"^(近|约|超|逾|超过)", raw))
+        key = (round(amount, 6), approximate)
+        if key in seen:
+            continue
+        seen.add(key)
+        constraints.append({"raw": raw, "value_yi": amount, "approximate": approximate})
+    return constraints[:8]
+
+
+def _amount_context_terms(values: Iterable[str]) -> list[str]:
+    terms = []
+    for value in values:
+        for token in _tokenize_query(str(value or "")):
+            if token in _AMOUNT_UNIT_TERMS or token in _QUERY_TARGET_TERMS:
+                continue
+            if token not in terms:
+                terms.append(token)
+            if re.fullmatch(r"[\u4e00-\u9fff]{2,4}", token):
+                root = token[0]
+                if root not in terms:
+                    terms.append(root)
+    return terms[:12]
+
+
+def _amount_constraint_hits(constraints: list[dict], text: str, *, context_terms: Iterable[str] | None = None) -> list[str]:
+    if not constraints:
+        return []
+    hits = []
+    compact = re.sub(r"\s+", "", str(text or "").casefold())
+    context = [str(term or "").casefold() for term in (context_terms or []) if str(term or "").strip()]
+    doc_amounts = []
+    for match in _AMOUNT_RE.finditer(compact):
+        raw = match.group(0)
+        amount = _amount_to_yi(raw)
+        if amount is not None:
+            doc_amounts.append((raw, amount, match.start(), match.end()))
+    for constraint in constraints:
+        target = float(constraint.get("value_yi") or 0)
+        if target <= 0:
+            continue
+        tolerance = 0.25 if constraint.get("approximate") else 0.08
+        for raw, amount, start, end in doc_amounts:
+            if abs(amount - target) / max(target, 1e-9) <= tolerance:
+                if context:
+                    window = compact[max(0, start - 30): min(len(compact), end + 30)]
+                    if not any(term and term in window for term in context):
+                        continue
+                label = str(constraint.get("raw") or raw)
+                if label not in hits:
+                    hits.append(label)
+                break
+    return hits[:8]
+
+
+def _tokenize_query(value: str) -> list[str]:
+    try:
+        import jieba  # type: ignore
+        cutter = getattr(jieba, "lcut", None)
+        raw_tokens = cutter(str(value or "")) if callable(cutter) else list(jieba.cut(str(value or "")))
+    except Exception:
+        raw_tokens = _WORD_RE.findall(str(value or ""))
+    tokens: list[str] = []
+    for raw in raw_tokens:
+        term = str(raw or "").strip().casefold()
+        if not term or term in _STOP or term in _QUERY_TARGET_TERMS:
+            continue
+        if re.fullmatch(r"\d+|[，。！？；、,.!?;:：]+", term):
+            continue
+        if len(term) < 2:
+            continue
+        if term not in tokens:
+            tokens.append(term)
+    return tokens[:32]
+
+
+def _amount_variants(value: str) -> list[str]:
+    compact = re.sub(r"\s+", "", str(value or "").casefold())
+    variants: list[str] = []
+    for match in _AMOUNT_RE.finditer(compact):
+        raw = match.group(0)
+        items = {raw}
+        bare = re.sub(r"^(近|约|超|逾|超过|累计|合计|达到|获得|完成|融了|融资|募资|投资)", "", raw)
+        if bare:
+            items.add(bare)
+        if bare.endswith("亿元"):
+            items.add(bare[:-2] + "亿")
+        if raw.endswith("亿元"):
+            items.add(raw[:-2] + "亿")
+        for item in items:
+            if item and item not in variants:
+                variants.append(item)
+    return variants[:16]
+
+
+def _query_phrases(values: Iterable[str]) -> list[str]:
+    phrases: list[str] = []
+    for value in values:
+        text = re.sub(r"\s+", "", str(value or "").casefold())
+        tokens = _tokenize_query(text)
+        for width in (4, 3, 2):
+            for index in range(0, max(0, len(tokens) - width + 1)):
+                phrase = "".join(tokens[index:index + width])
+                if len(phrase) >= 4 and phrase not in phrases:
+                    phrases.append(phrase)
+        for token in tokens:
+            if len(token) >= 2 and token not in phrases:
+                phrases.append(token)
+    return phrases[:40]
 
 
 def _notice_variants(year: str, number: str) -> list[str]:
@@ -297,11 +493,13 @@ def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, s
         authority_level = max(authority_level, 50)
     elif policy_meta.get("doc_type") == "ai_qa_summary":
         authority_level = min(authority_level, 10)
+    article_url = canonical_http_url(str(row.get("url") or ""))
+    policy_url = canonical_http_url(str(row.get("policy_source_url") or policy_meta.get("source_url") or ""))
     return {
         "evidence_ref": f"page:{article_id}" if source_type == "page_context" else f"article:{article_id}",
         "source_type": source_type,
         "title": repair_mojibake(row.get("title") or "未命名文章")[:1000],
-        "source_url": canonical_http_url(str(row.get("url") or "")),
+        "source_url": policy_url or article_url,
         "content_excerpt": content[:5000],
         "published_at": str(row.get("publish_date") or "") or None,
         "fetched_at": str(row.get("first_crawled") or "") or None,
@@ -317,6 +515,8 @@ def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, s
         "metadata": {
             "domain": str(row.get("domain") or ""),
             "category": str(row.get("final_category") or ""),
+            "article_url": article_url,
+            "article_detail": f"/article-management/api/article/{article_id}" if article_id else "",
             "matched_keywords": _json(row.get("matched_keywords_json"), []),
             "topic_tags": _json(row.get("topic_tags_json"), []),
             **{key: value for key, value in policy_meta.items() if value not in ("", 0, None)},
@@ -366,11 +566,25 @@ class ArticleRetriever:
                   ON ard.article_id=a.id
                  AND COALESCE(ard.sync_status,'') IN ('parsed','uploaded')
                  AND COALESCE(ard.doc_type,'') IN ('official_policy','official_interpretation')
-                WHERE c.industry_pack_id IS NOT NULL OR ard.id IS NOT NULL
+                WHERE (
+                    c.industry_pack_id IS NOT NULL
+                    OR EXISTS (
+                        SELECT 1 FROM content_industry_packs cip
+                        WHERE cip.content_type='article'
+                          AND cip.content_id=CAST(a.id AS TEXT)
+                          AND cip.industry_pack_id=?
+                          AND cip.is_active=1
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM intel_evidence_group_articles ega2
+                        JOIN intel_evidence_groups eg2 ON eg2.id=ega2.evidence_group_id
+                        WHERE ega2.article_id=a.id AND eg2.industry_pack_id=?
+                    )
+                )
                 ORDER BY COALESCE(a.publish_date,a.first_crawled,a.created_at,'') DESC,a.id DESC
                 LIMIT 1000
                 """,
-                (str(pack_id), str(pack_id)),
+                (str(pack_id), str(pack_id), str(pack_id), str(pack_id)),
             ).fetchall()
         accepted, excluded = [], {"inactive": 0, "stale_activation": 0, "quality_gate": 0, "unsafe_url": 0, "policy_registry": 0}
         seen = set()
@@ -398,7 +612,7 @@ class ArticleRetriever:
             accepted.append(row)
         return accepted, excluded
 
-    def _policy_registry_rows(self, spec: Mapping, limit: int = 20) -> list[dict]:
+    def _policy_registry_rows(self, spec: Mapping, *, pack_id: str, limit: int = 20) -> list[dict]:
         if not spec.get("is_policy"):
             return []
         notices = spec.get("notices") or []
@@ -418,8 +632,26 @@ class ArticleRetriever:
             "COALESCE(ard.sync_status,'') IN ('parsed','uploaded','')",
             "COALESCE(ard.doc_type,'') IN ('official_policy','official_interpretation')",
             "COALESCE(a.status,'active')='active'",
+            """(
+                EXISTS (
+                    SELECT 1 FROM article_intel_classifications c
+                    WHERE c.article_id=a.id AND c.industry_pack_id=?
+                )
+                OR EXISTS (
+                    SELECT 1 FROM content_industry_packs cip
+                    WHERE cip.content_type='article'
+                      AND cip.content_id=CAST(a.id AS TEXT)
+                      AND cip.industry_pack_id=?
+                      AND cip.is_active=1
+                )
+                OR EXISTS (
+                    SELECT 1 FROM intel_evidence_group_articles ega
+                    JOIN intel_evidence_groups eg ON eg.id=ega.evidence_group_id
+                    WHERE ega.article_id=a.id AND eg.industry_pack_id=?
+                )
+            )""",
         ]
-        params: list[str | int] = []
+        params: list[str | int] = [str(pack_id), str(pack_id), str(pack_id)]
         if filter_terms:
             like_parts = []
             for term in filter_terms[:24]:
@@ -455,7 +687,7 @@ class ArticleRetriever:
         with self.database.lock:
             return [dict(row) for row in self.database.connection.execute(sql, tuple(params)).fetchall()]
 
-    def _policy_exact_evidence(self, plan: Mapping, limit: int = 6) -> tuple[list[dict], dict]:
+    def _policy_exact_evidence(self, plan: Mapping, *, industry_pack_id: str, limit: int = 6) -> tuple[list[dict], dict]:
         spec = _policy_anchor_spec(plan)
         audit = {
             "policy_exact_gate": "not_applicable" if not spec.get("is_policy") else "applied",
@@ -468,7 +700,7 @@ class ArticleRetriever:
         if not spec.get("is_policy"):
             return [], audit
         ranked = []
-        for row in self._policy_registry_rows(spec, limit=30):
+        for row in self._policy_registry_rows(spec, pack_id=str(industry_pack_id), limit=30):
             score, reasons = _policy_match_score(row, spec)
             if score < 1050:
                 continue
@@ -536,7 +768,7 @@ class ArticleRetriever:
             selected.append(_article_evidence(row, score=1000, method="page_context", reason="用户当前页面或显式引用", source_type="page_context"))
             seen_articles.add(article_id)
 
-        policy_exact, policy_exact_audit = self._policy_exact_evidence(plan, limit=6)
+        policy_exact, policy_exact_audit = self._policy_exact_evidence(plan, industry_pack_id=industry_pack_id, limit=6)
         for item in policy_exact:
             article_id = int(item.get("article_id") or 0)
             if article_id and article_id in seen_articles:
@@ -547,6 +779,15 @@ class ArticleRetriever:
 
         queries = [str(item) for item in plan.get("queries") or [] if str(item).strip()]
         query_terms = _terms(queries or [str(plan.get("question") or "")])
+        anchor_terms = _semantic_anchor_terms(queries or [str(plan.get("question") or "")])
+        phrase_terms = _query_phrases(queries or [str(plan.get("question") or "")])
+        amount_constraints = []
+        for query in queries or [str(plan.get("question") or "")]:
+            for item in _amount_constraints(query):
+                key = (round(float(item.get("value_yi") or 0), 6), bool(item.get("approximate")))
+                if not any((round(float(existing.get("value_yi") or 0), 6), bool(existing.get("approximate"))) == key for existing in amount_constraints):
+                    amount_constraints.append(item)
+        amount_context_terms = _amount_context_terms(queries or [str(plan.get("question") or "")])
         semantic_scores = {}
         if self.semantic_search and rows:
             try:
@@ -568,18 +809,48 @@ class ArticleRetriever:
             keywords = " ".join(str(item) for item in _json(row.get("matched_keywords_json"), []))
             topics = " ".join(str(item) for item in _json(row.get("topic_tags_json"), []))
             body = str(row.get("content") or "")[:4000].casefold()
+            searchable_blob = f"{title} {keywords.casefold()} {topics.casefold()} {body}"
+            anchor_hits = [term for term in anchor_terms if term in searchable_blob]
             title_hits = [term for term in query_terms if term in title]
             keyword_hits = [term for term in query_terms if term in keywords.casefold() or term in topics.casefold()]
             body_hits = [term for term in query_terms if term in body]
+            title_phrase_hits = [term for term in phrase_terms if len(term) >= 3 and term in title]
+            body_phrase_hits = [term for term in phrase_terms if len(term) >= 3 and term in body]
+            title_amount_hits = _amount_constraint_hits(amount_constraints, title, context_terms=amount_context_terms)
+            body_amount_hits = _amount_constraint_hits(amount_constraints, body, context_terms=amount_context_terms)
+            if amount_constraints and not title_amount_hits and not body_amount_hits:
+                excluded["amount_miss"] = excluded.get("amount_miss", 0) + 1
+                continue
             semantic = semantic_scores.get(article_id, 0.0)
-            score = len(title_hits) * 8 + len(keyword_hits) * 5 + min(3, len(body_hits)) * 1.5 + semantic * 10
+            anchor_coverage = (len(anchor_hits) / max(1, len(anchor_terms))) if anchor_terms else 0.0
+            score = (
+                len(title_phrase_hits) * 32
+                + len(title_amount_hits) * 36
+                + len(title_hits) * 8
+                + len(keyword_hits) * 5
+                + min(5, len(body_phrase_hits)) * 10
+                + min(4, len(body_amount_hits)) * 16
+                + min(5, len(body_hits)) * 1.5
+                + anchor_coverage * 12
+                + semantic * 10
+            )
             if score <= 0:
                 continue
             reasons = []
+            if title_phrase_hits:
+                reasons.append("标题短语命中：" + "、".join(title_phrase_hits[:6]))
+            if title_amount_hits:
+                reasons.append("标题数值命中：" + "、".join(title_amount_hits[:4]))
             if title_hits:
                 reasons.append("标题命中：" + "、".join(title_hits[:6]))
             if keyword_hits:
                 reasons.append("分类词命中：" + "、".join(keyword_hits[:6]))
+            if body_phrase_hits:
+                reasons.append("正文短语命中：" + "、".join(body_phrase_hits[:6]))
+            if body_amount_hits:
+                reasons.append("正文数值命中：" + "、".join(body_amount_hits[:4]))
+            if anchor_hits:
+                reasons.append("核心词命中：" + "、".join(anchor_hits[:4]))
             if semantic:
                 reasons.append(f"语义相似度 {semantic:.2f}")
             ranked.append((score, str(row.get("publish_date") or row.get("first_crawled") or ""), article_id, row, "；".join(reasons) or "正文相关"))

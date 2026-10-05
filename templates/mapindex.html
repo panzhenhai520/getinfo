@@ -28,6 +28,22 @@
         }
         * { box-sizing: border-box; }
         html, body { height: 100%; margin: 0; }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        .brand img,
+        .dashboard-brand img,
+        .tenant-logo,
+        .pack-user-logo,
+        img[src*="logo"],
+        img[src*="righttime"] {
+            display: block;
+            width: auto;
+            max-width: 140px;
+            max-height: 40px;
+            object-fit: contain;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
             color: var(--ink);
@@ -1599,11 +1615,6 @@
         }
         .chat-drawer.open { transform: translateX(0); }
         .chat-drawer.article-quote-open { z-index: 1200; }
-        .chat-drawer unified-qa-assistant {
-            display: block;
-            min-height: 0;
-            height: 100%;
-        }
         .chat-head {
             display: grid;
             grid-template-columns: 1fr auto;
@@ -1765,6 +1776,11 @@
             letter-spacing: 0;
             white-space: pre-wrap;
         }
+        .message-body-wrap {
+            min-width: 0;
+            display: grid;
+            gap: 6px;
+        }
         .message.user {
             margin-left: auto;
             background: var(--accent);
@@ -1796,6 +1812,48 @@
             font-size: 16px;
             line-height: 1.78;
             white-space: normal;
+        }
+        .message.user .message-content {
+            color: inherit;
+            white-space: pre-wrap;
+        }
+        .message-meta-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 18px;
+            color: rgba(99, 116, 107, 0.82);
+            font-size: 11px;
+            line-height: 1.2;
+            user-select: none;
+        }
+        .message.user .message-meta-actions {
+            justify-content: flex-end;
+            color: rgba(255, 255, 255, 0.72);
+        }
+        .message.answer .message-meta-actions {
+            grid-column: 2;
+            padding-left: 1px;
+        }
+        .message-meta-actions button {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 0;
+            padding: 1px 3px;
+            border-radius: 4px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            cursor: pointer;
+        }
+        .message-meta-actions button:hover {
+            color: #176f58;
+            background: rgba(29, 127, 104, 0.08);
+        }
+        .message.user .message-meta-actions button:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.14);
         }
         .message-content p {
             margin: 0 0 10px;
@@ -2112,7 +2170,7 @@
             border: 1px solid rgba(29, 127, 104, 0.2);
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.82);
-            overflow: hidden;
+            overflow: visible;
             white-space: normal;
         }
         .qa-insight-drawer summary {
@@ -2193,8 +2251,164 @@
             background: #f0b429;
         }
         .qa-insight-card-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
             color: #234b39;
             font-weight: 700;
+        }
+        .qa-evidence-batch-crawl {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            min-width: 26px;
+            height: 24px;
+            margin-left: 8px;
+            padding: 0 8px;
+            border: 1px solid rgba(240, 180, 41, 0.72);
+            border-radius: 5px;
+            color: #5f4300;
+            background: linear-gradient(135deg, #fff5a6 0%, #ffd65a 100%);
+            box-shadow: 0 0 0 2px rgba(240, 180, 41, 0.16), 0 6px 16px rgba(107, 76, 0, 0.12);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        .qa-insight-drawer summary .qa-evidence-batch-crawl {
+            margin-left: 16px;
+        }
+        .qa-evidence-batch-crawl:hover {
+            color: #3e2c00;
+            background: linear-gradient(135deg, #fff08a 0%, #ffc933 100%);
+            box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.24), 0 8px 20px rgba(107, 76, 0, 0.16);
+        }
+        .qa-evidence-batch-crawl:disabled {
+            cursor: wait;
+            opacity: .72;
+        }
+        .qa-evidence-batch-crawl.is-running i {
+            animation: qaEvidenceCrawlerWalk .65s ease-in-out infinite alternate;
+        }
+        .qa-evidence-batch-crawl.is-done {
+            color: #0f7a4f;
+            background: #e7f8ec;
+            border-color: rgba(15, 122, 79, .28);
+        }
+        .qa-evidence-batch-crawl.is-error {
+            color: #a53d2b;
+            background: #fff0ed;
+            border-color: rgba(165, 61, 43, .26);
+        }
+        .qa-evidence-crawl-status {
+            display: none;
+            align-items: center;
+            gap: 9px;
+            margin: 8px 0 6px;
+            padding: 8px 10px;
+            border: 1px dashed rgba(29, 127, 104, .26);
+            border-radius: 8px;
+            color: #315b46;
+            background: rgba(244, 249, 246, .9);
+            font-size: 12px;
+        }
+        .qa-evidence-crawl-status.active {
+            display: flex;
+        }
+        .qa-evidence-crawl-status i {
+            color: #176f58;
+            animation: qaEvidenceCrawlerWalk .65s ease-in-out infinite alternate;
+        }
+        .qa-spider-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .42s ease;
+        }
+        .qa-spider-canvas.active {
+            opacity: 1;
+        }
+        .qa-spider-step-target {
+            display: inline-block;
+            transition: transform .22s, background .22s, color .22s, text-shadow .22s, outline-color .22s, box-shadow .22s;
+        }
+        .qa-spider-m1 { outline: 1.5px solid #d6246e; outline-offset: 2px; }
+        .qa-spider-m2 {
+            background: linear-gradient(90deg, transparent 0 34%, rgba(214, 36, 110, .92) 34% 58%, transparent 58% 100%) !important;
+            color: inherit !important;
+            text-shadow: 0 1px 0 rgba(255,255,255,.7);
+        }
+        .qa-spider-m3 { transform: scale(1.18); position: relative; z-index: 2; color: #d6246e !important; }
+        .qa-spider-m4 { transform: rotate(-8deg); color: #d6246e !important; }
+        .qa-spider-m5 {
+            transform: scaleY(.88);
+            background: linear-gradient(90deg, transparent 0 42%, rgba(23, 32, 29, .9) 42% 54%, transparent 54% 100%) !important;
+            color: inherit !important;
+        }
+        .qa-spider-m6 { text-shadow: 5px 0 0 rgba(214,36,110,.45), -5px 0 0 rgba(23,32,29,.28); }
+        .qa-spider-lock {
+            outline: 0;
+            outline-offset: 0;
+            color: inherit !important;
+            text-shadow: 0 0 10px rgba(57, 232, 148, .48);
+        }
+        .qa-evidence-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 5px;
+        }
+        .qa-evidence-actions button,
+        .qa-evidence-actions a {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border: 1px solid rgba(29, 127, 104, .18);
+            border-radius: 5px;
+            color: #176f58;
+            background: #f7fbf8;
+            font-size: 12px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .qa-evidence-actions button:disabled,
+        .qa-evidence-actions a.is-disabled {
+            color: #8a918d;
+            border-color: rgba(138, 145, 141, .22);
+            background: #f1f3f2;
+            cursor: default;
+            opacity: .82;
+        }
+        .qa-evidence-actions .qa-evidence-local-link.is-ready {
+            color: #0f7a4f;
+            border-color: rgba(15, 122, 79, .32);
+            background: #e7f8ec;
+            box-shadow: 0 0 0 2px rgba(15, 122, 79, .12);
+        }
+        .qa-evidence-actions .qa-evidence-original-link {
+            color: #176f58;
+            border-color: rgba(29, 127, 104, .18);
+            background: #f7fbf8;
+            opacity: 1;
+        }
+        .qa-insight-card.is-crawling {
+            border-color: rgba(29, 127, 104, .34);
+            background: linear-gradient(90deg, #f8fffb, #eefaf4);
+        }
+        .qa-insight-card.is-crawl-done {
+            border-color: rgba(29, 127, 104, 0.14);
+            background: #fff;
+        }
+        .qa-insight-card.is-crawl-error {
+            border-color: rgba(165, 61, 43, .28);
+            background: #fff8f6;
         }
         .qa-insight-card-meta {
             color: #6b7a70;
@@ -2211,6 +2425,14 @@
             0% { transform: translateY(0); box-shadow: 0 0 0 0 rgba(240, 180, 41, 0.42), 0 10px 24px rgba(23, 32, 29, 0.12); }
             42% { transform: translateY(-1px); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.18), 0 14px 30px rgba(23, 32, 29, 0.16); }
             100% { transform: translateY(0); box-shadow: 0 0 0 3px rgba(240, 180, 41, 0.22), 0 10px 24px rgba(23, 32, 29, 0.12); }
+        }
+        @keyframes qaEvidenceCrawlerWalk {
+            from { transform: translateX(-1px) rotate(-7deg); }
+            to { transform: translateX(2px) rotate(9deg); }
+        }
+        @keyframes qaSpiderLeg {
+            from { width: 22px; filter: brightness(.88); }
+            to { width: 30px; filter: brightness(1.25); }
         }
         .generated-file-actions {
             display: flex;
@@ -2882,7 +3104,6 @@
     </style>
     <link rel="stylesheet" href="/static/css/responsive.css?v=17">
     <link rel="stylesheet" href="/static/css/article-detail-modal.css">
-    <script type="module" src="/static/unified-qa/unified-qa.v1.js"></script>
 </head>
 <body data-home-view="{{ 'dashboard' if financial_workspace or not active_industry_pack.show_spatiotemporal_map else 'map' }}" data-show-spatiotemporal-map="{{ 'true' if active_industry_pack.show_spatiotemporal_map else 'false' }}" data-financial-workspace="{{ 'true' if financial_workspace else 'false' }}" data-industry-pack-id="{{ active_industry_pack.id }}" data-industry-name="{{ active_industry_pack.name }}" data-is-admin="{{ 'true' if is_admin else 'false' }}">
     <main class="mapindex-shell">
@@ -3009,60 +3230,58 @@
                     <button class="icon-button" id="closeChat" type="button" title="关闭"><i class="fa fa-chevron-right"></i></button>
                 </div>
             </header>
-            <unified-qa-assistant
-                origin="getinfo_ui"
-                industry-pack="{{ active_industry_pack.id }}"
-            ></unified-qa-assistant>
-            <div hidden aria-hidden="true">
-                <div class="chat-body">
-                    <div class="session-list" id="sessionList"></div>
-                    <div class="messages" id="messages"></div>
+            <div class="chat-body">
+                <div class="session-list" id="sessionList"></div>
+                <div class="messages" id="messages"></div>
+            </div>
+            <div class="qa-save-panel" id="qaSavePanel">
+                <div class="qa-save-head">
+                    <span><i class="fa fa-save"></i> 加入知识库</span>
+                    <button type="button" onclick="closeQaSavePanel()">×</button>
                 </div>
-                <div class="qa-save-panel" id="qaSavePanel">
-                    <div class="qa-save-head">
-                        <span><i class="fa fa-save"></i> 加入知识库</span>
-                        <button type="button" onclick="closeQaSavePanel()">×</button>
-                    </div>
-                    <div class="qa-save-options">
-                        <label>目标知识库</label>
-                        <select id="qaSaveKbId"><option value="">加载中...</option></select>
-                        <label>解析模式</label>
-                        <select id="qaSaveMethod">
-                            <option value="naive">General / 通用</option>
-                            <option value="qa">问答（Q&A）</option>
-                            <option value="one">整文档</option>
-                        </select>
-                    </div>
-                    <div class="qa-save-list" id="qaSaveList"></div>
-                    <div class="qa-save-actions">
-                        <label class="qa-save-row"><input type="checkbox" id="qaSaveSelectAll" onchange="toggleQaSaveAll(this)"> 全选</label>
-                        <div class="qa-save-row">
-                            <button type="button" onclick="closeQaSavePanel()">取消</button>
-                            <button type="button" class="primary" id="qaSaveConfirmBtn" onclick="confirmQaSaveToKb()">上传并解析</button>
-                        </div>
+                <div class="qa-save-options">
+                    <label>目标知识库</label>
+                    <select id="qaSaveKbId"><option value="">加载中...</option></select>
+                    <label>解析模式</label>
+                    <select id="qaSaveMethod">
+                        <option value="naive">General / 通用</option>
+                        <option value="qa">问答（Q&A）</option>
+                        <option value="one">整文档</option>
+                    </select>
+                </div>
+                <div class="qa-save-list" id="qaSaveList"></div>
+                <div class="qa-save-actions">
+                    <label class="qa-save-row"><input type="checkbox" id="qaSaveSelectAll" onchange="toggleQaSaveAll(this)"> 全选</label>
+                    <div class="qa-save-row">
+                        <button type="button" onclick="closeQaSavePanel()">取消</button>
+                        <button type="button" class="primary" id="qaSaveConfirmBtn" onclick="confirmQaSaveToKb()">上传并解析</button>
                     </div>
                 </div>
-                <form class="chat-compose" id="chatForm">
+            </div>
+            <form class="chat-compose" id="chatForm">
                 <div class="search-sources" id="searchSources"></div>
                 <div class="retrieval-trigger" id="retrievalSources"></div>
-                <div class="chat-input-row">
-                    <button class="web-search-button" id="onlineSearchToggle" type="button" title="联网搜索" aria-label="联网搜索" aria-pressed="false">
-                        <i class="fa fa-globe" aria-hidden="true"></i>
+                <div class="model-row">
+                    <div class="model-grid" id="chatModelGrid" aria-label="选择模型"></div>
+                    <button class="web-search-button" id="onlineSearchToggle" type="button" title="联网搜索">
+                        <img src="/static/img/ai/web-search.svg" width="22" height="22" alt="">
                         <span>联网搜索</span>
                     </button>
-                    <div class="chat-input-box">
-                        <textarea id="chatInput" placeholder="输入问题"></textarea>
-                        <button class="chat-input-clear" type="button" title="清空输入" aria-label="清空输入" onclick="clearChatInput()">−</button>
-                    </div>
+                </div>
+                <div class="toggle-row">
+                    <span id="activeSession">未选择会话</span>
+                </div>
+                <div class="chat-input-row">
+                    <textarea id="chatInput" placeholder="输入问题"></textarea>
                     <button class="chat-model-select" id="chatModelSelect" type="button" title="选择模型" aria-label="选择模型">
                         <i class="fa fa-robot" aria-hidden="true"></i><span id="chatModelSelectName">-</span><i class="fa fa-chevron-down" aria-hidden="true"></i>
                     </button>
                     <button class="send-button" type="submit" title="发送"><i class="fa fa-paper-plane"></i></button>
-                    {% if ragflow_upload_enabled %}<button class="save-kb-button" id="qaSaveOpenBtn" type="button" title="勾选对话并加入知识库" onclick="openQaSavePanel()"><i class="fa fa-save"></i></button>{% endif %}
+                    <button class="send-button" type="button" title="清空输入框" onclick="clearChatInput()" aria-label="清空输入框"><i class="fa fa-eraser"></i></button>
+                    <button class="save-kb-button" id="qaSaveOpenBtn" type="button" title="勾选对话并加入知识库" onclick="openQaSavePanel()"><i class="fa fa-save"></i></button>
                 </div>
                 <div class="status-line" id="chatStatus"></div>
             </form>
-            </div>
         </aside>
 
         <aside class="retrieval-drawer" id="retrievalDrawer" aria-label="本次回答参考的库内文章">
@@ -6779,6 +6998,7 @@
             if (path.some(node => node?.classList?.contains('app-confirm-backdrop'))) return;
             // 模型选择模态 / 召回抽屉 都在会话抽屉之外：点它们绝不能把会话窗口连带收起
             if (event.target.closest && event.target.closest('#modelSelectOverlay, .retrieval-drawer')) return;
+            if (path.some(node => node?.classList?.contains('article-modal'))) return;
             if (path.includes(drawer) || path.includes(toggle)) return;
             setChatOpen(false);
         });
@@ -7002,6 +7222,7 @@
 
         function collapseSupersededPlanNode(node, adjustmentText = '') {
             if (!node) return;
+            resolvePlanContinueGate(node, { silent: true });
             node.dataset.streamFrozen = 'true';
             node.dataset.planAwaitingAction = 'false';
             node.dataset.adjustmentPaused = 'false';
@@ -7018,24 +7239,57 @@
             });
         }
 
+        function resolvePlanContinueGate(node, options = {}) {
+            if (!node || !node._planContinueGate) return;
+            const gate = node._planContinueGate;
+            if (gate.timer) clearInterval(gate.timer);
+            if (gate.timeout) clearTimeout(gate.timeout);
+            node._planContinueGate = null;
+            node.dataset.planAwaitingAction = 'false';
+            if (!options.silent && gate.bar) {
+                gate.bar.remove();
+                startInlineAnswerProgress(node, '正在按问题分析思路继续：检索证据、整理引用并生成正文', { stage: 'level1_retrieval' });
+                setStatus(options.manual ? '已按当前思路继续生成' : '5秒未调整，已按当前思路继续生成');
+            }
+            if (typeof gate.resolve === 'function') gate.resolve();
+        }
+
+        async function waitForPlanContinueGate(node) {
+            if (!node || !node._planContinueGate) return;
+            await node._planContinueGate.promise;
+        }
+
         function showPlanControlActions(node, question, planText) {
             if (!node || node.querySelector('[data-plan-actions="true"]')) return;
+            resolvePlanContinueGate(node, { silent: true });
             node.dataset.planAwaitingAction = 'true';
             node.classList.remove('plan-thinking');
             const bar = document.createElement('div');
             bar.className = 'chat-plan-actions';
             bar.dataset.planActions = 'true';
             bar.innerHTML = `
-                <span>系统会按上述思路继续生成，你也可以先调整。</span>
-                <button type="button" data-plan-continue>按此思路继续</button>
+                <span>系统会按上述思路继续生成，你也可以先调整。<b data-plan-countdown style="font-weight:500;color:#176f58;">5秒后自动继续</b></span>
+                <button type="button" data-plan-continue>继续</button>
                 <button type="button" data-plan-adjust>调整思路</button>
             `;
+            const countdown = bar.querySelector('[data-plan-countdown]');
+            const continueAt = Date.now() + 5000;
+            const gate = {};
+            gate.bar = bar;
+            gate.promise = new Promise(resolve => { gate.resolve = resolve; });
+            const updateCountdown = () => {
+                if (!node._planContinueGate || node._planContinueGate !== gate) return;
+                const seconds = Math.max(0, Math.ceil((continueAt - Date.now()) / 1000));
+                if (countdown) countdown.textContent = `${seconds}秒后自动继续`;
+            };
+            gate.timer = setInterval(updateCountdown, 250);
+            gate.timeout = setTimeout(() => resolvePlanContinueGate(node), 5000);
+            node._planContinueGate = gate;
             bar.querySelector('[data-plan-continue]').addEventListener('click', () => {
-                bar.remove();
-                startInlineAnswerProgress(node, '已按当前思路继续：正在检索证据并生成回答', { stage: 'level1_retrieval' });
-                setStatus('已按当前思路继续生成');
+                resolvePlanContinueGate(node, { manual: true });
             });
             bar.querySelector('[data-plan-adjust]').addEventListener('click', async () => {
+                resolvePlanContinueGate(node, { silent: true });
                 const pausedRunId = state.currentQaRunId || '';
                 state.pendingPlanAdjustment = { question, planText: cleanChatUiText(planText || ''), runId: pausedRunId, node };
                 state.chatStreamSerial += 1;
@@ -7061,6 +7315,7 @@
                 bar.innerHTML = '<span>已暂停当前输出；请输入调整意见，发送后会按新思路重新组织答案。</span>';
                 setStatus('已暂停当前输出，等待调整思路');
             });
+            updateCountdown();
             node.appendChild(bar);
         }
 
@@ -7483,25 +7738,105 @@
             node.appendChild(tools);
         }
 
+        function formatMessageTime(date = new Date()) {
+            const now = new Date();
+            const sameDay = date.toDateString() === now.toDateString();
+            const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+            if (sameDay) return time;
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${month}-${day} ${time}`;
+        }
+
+        function messageCopyText(body, role) {
+            if (!body) return '';
+            if (role === 'assistant') return cleanChatUiText(body._fullAssistantContent || body.textContent || '').trim();
+            return cleanChatUiText(body.dataset.rawContent || body.textContent || '').trim();
+        }
+
+        async function copyTextToClipboard(text) {
+            const value = String(text || '');
+            if (!value) return false;
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(value);
+                    return true;
+                } catch (error) {
+                    console.warn('Clipboard API failed, using fallback', error);
+                }
+            }
+            const textarea = document.createElement('textarea');
+            textarea.value = value;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            textarea.style.top = '0';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            textarea.setSelectionRange(0, textarea.value.length);
+            let ok = false;
+            try {
+                ok = document.execCommand('copy');
+            } catch (error) {
+                console.warn('execCommand copy failed', error);
+            } finally {
+                textarea.remove();
+            }
+            return ok;
+        }
+
+        function appendMessageMeta(item, body, role) {
+            const meta = document.createElement('div');
+            meta.className = 'message-meta-actions';
+            meta.innerHTML = `
+                <time datetime="${new Date().toISOString()}">${formatMessageTime()}</time>
+                <button type="button" title="复制"><i class="fa fa-copy" aria-hidden="true"></i><span>复制</span></button>
+            `;
+            const button = meta.querySelector('button');
+            button.addEventListener('click', async event => {
+                event.preventDefault();
+                event.stopPropagation();
+                const text = messageCopyText(body, role);
+                if (!text) return;
+                const label = button.querySelector('span');
+                if (await copyTextToClipboard(text)) {
+                    label.textContent = '已复制';
+                    setTimeout(() => { label.textContent = '复制'; }, 1400);
+                } else {
+                    label.textContent = '复制失败';
+                    setTimeout(() => { label.textContent = '复制'; }, 1600);
+                }
+            });
+            item.appendChild(meta);
+        }
+
         function appendMessage(role, content) {
             const box = document.getElementById('messages');
             const item = document.createElement('div');
             item.className = `message ${role === 'user' ? 'user' : 'answer'}`;
+            let body = null;
             if (role === 'user') {
-                item.textContent = content || '';
+                body = document.createElement('div');
+                body.className = 'message-content';
+                body.dataset.rawContent = content || '';
+                body.textContent = content || '';
+                item.appendChild(body);
             } else {
                 const avatar = document.createElement('span');
                 avatar.className = 'assistant-avatar';
                 avatar.innerHTML = '<i class="fa fa-robot"></i>';
-                const body = document.createElement('div');
+                body = document.createElement('div');
                 body.className = 'message-content';
                 renderAssistantContent(body, content || '');
                 item.appendChild(avatar);
                 item.appendChild(body);
             }
+            appendMessageMeta(item, body, role === 'user' ? 'user' : 'assistant');
             box.appendChild(item);
             box.scrollTop = box.scrollHeight;
-            return item.querySelector('.message-content') || item;
+            return body || item;
         }
 
         function extractGeneratedFileBlocks(text) {
@@ -7738,7 +8073,7 @@
                         const model = models[modelId] || {};
                         const name = model.name || modelId;
                         return `<button type="button" class="model-icon ${modelId === state.activeModel ? 'active' : ''}" data-model-id="${modelId}" title="${name} · ${model.model_id || modelId}">
-                            <img src="/static/img/ai/${modelId}.svg" alt="${name}">
+                            <img src="/static/img/ai/${modelId}.svg" width="20" height="20" alt="${name}">
                             <span>${name}</span>
                         </button>`;
                     }).join('')}
@@ -8096,6 +8431,801 @@
             return /^https?:\/\//i.test(url) ? url : '';
         }
 
+        function qaEvidenceArticleId(item) {
+            const meta = item?.metadata || {};
+            const candidates = [
+                item?.article_id,
+                meta.article_id,
+                item?.evidence_ref,
+                meta.evidence_ref,
+                item?.source_url,
+                meta.source_url,
+            ];
+            for (const value of candidates) {
+                const match = String(value || '').match(/\barticle:(\d+)\b/i);
+                if (match) return match[1];
+                if ((value === item?.article_id || value === meta.article_id) && /^\d+$/.test(String(value || ''))) {
+                    return String(value);
+                }
+            }
+            return '';
+        }
+
+        function qaEvidenceCrawlPayload(item, title, ref) {
+            const url = qaEvidenceUrl(item);
+            const articleId = qaEvidenceArticleId(item);
+            const source = qaSourceLabel(item);
+            const published = item?.published_at || item?.metadata?.publish_date || '';
+            return {
+                title: title || '',
+                source_url: url || '',
+                evidence_ref: articleId ? `article:${articleId}` : (ref || ''),
+                source_label: source || '',
+                published_at: published || '',
+                knowledge_base_key: 'news',
+                industry_pack_id: document.body?.dataset?.industryPackId || '',
+                hasTarget: Boolean(url || articleId),
+            };
+        }
+
+        function qaEvidenceActionsHtml(articleId, originalUrl, detailReady = false) {
+            const detail = articleId && detailReady
+                ? `<button type="button" class="qa-evidence-local-link is-ready qa-spider-step-target" data-article-id="${escapeHtml(articleId)}"><i class="fa fa-eye" aria-hidden="true"></i>文章详情</button>`
+                : `<button type="button" class="qa-evidence-local-link qa-spider-step-target" disabled aria-disabled="true"><i class="fa fa-eye-slash" aria-hidden="true"></i>文章详情</button>`;
+            const original = originalUrl
+                ? `<a class="qa-evidence-original-link qa-spider-step-target" href="${escapeHtml(originalUrl)}" target="_blank" rel="noopener"><i class="fa fa-external-link" aria-hidden="true"></i>原文链接</a>`
+                : '';
+            return detail || original ? `<span class="qa-evidence-actions">${detail}${original}</span>` : '';
+        }
+
+        function qaUpdateEvidenceCardAfterCrawl(drawer, ref, result, item) {
+            const safeRef = String(ref || '');
+            const card = drawer.querySelector(`.qa-insight-card[data-ref="${CSS.escape(safeRef)}"]`);
+            if (!card) return;
+            card.classList.remove('is-crawling', 'is-crawl-error');
+            if (!result?.success) {
+                card.classList.add('is-crawl-error');
+                return;
+            }
+            card.classList.add('is-crawl-done');
+            const articleId = String(result.article_id || qaEvidenceArticleId(item) || '');
+            const originalUrl = qaEvidenceUrl(item);
+            let actions = card.querySelector('.qa-evidence-actions');
+            if (!actions) {
+                card.insertAdjacentHTML('beforeend', qaEvidenceActionsHtml(articleId, originalUrl, Boolean(articleId)));
+                actions = card.querySelector('.qa-evidence-actions');
+            } else if (articleId) {
+                let localButton = actions.querySelector('.qa-evidence-local-link');
+                if (!localButton) {
+                    actions.insertAdjacentHTML('afterbegin', qaEvidenceActionsHtml(articleId, '', true).replace(/^<span class="qa-evidence-actions">|<\/span>$/g, ''));
+                    localButton = actions.querySelector('.qa-evidence-local-link');
+                }
+                localButton.disabled = false;
+                localButton.removeAttribute('aria-disabled');
+                localButton.dataset.articleId = articleId;
+                localButton.classList.add('is-ready', 'qa-spider-step-target');
+                localButton.innerHTML = '<i class="fa fa-eye" aria-hidden="true"></i>文章详情';
+            }
+            if (actions) {
+                actions.querySelectorAll('.qa-evidence-local-link').forEach(link => {
+                    if (link.disabled || link.dataset.bound === 'true') return;
+                    link.dataset.bound = 'true';
+                    link.addEventListener('click', event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const id = Number(link.dataset.articleId || 0);
+                        if (id) viewArticle(id);
+                    });
+                });
+            }
+            const meta = card.querySelector('.qa-insight-card-meta');
+            if (meta && !/已入库/.test(meta.textContent || '')) {
+                meta.textContent = `${meta.textContent || ''} · 已入库`.trim();
+            }
+        }
+
+        function qaSpiderMutateElement(el) {
+            const target = el?.closest?.('.qa-spider-step-target');
+            if (!target) return;
+            const classes = ['qa-spider-m1', 'qa-spider-m2', 'qa-spider-m3', 'qa-spider-m4', 'qa-spider-m5', 'qa-spider-m6'];
+            const cls = classes[Math.floor(Math.random() * classes.length)];
+            target.classList.add(cls);
+            setTimeout(() => target.classList.remove(cls), 900 + Math.random() * 1400);
+        }
+
+        function qaSpiderTargetTerms(items) {
+            const stop = new Set(['官方原文', '解读材料', 'background', 'media', 'analysis', 'article', 'https', 'http', 'www']);
+            const counts = new Map();
+            (Array.isArray(items) ? items : []).forEach(item => {
+                const blob = [
+                    qaEvidenceTitle(item, ''),
+                    qaSourceLabel(item),
+                    item?.published_at || item?.metadata?.publish_date || '',
+                ].join(' ');
+                const tokens = String(blob).match(/[\u4e00-\u9fff]{2,10}|[a-z0-9][a-z0-9_-]{2,}/gi) || [];
+                tokens.forEach(raw => {
+                    const term = String(raw || '').trim();
+                    if (!term || stop.has(term) || /^\d+$/.test(term)) return;
+                    counts.set(term, (counts.get(term) || 0) + 1);
+                });
+            });
+            return [...counts.entries()]
+                .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+                .map(item => item[0])
+                .slice(0, 6);
+        }
+
+        function qaSpiderVoice(kind) {
+            if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
+            const text = kind === 'start'
+                ? '目标已设定。'
+                : kind === 'stored'
+                    ? '已入库。'
+                    : '发现目标。';
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-CN';
+                utterance.rate = 1.1;
+                window.speechSynthesis.speak(utterance);
+            } catch (error) {
+                console.debug('蜘蛛语音不可用', error);
+            }
+        }
+
+        function qaEnsureSpiderRunner(drawer) {
+            if (!drawer) return null;
+            if (drawer.__qaSpiderRunner) return drawer.__qaSpiderRunner;
+            drawer.style.position = drawer.style.position || 'relative';
+            const canvas = document.createElement('canvas');
+            canvas.className = 'qa-spider-canvas';
+            canvas.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+            const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const slow = reduced ? .55 : 1;
+            const S = Math.max(.42, Math.min(.58, (window.innerWidth || 1024) / 760 * .58));
+            const R = 100 * S;
+            const L = 70 * S;
+            const range = 95;
+            let W = 1;
+            let H = 1;
+            let raf = 0;
+            let active = false;
+            let last = performance.now();
+            let targetEl = null;
+            let readStart = 0;
+            let statusLabel = '爬取中';
+            let targetKeywords = [];
+            let detectedTarget = false;
+            let homeEl = null;
+            let returningHome = false;
+            let bodyTick = 0;
+            let idleSeed = Math.random() * 1000;
+            const target = { x: 90, y: 90 };
+            const sp = { x: 70, y: 92, vx: 0, vy: 0, hx: 1, hy: 0 };
+            const legs = [];
+            const pings = [];
+            const queue = [];
+
+            function parseRgb(value) {
+                const match = String(value || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+                return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+            }
+
+            function relativeLuma(rgb) {
+                if (!rgb) return 255;
+                return rgb[0] * .299 + rgb[1] * .587 + rgb[2] * .114;
+            }
+
+            function spiderPalette() {
+                const host = document.querySelector('.chat-drawer.open') || document.querySelector('.chat-drawer') || document.body;
+                const bg = parseRgb(window.getComputedStyle(host).backgroundColor) || parseRgb(window.getComputedStyle(document.body).backgroundColor);
+                const dark = relativeLuma(bg) < 120;
+                return {
+                    body: dark ? '#f3eadf' : '#17201d',
+                    accent: '#d6246e',
+                    probe: dark ? '#4dff91' : '#00c86f',
+                    labelBg: dark ? 'rgba(18, 27, 23, .94)' : 'rgba(255,255,255,.94)',
+                    labelBorder: dark ? 'rgba(125,255,181,.38)' : 'rgba(29,127,104,.3)',
+                    labelText: dark ? '#bfffd8' : '#176f58',
+                    targetBg: dark ? 'rgba(75, 60, 8, .86)' : 'rgba(255, 246, 184, .9)',
+                    targetBorder: dark ? 'rgba(255, 214, 90, .54)' : 'rgba(240, 180, 41, .42)',
+                    targetText: dark ? '#fff2ad' : '#5f4300',
+                };
+            }
+
+            function resize() {
+                W = Math.max(1, Math.round(window.innerWidth || document.documentElement.clientWidth || 1));
+                H = Math.max(1, Math.round(window.innerHeight || document.documentElement.clientHeight || 1));
+                const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+                canvas.width = Math.round(W * dpr);
+                canvas.height = Math.round(H * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                sp.x = Math.max(18, Math.min(W - 18, sp.x));
+                sp.y = Math.max(18, Math.min(H - 18, sp.y));
+            }
+
+            function rot(x, y, deg) {
+                const a = deg * Math.PI / 180;
+                const c = Math.cos(a);
+                const s = Math.sin(a);
+                return { x: x * c - y * s, y: x * s + y * c };
+            }
+
+            function trim(ax, ay, bx, by, ra, rb) {
+                const dx = bx - ax;
+                const dy = by - ay;
+                const n = Math.hypot(dx, dy) || 1;
+                return [ax + dx / n * ra, ay + dy / n * ra, bx - dx / n * rb, by - dy / n * rb];
+            }
+
+            function localRect(el) {
+                if (!el || !el.getBoundingClientRect) return null;
+                const box = el.getBoundingClientRect();
+                return {
+                    left: box.left,
+                    top: box.top,
+                    right: box.right,
+                    bottom: box.bottom,
+                    width: box.width,
+                    height: box.height,
+                };
+            }
+
+            function localPointForElement(el, ox = .5, oy = .5) {
+                const q = localRect(el);
+                if (!q) return null;
+                return { x: q.left + q.width * ox, y: q.top + q.height * oy };
+            }
+
+            function stepTargetAt(x, y) {
+                const el = document.elementFromPoint(x, y);
+                return el?.closest?.('.qa-spider-step-target') || null;
+            }
+
+            function scrollParentFor(el) {
+                let node = el?.parentElement;
+                while (node && node !== document.body) {
+                    const style = window.getComputedStyle(node);
+                    if (/(auto|scroll)/.test(`${style.overflowY}${style.overflow}`) && node.scrollHeight > node.clientHeight + 2) return node;
+                    node = node.parentElement;
+                }
+                return document.scrollingElement || document.documentElement;
+            }
+
+            function scrollByFor(el, dy) {
+                if (!el || Math.abs(dy) < 1) return;
+                const parent = scrollParentFor(el);
+                if (parent === document.scrollingElement || parent === document.documentElement || parent === document.body) {
+                    window.scrollBy({ top: dy, left: 0, behavior: 'auto' });
+                } else {
+                    parent.scrollTop += dy;
+                }
+            }
+
+            function visibleBoundsFor(el) {
+                const parent = scrollParentFor(el);
+                if (parent && parent !== document.scrollingElement && parent !== document.documentElement && parent !== document.body) {
+                    const rect = parent.getBoundingClientRect();
+                    return { top: Math.max(0, rect.top), bottom: Math.min(H, rect.bottom) };
+                }
+                return { top: 0, bottom: H };
+            }
+
+            function followTargetScroll() {
+                if (!targetEl) return;
+                const q = localRect(targetEl);
+                if (!q) return;
+                const bounds = visibleBoundsFor(targetEl);
+                const margin = 82;
+                const desiredTop = bounds.top + margin;
+                const desiredBottom = bounds.bottom - margin;
+                if (q.bottom > desiredBottom) {
+                    scrollByFor(targetEl, Math.min(36, q.bottom - desiredBottom));
+                } else if (q.top < desiredTop) {
+                    scrollByFor(targetEl, -Math.min(36, desiredTop - q.top));
+                }
+            }
+
+            function initLegs() {
+                legs.length = 0;
+                [-1, 1].forEach(side => {
+                    [40, 75, 110, 145].forEach((angle, index) => {
+                        const r = rot(sp.hx, sp.hy, side * angle);
+                        legs.push({
+                            s: side,
+                            a: angle,
+                            g: (index + (side > 0 ? 1 : 0)) % 2,
+                            t: 1,
+                            el: null,
+                            ox: .5,
+                            oy: .5,
+                            fx: sp.x + r.x * R,
+                            fy: sp.y + r.y * R,
+                            ax: sp.x + r.x * R,
+                            ay: sp.y + r.y * R,
+                            bx: sp.x + r.x * R,
+                            by: sp.y + r.y * R,
+                        });
+                    });
+                });
+            }
+
+            function frame(now) {
+                if (!active) return;
+                const dt = Math.min((now - last) / 1000, .05);
+                last = now;
+                resize();
+                const colors = spiderPalette();
+                followTargetScroll();
+                if (targetEl) {
+                    const box = localRect(targetEl);
+                    if (box) {
+                        target.x = Math.max(20, Math.min(W - 20, box.left + Math.min(box.width * .28, 120)));
+                        target.y = Math.max(24, Math.min(H - 24, box.top + box.height / 2));
+                    }
+                }
+
+                const dx = target.x - sp.x;
+                const dy = target.y - sp.y;
+                const d = Math.hypot(dx, dy);
+                const speed = d > 10 ? Math.min(d * 3, 240) * slow : 0;
+                const tvx = d > 0 ? dx / d * speed : 0;
+                const tvy = d > 0 ? dy / d * speed : 0;
+                sp.vx += (tvx - sp.vx) * Math.min(dt * 6, 1);
+                sp.vy += (tvy - sp.vy) * Math.min(dt * 6, 1);
+                sp.x += sp.vx * dt;
+                sp.y += sp.vy * dt;
+
+                const v = Math.hypot(sp.vx, sp.vy);
+                if (v > 12) {
+                    sp.hx += (sp.vx / v - sp.hx) * Math.min(dt * 5, 1);
+                    sp.hy += (sp.vy / v - sp.hy) * Math.min(dt * 5, 1);
+                    const hl = Math.hypot(sp.hx, sp.hy) || 1;
+                    sp.hx /= hl;
+                    sp.hy /= hl;
+                } else if (targetEl || statusLabel) {
+                    const idleAngle = Math.atan2(sp.hy, sp.hx) + Math.sin(now / 720 + idleSeed) * .42 + Math.sin(now / 1130 + idleSeed * .37) * .24;
+                    const ix = Math.cos(idleAngle);
+                    const iy = Math.sin(idleAngle);
+                    sp.hx += (ix - sp.hx) * Math.min(dt * 1.8, 1);
+                    sp.hy += (iy - sp.hy) * Math.min(dt * 1.8, 1);
+                    const hl = Math.hypot(sp.hx, sp.hy) || 1;
+                    sp.hx /= hl;
+                    sp.hy /= hl;
+                }
+
+                let moving = null;
+                legs.forEach(l => { if (l.t < 1) moving = l.g; });
+                legs.forEach(l => {
+                    const r = rot(sp.hx, sp.hy, l.s * l.a);
+                    const rx = sp.x + r.x * R + sp.hx * Math.min(v * .18, 36 * S);
+                    const ry = sp.y + r.y * R + sp.hy * Math.min(v * .18, 36 * S);
+                    if (l.t < 1) {
+                        l.t = Math.min(l.t + dt / .16, 1);
+                        const e = l.t * l.t * (3 - 2 * l.t);
+                        if (l.el) {
+                            const point = localPointForElement(l.el, l.ox, l.oy);
+                            if (point) {
+                                l.bx = point.x;
+                                l.by = point.y;
+                            }
+                        }
+                        l.fx = l.ax + (l.bx - l.ax) * e;
+                        l.fy = l.ay + (l.by - l.ay) * e;
+                        if (l.t >= 1) queue.push(l.el);
+                        return;
+                    }
+                    if (l.el) {
+                        const point = localPointForElement(l.el, l.ox, l.oy);
+                        if (point) {
+                            l.fx = point.x;
+                            l.fy = point.y;
+                        }
+                    }
+                    const far = Math.hypot(l.fx - rx, l.fy - ry);
+                    const tooFar = Math.hypot(l.fx - sp.x, l.fy - sp.y) > R * 1.7;
+                    if ((far > R * .7 && (moving === null || moving === l.g)) || tooFar) {
+                        const el = stepTargetAt(rx, ry);
+                        l.el = el;
+                        l.ax = l.fx;
+                        l.ay = l.fy;
+                        if (el) {
+                            const q = localRect(el);
+                            l.ox = .25 + Math.random() * .5;
+                            l.oy = .5;
+                            l.bx = q ? q.left + q.width * l.ox : rx;
+                            l.by = q ? q.top + q.height * l.oy : ry;
+                        } else {
+                            l.bx = rx;
+                            l.by = ry;
+                        }
+                        l.t = 0;
+                        moving = l.g;
+                    }
+                });
+                bodyTick += dt;
+                if (bodyTick > .22 && v > 20) {
+                    bodyTick = 0;
+                    queue.push(stepTargetAt(sp.x, sp.y));
+                }
+
+                ctx.clearRect(0, 0, W, H);
+                ctx.lineWidth = 1.6;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = colors.body;
+                ctx.fillStyle = colors.body;
+                legs.forEach(l => {
+                    const side = rot(sp.hx, sp.hy, l.s * 90);
+                    const off = (14 - (l.a - 40) * 28 / 105) * S;
+                    const gx = sp.x + sp.hx * off + side.x * 7 * S;
+                    const gy = sp.y + sp.hy * off + side.y * 7 * S;
+                    const ex = l.fx - gx;
+                    const ey = l.fy - gy;
+                    const dist = Math.hypot(ex, ey) || 1;
+                    const dd = Math.min(dist, 2 * L - 1);
+                    const ux = ex / dist;
+                    const uy = ey / dist;
+                    const h = Math.sqrt(L * L - dd * dd / 4);
+                    let px = -uy;
+                    let py = ux;
+                    if (px * side.x + py * side.y < 0) {
+                        px = -px;
+                        py = -py;
+                    }
+                    const lift = l.t < 1 ? Math.sin(Math.PI * l.t) * .5 : 0;
+                    const kx = gx + ux * dd / 2 + px * h * (1 + lift);
+                    const ky = gy + uy * dd / 2 + py * h * (1 + lift);
+                    const s1 = trim(gx, gy, kx, ky, 0, 2.6);
+                    const s2 = trim(kx, ky, l.fx, l.fy, 2.6, 0);
+                    ctx.strokeStyle = colors.body;
+                    ctx.beginPath();
+                    ctx.moveTo(s1[0], s1[1]);
+                    ctx.lineTo(s1[2], s1[3]);
+                    ctx.moveTo(s2[0], s2[1]);
+                    ctx.lineTo(s2[2], s2[3]);
+                    ctx.stroke();
+                    ctx.strokeStyle = colors.accent;
+                    ctx.beginPath();
+                    ctx.arc(kx, ky, 2.6, 0, 7);
+                    ctx.stroke();
+                    if (l.t >= 1) {
+                        ctx.fillStyle = colors.accent;
+                        ctx.beginPath();
+                        ctx.arc(l.fx, l.fy, 2, 0, 7);
+                        ctx.fill();
+                    }
+                });
+
+                const ang = Math.atan2(sp.hy, sp.hx);
+                ctx.save();
+                ctx.translate(sp.x, sp.y);
+                ctx.rotate(ang);
+                ctx.strokeStyle = colors.accent;
+                ctx.lineWidth = 1.6;
+                ctx.lineJoin = 'miter';
+                ctx.strokeRect(-24 * S, -7 * S, 48 * S, 14 * S);
+                ctx.restore();
+
+                const beam = Math.atan2(sp.hy, sp.hx) + Math.sin(now / 300) * .72;
+                const lx = sp.x + sp.hx * 14 * S;
+                const ly = sp.y + sp.hy * 14 * S;
+                ctx.save();
+                ctx.strokeStyle = colors.probe;
+                ctx.fillStyle = colors.probe;
+                ctx.shadowColor = colors.probe;
+                ctx.shadowBlur = 10;
+                if (targetEl) {
+                    const q = localRect(targetEl);
+                    if (q) {
+                        const tx = Math.max(q.left, Math.min(q.right, q.left + q.width * .45));
+                        const ty = q.top + q.height * .5;
+                        const vx = tx - lx;
+                        const vy = ty - ly;
+                        const vn = Math.hypot(vx, vy) || 1;
+                        const baseBeam = Math.atan2(vy, vx);
+                        const sweep = Math.sin(now / 260) * .62;
+                        const beamAngle = baseBeam + sweep;
+                        const ray = Math.min(120, Math.max(54, vn * .48));
+                        ctx.globalAlpha = .34 + Math.sin(now / 190) * .12;
+                        ctx.lineWidth = 1.1;
+                        ctx.beginPath();
+                        ctx.moveTo(lx, ly);
+                        ctx.lineTo(lx + Math.cos(beamAngle) * ray, ly + Math.sin(beamAngle) * ray);
+                        ctx.stroke();
+                    }
+                }
+                ctx.globalAlpha = 1;
+                for (let i = pings.length - 1; i >= 0; i -= 1) {
+                    const p = pings[i];
+                    p.t += dt;
+                    if (p.t >= .7) {
+                        pings.splice(i, 1);
+                        continue;
+                    }
+                    ctx.globalAlpha = 1 - p.t / .7;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 8 + p.t * 70, 0, 7);
+                    ctx.stroke();
+                }
+                ctx.restore();
+                if (statusLabel) {
+                    ctx.save();
+                    ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                    ctx.fillStyle = colors.labelBg;
+                    ctx.strokeStyle = colors.labelBorder;
+                    const text = statusLabel;
+                    const width = Math.min(ctx.measureText(text).width + 18, Math.max(70, W - 20));
+                    const x = Math.min(Math.max(8, sp.x + 20), W - width - 8);
+                    const y = Math.min(Math.max(18, sp.y - 28), H - 18);
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(x, y - 16, width, 22, 6);
+                    else ctx.rect(x, y - 16, width, 22);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.fillStyle = colors.labelText;
+                    ctx.fillText(text, x + 9, y - 1, width - 18);
+                    ctx.restore();
+                }
+                if (targetKeywords.length) {
+                    ctx.save();
+                    ctx.font = '11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+                    let x = 10;
+                    let y = 18;
+                    targetKeywords.slice(0, 4).forEach(term => {
+                        const text = `目标 ${term}`;
+                        const w = Math.min(ctx.measureText(text).width + 14, Math.max(62, W - 20));
+                        ctx.fillStyle = colors.targetBg;
+                        ctx.strokeStyle = colors.targetBorder;
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(x, y - 13, w, 19, 6);
+                        else ctx.rect(x, y - 13, w, 19);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.fillStyle = colors.targetText;
+                        ctx.fillText(text, x + 7, y + 1, w - 14);
+                        x += w + 6;
+                        if (x > W - 80) {
+                            x = 10;
+                            y += 22;
+                        }
+                    });
+                    ctx.restore();
+                }
+                while (queue.length) qaSpiderMutateElement(queue.pop());
+
+                raf = requestAnimationFrame(frame);
+            }
+
+            initLegs();
+            const runner = {
+                canvas,
+                start() {
+                    active = true;
+                    last = performance.now();
+                    resize();
+                    canvas.classList.add('active');
+                    if (!raf) raf = requestAnimationFrame(frame);
+                },
+                setTarget(el, label) {
+                    if (targetEl && targetEl !== el) targetEl.classList.remove('qa-spider-lock');
+                    targetEl = el || null;
+                    if (targetEl) targetEl.classList.add('qa-spider-lock');
+                    idleSeed = Math.random() * 1000;
+                    statusLabel = label || '爬取中';
+                    readStart = performance.now();
+                    detectedTarget = false;
+                    const box = localRect(targetEl);
+                    if (box) {
+                        target.x = Math.max(20, Math.min(W - 20, box.left + Math.min(box.width * .28, 120)));
+                        target.y = Math.max(24, Math.min(H - 24, box.top + box.height / 2));
+                        pings.push({ x: box.left + box.width / 2, y: box.top + box.height / 2, t: 0 });
+                    }
+                    this.start();
+                },
+                setHome(el) {
+                    homeEl = el || null;
+                    resize();
+                    const point = localPointForElement(homeEl, .5, .5);
+                    if (point) {
+                        sp.x = Math.max(24, Math.min(W - 24, point.x));
+                        sp.y = Math.max(24, Math.min(H - 24, point.y + 32));
+                        sp.vx = 0;
+                        sp.vy = 0;
+                        target.x = sp.x + 35;
+                        target.y = sp.y + 12;
+                        pings.push({ x: sp.x, y: sp.y, t: 0 });
+                    }
+                },
+                setKeywords(terms) {
+                    targetKeywords = Array.isArray(terms) ? terms.filter(Boolean).slice(0, 6) : [];
+                },
+                async wanderTo(x, y, label = '') {
+                    const waypoints = [
+                        {
+                            x: Math.max(24, Math.min(W - 24, sp.x + (Math.random() * 100 - 50))),
+                            y: Math.max(24, Math.min(H - 24, sp.y + (Math.random() * 70 - 35))),
+                        },
+                        {
+                            x: Math.max(24, Math.min(W - 24, (sp.x + x) / 2 + (Math.random() * 120 - 60))),
+                            y: Math.max(24, Math.min(H - 24, (sp.y + y) / 2 + (Math.random() * 100 - 50))),
+                        },
+                        { x, y },
+                    ];
+                    for (const point of waypoints) {
+                        target.x = point.x;
+                        target.y = point.y;
+                        if (label) statusLabel = label;
+                        const started = performance.now();
+                        while (performance.now() - started < 900) {
+                            if (Math.hypot(sp.x - point.x, sp.y - point.y) < 28) break;
+                            await delay(70);
+                        }
+                    }
+                },
+                async approachTarget(el, label, terms, voiceLabel = '') {
+                    if (terms) this.setKeywords(terms);
+                    this.start();
+                    if (!el) {
+                        this.setTarget(drawer, label || '探测目标');
+                        await delay(500);
+                        return;
+                    }
+                    resize();
+                    const box = localRect(el);
+                    if (box) {
+                        const fromAbove = box.top + box.height / 2 > sp.y;
+                        targetEl = null;
+                        el.classList.remove('qa-spider-lock');
+                        statusLabel = `探测目标：${targetKeywords[0] || label || '引用证据'}`;
+                        const scoutX = Math.max(24, Math.min(W - 24, box.left + Math.min(box.width * .18, 90)));
+                        const scoutY = Math.max(24, Math.min(H - 24, box.top + (fromAbove ? -30 : box.height + 30)));
+                        await this.wanderTo(scoutX, scoutY, statusLabel);
+                    }
+                    this.setTarget(el, label || '锁定目标');
+                    const started = performance.now();
+                    while (performance.now() - started < 1800) {
+                        const current = localRect(el);
+                        if (current) {
+                            const cx = current.left + current.width / 2;
+                            const cy = current.top + current.height / 2;
+                            if (Math.hypot(sp.x - cx, sp.y - cy) < 70) {
+                                if (!detectedTarget) {
+                                    detectedTarget = true;
+                                    statusLabel = `探测到：${targetKeywords[0] || label || '目标'}`;
+                                    pings.push({ x: cx, y: cy, t: 0 });
+                                    qaSpiderVoice('found');
+                                }
+                                break;
+                            }
+                        }
+                        await delay(80);
+                    }
+                    await delay(260);
+                    el.classList.remove('qa-spider-lock');
+                },
+                finish(label) {
+                    statusLabel = label || '完成';
+                    const end = async () => {
+                        returningHome = true;
+                        if (homeEl) {
+                            resize();
+                            this.setTarget(homeEl, '返回起点');
+                            const started = performance.now();
+                            while (performance.now() - started < 2200) {
+                                const point = localPointForElement(homeEl, .5, .5);
+                                if (point && Math.hypot(sp.x - point.x, sp.y - point.y) < 46) break;
+                                await delay(80);
+                            }
+                            if (homeEl) homeEl.classList.remove('qa-spider-lock');
+                        }
+                        returningHome = false;
+                        statusLabel = '回到起点';
+                        canvas.classList.remove('active');
+                        await delay(460);
+                        active = false;
+                        ctx.clearRect(0, 0, W, H);
+                        if (raf) cancelAnimationFrame(raf);
+                        raf = 0;
+                    };
+                    setTimeout(end, 800);
+                },
+            };
+            drawer.__qaSpiderRunner = runner;
+            return runner;
+        }
+
+        function qaMoveSpiderTo(drawer, spider, target, label) {
+            if (!drawer || !spider || !target) return;
+            spider.setTarget(target, label || '爬取中');
+        }
+
+        async function runQaEvidenceBatchCrawl(drawer, button, items) {
+            const targets = (Array.isArray(items) ? items : [])
+                .map(item => ({
+                    item,
+                    ref: String(item?.evidence_ref || ''),
+                    title: qaEvidenceTitle(item, ''),
+                }))
+                .map(entry => ({ ...entry, payload: qaEvidenceCrawlPayload(entry.item, entry.title, entry.ref) }))
+                .filter(entry => entry.payload.hasTarget);
+            if (!targets.length) {
+                setStatus('当前证据没有可爬取的原文 URL 或 article ID');
+                return;
+            }
+            const targetTerms = qaSpiderTargetTerms(targets.map(entry => entry.item));
+            const status = drawer.querySelector('.qa-evidence-crawl-status');
+            button.disabled = true;
+            button.classList.remove('is-done', 'is-error');
+            button.classList.add('is-running');
+            button.innerHTML = '<i class="fa fa-bug" aria-hidden="true"></i><span>爬取中</span>';
+            if (status) {
+                status.classList.add('active');
+                status.innerHTML = `<i class="fa fa-bug" aria-hidden="true"></i><span>蜘蛛获得目标：${escapeHtml(targetTerms.join('、') || '引用证据')}。开始探测：0/${targets.length}</span>`;
+            }
+            setStatus(`正在批量爬取 ${targets.length} 条引用证据...`);
+            let success = 0;
+            let failed = 0;
+            const spider = qaEnsureSpiderRunner(drawer);
+            if (spider) {
+                spider.setHome?.(button);
+                spider.setKeywords(targetTerms);
+                spider.start();
+                qaSpiderVoice('start');
+                await delay(420);
+            }
+            for (const [index, entry] of targets.entries()) {
+                const card = drawer.querySelector(`.qa-insight-card[data-ref="${CSS.escape(entry.ref)}"]`);
+                if (card) {
+                    card.classList.add('is-crawling');
+                }
+                if (spider?.approachTarget) {
+                    await spider.approachTarget(card || drawer, `${index + 1}/${targets.length}`, targetTerms, entry.title || entry.ref);
+                } else {
+                    qaMoveSpiderTo(drawer, spider, card || drawer, `${index + 1}/${targets.length}`);
+                }
+                if (status) {
+                    status.innerHTML = `<i class="fa fa-bug" aria-hidden="true"></i><span>探测到目标，正在抓取：${escapeHtml(entry.title || entry.ref || '未命名证据')}（${index + 1}/${targets.length}）</span>`;
+                }
+                try {
+                    const response = await fetch('/api/chat/evidence-crawl', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(entry.payload),
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || data.error || `入库失败 HTTP ${response.status}`);
+                    }
+                    success += 1;
+                    qaUpdateEvidenceCardAfterCrawl(drawer, entry.ref, data, entry.item);
+                    qaSpiderVoice('stored');
+                } catch (error) {
+                    failed += 1;
+                    qaUpdateEvidenceCardAfterCrawl(drawer, entry.ref, { success: false }, entry.item);
+                    console.warn('证据补爬失败', entry.title, error);
+                }
+            }
+            button.disabled = false;
+            button.classList.remove('is-running');
+            button.classList.toggle('is-error', failed > 0);
+            button.classList.toggle('is-done', failed === 0);
+            button.innerHTML = failed
+                ? '<i class="fa fa-exclamation-triangle" aria-hidden="true"></i><span>部分失败</span>'
+                : '<i class="fa fa-check" aria-hidden="true"></i><span>已入库</span>';
+            if (status) {
+                status.classList.add('active');
+                status.innerHTML = `<i class="fa fa-check" aria-hidden="true"></i><span>批量补爬完成：成功 ${success} 条，失败 ${failed} 条。证据卡片已支持打开文章详情和原文链接。</span>`;
+                setTimeout(() => status.classList.remove('active'), 6500);
+            }
+            if (spider) spider.finish(failed ? '部分失败' : '完成');
+            setStatus(`证据补爬完成：成功 ${success} 条，失败 ${failed} 条`);
+        }
+
         function qaMeaningfulConflict(conflict) {
             const text = conflict?.summary || conflict?.reason || conflict?.rationale || conflict?.subject || conflict?.claim || conflict?.verdict || '';
             let clean = cleanChatUiText(text).trim();
@@ -8234,9 +9364,10 @@
                 const url = qaEvidenceUrl(item);
                 const meta = [qaSourceLabel(item), item.published_at || item.metadata?.publish_date || '', ref].filter(Boolean).join(' · ');
                 const titleHtml = url
-                    ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
-                    : escapeHtml(title);
-                return `<li class="qa-insight-card" data-ref="${escapeHtml(ref)}"><span class="qa-insight-card-title">${titleHtml}</span><span class="qa-insight-card-meta">${escapeHtml(cleanChatUiText(meta))}</span></li>`;
+                    ? `<a class="qa-spider-step-target" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
+                    : `<span class="qa-spider-step-target">${escapeHtml(title)}</span>`;
+                const actions = qaEvidenceActionsHtml(qaEvidenceArticleId(item), url);
+                return `<li class="qa-insight-card" data-ref="${escapeHtml(ref)}"><span class="qa-insight-card-title">${titleHtml}</span><span class="qa-insight-card-meta">${escapeHtml(cleanChatUiText(meta))}</span>${actions}</li>`;
             }).join('');
             const riskItems = risks.slice(0, 5).map(risk => {
                 const labels = Array.isArray(risk.citation_labels) ? risk.citation_labels.join(' ') : '';
@@ -8248,7 +9379,8 @@
             drawer.className = 'qa-insight-drawer';
             drawer.open = true;
             drawer.innerHTML = `
-                <summary><i class="fa fa-folder-open-o" aria-hidden="true"></i><span>依据、分析与核验</span></summary>
+                <summary><i class="fa fa-folder-open-o" aria-hidden="true"></i><span>依据、分析与核验</span><button type="button" class="qa-evidence-batch-crawl" title="批量爬取引用文章并入库"><i class="fa fa-bug" aria-hidden="true"></i><span>入库</span></button></summary>
+                <div class="qa-evidence-crawl-status" aria-live="polite"></div>
                 <div class="qa-insight-drawer-body">
                     ${citationItems ? `<div class="qa-insight-section"><strong>引用映射</strong><ol class="qa-insight-list">${citationItems}</ol></div>` : ''}
                     ${evidenceItems ? `<div class="qa-insight-section"><strong>证据</strong><ol class="qa-insight-list">${evidenceItems}</ol></div>` : ''}
@@ -8258,6 +9390,20 @@
                 </div>
             `;
             container.appendChild(drawer);
+            drawer.querySelectorAll('.qa-evidence-local-link').forEach(link => {
+                if (link.disabled) return;
+                link.addEventListener('click', event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const id = Number(link.dataset.articleId || 0);
+                    if (id) viewArticle(id);
+                });
+            });
+            drawer.querySelector('.qa-evidence-batch-crawl')?.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                runQaEvidenceBatchCrawl(drawer, event.currentTarget, uniqueEvidenceForDrawer);
+            });
             drawer.querySelectorAll('.qa-citation-link[data-ref]').forEach(button => {
                 button.addEventListener('click', () => {
                     const safeRef = String(button.dataset.ref || '');
@@ -9110,7 +10256,7 @@
                                         answerNode.dataset.planAnimationDone = 'true';
                                         answerNode.classList.remove('plan-thinking');
                                         if (showPlanAfterRender) showPlanControlActions(answerNode, question, answer);
-                                        startInlineAnswerProgress(
+                                        else startInlineAnswerProgress(
                                             answerNode,
                                             '正在按问题分析思路继续：检索证据、整理引用并生成正文',
                                             { stage: 'level1_retrieval' }
@@ -9121,6 +10267,7 @@
                                     answerNode.classList.remove('plan-thinking');
                                     queuedAnswerText = mergeAssistantChunk(queuedAnswerText || answer, incoming);
                                     chunkRenderQueue = chunkRenderQueue.then(async () => {
+                                        await waitForPlanContinueGate(answerNode);
                                         await stopInlineAnswerProgressAfterMinimum(answerNode, 700);
                                         return appendAssistantDelta(answerNode, incoming, {
                                             intervalMs: 32,

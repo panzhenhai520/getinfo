@@ -134,9 +134,9 @@ _RAG_NOISE_TERMS = {
     "instagram", "facebook", "linkedin", "峰会", "论坛", "花絮", "精彩瞬间", "心情",
     "点赞", "转发", "评论", "活动回顾", "纳斯达克大屏", "获奖", "招聘",
 }
-_GENERIC_FAMILY_OFFICE_TERMS = {
-    "家族办公室", "家办", "family office", "家族信托", "财富传承", "财富规划",
-    "跨境资产配置", "资产保护", "高净值客户", "财富管理",
+_GENERIC_BACKGROUND_TERMS = {
+    "行业", "产业", "市场", "峰会", "论坛", "活动", "协会", "发布会", "合作伙伴",
+    "圆满举行", "精彩回顾", "发展机遇", "专业人士", "战略合作", "高峰论坛",
 }
 _POLICY_DIRECT_TERMS = {
     "离岸信托", "境外信托", "个人所得税", "个税", "21号", "公告", "税务",
@@ -261,13 +261,13 @@ def _clean_material_evidence(
             for key in ("title", "source_url", "content_excerpt", "excerpt", "content")
         ).casefold()
         noise_hits = [term for term in _RAG_NOISE_TERMS if term in blob]
-        generic_hits = [term for term in _GENERIC_FAMILY_OFFICE_TERMS if term.casefold() in blob]
+        generic_hits = [term for term in _GENERIC_BACKGROUND_TERMS if term.casefold() in blob]
         direct_hits = [term for term in direct_terms if term and term in blob]
         reason = ""
         if cleaning.get("exclude_social_media") and noise_hits:
             reason = "material_cleaning_social_media_or_event_noise"
         elif cleaning.get("exclude_generic_background") and generic_hits and not direct_hits:
-            reason = "material_cleaning_generic_family_office_background"
+            reason = "material_cleaning_generic_pack_background"
         if reason:
             excluded.append({
                 "evidence_ref": item.get("evidence_ref"),
