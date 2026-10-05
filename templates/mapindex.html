@@ -6967,23 +6967,35 @@
         }
         document.getElementById('chatToggle').addEventListener('click', () => setChatOpen(true));
         document.getElementById('closeChat').addEventListener('click', () => setChatOpen(false));
-        // 报告页「选择引用到AI助手」跳转：带 openChat=1 与 localStorage 引用文本 → 拉起对话窗并填入
+        // 各页「引用到AI助手」统一跳到这里：把引用放进 localStorage 再带 openChat=1 回来。
+        // 注意不能只看 openChat=1 参数：若会话还没选行业包，/ 会被重定向到 /select-pack，
+        // query 被丢掉、参数判断失效，引用就永远打不开。所以只要 localStorage 里还有待引用
+        // 内容就自动拉起助手并填入（填完即清），经过任何重定向都不会丢。
         try {
             const _qp = new URLSearchParams(location.search);
-            if (_qp.get('openChat') === '1') {
-                const quote = localStorage.getItem('chatPendingQuote');
-                if (quote) {
-                    localStorage.removeItem('chatPendingQuote');
-                    setTimeout(() => {
-                        setChatOpen(true);
-                        const input = document.getElementById('chatInput');
-                        if (input) {
+            const _paramWants = _qp.get('openChat') === '1';
+            const quote = localStorage.getItem('chatPendingQuote');
+            // 有带过来的引用 → 拉起助手并填入；只带 openChat=1（唤醒按钮）→ 也要拉起助手，
+            // 只是没有文字要填。
+            if (quote || _paramWants) {
+                if (quote) localStorage.removeItem('chatPendingQuote');
+                setTimeout(() => {
+                    setChatOpen(true);
+                    const input = document.getElementById('chatInput');
+                    if (input) {
+                        if (quote) {
                             input.value = quote;
                             input.dispatchEvent(new Event('input', { bubbles: true }));
-                            input.focus();
-                            input.setSelectionRange(input.value.length, input.value.length);
                         }
-                    }, 700);
+                        input.focus();
+                        input.setSelectionRange(input.value.length, input.value.length);
+                    }
+                }, 700);
+                if (_paramWants) {
+                    // 去掉参数，避免刷新后重复触发
+                    const _url = new URL(window.location.href);
+                    _url.searchParams.delete('openChat');
+                    history.replaceState({}, '', _url);
                 }
             }
         } catch (e) {}

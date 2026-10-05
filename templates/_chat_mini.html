@@ -11,7 +11,7 @@
         <button type="button" class="mini-chat-close" id="miniChatClose" aria-label="关闭"><i class="fa fa-chevron-right"></i></button>
     </header>
     <div class="mini-chat-body" id="miniChatMessages">
-        <div class="mini-chat-welcome">你好，我是 AI 助手。可以在文章详情中选中文字后点击「引用到AI助手」，或直接输入问题。</div>
+        <div class="mini-chat-welcome">你好，我是{{ assistant_name }}。可以在文章详情中选中文字后点击「引用到AI助手」，或直接输入问题。</div>
     </div>
     <form class="mini-chat-compose" id="miniChatForm">
         <div class="mini-chat-input-row">
@@ -355,7 +355,9 @@
         });
     });
 
-    fab.addEventListener('click', function () { window.openMiniChat(); });
+    // 统一到首页那套 AI 助手：本文件原先自带一个 mini 抽屉（只占半屏、配色与首页不一致），
+    // 现改为一律带 openChat=1 跳回首页，由首页的助手接管 —— 全站只有一套助手界面。
+    fab.addEventListener('click', function () { location.href = '/?openChat=1'; });
     closeBtn.addEventListener('click', closeMiniChat);
 
     // 引用到AI助手：与首页实现一致——移动端点击按钮的瞬间手机浏览器会清空选区
@@ -396,10 +398,13 @@
             return;
         }
         cachedQuoteSelection = '';   // 引用已消费，清空缓存；再次引用需重新选择
-        window.openMiniChat();
-        var draft = input.value.replace(/\s+$/, '');
-        input.value = draft ? draft + '\n\n' + selected : selected;
-        input.focus();
+        // 统一到首页助手：把引用放进 localStorage 再跳首页，
+        // 与周报页/聚合结果页的做法一致（首页 openChat=1 会读出并填入输入框）。
+        var titleNode = document.getElementById('modalTitle');
+        var title = titleNode ? (titleNode.textContent || '').trim() : '';
+        var quote = (title ? ('【文章引用：' + title + '】\n') : '') + selected;
+        try { localStorage.setItem('chatPendingQuote', quote); } catch (e) { /* 忽略隐私模式 */ }
+        location.href = '/?openChat=1';
     };
 })();
 </script>

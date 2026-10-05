@@ -3325,11 +3325,12 @@
         }
         var titleNode = document.getElementById('modalTitle');
         var title = titleNode ? (titleNode.textContent || '').trim() : '';
-        openChatDrawer(title ? ('「' + title + '」') : '');
-        var input = document.getElementById('chatInput');
-        var draft = input.value.replace(/\s+$/, '');
-        input.value = draft ? draft + '\n\n' + selected : selected;
-        input.focus();
+        // 统一到首页那套 AI 助手：本页原先有一套独立的抽屉（宽度、配色都与首页不一致），
+        // 现改为把引用放进 localStorage 并带 openChat=1 跳回首页，由首页的助手接管，
+        // 与周报页「选择引用到AI助手」的做法一致，保证全站只有一套助手界面。
+        var quote = (title ? ('【文章引用：' + title + '】\n') : '') + selected;
+        try { localStorage.setItem('chatPendingQuote', quote); } catch (e) { /* 忽略隐私模式 */ }
+        location.href = '/?openChat=1';
     }
 
     function clearChatTopic() {
@@ -3345,11 +3346,14 @@
     }
 
     // ── 欢迎消息 ──
+    // 称谓由服务端按当前行业包注入（assistant_name），不再写死「时博士助手」——
+    // 那是家族办公室时和公司的专用称谓，切换行业包后必须跟着变。
+    const ASSISTANT_NAME = {{ assistant_name|tojson }};
     function showWelcomeMessage() {
         const modelName = MODEL_NAMES[chatState.activeModel] || chatState.activeModel;
         const welcome = chatState.topic
-            ? `你好，我是时博士助手（${modelName}）。当前话题：「${chatState.topic}」，请提问。`
-            : `你好，我是时博士助手（${modelName}）。请提问。`;
+            ? `你好，我是${ASSISTANT_NAME}（${modelName}）。当前话题：「${chatState.topic}」，请提问。`
+            : `你好，我是${ASSISTANT_NAME}（${modelName}）。请提问。`;
         appendAiMessage(welcome, false);
     }
 

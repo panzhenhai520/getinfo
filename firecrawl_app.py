@@ -126,9 +126,23 @@ def _inject_platform_branding():
     except Exception:
         pass
     _cu = getattr(request, 'current_user', None) or {}
+    # 助手称谓跟随当前行业包，所有模板共用同一个来源。
+    # 原先 article_management.html 里写死「时博士助手」（家族办公室时和公司的专用称谓），
+    # 切换行业包后仍然显示旧称谓；首页早就按包名拼（currentAssistantName），
+    # 这里把它提到服务端注入，各处保持一致。
+    assistant_name = 'AI助手'
+    try:
+        from industry_pack_runtime import active_industry_identity
+
+        _pack_name = str((active_industry_identity() or {}).get('name') or '').strip()
+        if _pack_name:
+            assistant_name = f'{_pack_name}AI助手'
+    except Exception:
+        pass
     return {
         'platform_name': name,
         'platform_logo': logo,
+        'assistant_name': assistant_name,
         'is_admin': bool(isinstance(_cu, dict) and str(_cu.get('role') or '') == 'admin'),
         'serpapi_enabled': bool(getattr(config, 'SERPAPI_ENABLED', False)),
         'ragflow_upload_enabled': bool(getattr(config, 'RAGFLOW_UPLOAD_ENABLED', False)),
