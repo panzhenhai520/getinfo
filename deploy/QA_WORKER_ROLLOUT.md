@@ -79,6 +79,42 @@ pwsh -File F:\CollectInfo\deploy-to-prod.ps1
 
 ---
 
+## 2.5 一次性数据迁移：`article_ragflow_documents` 政策列（**PG 部署必做**）
+
+生产是 PostgreSQL 主库，而 `sqlite_database.create_tables()` 在 PG 模式下会直接
+`跳过 SQLite DDL，使用已迁移 schema` —— 所以 `article_ragflow_documents` 的 10 个政策列
+（`doc_type/issuer/doc_no/article_no/policy_title/publish_date/effective_date/source_url/
+authority_level/metadata_json`）与 3 个索引**不会自动补**。缺列会让 QA 的
+`level1_retrieval` 直接 `UndefinedColumn` 失败。
+
+发布后在生产机上执行一次（幂等，已存在就跳过）：
+
+```bash
+docker exec -i collectinfo-web python - <<'PY'
+import sys; sys.path.insert(0, "/app")
+from sqlite_database import sqlite_db
+sqlite_db._ensure_connection()
+cur = sqlite_db.connection.cursor()
+sqlite_db._ensure_article_ragflow_policy_columns(cur)
+sqlite_db.connection.commit(); cur.close()
+print("done")
+PY
+
+# 核对：应列出 19 列（9 基础 + 10 政策）与 3 个 idx_article_ragflow_* 索引
+docker exec collectinfo-postgres psql -U postgres -d collectinfo -tAc \
+ "select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_name='article_ragflow_documents'"
+```
+
+`qa_*` 那 17 张表不用管：它们是 `ensure_qa_tables()` 懒创建的（第一次问答或第一次读
+feature flags 时自动建），但也可以顺手确认：
+
+```bash
+docker exec collectinfo-postgres psql -U postgres -d collectinfo -tAc \
+ "select count(*) from information_schema.tables where table_name like 'qa%'"   # 期望 17
+```
+
+---
+
 ## 3. 发布后验证（按顺序做，任何一步不过就回滚）
 
 ```bash
@@ -169,3 +205,42 @@ systemctl status info-aggregator-qa-worker --no-pager
    其 long 泳道命令行里仍带 `--job-type qa.run`（那是旧代码算出来的泳道），
    重启容器后 long 泳道变回 3 个财务作业，`qa.run` 只归 QA 容器。
    → 生产发布时同样要**重启** `collectinfo-intel-worker`，不能只换镜像。
+
+## 9. 生产首次发布实测记录（2026-10-05 已执行）
+
+发布结果：`collectinfo-qa-worker` 随 compose 一起建起（healthy）；intel-worker 两条泳道
+均不含 `qa.run`；QA 的 17 张表懒创建成功；政策列迁移执行后 19 列 + 3 索引齐全；
+容器内跑 `chat_api._legacy_request_via_unified_qa` 得到 `HTTP 200 + text/event-stream`
+且带 `X-QA-Run-ID`，事件序列 `status/searching/chunk/retrieval/search_done/done` 与旧前端契约一致。
+灰度取值：`UNIFIED_QA_ENABLED=true`、`UNIFIED_QA_LEVEL2_ENABLED=false`（生产暂无可用 RAGFlow）。
+
+**模型侧是本轮真正的瓶颈，与发布无关**：
+
+| 实测 | 结果 |
+|---|---|
+| 生产助手用的 `gemma431b-32k`（10.88.0.1:11434） | 冷加载 `load_duration≈50s`；一次问答总时长可达 200s+ |
+| `qwen3.8-27b-uncensored`（同机） | 约 2k 字上下文热态 11.5s，可用 |
+| 服务器默认给 `provider=local` 的首包超时 8s | 必然先超时一次再重试，表现为降级标记 |
+| `_prewarm_synthesis_provider` 打的是 `GET /v1/models` | 对 Ollama **不会**把模型加载进显存，起不到预热作用 |
+
+因此生产 `.env` 显式放宽了本地模型超时（这几个变量只对 `provider=local` 生效）：
+
+```ini
+QA_LEVEL1_LOCAL_TIMEOUT_SECONDS=120
+QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS=60
+QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS=120
+QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS=180
+QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS=60
+```
+
+两类待办（都在模型宿主侧，不在本仓库）：
+
+1. 让模型常驻：给 Ollama 设长 `OLLAMA_KEEP_ALIVE`（或把预热改成一次 1 token 的
+   `generate` 带 `keep_alive`），避免每个问题都付 ~50s 冷加载。
+2. 若仍太慢：把助手使用的本地模型换成热态更快的那一个（改
+   `/www/CollectInfo_latest_new/data/chat_config.json` 的 `models.local.model_id` 后重启 web）。
+
+未配 RAGFlow 时，`create_run` 会写入 `RAG_ENHANCEMENT_NOT_CONFIGURED` 降级项、二级整段跳过，
+问答仍能完成（只用平台文章库证据）——生产当前就是这个形态；等 RAGFlow 端点与 API Key 就绪后，
+把 `UNIFIED_QA_LEVEL2_ENABLED` 打开即可。
+
