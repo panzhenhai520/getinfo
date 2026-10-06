@@ -659,10 +659,26 @@ class QaQueryPlanner:
             axes.append("peer_cases")
         if needs_retrieval:
             axes.append("conflict")
+        # 任务模板：先判定"这是哪一类需求"，把检查清单、边界、能力声明写进计划。
+        # 参考用户给的正例：好的计划会先说清"我按哪几组检查项做、只读不改、做不到的明说"，
+        # 而不是只把问句拆成子问题。
+        try:
+            from qa_task_templates import match_task_template
+
+            task_template = match_task_template(planning_question or question)
+        except Exception:
+            task_template = {}
+        question_plan["task_template"] = task_template
+        question_plan["plan_checklist"] = task_template.get("checklist") or []
+        question_plan["plan_boundary"] = str(task_template.get("boundary") or "")
+        question_plan["capability"] = str(task_template.get("capability") or "document_research")
+        if task_template.get("capability_note"):
+            question_plan["capability_note"] = str(task_template["capability_note"])
         return {
             "question": question,
             "standalone_question": planning_question,
             "question_plan": question_plan,
+            "task_template": task_template,
             "intent": "smalltalk" if not needs_retrieval else ("policy_impact_analysis" if policy else ("comparison" if comparison else "industry_research")),
             "requested_mode": str(request_payload.get("mode") or "standard"),
             "needs_local_articles": needs_retrieval,

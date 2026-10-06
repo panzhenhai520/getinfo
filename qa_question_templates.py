@@ -85,6 +85,17 @@ def render_question_plan_answer(plan: Mapping) -> str:
         lines.append("- " + " → ".join(steps) + "。")
     elif plan.get("answer_strategy"):
         lines.append("- 我会按这个策略继续：" + str(plan.get("answer_strategy")))
+    # 任务简报：把"这是哪类需求、按哪几组检查项做、边界是什么、哪些做不到"讲清楚。
+    # 用户给的对照案例（Codex）之所以显得全面，靠的就是这三样结构，而不是模型更聪明。
+    try:
+        from qa_task_templates import render_task_brief
+
+        brief = render_task_brief(plan.get("task_template") or {})
+        if brief:
+            lines.append("")
+            lines.extend(brief)
+    except Exception:
+        pass
     return "\n".join(lines)
 
 
