@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 import uuid
@@ -29,6 +30,7 @@ from qa_sse import encode_qa_sse
 
 
 qa_bp = Blueprint("unified_qa", __name__)
+logger = logging.getLogger(__name__)
 _service_override = None
 
 
@@ -104,6 +106,15 @@ class QaGatewayService:
 
         owner_limit = _integer_env("QA_MAX_ACTIVE_RUNS_PER_USER", 2, 1, 20)
         system_limit = _integer_env("QA_MAX_ACTIVE_RUNS_SYSTEM", 20, 1, 500)
+        # 先把长时间没推进的僵尸运行回收掉，再算配额：worker 不在跑时 queued/running 的 run
+        # 永远不会结束，会把用户永久锁在 429（实测本机 2 条僵尸 run 就让之后所有提问恒 429）。
+        try:
+            expired = self.store.expire_stale_runs(
+                _integer_env("QA_RUN_STALE_SECONDS", 1800, 60, 86400), owner_user_id)
+            if expired:
+                logger.warning("回收僵尸问答运行 %d 个: %s", len(expired), ",".join(expired[:5]))
+        except Exception as exc:  # 回收失败不能挡住正常提问
+            logger.warning("回收僵尸问答运行失败: %s", str(exc)[:160])
         # Existing idempotent requests bypass capacity checks.
         existing = self.store.get_run_by_idempotency(owner_user_id, idem)
         if existing is None:

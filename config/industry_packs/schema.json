@@ -73,7 +73,7 @@
         "properties": {
           "name": {"type": "string", "minLength": 1},
           "url": {"type": "string", "pattern": "^https?://"},
-          "source_type": {"enum": ["website", "list_page", "rss"]},
+          "source_type": {"enum": ["website", "list_page", "rss", "ggzy_api"]},
           "source_role": {
             "enum": [
               "government_regulator",

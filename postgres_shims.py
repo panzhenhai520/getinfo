@@ -592,8 +592,11 @@ def ensure_postgres_shims(connection) -> None:
         "julianday(text)",
     )
 
-    # 扫描类型 CHECK 约束演进：老表约束不含 'tavily' → 重建（NOT VALID 只约束新行，
+    # 扫描类型 CHECK 约束演进：老表约束不含 'tavily'/'ggzy_api' → 重建（NOT VALID 只约束新行，
     # 不校验历史行；幂等，失败静默）。SQLite 新库由建表文本覆盖，此处仅 PG 生效。
+    # 为什么必须有 'ggzy_api'：代码里已实现 GgzyTradingApiScanner（intel_light_scanner），
+    # 行业包 bolean_security_compute 也带了 ggzy_api 信源；约束不含它会让新扫描记录直接写不进去
+    # （实测该类型记录停在 2026-09-07，之后一条都没有）。
     _execute(
         connection,
         "ALTER TABLE IF EXISTS intel_scan_runs "
@@ -604,7 +607,7 @@ def ensure_postgres_shims(connection) -> None:
         connection,
         "ALTER TABLE IF EXISTS intel_scan_runs "
         "ADD CONSTRAINT intel_scan_runs_scanner_type_check "
-        "CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily')) NOT VALID",
+        "CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', 'ggzy_api')) NOT VALID",
         "intel_scan_runs_scanner_type_check.add",
     )
 

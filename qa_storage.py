@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Mapping
 
 from qa_contracts import QA_CONTRACT_VERSION
@@ -16,6 +16,12 @@ from qa_schema import ensure_qa_tables
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _minutes_ago_text(minutes: float) -> str:
+    """N 分钟前的 UTC 文本（格式与 _now() 一致，便于直接做字符串比较）。"""
+    moment = datetime.now(timezone.utc) - timedelta(minutes=float(minutes))
+    return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _json(value) -> str:
@@ -315,6 +321,61 @@ class QaStore:
         with self.database.lock:
             row = self.database.connection.execute(sql, params).fetchone()
         return int(row[0] if row else 0)
+
+    def expire_stale_runs(self, max_age_seconds: int, owner_user_id: str = "") -> list[str]:
+        """把长时间没推进的问答运行置为失败，返回被回收的 run_id 列表。
+
+        为什么需要：活跃配额（count_active_runs）把 queued/running/retry_wait 全部计入，
+        而 worker 不在跑、或作业入队后没被领取时这些运行永远不会结束——用户会被永久锁在
+        429「当前已有问答正在研究」，前端连阻塞的 run_id 都拿不到，无法自助取消。
+        实测：本机库里 2 条 queued 的 run（qa_events / qa_stage_runs 都是 0 行）就会让之后
+        所有 /api/chat/send 恒返回 USER_CONCURRENCY_LIMIT。
+        """
+        self.ensure_schema()
+        max_age_seconds = max(60, int(max_age_seconds or 0))
+        cutoff = _minutes_ago_text(max_age_seconds / 60.0)
+        now = _now()
+        owner_sql = ""
+        select_params: list = [cutoff]
+        if owner_user_id:
+            owner_sql = " AND owner_user_id=?"
+            select_params.append(str(owner_user_id))
+        run_ids: list[str] = []
+        with self.database.lock:
+            cursor = self.database.connection.cursor()
+            try:
+                cursor.execute(
+                    """
+                    SELECT id FROM qa_runs
+                     WHERE status IN ('queued','running','retry_wait')
+                       AND COALESCE(NULLIF(updated_at,''), created_at) <= ?
+                    """ + owner_sql,
+                    select_params,
+                )
+                for row in cursor.fetchall():
+                    value = dict(row) if hasattr(row, "keys") else {"id": row[0]}
+                    if value.get("id"):
+                        run_ids.append(str(value["id"]))
+                if run_ids:
+                    placeholders = ",".join("?" for _ in run_ids)
+                    degradation = _json([{
+                        "code": "STALE_RUN_EXPIRED",
+                        "message": "该问答长时间未推进，已自动结束，可重新提问。",
+                        "stage": "recovery",
+                    }])
+                    cursor.execute(
+                        """
+                        UPDATE qa_runs
+                           SET status='failed', completed_at=?, updated_at=?,
+                               degradation_json=?, degraded=1
+                         WHERE id IN (%s)
+                        """ % placeholders,
+                        [now, now, degradation, *run_ids],
+                    )
+                self.database.connection.commit()
+            finally:
+                cursor.close()
+        return run_ids
 
     def persist_level1_result(self, run_id: str, result: Mapping) -> None:
         """Upsert verified L1 evidence/claims in one short transaction."""
