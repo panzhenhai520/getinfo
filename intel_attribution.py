@@ -126,6 +126,16 @@ def _real_score_details(pack_id: str, article_data: dict) -> dict:
         return {}
 
 
+def _admitted(scored: dict) -> bool:
+    """复用检索质量门的判据（intel_topics._classification_admitted）。"""
+    try:
+        from intel_topics import _classification_admitted
+
+        return bool(_classification_admitted(scored.get("score_details") or {}))
+    except Exception:
+        return False
+
+
 def _topic_tags(pack_id: str, article_data: dict) -> list:
     """把文章归到该包设定主题/领域里最匹配的一个（命中即打标）。"""
     try:
@@ -196,6 +206,13 @@ def ensure_pack_attribution(db, article_id: int, article_data: dict, *, pack_ids
         # 真实打分放到锁外先算好：classify_article 是纯函数但耗 CPU，
         # 不要在持有写锁时跑全量关键词匹配。
         scored_by_pack = {pack_id: _real_score_details(pack_id, article_data) for pack_id in packs}
+        # 关键词粗筛会命中"扩展词"，但真实分类器要求行业锚点才算相关。若某个候选包
+        # 拿不出可准入的真实证据，就不要把文章挂到它的「其他」分类里（那只是给别的包
+        # 添噪声）；只有在所有候选都拿不到证据时，才保留第一个候选保底归属。
+        # 显式指定包不受此影响——那是入库方/编辑者的明确选择。
+        if source != "explicit":
+            backed = [p for p in packs if _admitted(scored_by_pack.get(p) or {})]
+            packs = backed or packs[:1]
         with db.lock:
             cursor = db.connection.cursor()
             for pack_id in packs:
