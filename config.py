@@ -252,6 +252,27 @@ INTEL_JOB_HARD_TIMEOUT_SECONDS = _env_int(
     'INTEL_JOB_HARD_TIMEOUT_SECONDS', 1800, 60, 86400
 )
 INTEL_JOB_MAX_RETRIES = _env_int('INTEL_JOB_MAX_RETRIES', 3, 0, 10)
+INTEL_JOB_REAP_INTERVAL_SECONDS = _env_int(
+    # 调度层主动巡检卡死作业的间隔（见 IntelWorker._maybe_reap_stuck_jobs）
+    'INTEL_JOB_REAP_INTERVAL_SECONDS', 120, 10, 3600
+)
+INTEL_JOB_REAP_GRACE_SECONDS = _env_int(
+    # 巡检阈值比看门狗再宽这么多秒：本 worker 自己的作业由看门狗负责，
+    # 巡检主要收"别的进程遗留、心跳还在续租"的卡死作业。
+    'INTEL_JOB_REAP_GRACE_SECONDS', 300, 0, 86400
+)
+INTEL_WORKER_HEARTBEAT_SECONDS = _env_int(
+    # worker 心跳上报间隔：上报进程、在跑作业与运行时长、连续超时次数
+    'INTEL_WORKER_HEARTBEAT_SECONDS', 30, 5, 600
+)
+INTEL_LANE_TIMEOUT_BREAKER_THRESHOLD = _env_int(
+    # 单条 lane 连续多少次子任务超时就进入限流冷却（防雪崩）
+    'INTEL_LANE_TIMEOUT_BREAKER_THRESHOLD', 3, 2, 100
+)
+INTEL_LANE_TIMEOUT_BREAKER_COOLDOWN_SECONDS = _env_int(
+    # 熔断后的冷却时长；期间并发临时降为 1，冷却结束自动恢复
+    'INTEL_LANE_TIMEOUT_BREAKER_COOLDOWN_SECONDS', 300, 30, 86400
+)
 INTEL_JOB_PRIORITY_AGING_SECONDS = _env_int(
     # 每等待多少秒给作业 +1 优先级积分。原来 30 秒太小：任何等待超过约 1 分钟的作业
     # 都会盖过任意优先级设置，优先级完全失效、退化成纯 FIFO（实测分类被 31 小时未处理的

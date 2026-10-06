@@ -1988,17 +1988,19 @@ class IntelRepository:
                             attempt_count = attempt_count + 1,
                             lease_owner = ?,
                             lease_expires_at = ?,
+                            started_at = ?,
                             updated_at = ?
                         WHERE id = ?
                           AND status IN ('queued', 'retry_wait')
                         """,
-                        (worker_id, lease_text, now_text, row["id"]),
+                        (worker_id, lease_text, now_text, now_text, row["id"]),
                     )
                     if cursor.rowcount:
                         row["status"] = "running"
                         row["attempt_count"] = int(row.get("attempt_count") or 0) + 1
                         row["lease_owner"] = worker_id
                         row["lease_expires_at"] = lease_text
+                        row["started_at"] = now_text
                         row["payload"] = _json_value(row.pop("payload_json", "{}"), {})
                         claimed.append(row)
                 self.db.connection.commit()
@@ -2216,6 +2218,101 @@ class IntelRepository:
                 return result
             finally:
                 cursor.close()
+
+    def reap_stuck_jobs(self, *, max_runtime_seconds: int, limit: int = 50) -> List[Dict]:
+        """回收"运行时长超阈值但租约还有效"的作业（调度层主动巡检，不依赖作业自己）。
+
+        为什么要它：心跳会持续续租，所以租约回收救不了卡死的作业（实测有作业卡了 19.3 小时）。
+        这里按 started_at（领取时间）判断真实运行时长，超过阈值就按可重试失败写回；
+        fail_job 内部已有 attempt_count < max_attempts 的重试上限与指数退避，
+        因此不会无限重试。返回被回收的作业列表，供调用方记录/告警。
+        """
+        threshold = max(60, int(max_runtime_seconds or 0))
+        self._ensure()
+        # 时间比较在 Python 侧算好再按文本比：存储格式是 UTC ISO（…Z），
+        # 而 datetime('now', '-N seconds') 在 PostgreSQL 上不可用（实测巡检查不到任何行）。
+        cutoff = utc_text(utc_now() - timedelta(seconds=threshold))
+        with self.db.lock:
+            rows = self.db.connection.execute(
+                """
+                SELECT id, job_type, lease_owner, started_at, created_at
+                  FROM intel_jobs
+                 WHERE status = 'running'
+                   AND COALESCE(started_at, created_at) <= ?
+                 ORDER BY COALESCE(started_at, created_at) ASC
+                 LIMIT ?
+                """,
+                (cutoff, max(1, int(limit))),
+            ).fetchall()
+        reclaimed = []
+        for row in rows:
+            item = dict(row)
+            error = ("运行时长超过 %s 秒阈值，由调度巡检回收（owner=%s）"
+                     % (threshold, str(item.get("lease_owner") or "")[:40]))
+            status = self.fail_job(int(item["id"]), error, retryable=True)
+            item["reclaimed_status"] = status
+            if status in {"retry_wait", "failed"}:
+                reclaimed.append(item)
+        return reclaimed
+
+    def record_worker_heartbeat(
+        self,
+        worker_id: str,
+        *,
+        lane: str = "",
+        pid: int = 0,
+        host: str = "",
+        status: str = "running",
+        inflight_count: int = 0,
+        timeout_streak: int = 0,
+        note: str = "",
+        detail: Optional[Dict] = None,
+    ) -> None:
+        """worker 心跳：上报进程、当前在跑的作业与连续超时次数，供调度层巡检。"""
+        self._ensure()
+        now_text = utc_text(utc_now())
+        payload = _json_text(detail or {}, {})
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO intel_worker_heartbeats(
+                        worker_id, lane, pid, host, started_at, last_seen, status,
+                        inflight_count, timeout_streak, note, detail_json, updated_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(worker_id) DO UPDATE SET
+                        lane=excluded.lane, pid=excluded.pid, host=excluded.host,
+                        last_seen=excluded.last_seen, status=excluded.status,
+                        inflight_count=excluded.inflight_count,
+                        timeout_streak=excluded.timeout_streak,
+                        note=excluded.note, detail_json=excluded.detail_json,
+                        updated_at=excluded.updated_at
+                    """,
+                    (str(worker_id), str(lane), int(pid or 0), str(host)[:120], now_text,
+                     now_text, str(status), int(inflight_count or 0), int(timeout_streak or 0),
+                     str(note)[:500], payload, now_text),
+                )
+                self.db.connection.commit()
+            except Exception:
+                self.db.connection.rollback()
+                raise
+            finally:
+                cursor.close()
+
+    def list_worker_heartbeats(self, *, limit: int = 50) -> List[Dict]:
+        self._ensure()
+        with self.db.lock:
+            rows = self.db.connection.execute(
+                """
+                SELECT worker_id, lane, pid, host, started_at, last_seen, status,
+                       inflight_count, timeout_streak, note,
+                       round(EXTRACT(EPOCH FROM (now() - last_seen::timestamptz))) AS since_seen_s
+                  FROM intel_worker_heartbeats ORDER BY last_seen DESC LIMIT ?
+                """,
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def get_job_by_dedupe_key(self, dedupe_key: str) -> Optional[Dict]:
         self._ensure()

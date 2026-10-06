@@ -92,6 +92,7 @@ class IntelWorker:
         job_lease_seconds: Optional[int] = None,
         heartbeat_seconds: Optional[float] = None,
         active_composition_service: ActiveIndustryCompositionService = None,
+        lane_name: str = "core",
     ):
         self.repository = repository or intel_repository
         self.active_composition_service = (
@@ -147,6 +148,23 @@ class IntelWorker:
         except Exception:
             hard_timeout = 1800
         self.job_hard_timeout_seconds = max(60, hard_timeout)
+        # ── 流式执行与看门狗（对应"每个子任务独立超时、任务之间解耦"） ──────────────
+        # 关键点：不再"领一批→等整批跑完→再领下一批"，而是持久线程池 + 在飞作业表：
+        # 只要有空闲槽位就继续领活，卡死的作业只占它自己那一个槽，不阻塞后续任务。
+        self._job_pool = None
+        self._job_pool_size = 0
+        self._in_flight: Dict = {}          # future -> {job, deadline, thread_name, cancel_event, heartbeat_stop}
+        self._in_flight_lock = threading.Lock()
+        # 超时作业所在线程需要清理的资源挂在这里，等该线程下次跑作业时**在该线程内**清理
+        # （同步浏览器 API 有线程亲和性，从别的线程关闭会报 cannot switch to a different thread）。
+        self._thread_cleanup_pending: Dict[str, int] = {}
+        # 连续超时熔断：连续多次超时说明下游（LLM/抓取目标）可能雪崩，先自限流再恢复
+        self._timeout_streak = 0
+        self._lane_cooldown_until = 0.0
+        self._last_reap_at = 0.0
+        self._heartbeat_thread = None
+        self._worker_started_at = utc_now()
+        self.lane_name = str(lane_name or "core")
         self.stop_requested = False
         self._active_job_lock = threading.Lock()
         self._active_cancel_events: Dict[int, threading.Event] = {}
@@ -1543,6 +1561,332 @@ class IntelWorker:
             pool.shutdown(wait=False)
         return stats
 
+    # ==================== 流式执行 + 看门狗 + 心跳 + 熔断 ====================
+    def _effective_concurrency(self) -> int:
+        try:
+            value = int(os.environ.get("INTEL_WORKER_JOB_CONCURRENCY", "1") or 1)
+        except (TypeError, ValueError):
+            value = 1
+        base = max(1, value)
+        # 连续超时熔断期间降级为单并发（防止雪崩：下游可能已经挂了，多并发只会制造更多卡死会话）
+        if self._timeout_streak >= self._breaker_threshold():
+            return 1
+        return base
+
+    @staticmethod
+    def _breaker_threshold() -> int:
+        try:
+            return max(2, int(config.INTEL_LANE_TIMEOUT_BREAKER_THRESHOLD))
+        except Exception:
+            return 3
+
+    @staticmethod
+    def _breaker_cooldown_seconds() -> int:
+        try:
+            return max(30, int(config.INTEL_LANE_TIMEOUT_BREAKER_COOLDOWN_SECONDS))
+        except Exception:
+            return 300
+
+    def _lane_paused(self) -> bool:
+        if self._lane_cooldown_until and time.time() < self._lane_cooldown_until:
+            return True
+        if self._lane_cooldown_until:
+            # 冷却结束：清掉连续超时计数，并发与领活恢复正常
+            self._lane_cooldown_until = 0.0
+            self._timeout_streak = 0
+        return False
+
+    def _job_timeout_for(self, job_type: str) -> int:
+        """单个子任务的超时：支持按类型覆盖 INTEL_JOB_TIMEOUT_<TYPE>，否则用全局硬超时。"""
+        key = "INTEL_JOB_TIMEOUT_" + str(job_type or "").upper().replace("-", "_")
+        raw = os.environ.get(key)
+        if raw:
+            try:
+                return max(30, int(raw))
+            except (TypeError, ValueError):
+                pass
+        return int(self.job_hard_timeout_seconds)
+
+    def _ensure_job_pool(self, size: int) -> None:
+        if self._job_pool is not None and self._job_pool_size == size:
+            return
+        if self._job_pool is not None:
+            self._job_pool.shutdown(wait=False)
+        self._job_pool = ThreadPoolExecutor(max_workers=size, thread_name_prefix="intel-job")
+        self._job_pool_size = size
+
+    def _cleanup_thread_resources(self, timed_out_job_id: int, thread_name: str) -> None:
+        """在**超时作业所在的那个线程里**清理它留下的底层资源。
+
+        为什么必须在这个线程里做：Scrapling/Playwright 的同步 API 有线程亲和性，
+        从别的线程关闭会话会抛 cannot switch to a different thread。
+        清理对象：该线程复用的浏览器会话（close() 会连带结束浏览器子进程）、
+        本进程在该线程期间派生的孤儿子进程、以及 Python 侧引用（gc）。
+        """
+        cleaned = []
+        try:
+            from candidate_crawler_adapter import _drop_thread_scrapling_session
+
+            _drop_thread_scrapling_session()
+            cleaned.append("scrapling-session")
+        except Exception:
+            pass
+        try:
+            import gc
+
+            collected = gc.collect()
+            if collected:
+                cleaned.append("gc:%d" % collected)
+        except Exception:
+            pass
+        try:
+            children = self._kill_orphan_children()
+            if children:
+                cleaned.append("children:%d" % children)
+        except Exception:
+            pass
+        print("🧹 清理超时作业 %s 在线程 %s 上的残留资源: %s"
+              % (timed_out_job_id, thread_name, ",".join(cleaned) or "(无可清理项)"), flush=True)
+
+    def _kill_orphan_children(self) -> int:
+        """回收本进程派生、且已失去父进程跟踪的孤儿子进程（浏览器/驱动等）。
+
+        只杀"父进程已不是本进程"或明显属于被看门狗放弃的作业留下的进程；
+        保守起见只处理 psutil 能识别为 zombie/orphan 的进程，绝不误杀正常作业的浏览器。
+        """
+        try:
+            import psutil
+        except Exception:
+            return 0
+        killed = 0
+        me = psutil.Process()
+        for child in me.children(recursive=True):
+            try:
+                if child.status() == psutil.STATUS_ZOMBIE:
+                    child.kill()
+                    killed += 1
+            except Exception:
+                continue
+        return killed
+
+    def _run_job_with_cleanup(self, job: Dict, runtimes: Dict, stats: Dict,
+                              stats_lock: Optional[threading.Lock] = None,
+                              info: Optional[Dict] = None) -> None:
+        """线程入口：先做上一个超时作业留给本线程的清理，再执行当前作业。"""
+        thread_name = threading.current_thread().name
+        if info is not None:
+            # 线程名要在线程内部记录：超时清理是按线程登记的（同步浏览器 API 有线程亲和性）
+            info["thread_name"] = thread_name
+        pending = None
+        with self._in_flight_lock:
+            pending = self._thread_cleanup_pending.pop(thread_name, None)
+        if pending is not None:
+            self._cleanup_thread_resources(pending, thread_name)
+        self._process_claimed_job(job, runtimes, stats, stats_lock)
+
+    def _settle_in_flight(self, stats: Dict) -> None:
+        """结算在飞作业：完成的收尾、超过各自超时的按可重试失败处理（看门狗）。"""
+        now = time.time()
+        with self._in_flight_lock:
+            items = list(self._in_flight.items())
+        for future, info in items:
+            if future.done():
+                ok = False
+                try:
+                    future.result()
+                    ok = True
+                except Exception as exc:
+                    print(f"⚠️ 作业执行线程异常: {type(exc).__name__}: {str(exc)[:160]}")
+                finally:
+                    self._forget_in_flight(future)
+                if ok:
+                    # 有作业正常跑完 = 下游还健康：解除连续超时计数（熔断恢复）
+                    self._timeout_streak = 0
+                continue
+            if now >= float(info.get("deadline") or 0):
+                self._on_job_timeout(future, info, stats)
+
+    def _forget_in_flight(self, future) -> None:
+        with self._in_flight_lock:
+            info = self._in_flight.pop(future, None)
+        if not info:
+            return
+        try:
+            info["heartbeat_stop"].set()
+        except Exception:
+            pass
+        try:
+            self._release_job_context(info["job"]["id"])
+        except Exception:
+            pass
+
+    def _on_job_timeout(self, future, info: Dict, stats: Dict) -> None:
+        """看门狗触发：取消信号 + 终态写回 + 资源清理登记 + 连续超时熔断。"""
+        job = info["job"]
+        job_id = int(job["id"])
+        timeout = int(info.get("timeout") or self.job_hard_timeout_seconds)
+        try:
+            info["cancel_event"].set()          # 让支持协作取消的 handler 尽快退出
+        except Exception:
+            pass
+        error = ("子任务运行超过 %s 秒未完成，看门狗已终止等待并按可重试失败处理（job=%s/%s）"
+                 % (timeout, job_id, job.get("job_type")))
+        status = "unknown"
+        try:
+            status = self.repository.fail_job(
+                job_id, error, lease_owner=self.worker_id, retryable=True)
+        except Exception as exc:
+            print("⚠️ 看门狗写回失败 job=%s: %s" % (job_id, str(exc)[:120]))
+        stats["timed_out"] = stats.get("timed_out", 0) + 1
+        stats[status] = stats.get(status, 0) + 1
+        with self._in_flight_lock:
+            self._thread_cleanup_pending[str(info.get("thread_name") or "")] = job_id
+        print("⏱️ %s → 终态=%s（该线程的资源将在其下次执行作业时清理）" % (error, status), flush=True)
+        self._timeout_streak += 1
+        if self._timeout_streak >= self._breaker_threshold():
+            cooldown = self._breaker_cooldown_seconds()
+            self._lane_cooldown_until = time.time() + cooldown
+            print("🚧 连续 %d 次子任务超时，lane 进入 %d 秒限流冷却（并发临时降为 1）"
+                  % (self._timeout_streak, cooldown), flush=True)
+        self._forget_in_flight(future)
+
+    def _record_lane_heartbeat(self, *, status: str = "running", note: str = "") -> None:
+        try:
+            with self._in_flight_lock:
+                jobs = [{"job_id": int(info["job"]["id"]),
+                         "job_type": str(info["job"].get("job_type") or ""),
+                         "running_seconds": int(time.time() - float(info.get("started") or time.time())),
+                         "timeout_seconds": int(info.get("timeout") or 0)}
+                        for info in self._in_flight.values()]
+            self.repository.record_worker_heartbeat(
+                self.worker_id,
+                lane=self.lane_name,
+                pid=os.getpid(),
+                host=socket.gethostname(),
+                status=status,
+                inflight_count=len(jobs),
+                timeout_streak=self._timeout_streak,
+                note=note,
+                detail={"jobs": jobs, "concurrency": self._effective_concurrency(),
+                        "started_at": str(self._worker_started_at)},
+            )
+        except Exception as exc:
+            print("⚠️ worker 心跳写入失败: %s" % str(exc)[:120])
+
+    def _start_heartbeat_thread(self) -> None:
+        if self._heartbeat_thread is not None:
+            return
+        try:
+            interval = max(5, int(config.INTEL_WORKER_HEARTBEAT_SECONDS))
+        except Exception:
+            interval = 30
+
+        def _loop() -> None:
+            while not self.stop_requested:
+                self._record_lane_heartbeat()
+                if self._heartbeat_thread_stop.wait(interval):
+                    return
+
+        self._heartbeat_thread_stop = threading.Event()
+        self._heartbeat_thread = threading.Thread(
+            target=_loop, name="intel-worker-heartbeat", daemon=True)
+        self._heartbeat_thread.start()
+
+    def _maybe_reap_stuck_jobs(self) -> None:
+        """调度层主动巡检：把"运行时长超阈值但租约仍有效"的作业直接回收。"""
+        try:
+            interval = max(30, int(config.INTEL_JOB_REAP_INTERVAL_SECONDS))
+        except Exception:
+            interval = 120
+        if time.time() - self._last_reap_at < interval:
+            return
+        self._last_reap_at = time.time()
+        try:
+            timeout = int(self.job_hard_timeout_seconds)
+        except Exception:
+            timeout = 1800
+        # 巡检阈值比看门狗宽一些：本 worker 自己的作业由看门狗负责，这里主要收别处遗留的卡死作业
+        try:
+            grace = max(0, int(config.INTEL_JOB_REAP_GRACE_SECONDS))
+        except Exception:
+            grace = 300
+        try:
+            reclaimed = self.repository.reap_stuck_jobs(max_runtime_seconds=timeout + grace)
+        except Exception as exc:
+            print("⚠️ 卡死作业巡检失败: %s" % str(exc)[:140])
+            return
+        for item in reclaimed:
+            print("♻️ 巡检回收卡死作业 job=%s type=%s owner=%s → %s"
+                  % (item.get("id"), item.get("job_type"),
+                     str(item.get("lease_owner") or "")[:32], item.get("reclaimed_status")),
+                  flush=True)
+
+    def _pump_once(self, *, job_types=None, schedule_periodic: bool = True) -> Dict:
+        """一次调度循环：结算在飞 → 巡检 → 有空槽就领活，绝不等待整批完成。"""
+        stats = {"claimed": 0, "completed": 0, "retry_wait": 0, "failed": 0,
+                 "cancelled": 0, "lease_lost": 0, "timed_out": 0, "in_flight": 0,
+                 "cooldown": self._lane_paused()}
+        self._settle_in_flight(stats)
+        if schedule_periodic:
+            self.enqueue_due_periodic_jobs()
+        self._maybe_reap_stuck_jobs()
+        concurrency = self._effective_concurrency()
+        with self._in_flight_lock:
+            in_flight = len(self._in_flight)
+        free = concurrency - in_flight
+        if free > 0 and not self._lane_paused():
+            self._ensure_job_pool(concurrency)
+            allowed = list(job_types or self.handlers.keys())
+            jobs = self.repository.claim_jobs(
+                self.worker_id, job_types=allowed, limit=free,
+                lease_seconds=self.job_lease_seconds)
+            for job in jobs:
+                context = self._job_context(job)
+                heartbeat_stop = threading.Event()
+                heartbeat = threading.Thread(
+                    target=self._heartbeat_job,
+                    args=(int(job["id"]), context.cancel_event, heartbeat_stop),
+                    name=f"intel-job-heartbeat-{job['id']}",
+                    daemon=True,
+                )
+                heartbeat.start()
+                runtimes = {int(job["id"]): (context, heartbeat_stop, heartbeat)}
+                info = {"job": job, "started": time.time(),
+                        "timeout": self._job_timeout_for(job.get("job_type")),
+                        "cancel_event": context.cancel_event,
+                        "heartbeat_stop": heartbeat_stop,
+                        "thread_name": ""}
+                info["deadline"] = info["started"] + info["timeout"]
+                future = self._job_pool.submit(
+                    self._run_job_with_cleanup, job, runtimes, stats, None, info)
+                with self._in_flight_lock:
+                    self._in_flight[future] = info
+            stats["claimed"] = len(jobs)
+        with self._in_flight_lock:
+            stats["in_flight"] = len(self._in_flight)
+        return stats
+
+    def run_forever(
+        self,
+        poll_seconds: Optional[int] = None,
+        *,
+        job_types: Optional[Iterable[str]] = None,
+        schedule_periodic: bool = True,
+    ) -> None:
+        interval = max(1, int(poll_seconds or config.INTEL_WORKER_POLL_SECONDS))
+        self._start_heartbeat_thread()
+        try:
+            while not self.stop_requested:
+                stats = self._pump_once(job_types=job_types, schedule_periodic=schedule_periodic)
+                if stats["claimed"] == 0 and stats["in_flight"] == 0:
+                    time.sleep(interval)
+                elif stats.get("cooldown"):
+                    time.sleep(2)
+        finally:
+            self._record_lane_heartbeat(status="stopped", note="worker 退出")
+            if self._job_pool is not None:
+                self._job_pool.shutdown(wait=False)
+
     def _process_claimed_job(self, job: Dict, runtimes: Dict, stats: Dict,
                              stats_lock: Optional[threading.Lock] = None) -> None:
         """执行一个已领取的作业：handler 调用 + 成功/失败/取消的终态写回。
@@ -1620,27 +1964,20 @@ class IntelWorker:
             _bump(status)
         finally:
             heartbeat_stop.set()
-            heartbeat.join(timeout=max(0.1, self.heartbeat_seconds * 2))
+            try:
+                heartbeat.join(timeout=max(0.1, self.heartbeat_seconds * 2))
+            except RuntimeError:
+                # 心跳线程可能尚未 start（测试替身/极端时序），忽略即可
+                pass
             self._release_job_context(job["id"])
-
-    def run_forever(
-        self,
-        poll_seconds: Optional[int] = None,
-        *,
-        job_types: Optional[Iterable[str]] = None,
-        schedule_periodic: bool = True,
-    ) -> None:
-        interval = max(1, int(poll_seconds or config.INTEL_WORKER_POLL_SECONDS))
-        while not self.stop_requested:
-            stats = self.run_once(
-                job_types=job_types,
-                schedule_periodic=schedule_periodic,
-            )
-            if stats["claimed"] == 0:
-                time.sleep(interval)
 
     def request_stop(self, *_args) -> None:
         self.stop_requested = True
+        try:
+            if getattr(self, "_heartbeat_thread_stop", None) is not None:
+                self._heartbeat_thread_stop.set()
+        except Exception:
+            pass
         with self._active_job_lock:
             for cancel_event in self._active_cancel_events.values():
                 cancel_event.set()

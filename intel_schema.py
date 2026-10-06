@@ -9,17 +9,51 @@ from __future__ import annotations
 UTC_NOW_SQL = "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
 
 
-def _ensure_column(cursor, table_name: str, column_name: str, definition: str) -> None:
-    # SQLite 用 PRAGMA；PostgreSQL 用 information_schema（PRAGMA 在 PG 上会报错）
+def _existing_columns(cursor, table_name: str) -> set:
+    """列出表已有列名：SQLite 用 PRAGMA、PostgreSQL 用 information_schema，两边都试。
+
+    为什么两边都试：在 PostgreSQL 上 `PRAGMA table_info(x)` 不报错但**返回空集**，
+    老实现因此认为"所有列都不存在"，于是对已存在的列执行 ALTER TABLE ADD COLUMN
+    → `DuplicateColumn`（实测：intel_source_industries.is_active 已存在却仍被 ADD）。
+    这里改成取两个来源的并集，并且只在**确实拿到非空列集**时才决定要不要加列。
+    """
+    names = set()
     try:
         cursor.execute(f"PRAGMA table_info({table_name})")
-        columns = {row["name"] if hasattr(row, "keys") else row[1] for row in cursor.fetchall()}
+        for row in cursor.fetchall():
+            try:
+                names.add(str(row["name"]))
+            except Exception:
+                try:
+                    names.add(str(row[1]))
+                except Exception:
+                    continue
     except Exception:
-        cursor.execute(
-            "SELECT column_name FROM information_schema.columns WHERE table_name=?",
-            (table_name,),
-        )
-        columns = {row["column_name"] for row in cursor.fetchall()}
+        pass
+    if not names:
+        try:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name=?",
+                (table_name,),
+            )
+            for row in cursor.fetchall():
+                try:
+                    names.add(str(row["column_name"]))
+                except Exception:
+                    try:
+                        names.add(str(row[0]))
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+    return names
+
+
+def _ensure_column(cursor, table_name: str, column_name: str, definition: str) -> None:
+    columns = _existing_columns(cursor, table_name)
+    if not columns:
+        # 拿不到列清单（表还没建/后端异常）时不要盲加列，避免 DuplicateColumn 打断整段建表流程
+        return
     if column_name not in columns:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
@@ -293,11 +327,38 @@ def ensure_intel_core_tables(cursor) -> None:
             created_by TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
             updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
-            completed_at TEXT
+            completed_at TEXT,
+            started_at TEXT
         )
         """
     )
     _ensure_column(cursor, "intel_jobs", "created_by", "TEXT NOT NULL DEFAULT ''")
+    # started_at：本次领取的开始时间（updated_at 被心跳不断刷新，无法用来算运行时长）。
+    # 有了它才能做"运行时长超阈值就回收"的巡检，也才能在 worker 心跳里上报当前作业跑了多久。
+    _ensure_column(cursor, "intel_jobs", "started_at", "TEXT")
+
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS intel_worker_heartbeats (
+            worker_id TEXT PRIMARY KEY,
+            lane TEXT NOT NULL DEFAULT '',
+            pid INTEGER,
+            host TEXT NOT NULL DEFAULT '',
+            started_at TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            inflight_count INTEGER NOT NULL DEFAULT 0,
+            timeout_streak INTEGER NOT NULL DEFAULT 0,
+            note TEXT NOT NULL DEFAULT '',
+            detail_json TEXT NOT NULL DEFAULT '{{}}',
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL}
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_worker_heartbeats_seen "
+        "ON intel_worker_heartbeats(last_seen)"
+    )
 
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_intel_classifications_industry_category "
