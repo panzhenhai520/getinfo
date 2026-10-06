@@ -13,6 +13,7 @@ import socket
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta, timezone
 from typing import Callable, Dict, Iterable, Optional
 
@@ -1413,6 +1414,7 @@ class IntelWorker:
         job_types: Optional[Iterable[str]] = None,
         limit: Optional[int] = None,
         schedule_periodic: bool = True,
+        concurrency: Optional[int] = None,
     ) -> Dict:
         if schedule_periodic:
             self.enqueue_due_periodic_jobs()
@@ -1423,6 +1425,11 @@ class IntelWorker:
             limit=limit,
             lease_seconds=self.job_lease_seconds,
         )
+        concurrency = max(1, int(
+            concurrency
+            if concurrency is not None
+            else os.environ.get("INTEL_WORKER_JOB_CONCURRENCY", "1") or 1
+        ))
         stats = {
             "claimed": len(jobs),
             "completed": 0,
@@ -1432,9 +1439,8 @@ class IntelWorker:
             "lease_lost": 0,
         }
         runtimes = {}
-        # A batch is claimed atomically but processed sequentially.  Start a
-        # lease heartbeat for every claimed row immediately so a long research
-        # job cannot let the remaining RSS/financial jobs expire while waiting.
+        # 批次是一次性原子领取的，因此必须先给每条记录起租约心跳：
+        # 否则慢作业会让同批里其余作业在排队等待期间租约过期（被别的 worker 抢走）。
         for job in jobs:
             context = self._job_context(job)
             heartbeat_stop = threading.Event()
@@ -1446,74 +1452,107 @@ class IntelWorker:
             )
             heartbeat.start()
             runtimes[int(job["id"])] = (context, heartbeat_stop, heartbeat)
-        for job in jobs:
-            handler = self.handlers.get(job["job_type"])
-            context, heartbeat_stop, heartbeat = runtimes[int(job["id"])]
-            try:
-                if not handler:
-                    status = self.repository.fail_job(
-                        job["id"],
-                        "no handler registered",
-                        lease_owner=self.worker_id,
-                        retryable=False,
-                    )
-                    stats[status] = stats.get(status, 0) + 1
-                    continue
-                if job["job_type"] in self._context_handler_types:
-                    result = handler(job.get("payload") or {}, context)
-                else:
-                    result = handler(job.get("payload") or {})
-                # 🔥 失败语义修复：handler 显式返回 success=False 时任务必须走
-                # fail_job（重试/终态失败），绝不能无条件 complete——否则 VPN 精炼
-                # 失败的文章会被误标 completed 而永远不再重试，正文保持原始噪声。
-                if isinstance(result, dict) and result.get("success") is False:
-                    status = self.repository.fail_job(
-                        job["id"],
-                        str(result.get("error") or "handler 返回失败")[:2000],
-                        lease_owner=self.worker_id,
-                        retryable=bool(result.get("retryable", True)),
-                    )
-                    stats[status] = stats.get(status, 0) + 1
-                    continue
-                completed = self.repository.complete_job(
-                    job["id"], result, lease_owner=self.worker_id
-                )
-                if completed:
-                    stats["completed"] += 1
-                else:
-                    current = self.repository.get_job(job["id"]) or {}
-                    status = str(current.get("status") or "lease_lost")
-                    status = "cancelled" if status == "cancelled" else "lease_lost"
-                    stats[status] = stats.get(status, 0) + 1
-            except FinancialJobCancelled as exc:
-                current = self.repository.get_job(job["id"]) or {}
-                if current.get("status") == "cancelled":
-                    stats["cancelled"] += 1
-                elif exc.error_code == "lease_lost":
-                    stats["lease_lost"] += 1
-                else:
-                    status = self.repository.fail_job(
-                        job["id"],
-                        exc.error_code,
-                        lease_owner=self.worker_id,
-                        retryable=True,
-                    )
-                    stats[status] = stats.get(status, 0) + 1
-            except Exception as exc:
-                error_code = str(getattr(exc, "error_code", "") or "").strip()
-                error_text = f"{error_code}: {exc}" if error_code else str(exc)
+        # 批次内并发度：默认 1（与历史行为逐字一致）。
+        # 生产实测（A 机）：单条 lane 串行处理时总吞吐只有 ~53 个作业/小时，
+        # 而 classification 的稳态到达约 11 篇/小时、队列里还有一次性积压 5000+，
+        # 串行永远排不空（实测 14 小时只完成 11 个分类作业）。
+        # 作业耗时几乎全在等 LLM/网络，DB 访问本身有 repository 锁保护，
+        # 因此把"等待"并行起来即可成倍提升吞吐，用 INTEL_WORKER_JOB_CONCURRENCY 控制。
+        if concurrency <= 1 or len(jobs) <= 1:
+            for job in jobs:
+                self._process_claimed_job(job, runtimes, stats)
+            return stats
+        stats_lock = threading.Lock()
+        with ThreadPoolExecutor(max_workers=concurrency,
+                                thread_name_prefix="intel-job") as pool:
+            futures = [pool.submit(self._process_claimed_job, job, runtimes, stats, stats_lock)
+                       for job in jobs]
+            for future in futures:
+                try:
+                    future.result()
+                except Exception as exc:  # 兜底：单条作业异常不能拖垮整批
+                    print(f"⚠️ 作业执行线程异常: {type(exc).__name__}: {str(exc)[:160]}")
+        return stats
+
+    def _process_claimed_job(self, job: Dict, runtimes: Dict, stats: Dict,
+                             stats_lock: Optional[threading.Lock] = None) -> None:
+        """执行一个已领取的作业：handler 调用 + 成功/失败/取消的终态写回。
+
+        并发执行（INTEL_WORKER_JOB_CONCURRENCY>1）时由调用方传 stats_lock 保护计数。
+        """
+        def _bump(key: str) -> None:
+            if stats_lock is None:
+                stats[key] = stats.get(key, 0) + 1
+            else:
+                with stats_lock:
+                    stats[key] = stats.get(key, 0) + 1
+
+        handler = self.handlers.get(job["job_type"])
+        context, heartbeat_stop, heartbeat = runtimes[int(job["id"])]
+        try:
+            if not handler:
                 status = self.repository.fail_job(
                     job["id"],
-                    error_text,
+                    "no handler registered",
                     lease_owner=self.worker_id,
-                    retryable=bool(getattr(exc, "retryable", True)),
+                    retryable=False,
                 )
-                stats[status] = stats.get(status, 0) + 1
-            finally:
-                heartbeat_stop.set()
-                heartbeat.join(timeout=max(0.1, self.heartbeat_seconds * 2))
-                self._release_job_context(job["id"])
-        return stats
+                _bump(status)
+                return
+            if job["job_type"] in self._context_handler_types:
+                result = handler(job.get("payload") or {}, context)
+            else:
+                result = handler(job.get("payload") or {})
+            # 🔥 失败语义修复：handler 显式返回 success=False 时任务必须走
+            # fail_job（重试/终态失败），绝不能无条件 complete——否则 VPN 精炼
+            # 失败的文章会被误标 completed 而永远不再重试，正文保持原始噪声。
+            if isinstance(result, dict) and result.get("success") is False:
+                status = self.repository.fail_job(
+                    job["id"],
+                    str(result.get("error") or "handler 返回失败")[:2000],
+                    lease_owner=self.worker_id,
+                    retryable=bool(result.get("retryable", True)),
+                )
+                _bump(status)
+                return
+            completed = self.repository.complete_job(
+                job["id"], result, lease_owner=self.worker_id
+            )
+            if completed:
+                _bump("completed")
+            else:
+                current = self.repository.get_job(job["id"]) or {}
+                status = str(current.get("status") or "lease_lost")
+                status = "cancelled" if status == "cancelled" else "lease_lost"
+                _bump(status)
+        except FinancialJobCancelled as exc:
+            current = self.repository.get_job(job["id"]) or {}
+            if current.get("status") == "cancelled":
+                _bump("cancelled")
+            elif exc.error_code == "lease_lost":
+                _bump("lease_lost")
+            else:
+                status = self.repository.fail_job(
+                    job["id"],
+                    exc.error_code,
+                    lease_owner=self.worker_id,
+                    retryable=True,
+                )
+                _bump(status)
+        except Exception as exc:
+            error_code = str(getattr(exc, "error_code", "") or "").strip()
+            error_text = f"{error_code}: {exc}" if error_code else str(exc)
+            status = self.repository.fail_job(
+                job["id"],
+                error_text,
+                lease_owner=self.worker_id,
+                retryable=bool(getattr(exc, "retryable", True)),
+            )
+            _bump(status)
+        finally:
+            heartbeat_stop.set()
+            heartbeat.join(timeout=max(0.1, self.heartbeat_seconds * 2))
+            self._release_job_context(job["id"])
 
     def run_forever(
         self,
