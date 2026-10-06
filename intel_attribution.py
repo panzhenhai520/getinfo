@@ -145,8 +145,12 @@ def _topic_tags(pack_id: str, article_data: dict) -> list:
     return [best] if best else []
 
 
-def ensure_pack_attribution(db, article_id: int, article_data: dict) -> dict:
+def ensure_pack_attribution(db, article_id: int, article_data: dict, *, pack_ids=None) -> dict:
     """保证文章至少有本包归属（异步分类之后可升级为真实分类）。
+
+    Args:
+        pack_ids: 显式指定归属包（存量补归属时由调用方给出候选准入包）；
+            不传则按「显式字段 → 关键词打分 → 当前激活包」自行选择。
 
     返回 {attributed: [...], source: 'existing'|'explicit'|'keyword'|'active'|'none'}。
     """
@@ -165,7 +169,8 @@ def ensure_pack_attribution(db, article_id: int, article_data: dict) -> dict:
             return result
 
         packs, source = [], ""
-        explicit = _explicit_packs(article_data)
+        forced = [str(p).strip() for p in (pack_ids or []) if str(p or "").strip()]
+        explicit = forced or _explicit_packs(article_data)
         if explicit:
             packs, source = explicit[:3], "explicit"
         else:

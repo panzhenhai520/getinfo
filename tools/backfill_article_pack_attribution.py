@@ -140,7 +140,9 @@ def _purge_generic(db, *, apply: bool, min_hits: int) -> int:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--apply", action="store_true", help="真正入队补全（默认只统计）")
+    parser.add_argument("--apply", action="store_true", help="真正补全（默认只统计）")
+    parser.add_argument("--also-enqueue", action="store_true",
+                        help="除同步写兜底归属外，再入队 classification 让真实分类覆盖它")
     parser.add_argument("--purge-generic", action="store_true",
                         help="删除无归属且零关键词命中的通用条目（先导出备份再软删）")
     parser.add_argument("--min-keyword-hits", type=int, default=2,
@@ -196,20 +198,47 @@ def main(argv=None) -> int:
         print("\n[dry-run] 未写库。确认分布后加 --apply 执行。")
         return 0
 
-    from intel_database import IntelRepository
+    # 同步写兜底归属（pipeline 收口里同一套逻辑 intel_attribution.ensure_pack_attribution）：
+    # 不依赖分类队列——队列可能积压几千条，而"页面看得到、AI 搜不到"是当下就要修的。
+    # 兜底行落在该包「其他」分类，并带真实行业打分证据（能通过检索质量门）；
+    # 之后 worker 的真实分类会把这一行升级成 trend/event。
+    from intel_attribution import ensure_pack_attribution
 
-    repo = IntelRepository(sqlite_db)
-    queued, failed = 0, 0
+    written, skipped = 0, 0
     for art, packs in via_candidate + via_keyword:
-        for pack_id in packs:
-            try:
-                repo.enqueue_classification(int(art["id"]), str(pack_id), ragflow_upload=False)
-                queued += 1
-            except Exception as exc:
-                failed += 1
-                print("    入队失败 id=%s pack=%s: %s" % (art["id"], pack_id, str(exc)[:80]))
-    print("\n已入队 classification 任务: %d 个（失败 %d）" % (queued, failed))
-    print("分类由既有 worker 执行；跑完后再次运行本工具应看到剩余数下降。")
+        picked = [p for p, _n in packs] if packs and isinstance(packs[0], tuple) else list(packs)
+        outcome = ensure_pack_attribution(
+            sqlite_db, int(art["id"]), art, pack_ids=picked
+        )
+        if outcome.get("attributed"):
+            written += 1
+        else:
+            skipped += 1
+    # 弱命中/无命中的也要有归属（要求：至少归到该行业包的「其他」分类），
+    # 交给 ensure_pack_attribution 自己的兜底顺序：关键词命中 → 当前激活包。
+    for art, _kw in unresolved:
+        outcome = ensure_pack_attribution(sqlite_db, int(art["id"]), art)
+        if outcome.get("attributed"):
+            written += 1
+        else:
+            skipped += 1
+    print("\n已同步写入兜底归属: %d 篇（未写成 %d 篇）" % (written, skipped))
+
+    if args.also_enqueue:
+        from intel_database import IntelRepository
+
+        repo = IntelRepository(sqlite_db)
+        queued, failed = 0, 0
+        for art, packs in via_candidate + via_keyword:
+            picked = [p for p, _n in packs] if packs and isinstance(packs[0], tuple) else list(packs)
+            for pack_id in picked:
+                try:
+                    repo.enqueue_classification(int(art["id"]), str(pack_id), ragflow_upload=False)
+                    queued += 1
+                except Exception as exc:
+                    failed += 1
+                    print("    入队失败 id=%s pack=%s: %s" % (art["id"], pack_id, str(exc)[:80]))
+        print("已额外入队 classification 任务: %d 个（失败 %d）" % (queued, failed))
     return 0
 
 
