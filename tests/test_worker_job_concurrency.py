@@ -54,12 +54,13 @@ def _job(job_id, index):
 
 
 class WorkerBatchConcurrencyTest(unittest.TestCase):
-    def _worker(self, runner, jobs):
+    def _worker(self, runner, jobs, *, hard_timeout=1800):
         worker = IntelWorker.__new__(IntelWorker)
         worker.repository = _StubRepository(jobs)
         worker.worker_id = "concurrency-test"
         worker.job_lease_seconds = 60
         worker.heartbeat_seconds = 0.05
+        worker.job_hard_timeout_seconds = hard_timeout
         worker.stop_requested = False
         worker.handlers = {job_type: runner for job_type in JOB_TYPES}
         worker._context_handler_types = frozenset()
@@ -125,6 +126,30 @@ class WorkerBatchConcurrencyTest(unittest.TestCase):
         stats = worker.run_once(job_types=JOB_TYPES, limit=3, concurrency=3)
         self.assertEqual(2, stats["completed"])
         self.assertEqual(1, stats.get("failed", 0) + stats.get("retry_wait", 0))
+        self.assertEqual([2], [job_id for job_id, _err in worker.repository.failed])
+
+    def test_hung_job_does_not_block_the_batch(self):
+        """看门狗：一条卡死的作业不能拖住整条 lane（生产实测有作业卡了 19.3 小时）。"""
+        finished = []
+        lock = threading.Lock()
+
+        def runner(payload):
+            if payload["index"] == 1:
+                time.sleep(30)          # 模拟卡死（远超看门狗超时）
+                return {"status": "completed"}
+            with lock:
+                finished.append(payload["index"])
+            return {"status": "completed"}
+
+        jobs = [_job(index + 1, index) for index in range(3)]
+        worker = self._worker(runner, jobs, hard_timeout=1)
+        started = time.time()
+        stats = worker.run_once(job_types=JOB_TYPES, limit=3, concurrency=3)
+        elapsed = time.time() - started
+        self.assertLess(elapsed, 10, "看门狗应按超时返回，而不是等卡死作业自己结束")
+        self.assertEqual(sorted([0, 2]), sorted(finished), "正常作业应全部完成")
+        self.assertEqual(1, stats.get("retry_wait", 0) + stats.get("failed", 0),
+                         "超时作业应被记账为可重试失败")
         self.assertEqual([2], [job_id for job_id, _err in worker.repository.failed])
 
     def test_handler_success_false_counts_as_failure(self):

@@ -13,7 +13,7 @@ import socket
 import threading
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import timedelta, timezone
 from typing import Callable, Dict, Iterable, Optional
 
@@ -139,6 +139,14 @@ class IntelWorker:
             0.01,
             float(default_heartbeat if heartbeat_seconds is None else heartbeat_seconds),
         )
+        # 单条作业的硬超时（看门狗）：批次要整体等待完成才能领下一批，
+        # 一条卡死的作业会拖住整条 lane（实测有作业卡了 19.3 小时，期间 lane 只完成 1 个作业）。
+        # 默认 1800 秒，可用 INTEL_JOB_HARD_TIMEOUT_SECONDS 调整。
+        try:
+            hard_timeout = int(config.INTEL_JOB_HARD_TIMEOUT_SECONDS)
+        except Exception:
+            hard_timeout = 1800
+        self.job_hard_timeout_seconds = max(60, hard_timeout)
         self.stop_requested = False
         self._active_job_lock = threading.Lock()
         self._active_cancel_events: Dict[int, threading.Event] = {}
@@ -1500,15 +1508,39 @@ class IntelWorker:
                 self._process_claimed_job(job, runtimes, stats)
             return stats
         stats_lock = threading.Lock()
-        with ThreadPoolExecutor(max_workers=concurrency,
-                                thread_name_prefix="intel-job") as pool:
-            futures = [pool.submit(self._process_claimed_job, job, runtimes, stats, stats_lock)
-                       for job in jobs]
-            for future in futures:
+        # 不用 with 语句：ThreadPoolExecutor.__exit__ 会 shutdown(wait=True)，
+        # 那样即使看门狗判了超时，退出时仍会**等那条卡死的作业自己结束**，
+        # lane 照样被拖住（实测调用方要多等 30 秒）。这里改成手动 shutdown(wait=False)。
+        pool = ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="intel-job")
+        try:
+            futures = {pool.submit(self._process_claimed_job, job, runtimes, stats, stats_lock): job
+                       for job in jobs}
+            # 看门狗：批次必须整体等待完成才能领下一批，所以**任何一条卡死的作业都会拖住整条 lane**。
+            # 生产实测：一条 candidate_dispatch 作业卡了 19.3 小时（心跳还在续租，所以不会被租约回收），
+            # 期间整条 lane 只完成 1 个作业、分类积压纹丝不动。
+            # 这里给整批设一个硬超时：超时仍未结束的作业按可重试失败处理并让 lane 继续，
+            # 卡住的线程留在后台自生自灭，不会再阻塞后续批次。
+            done, pending = wait(futures, timeout=self.job_hard_timeout_seconds)
+            for future in done:
                 try:
                     future.result()
                 except Exception as exc:  # 兜底：单条作业异常不能拖垮整批
                     print(f"⚠️ 作业执行线程异常: {type(exc).__name__}: {str(exc)[:160]}")
+            for future in pending:
+                job = futures[future]
+                error = ("作业超过 %s 秒未完成，已由看门狗终止等待并置为可重试"
+                         % self.job_hard_timeout_seconds)
+                print("⏱️ %s（job=%s type=%s）" % (error, job.get("id"), job.get("job_type")),
+                      flush=True)
+                try:
+                    status = self.repository.fail_job(
+                        job["id"], error, lease_owner=self.worker_id, retryable=True)
+                    with stats_lock:
+                        stats[status] = stats.get(status, 0) + 1
+                except Exception as exc:
+                    print("⚠️ 看门狗写回失败 job=%s: %s" % (job.get("id"), str(exc)[:120]))
+        finally:
+            pool.shutdown(wait=False)
         return stats
 
     def _process_claimed_job(self, job: Dict, runtimes: Dict, stats: Dict,

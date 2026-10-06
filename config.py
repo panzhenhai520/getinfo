@@ -245,6 +245,12 @@ INTEL_CANDIDATE_MAX_RETRIES = _env_int('INTEL_CANDIDATE_MAX_RETRIES', 3, 0, 10)
 INTEL_WORKER_POLL_SECONDS = _env_int('INTEL_WORKER_POLL_SECONDS', 5, 1, 300)
 INTEL_WORKER_BATCH_SIZE = _env_int('INTEL_WORKER_BATCH_SIZE', 20, 1, 500)
 INTEL_JOB_LEASE_SECONDS = _env_int('INTEL_JOB_LEASE_SECONDS', 300, 30, 3600)
+INTEL_JOB_HARD_TIMEOUT_SECONDS = _env_int(
+    # 单条作业的硬超时（看门狗）。批次必须整体完成才能领下一批，一条卡死的作业会拖住整条 lane：
+    # 生产实测有作业卡了 19.3 小时、心跳还在续租（所以租约回收救不了它），期间整条 lane 只完成
+    # 1 个作业、分类积压纹丝不动。超时后按可重试失败处理并让 lane 继续。
+    'INTEL_JOB_HARD_TIMEOUT_SECONDS', 1800, 60, 86400
+)
 INTEL_JOB_MAX_RETRIES = _env_int('INTEL_JOB_MAX_RETRIES', 3, 0, 10)
 INTEL_JOB_PRIORITY_AGING_SECONDS = _env_int(
     # 每等待多少秒给作业 +1 优先级积分。原来 30 秒太小：任何等待超过约 1 分钟的作业
