@@ -66,6 +66,32 @@ def _unique_strings(values, *, limit: int, item_limit: int = 200) -> list[str]:
     return result
 
 
+def _canonical_timeline_hints(value) -> list:
+    """把模型给的 timeline_hints 规范化成 schema 要求的对象数组。
+
+    实测（本地 qwen3.8-27b）：模型经常把该项写成字符串数组
+    （如 ["2026-10-06: 多篇相关文章发布或更新"]），而 LEVEL1_RESULT_SCHEMA 要求 items 是
+    object → 校验直接失败 `timeline_hints.0: ... is not of type 'object'`，
+    于是白白走一次"修复重试"，每次多花 34~40 秒模型调用。
+    这里就地归一：字符串/数值包成 {"date": ..., "event": ...} 形态的对象，无法识别的项丢弃。
+    """
+    if not isinstance(value, (list, tuple)):
+        return []
+    out = []
+    for item in value:
+        if isinstance(item, Mapping):
+            out.append(dict(item))
+        elif isinstance(item, (str, int, float)):
+            text = str(item).strip()
+            if not text:
+                continue
+            date, _, event = text.partition(":")
+            out.append({"date": date.strip()[:40], "event": (event or text).strip()[:400]})
+        if len(out) >= 6:
+            break
+    return out
+
+
 def _canonicalize_level1_result(parsed: Mapping, evidence: list[dict]) -> dict:
     allowed_refs = {str(item.get("evidence_ref") or "") for item in evidence}
     claims, seen_ids = [], set()
@@ -117,7 +143,7 @@ def _canonicalize_level1_result(parsed: Mapping, evidence: list[dict]) -> dict:
         "draft_answer": _compact(parsed.get("draft_answer") or parsed.get("answer"), 30000),
         "claims": claims,
         "entities": _unique_strings(parsed.get("entities") or [], limit=12),
-        "timeline_hints": list(parsed.get("timeline_hints") or [])[:6],
+        "timeline_hints": _canonical_timeline_hints(parsed.get("timeline_hints")),
         "gaps": _unique_strings(parsed.get("gaps") or [], limit=6, item_limit=1000),
         "followup_queries": _unique_strings(parsed.get("followup_queries") or [], limit=6, item_limit=1000),
         "evidence": list(evidence),
