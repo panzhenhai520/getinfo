@@ -295,9 +295,15 @@ INTEL_WORKER_STARVATION_DEADLINE_SECONDS = _env_int(
     'INTEL_WORKER_STARVATION_DEADLINE_SECONDS', 1800, 60, 86400
 )
 INTEL_WORKER_STARVATION_RESERVED_SLOTS = _env_int(
-    # 每次领活先给"饥饿作业"留出的并发槽位数（0=关闭保留，退回纯优先级）。
-    # 实测并发 8 时保留 2 个槽，低优先级维护类可以持续推进，同时把 6 个槽留给高优先级。
+    # 轮到"饥饿通道"时，一次最多用几个并发槽领饥饿作业（0=关闭保留，退回纯优先级）。
     'INTEL_WORKER_STARVATION_RESERVED_SLOTS', 2, 0, 64
+)
+INTEL_WORKER_STARVATION_TURN_EVERY = _env_int(
+    # 每 N 次领活机会里让 1 次走饥饿通道，其余 N-1 次仍按优先级。
+    # 为什么不能"每次领活都先发保留名额"：lane 通常已满，一次领活往往只有 1 个空槽，
+    # 保留名额会把唯一空槽全吃掉——A 机实测分类作业 15 分钟一个都领不到。
+    # 取 4 表示维护类至少拿到 1/4 的吞吐，分类等要紧的活仍占 3/4。
+    'INTEL_WORKER_STARVATION_TURN_EVERY', 4, 2, 100
 )
 
 SERPAPI_API_KEY = _env_str('SERPAPI_API_KEY', '')

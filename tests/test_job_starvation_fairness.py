@@ -157,37 +157,58 @@ def _job(job_id, job_type):
 
 
 class StarvationReservedSlotsTests(unittest.TestCase):
-    """worker 层：保留名额的数量与两段式领取。"""
+    """worker 层：保留名额的数量与轮转（每 N 次领活让 1 次走饥饿通道）。"""
 
     def _worker(self, repository, *, concurrency=8):
         worker = IntelWorker.__new__(IntelWorker)
         worker.repository = repository
         worker.worker_id = "reserved-slot-test"
         worker.job_lease_seconds = 300
+        worker._claim_seq = 0
         return worker
 
-    def test_reserved_slots_are_a_minority_of_concurrency(self):
+    def test_reserved_slots_respect_free_and_config(self):
         worker = self._worker(_RecordingRepository())
-        self.assertEqual(0, worker._starvation_reserved_slots(1), "并发 1 时不保留，避免吞吐归零")
-        for concurrency in (2, 4, 8, 16):
-            reserved = worker._starvation_reserved_slots(concurrency)
-            self.assertGreaterEqual(reserved, 1)
-            self.assertLess(reserved, concurrency, "必须给优先级通道留下多数槽位")
+        self.assertEqual(1, worker._starvation_reserved_slots(1), "只有 1 个空槽时也只能用 1 个")
+        configured = int(config.INTEL_WORKER_STARVATION_RESERVED_SLOTS)
+        self.assertEqual(configured, worker._starvation_reserved_slots(8))
+        self.assertEqual(0, worker._starvation_reserved_slots(0))
 
-    def test_claim_uses_starved_channel_first_then_priority(self):
+    def test_starved_channel_is_used_one_turn_in_every_n(self):
+        """关键性质：饥饿通道不能每次都抢空槽，否则分类会被反过来饿死（A 机实测 15 分钟 0 条）。"""
+        repository = _RecordingRepository(
+            starved_jobs=[_job(index, LOW_PRIORITY_TYPE) for index in range(1, 20)],
+            priority_jobs=[_job(index, HIGH_PRIORITY_TYPE) for index in range(1, 20)],
+        )
+        worker = self._worker(repository)
+        every = worker._starvation_turn_every()
+        for _ in range(every * 3):
+            worker._claim_for_pump([HIGH_PRIORITY_TYPE, LOW_PRIORITY_TYPE], 1)
+
+        starved_calls = [call for call in repository.calls if call["starved_before"]]
+        total_turns = len(repository.calls)
+        self.assertEqual(3, len(starved_calls),
+                         "每 %d 次领活只允许 1 次走饥饿通道" % every)
+        self.assertEqual(every * 3, total_turns)
+        # 每次领活都必须真的领到活（free=1 时优先通道不能被保留名额挤成 0）
+        self.assertTrue(all(call["limit"] >= 1 for call in repository.calls))
+
+    def test_starved_channel_then_priority_in_same_turn(self):
         repository = _RecordingRepository(
             starved_jobs=[_job(1, LOW_PRIORITY_TYPE), _job(2, LOW_PRIORITY_TYPE)],
             priority_jobs=[_job(3, HIGH_PRIORITY_TYPE), _job(4, HIGH_PRIORITY_TYPE),
-                           _job(5, HIGH_PRIORITY_TYPE)],
+                           _job(5, HIGH_PRIORITY_TYPE), _job(6, HIGH_PRIORITY_TYPE)],
         )
         worker = self._worker(repository)
+        every = worker._starvation_turn_every()
+        worker._claim_seq = every - 1          # 下一次领活即为饥饿轮次
         jobs = worker._claim_for_pump([HIGH_PRIORITY_TYPE, LOW_PRIORITY_TYPE], 8)
 
-        self.assertEqual([1, 2, 3, 4, 5], [int(job["id"]) for job in jobs])
+        self.assertEqual([1, 2, 3, 4, 5, 6], [int(job["id"]) for job in jobs])
         first, second = repository.calls
-        self.assertIsNotNone(first["starved_before"], "第一次必须先走饥饿保留通道")
-        self.assertLessEqual(first["limit"], 8)
-        self.assertIsNone(second["starved_before"], "第二次是正常的优先级通道")
+        self.assertIsNotNone(first["starved_before"], "饥饿轮次必须先走保留通道")
+        self.assertEqual(int(config.INTEL_WORKER_STARVATION_RESERVED_SLOTS), first["limit"])
+        self.assertIsNone(second["starved_before"], "同一轮次剩余的槽位仍按优先级领")
         self.assertEqual(8 - first["limit"], second["limit"],
                          "两段合计不能超过空闲槽位，否则会超并发")
 
@@ -195,6 +216,8 @@ class StarvationReservedSlotsTests(unittest.TestCase):
         repository = _RecordingRepository(
             priority_jobs=[_job(index, HIGH_PRIORITY_TYPE) for index in range(1, 9)])
         worker = self._worker(repository)
+        every = worker._starvation_turn_every()
+        worker._claim_seq = every - 1
         jobs = worker._claim_for_pump([HIGH_PRIORITY_TYPE], 8)
         self.assertEqual(8, len(jobs))
         self.assertEqual(8, repository.calls[-1]["limit"],
@@ -206,9 +229,10 @@ class StarvationReservedSlotsTests(unittest.TestCase):
         try:
             repository = _RecordingRepository(priority_jobs=[_job(1, HIGH_PRIORITY_TYPE)])
             worker = self._worker(repository)
-            worker._claim_for_pump([HIGH_PRIORITY_TYPE], 8)
-            self.assertEqual(1, len(repository.calls))
-            self.assertIsNone(repository.calls[0]["starved_before"])
+            for _ in range(worker._starvation_turn_every() * 2):
+                worker._claim_for_pump([HIGH_PRIORITY_TYPE], 8)
+            self.assertTrue(all(call["starved_before"] is None for call in repository.calls),
+                            "关闭保留名额后不允许再走饥饿通道")
         finally:
             config.INTEL_WORKER_STARVATION_RESERVED_SLOTS = original
 
@@ -225,6 +249,7 @@ class StarvationReservedSlotsTests(unittest.TestCase):
 
         repository = _FailingStarved(priority_jobs=[_job(1, HIGH_PRIORITY_TYPE)])
         worker = self._worker(repository)
+        worker._claim_seq = worker._starvation_turn_every() - 1
         jobs = worker._claim_for_pump([HIGH_PRIORITY_TYPE], 8)
         self.assertEqual([1], [int(job["id"]) for job in jobs])
 

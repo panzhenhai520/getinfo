@@ -97,13 +97,16 @@ INTEL_JOB_PRIORITY_AGING_CAP=90         # 等待积分上限：不设上限则"�
 
 # ── 防饿死保留名额（10-06 二次修复，两台都要做）─────────────
 INTEL_WORKER_STARVATION_DEADLINE_SECONDS=1800   # 等超过该秒数视为"饥饿"，走 FIFO 保留通道，默认 1800
-INTEL_WORKER_STARVATION_RESERVED_SLOTS=2        # 每次领活先给饥饿作业留的并发槽位数，默认 2；0=关闭
+INTEL_WORKER_STARVATION_RESERVED_SLOTS=2        # 饥饿轮次一次最多用几个空槽，默认 2；0=关闭
+INTEL_WORKER_STARVATION_TURN_EVERY=4            # 每 4 次领活机会让 1 次走饥饿通道，默认 4
 # 为什么必须要有：优先级+等待积分是**有封顶**的（CAP=90），而优先级带宽是 -45~+100，
 # 所以"高优先级类型只要持续到货，低优先级类型就永远赢不了"。A 机 10-06 实测：
 # 按真实排序键取出的下 20 条全是 15 小时前的 candidate_dispatch(prio=5→eff=95)；
 # topic_cluster(-40→eff=50) 积压 1564 条、trend_aggregate(-45→eff=45) 积压 434 条，
-# 最久 32 小时且 attempt_count=0（从未被领取）。保留名额让"等太久的作业"按 FIFO 必被领取，
-# 阈值之内仍然完全按优先级（分类/候选抓取等要紧的活照常插队）。
+# 最久 32 小时且 attempt_count=0（从未被领取）。
+# 为什么是"每 N 次轮一次"而不是"每次先发保留名额"：lane 通常已满，一次领活往往只有 1 个
+# 空槽，保留名额会把唯一空槽全吃掉——实测那样改完分类作业 15 分钟一个都领不到（反向饿死）。
+# 轮转后维护类稳定拿到约 1/N 的吞吐，分类等要紧的活仍占 (N-1)/N。
 
 # ── 可选：按类型单独设超时（默认继承全局硬超时）────────────
 # INTEL_JOB_TIMEOUT_LIGHT_SCAN=900

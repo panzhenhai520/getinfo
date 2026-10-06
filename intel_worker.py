@@ -161,6 +161,7 @@ class IntelWorker:
         # 连续超时熔断：连续多次超时说明下游（LLM/抓取目标）可能雪崩，先自限流再恢复
         self._timeout_streak = 0
         self._lane_cooldown_until = 0.0
+        self._claim_seq = 0          # 领活轮转计数：每 N 次走一次饥饿通道
         self._last_reap_at = 0.0
         self._heartbeat_thread = None
         self._worker_started_at = utc_now()
@@ -1864,15 +1865,15 @@ class IntelWorker:
             stats["in_flight"] = len(self._in_flight)
         return stats
 
-    def _starvation_reserved_slots(self, concurrency: int) -> int:
-        """防饿死保留名额：把少数并发槽留给「等太久」的作业，其余槽完全按优先级分配。"""
+    def _starvation_reserved_slots(self, free: int) -> int:
+        """轮到饥饿通道时，本次最多能用几个空槽。"""
         try:
             reserved = int(config.INTEL_WORKER_STARVATION_RESERVED_SLOTS)
         except Exception:
             reserved = 2
-        if reserved <= 0 or concurrency <= 1:
+        if reserved <= 0 or free <= 0:
             return 0
-        return max(1, min(reserved, concurrency - 1))
+        return max(1, min(reserved, free))
 
     def _starvation_deadline_seconds(self) -> int:
         try:
@@ -1880,24 +1881,45 @@ class IntelWorker:
         except Exception:
             return 1800
 
+    def _starvation_turn_every(self) -> int:
+        try:
+            return max(2, int(config.INTEL_WORKER_STARVATION_TURN_EVERY))
+        except Exception:
+            return 4
+
+    def _is_starvation_turn(self) -> bool:
+        """轮转：每 N 次领活机会让 1 次走饥饿通道。
+
+        不能改成"每次领活都先发保留名额"——lane 通常是满的，一次领活只有 1 个空槽，
+        保留名额会把唯一空槽全吃掉，分类作业反而被饿死（A 机实测 15 分钟 0 条）。
+        """
+        if self._starvation_reserved_slots(1) <= 0:
+            return False
+        every = self._starvation_turn_every()
+        # 支持 IntelWorker.__new__ 构造的轻量实例（部分测试直接注入依赖）
+        self._claim_seq = int(getattr(self, "_claim_seq", 0)) + 1
+        return self._claim_seq % every == 0
+
     def _claim_for_pump(self, allowed: List[str], free: int) -> List[Dict]:
-        """两段式领活：先给饥饿作业按 FIFO 发保留名额，剩下的槽位按「优先级+等待积分」发。
+        """两段式领活：轮到饥饿通道时先用保留名额按 FIFO 领最老的作业，其余槽位按优先级发。
 
         背景（A 机实测）：优先级+等待积分有封顶，高优先级类型只要持续到货，低优先级类型就
-        永远赢不了——topic_cluster/trend_aggregate/embed_articles 积压 32 小时且 attempt_count=0。
-        保留名额让「等超过 INTEL_WORKER_STARVATION_DEADLINE_SECONDS 的作业」按 FIFO 必被领取，
-        在阈值之内仍然完全按优先级（分类、候选抓取等要紧的活照常插队）。
+        永远赢不了——topic_cluster/trend_aggregate/embed_articles 积压最久 32 小时且 attempt_count=0。
+        保留名额保证「等超过 INTEL_WORKER_STARVATION_DEADLINE_SECONDS 的作业」按 FIFO 也能被领取；
+        阈值之内仍然完全按优先级（分类、候选抓取等要紧的活照常插队）。
         """
         jobs: List[Dict] = []
-        reserve = self._starvation_reserved_slots(free)
-        if reserve:
-            cutoff = utc_text(utc_now() - timedelta(seconds=self._starvation_deadline_seconds()))
-            try:
-                jobs.extend(self.repository.claim_jobs(
-                    self.worker_id, job_types=allowed, limit=min(reserve, free),
-                    lease_seconds=self.job_lease_seconds, starved_before=cutoff))
-            except Exception as exc:
-                print("⚠️ 饥饿保留名额领取失败（继续走优先级通道）: %s" % str(exc)[:160])
+        if self._is_starvation_turn():
+            reserve = self._starvation_reserved_slots(free)
+            if reserve:
+                cutoff = utc_text(utc_now() - timedelta(
+                    seconds=self._starvation_deadline_seconds()))
+                try:
+                    jobs.extend(self.repository.claim_jobs(
+                        self.worker_id, job_types=allowed, limit=reserve,
+                        lease_seconds=self.job_lease_seconds, starved_before=cutoff))
+                except Exception as exc:
+                    print("⚠️ 饥饿保留名额领取失败（继续走优先级通道）: %s" % str(exc)[:160])
         if len(jobs) < free:
             jobs.extend(self.repository.claim_jobs(
                 self.worker_id, job_types=allowed, limit=free - len(jobs),

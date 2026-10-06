@@ -91,12 +91,15 @@ class PrioritySemanticsTests(unittest.TestCase):
                         "排序键上维护类赢不了新鲜分类——所以必须有饥饿保留名额兜底")
 
     def test_starvation_reserved_slots_are_configured(self):
-        """保留名额必须存在且不占多数，否则低优先级类型会再次长期饿死。"""
+        """保留名额必须存在、不占多数，且轮转周期 > 1（否则会把优先级通道饿死）。"""
         deadline = int(config.INTEL_WORKER_STARVATION_DEADLINE_SECONDS)
         reserved = int(config.INTEL_WORKER_STARVATION_RESERVED_SLOTS)
+        every = int(config.INTEL_WORKER_STARVATION_TURN_EVERY)
         self.assertGreater(deadline, 0, "饥饿阈值必须为正")
         self.assertLessEqual(deadline, 86400, "饥饿阈值不该超过一天，否则等于没有兜底")
         self.assertGreater(reserved, 0, "保留名额为 0 时低优先级类型会饿死")
+        self.assertGreater(every, 1,
+                           "轮转周期必须 >1：每次都走饥饿通道会把分类等要紧的活饿死")
         concurrency = int(os.environ.get("INTEL_WORKER_JOB_CONCURRENCY", "1") or 1)
         if concurrency > 1:
             self.assertLess(reserved, concurrency,
