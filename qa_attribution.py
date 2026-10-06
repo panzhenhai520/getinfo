@@ -604,9 +604,12 @@ class QaAttributionService:
         updated = 0
         degraded = 0
         for unit in units:
-            links = [item for item in unit.get("links") or []
-                     if item.get("relation") in {"support", "mention", "refute"}]
-            links = links[:max(1, int(top_sentences))]
+            all_links = list(unit.get("links") or [])
+            relevant = [item for item in all_links
+                        if item.get("relation") in {"support", "mention", "refute"}]
+            # 优先算"确实相关"的证据句；若该单元全是 irrelevant（LLM 判为无关），
+            # 也要给出影响力——"这句话对结论几乎没有影响"本身就是用户想知道的信息。
+            links = (relevant or all_links)[:max(1, int(top_sentences))]
             if not links:
                 continue
             sentences = [item["sentence"] for item in links]
