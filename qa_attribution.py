@@ -410,12 +410,25 @@ class QaAttributionService:
                     "message": "该回答没有可用证据（可能是未启用检索的直答）。"}
         pool = self._candidate_sentences(evidence)
         budget = {"calls": 0}
-        units = self._decompose_llm(answer, claims, run, budget) or self._decompose_rule(answer, claims)
+        # LLM 不可用（端点被安全策略拦、超时、返回非法 JSON）时必须退化为规则分解 +
+        # 词汇重叠归因，而不是让整个【证据解析】失败——归因是"看得更清楚"的增强能力。
+        try:
+            llm_units = self._decompose_llm(answer, claims, run, budget)
+        except Exception as exc:
+            print("⚠️ 证据解析 LLM 分解失败，改用规则分解: %s" % str(exc)[:120])
+            llm_units = []
+        units = llm_units or self._decompose_rule(answer, claims)
         method = "llm" if units and units[0].get("method") == "llm" else "lexical"
         links = []
         for unit in units:
             candidates = self._recall(unit["text"], pool)
-            judgements = self._judge_llm(unit["text"], candidates, run, budget) if candidates else {}
+            judgements = {}
+            if candidates:
+                try:
+                    judgements = self._judge_llm(unit["text"], candidates, run, budget)
+                except Exception as exc:
+                    print("⚠️ 证据解析 LLM 判定失败，改用词汇重叠: %s" % str(exc)[:100])
+                    judgements = {}
             if not candidates:
                 continue
             for index, candidate in enumerate(candidates, start=1):

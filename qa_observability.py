@@ -127,6 +127,17 @@ class QaMetricsService:
 
 
 def provider_allowed_hosts() -> set[str]:
+    """出站白名单：管理员在 .env / chat_config.json 里配置的模型端点都算可信。
+
+    为什么要把这些环境变量也算进来：私网地址（如 B 机的 http://192.168.0.64:8106/v1）
+    只在"显式白名单"里才被 validate_outbound_url 放行。此前白名单只取 chat_api.MODEL_META
+    与 QA_ALLOWED_PROVIDER_HOSTS，于是**管理员自己配在 .env 里的 QA_LLM_BASE_URL_* /
+    INTEL_LLM_BASE_URL 反而被拦**，实测 B 机因此每次 level1_draft 都降级
+    （INTERNAL_ERROR「服务地址解析到本机、内网或保留地址，已阻止访问」），
+    等于这台机器上的 AI 回答从来没有真正调用过模型。
+    白名单的本意是防"用户可控 URL 造成的 SSRF"，管理员配置的端点是同一类可信来源，
+    所以这里按前缀把这些配置项的 host 一并纳入。
+    """
     result = set()
     try:
         from chat_api import MODEL_META
@@ -137,6 +148,23 @@ def provider_allowed_hosts() -> set[str]:
                 result.add(host.casefold())
     except Exception:
         pass
+
+    def _add(raw: str) -> None:
+        try:
+            host = urlsplit(str(raw or "").strip()).hostname
+        except Exception:
+            host = ""
+        if host:
+            result.add(host.casefold())
+
+    # 管理员在 .env 里配置的模型/知识库端点：单值项 + 按前缀的多值项（QA_LLM_BASE_URL_*）
+    for key in ("INTEL_LLM_BASE_URL", "INTEL_EMBEDDING_BASE_URL", "RAGFLOW_BASE_URL",
+                "QA_RAGFLOW_BASE_URL", "QA_LLM_BASE_URL"):
+        _add(os.getenv(key, ""))
+    for key, value in os.environ.items():
+        if key.startswith("QA_LLM_BASE_URL_") or key.startswith("QA_EMBEDDING_BASE_URL_"):
+            _add(value)
+
     result.update(item.strip().casefold() for item in os.getenv("QA_ALLOWED_PROVIDER_HOSTS", "").split(",") if item.strip())
     return result
 
