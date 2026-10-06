@@ -70,6 +70,16 @@ class QaRagflowResearchClient:
         self.kb_id = str(kb_id or "")
         cap = _int_env("QA_RAG_ENHANCEMENT_REQUEST_TIMEOUT_SECONDS", 25, 5, 90)
         self.timeout_seconds = max(5, min(cap, int(timeout_seconds or 90)))
+        # 研究调用是"思考型"长生成，不能复用通用上限：实测生产量级的证据提示（3138 字符）
+        # 单次调用就要 12.8 秒，而研究调用原先默认 min(timeout_seconds, 15)=15 秒，
+        # 证据再多一点就超时 → level2_research 报 INTERNAL_ERROR 并整条答案降级。
+        # 这里单独取策略里的 research_timeout_seconds（默认 90 秒）。
+        self.research_timeout_seconds = _int_env(
+            "QA_RAG_ENHANCEMENT_RESEARCH_TIMEOUT_SECONDS",
+            int(timeout_seconds or 90),
+            6,
+            300,
+        )
         self.retries = max(0, min(3, int(retries or 0)))
         self.session = session or requests.Session()
         self.proxies = proxies
@@ -280,7 +290,7 @@ class QaRagflowResearchClient:
             path = "/v1/unified_qa/research"
         response, request_id = self._request(
             "POST", path, json=body,
-            timeout=_int_env("QA_RAG_ENHANCEMENT_RESEARCH_TIMEOUT_SECONDS", min(self.timeout_seconds, 15), 6, 300),
+            timeout=self.research_timeout_seconds,
             stream=bool(stream), max_retries=0,
         )
         if stream:
