@@ -18,6 +18,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class FinancialPrimaryIndustryGateTest(unittest.TestCase):
     def setUp(self):
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # SQLiteDatabase(path) 只改路径不改后端，本文件的快照/文章会真的写进
+        # 共享主库；这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         root = Path(self.temp_dir.name)
         packs = root / "packs"
@@ -110,6 +119,10 @@ class FinancialPrimaryIndustryGateTest(unittest.TestCase):
     def test_non_family_financial_cards_require_primary_industry_keyword(self):
         with patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True), patch.object(
             config, "TRADING_AGENTS_ENABLED", False
+        ), patch.object(
+            # 生产 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），会先于
+            # 行业包闸门把 feed 关掉；本文件验证的是"主行业包关键词闸门"。
+            config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"
         ):
             payload = FinancialFeedService(
                 self.database,
@@ -167,6 +180,8 @@ class FinancialPrimaryIndustryGateTest(unittest.TestCase):
 
         with patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True), patch.object(
             config, "TRADING_AGENTS_ENABLED", False
+        ), patch.object(
+            config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"
         ):
             payload = FinancialFeedService(
                 self.database,

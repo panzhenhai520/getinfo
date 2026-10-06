@@ -40,6 +40,20 @@ def _settings(financial: bool, agents: bool, simulation: bool) -> dict:
 
 
 class FinancialFeatureGateTests(unittest.TestCase):
+    def setUp(self):
+        # 生产 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），会把所有
+        # 金融能力整体关掉，与本文件验证的"开关组合投影"无关；显式放到最高级。
+        for item in (
+            patch.object(config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"),
+            # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是
+            # postgres），SQLiteDatabase(path) 只改路径不改后端，作业行会真的
+            # 写进共享主库；这里强制回到临时 SQLite。
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
+
     def test_all_switch_combinations_and_shared_financial_addon_contract(self):
         for financial, agents, simulation in itertools.product((False, True), repeat=3):
             with self.subTest(financial=financial, agents=agents, simulation=simulation):
@@ -62,7 +76,10 @@ class FinancialFeatureGateTests(unittest.TestCase):
                         "show_financial_news": True,
                         "show_market_index_cards": True,
                         "show_watched_stock_cards": True,
-                        "show_spatiotemporal_map": True,
+                        # 时空地图首页已下线：任何行业包都不再有地图首页
+                        # （financial_config.financial_product_capabilities 里
+                        # 固定为 False，见 2026-10 首页调整）。
+                        "show_spatiotemporal_map": False,
                     },
                 )
 
@@ -84,7 +101,7 @@ class FinancialFeatureGateTests(unittest.TestCase):
                 "show_financial_news": True,
                 "show_market_index_cards": False,
                 "show_watched_stock_cards": False,
-                "show_spatiotemporal_map": True,
+                "show_spatiotemporal_map": False,
             },
         )
 

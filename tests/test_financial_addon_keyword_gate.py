@@ -18,6 +18,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 class FinancialAddonKeywordGateTest(unittest.TestCase):
     def setUp(self):
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # SQLiteDatabase(path) 只改路径不改后端，本文件的文章/匹配行会真的写进
+        # 共享主库；这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(
             str(Path(self.temp_dir.name) / "financial-addon.sqlite3")
@@ -91,6 +100,11 @@ class FinancialAddonKeywordGateTest(unittest.TestCase):
     def _build(self, pack_id):
         with patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True), patch.object(
             config, "TRADING_AGENTS_ENABLED", False
+        ), patch.object(
+            # 生产 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），会把
+            # 整个 feed 关掉；本文件验证的是"行业包关键词闸门"，因此显式放到
+            # 最高级，只留下包/关键词这一层判定。
+            config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"
         ):
             return FinancialFeedService(
                 self.database,

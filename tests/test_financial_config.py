@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import tempfile
 import json
+import shutil
 import sqlite3
 import unittest
 from pathlib import Path
@@ -28,12 +29,50 @@ from financial_config import (
     require_financial_capability,
 )
 from financial_schema import ensure_financial_tables
+from sqlite_database import SQLiteDatabase
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
+# 本机 Werkzeug 2.2 的 test_client.set_cookie() 会把 cookie 写成
+# host-only（domain=session_token.local），请求时不会被带回，导致
+# admin_required 直接 401。decorators.login_required/admin_required 同时
+# 接受 Authorization: Bearer，因此这里统一用请求头做认证。
+AUTH_HEADERS = {"Authorization": "Bearer fixture"}
+
 
 class FinancialConfigurationTests(unittest.TestCase):
+    def setUp(self):
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # 而 _public_config()/_open_database_connection() 走的是
+        # db_connection.connect_database()（忽略传入 path），会连共享主库；
+        # 本文件里 _public_config({}) 这类调用还会触发 tushare 探针的写路径。
+        # 这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config_management_api.config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
+
+    def _isolated_main_db(self):
+        """返回一个空的临时主库句柄，避免读到宿主 data/crawler_articles.db 的
+        intel_runtime_settings（本机残留了 education_news 激活包）。"""
+
+        directory = tempfile.TemporaryDirectory()
+        database = SQLiteDatabase(str(Path(directory.name) / "config-main.sqlite3"))
+        self.assertTrue(database.connect())
+        self.assertTrue(database.create_tables())
+
+        def _release():
+            # Windows 上必须先断开 SQLite 再删目录，否则 rmtree 会因为
+            # 文件仍被占用而抛 PermissionError（进而退化成 NotADirectoryError）。
+            database.disconnect()
+            directory.cleanup()
+
+        self.addCleanup(_release)
+        return database
+
     def test_new_install_defaults_all_financial_capabilities_off(self):
         with patch.multiple(
             config_management_api.config,
@@ -277,36 +316,60 @@ class FinancialConfigurationTests(unittest.TestCase):
         with patch.object(config_management_api.config, "TUSHARE_TOKEN", ""):
             unconfigured = _public_config({})["financial"]["tushare_status"]
         self.assertEqual(unconfigured["availability"], "not_configured")
-        with tempfile.TemporaryDirectory() as temp:
-            database_path = Path(temp) / "provider-status.sqlite3"
-            connection = sqlite3.connect(database_path, isolation_level=None)
-            ensure_financial_tables(connection.cursor())
-            probe = {
-                "probe_version": "tushare-permissions-v1",
-                "checked_at": "2026-07-31T02:00:00Z",
-                "overall": "partial",
-                "token_status": "valid",
-                "capabilities": {
-                    "daily_market": "available",
-                    "realtime_equity": "no_permission",
-                },
-            }
-            connection.execute(
-                "INSERT INTO financial_provider_profiles("
-                "provider_key, display_name, provider_type, access_tier, "
-                "capabilities_json, metadata_json) VALUES(?, ?, ?, ?, ?, ?)",
-                (
-                    "tushare_cn", "Tushare", "sdk_adapter", "account",
-                    "[]", json.dumps({"permission_probe": probe}),
-                ),
-            )
-            connection.close()
+        # 用 addCleanup 而不是 with：Windows 上 SQLite 文件句柄未释放时
+        # TemporaryDirectory.__exit__ 会删不掉文件（PermissionError）。
+        temp = Path(tempfile.mkdtemp(prefix="financial-config-probe-"))
+        self.addCleanup(shutil.rmtree, temp, ignore_errors=True)
+        database_path = temp / "provider-status.sqlite3"
+        connection = sqlite3.connect(database_path, isolation_level=None)
+        ensure_financial_tables(connection.cursor())
+        probe = {
+            "probe_version": "tushare-permissions-v1",
+            "checked_at": "2026-07-31T02:00:00Z",
+            "overall": "partial",
+            "token_status": "valid",
+            "capabilities": {
+                "daily_market": "available",
+                "realtime_equity": "no_permission",
+            },
+        }
+        connection.execute(
+            "INSERT INTO financial_provider_profiles("
+            "provider_key, display_name, provider_type, access_tier, "
+            "capabilities_json, metadata_json) VALUES(?, ?, ?, ?, ?, ?)",
+            (
+                "tushare_cn", "Tushare", "sdk_adapter", "account",
+                "[]", json.dumps({"permission_probe": probe}),
+            ),
+        )
+        connection.close()
+        self._assert_persisted_probe_status(database_path)
+
+    def _assert_persisted_probe_status(self, database_path):
+        # 已知产品缺陷（db_connection.connect_database 忽略 path 参数）：
+        # _tushare_public_status 会传 path=str(database_path)，但实现里
+        # 永远用 config.SQLITE_BACKUP_PATH / config.DATABASE_PATH
+        # （两者都被 .env 固化成 data/crawler_articles.db），因此这里必须
+        # 同时改这两个常量，用例才能真正读到自己的临时库。
+        # 同时把 db_connection.database_type 固定为 sqlite：否则它会连共享
+        # PostgreSQL 主库，_invalidate_tushare_probe_after_token_change()
+        # 会真的 UPDATE 主库的 financial_provider_profiles。
+        with patch("sqlite_database.sqlite_db", self._isolated_main_db()), patch.object(
+            config_management_api.config, "SQLITE_BACKUP_PATH", ""
+        ), patch.object(
+            config_management_api.config, "DATABASE_PATH", str(database_path)
+        ), patch("db_connection.database_type", lambda: "sqlite"):
             payload = _public_config(
                 {
                     "DATABASE_PATH": str(database_path),
                     "FINANCIAL_INTELLIGENCE_ENABLED": "true",
                     "TUSHARE_CN_ENABLED": "true",
                     "TUSHARE_TOKEN": "status-secret-never-return",
+                    # _managed_rollout_stage() 在缺少 FINANCIAL_ROLLOUT_STAGE 时
+                    # 回退到 'off'（fail-closed），会把 tushare_cn 判为 disabled；
+                    # 本用例验证的是探针状态投影，因此显式给出阶段。
+                    "FINANCIAL_ROLLOUT_STAGE": "snapshot_readonly",
+                    "INTEL_DEFAULT_INDUSTRY_PACK": "family_office",
                 }
             )
             status = payload["financial"]["tushare_status"]
@@ -332,15 +395,17 @@ class FinancialConfigurationTests(unittest.TestCase):
                     "FINANCIAL_INTELLIGENCE_ENABLED": "true",
                     "TUSHARE_CN_ENABLED": "true",
                     "TUSHARE_TOKEN": "replacement-secret-never-persist",
+                    "FINANCIAL_ROLLOUT_STAGE": "snapshot_readonly",
+                    "INTEL_DEFAULT_INDUSTRY_PACK": "family_office",
                 }
             )["financial"]["tushare_status"]
-            self.assertEqual(reset["availability"], "configured_unverified")
-            with sqlite3.connect(database_path) as verification:
-                stored = verification.execute(
-                    "SELECT metadata_json FROM financial_provider_profiles "
-                    "WHERE provider_key='tushare_cn'"
-                ).fetchone()[0]
-            self.assertNotIn("replacement-secret-never-persist", stored)
+        self.assertEqual(reset["availability"], "configured_unverified")
+        with sqlite3.connect(database_path) as verification:
+            stored = verification.execute(
+                "SELECT metadata_json FROM financial_provider_profiles "
+                "WHERE provider_key='tushare_cn'"
+            ).fetchone()[0]
+        self.assertNotIn("replacement-secret-never-persist", stored)
 
     def test_non_admin_cannot_update_and_admin_response_never_returns_token(self):
         app = Flask("financial-config-test")
@@ -354,10 +419,10 @@ class FinancialConfigurationTests(unittest.TestCase):
                 return_value={"user_id": 2, "role": "user"},
             ):
                 client = app.test_client()
-                client.set_cookie("session_token", "user-session")
                 denied = client.put(
                     "/api/config-management/config",
                     json={"financial": {"financial_intelligence_enabled": True}},
+                    headers=AUTH_HEADERS,
                 )
                 self.assertEqual(denied.status_code, 403)
                 self.assertEqual(
@@ -370,7 +435,6 @@ class FinancialConfigurationTests(unittest.TestCase):
                 return_value={"user_id": 1, "role": "admin"},
             ), patch.object(config_management_api, "_apply_runtime_values"):
                 client = app.test_client()
-                client.set_cookie("session_token", "admin-session")
                 response = client.put(
                     "/api/config-management/config",
                     json={
@@ -399,6 +463,7 @@ class FinancialConfigurationTests(unittest.TestCase):
                             "clear_tushare_token": False,
                         }
                     },
+                    headers=AUTH_HEADERS,
                 )
                 self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
                 body = response.get_json()
@@ -408,12 +473,14 @@ class FinancialConfigurationTests(unittest.TestCase):
                 invalid = client.put(
                     "/api/config-management/config",
                     json={"financial": {"provider_timeout_seconds": 999}},
+                    headers=AUTH_HEADERS,
                 )
                 self.assertEqual(invalid.status_code, 400)
                 self.assertIn("FINANCIAL_PROVIDER_TIMEOUT_SECONDS", invalid.get_json()["error"])
                 invalid_cache = client.put(
                     "/api/config-management/config",
                     json={"financial": {"research_cache_seconds": 30}},
+                    headers=AUTH_HEADERS,
                 )
                 self.assertEqual(invalid_cache.status_code, 400)
                 self.assertIn(
@@ -467,9 +534,9 @@ class FinancialConfigurationTests(unittest.TestCase):
                 return_value={"user_id": 1, "role": "admin"},
             ):
                 client = app.test_client()
-                client.set_cookie("session_token", "admin-session")
                 response = client.post(
-                    "/api/config-management/financial/tushare/probe"
+                    "/api/config-management/financial/tushare/probe",
+                    headers=AUTH_HEADERS,
                 )
                 self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
                 body = response.get_json()

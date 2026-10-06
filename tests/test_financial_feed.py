@@ -33,6 +33,23 @@ UTC = timezone.utc
 
 class FinancialFeedTests(unittest.TestCase):
     def setUp(self):
+        # 本机 .env 为生产默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），
+        # 而本用例验证的是"开关打开后 feed 的行为"，因此需要把灰度阶段放到
+        # 最高级；否则金融能力会被灰度闸门关闭，与开关无关。
+        self._rollout_stage = patch.object(
+            config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"
+        )
+        self._rollout_stage.start()
+        self.addCleanup(self._rollout_stage.stop)
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # 而 SQLiteDatabase(path) 只改路径不改后端：不强制切 sqlite，本文件
+        # seed 的 snapshots/reports 会真的写进共享主库。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.original_flags = {
             key: getattr(config, key)
             for key in (
@@ -45,6 +62,7 @@ class FinancialFeedTests(unittest.TestCase):
         config.TRADING_AGENTS_ENABLED = True
         config.TRADING_SIMULATION_ENABLED = False
         self.temp_dir = tempfile.TemporaryDirectory()
+        self._clients = []
         self.db = SQLiteDatabase(os.path.join(self.temp_dir.name, "feed.sqlite3"))
         self.assertTrue(self.db.connect())
         self.assertTrue(self.db.create_tables())
@@ -53,6 +71,7 @@ class FinancialFeedTests(unittest.TestCase):
         self._seed()
 
     def tearDown(self):
+        self._clients = []
         self.db.disconnect()
         self.temp_dir.cleanup()
         for key, value in self.original_flags.items():
@@ -246,7 +265,14 @@ class FinancialFeedTests(unittest.TestCase):
         app = Flask(__name__)
         app.config.update(TESTING=True)
         app.register_blueprint(intel_bp)
-        return app.test_client()
+        # Flask 的 Response.json_module 里保存的是 Flask app 的 weakref，
+        # 而 test_client 的 application 是唯一强引用。若 client 只存在于
+        # 本栈帧，请求返回后 app 即被回收，随后 response.get_json() 会抛
+        # ReferenceError: weakly-referenced object no longer exists。
+        # 因此在测试实例上保留 client 强引用，直到 tearDown。
+        client = app.test_client()
+        self._clients.append(client)
+        return client
 
     def _get(self, query=None):
         return self._get_as(1, query=query)
@@ -571,6 +597,10 @@ class FinancialFeedTests(unittest.TestCase):
                     "item_id": "overview:nasdaq",
                     "title": "纳斯达克综合指数",
                     "summary": "暂无合格指数快照。",
+                    # 翻译端点同样受行业包闸门约束；不带 industry_pack_id 时会
+                    # 落回全局激活包（测试库里是 education_news），被
+                    # financial_products_hidden_for_primary_pack 拒绝。
+                    "industry_pack_id": "family_office",
                 },
                 headers={"Authorization": "Bearer fixture"},
             )

@@ -12,6 +12,7 @@ from unittest.mock import patch
 from flask import Flask
 
 import chat_api
+import config
 from chat_route_orchestrator import ChatFinancialRouteStore, ChatRouteOrchestrator
 from financial_full_research import (
     FinancialFullResearchRouter,
@@ -31,6 +32,7 @@ from sqlite_database import SQLiteDatabase
 
 UTC = timezone.utc
 NOW = datetime(2026, 7, 31, 2, 0, tzinfo=UTC)
+AUTH_HEADERS = {"Authorization": "Bearer fixture"}
 RUNTIME = {
     "provider_id": "local",
     "type": "openai",
@@ -71,6 +73,15 @@ def _decode(block):
 
 class FinancialFullResearchTest(unittest.TestCase):
     def setUp(self):
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # SQLiteDatabase(path) 只改路径不改后端，本文件的研究作业会真的写进
+        # 共享主库 intel_jobs；这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(
             str(Path(self.temp_dir.name) / "financial-full-research.sqlite3")
@@ -257,11 +268,20 @@ class FinancialFullResearchTest(unittest.TestCase):
             chat_api, "_load_config"
         ) as config_loader, patch.object(chat_api, "_web_search") as web, patch.object(
             chat_api, "_stream_openai"
-        ) as model:
+        ) as model, patch.object(
+            # 统一 QA 网关若可用会接管 /api/chat/send（其 SSE 由后台 run 驱动，
+            # 在本进程内不会结束），本用例验证的是旧链路，显式关闭。
+            chat_api, "_unified_qa_available", return_value=False
+        ), patch(
+            # /api/chat/send 走 @login_required，提供管理员会话。
+            "user_database.user_db.verify_session",
+            return_value={"user_id": 1, "role": "admin"},
+        ):
             response = app.test_client().post(
                 "/api/chat/send",
                 json=payload,
                 buffered=True,
+                headers=AUTH_HEADERS,
             )
 
         events = [_decode(item) for item in response.response]
@@ -438,11 +458,17 @@ class FinancialFullResearchTest(unittest.TestCase):
             chat_api, "_load_config"
         ) as config_loader, patch.object(chat_api, "_web_search") as web, patch.object(
             chat_api, "_stream_openai"
-        ) as model:
+        ) as model, patch.object(
+            chat_api, "_unified_qa_available", return_value=False
+        ), patch(
+            "user_database.user_db.verify_session",
+            return_value={"user_id": 1, "role": "admin"},
+        ):
             response = app.test_client().post(
                 "/api/chat/send",
                 json=_payload("分析腾讯的基本面和风险", "failed-sse"),
                 buffered=True,
+                headers=AUTH_HEADERS,
             )
         events = [_decode(item) for item in response.response]
         self.assertEqual([item["type"] for item in events], ["status", "chunk", "done"])

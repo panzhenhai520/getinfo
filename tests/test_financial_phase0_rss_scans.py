@@ -7,12 +7,14 @@ import json
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 _BOOTSTRAP_TEMP_DIR = tempfile.TemporaryDirectory()
 os.environ["DATABASE_PATH"] = os.path.join(_BOOTSTRAP_TEMP_DIR.name, "bootstrap.sqlite3")
 os.environ["INTEL_LLM_ENABLED"] = "false"
 
-from intel_candidates import IntelCandidateRepository
+import config  # noqa: E402
+from intel_candidates import IntelCandidateRepository  # noqa: E402
 from intel_http import ExternalFetchError
 from intel_light_scanner import IntelLightScanner, RSSScanner
 from intel_sources import IntelSourceRegistry
@@ -49,6 +51,24 @@ class _StaticHTTP:
 
 class FinancialRSSScanTests(unittest.TestCase):
     def setUp(self):
+        # 金融 RSS 源在扫描前会被两道"与 RSS 解析无关"的闸门过滤：
+        #   1) IntelLightScanner._enabled_sources() 对 financial_markets 的 RSS 源
+        #      检查灰度能力 rollout_capability_enabled("rss", config)，而本机 .env
+        #      是 FINANCIAL_ROLLOUT_STAGE=off（fail-closed）；
+        #   2) scan() 末尾的 Tavily 搜索分支（TAVILY_ENABLED=True 且本地已配 Key）
+        #      会真的走外网并额外写入 intel_scan_runs，污染本文的审计断言。
+        # 两者都不属于本文件要验证的"RSS 扫描审计/健康度"行为，显式关掉。
+        #   3) conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是
+        #      postgres），SQLiteDatabase(path) 只改路径不改后端，会把本用例的
+        #       信源/扫描行写进共享主库。这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"),
+            patch.object(config, "TAVILY_ENABLED", False),
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db = SQLiteDatabase(os.path.join(self.temp_dir.name, "financial-scan.sqlite3"))
         self.assertTrue(self.db.connect())

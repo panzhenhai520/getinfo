@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
+import config
 from candidate_dispatcher import IntelCandidateDispatcher
 from industry_packs import IndustryPackLoader
 from intel_candidates import IntelCandidateRepository
@@ -63,6 +64,33 @@ class _OneArticleAdapter:
 
 class FinancialSharedSourceTest(unittest.TestCase):
     def setUp(self):
+        # IntelLightScanner._enabled_sources() 对 origin_pack_id=financial_markets
+        # 的 RSS 源会额外检查灰度能力 rollout_capability_enabled("rss", config)。
+        # 本机 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），共享金融
+        # RSS 源会被整体过滤掉，与本文件验证的"共享源/去重"行为无关，
+        # 因此把灰度阶段显式放到已包含 rss 的档位。
+        self._rollout_stage = patch.object(
+            config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"
+        )
+        self._rollout_stage.start()
+        self.addCleanup(self._rollout_stage.stop)
+        # 本机 .env 打开了 TAVILY_ENABLED 且配好了 API Key，scan() 的
+        # "Tavily 搜索发现"分支（intel_light_scanner.py:945）会在 RSS 分支之后
+        # 再额外创建扫描行并真的发起外网调用——这既不是本文件要验证的
+        # "共享信源/RSS 去重"，也会把 intel_scan_runs 计数打乱、并对测试产生
+        # 不可控的外部依赖。这里显式关掉该搜索分支。
+        self._tavily_flag = patch.object(config, "TAVILY_ENABLED", False)
+        self._tavily_flag.start()
+        self.addCleanup(self._tavily_flag.stop)
+        # conftest 的 DATABASE_TYPE=sqlite 被 .env 覆盖（config 里仍是 postgres），
+        # SQLiteDatabase(path) 只改路径不改后端。本用例的并发扫描会真的写
+        # intel_scan_runs/intel_candidates，必须落在临时库上。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(
             str(Path(self.temp_dir.name) / "financial-shared-source.sqlite3")

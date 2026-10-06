@@ -6,13 +6,14 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 _BOOTSTRAP_TEMP_DIR = tempfile.TemporaryDirectory()
 os.environ["DATABASE_PATH"] = os.path.join(_BOOTSTRAP_TEMP_DIR.name, "bootstrap.sqlite3")
 os.environ["INTEL_LLM_ENABLED"] = "false"
 os.environ["CRAWL_REQUIRE_KEYWORD_MATCH"] = "false"
 
-import config
+import config  # noqa: E402
 from candidate_crawler_adapter import CandidateCrawlerAdapter
 from candidate_dispatcher import IntelCandidateDispatcher
 from intel_candidates import IntelCandidateRepository
@@ -36,7 +37,15 @@ class _Extractor:
             "content": (
                 "The Securities and Futures Commission announced a capital market "
                 "regulatory framework for securities market trading. "
-            ) * 20,
+            )
+            * 20
+            # 正文质量闸门（intel_content_quality_gate._content_sanity）要求
+            # ≥800 字的内容至少有 2 个真实段落/实质行，单块长文本会被判
+            # no_real_paragraphs。这里给出真实的空行分段正文。
+            + "\n\nThe framework covers disclosure duties, market conduct and "
+            "supervisory reporting for licensed intermediaries.\n\n"
+            "It takes effect after a consultation period and applies to all "
+            "regulated securities market participants in Hong Kong.",
             "publish_date": "2026-07-31",
             "site_name": "SFC",
             "extraction_method": "fixture",
@@ -52,6 +61,17 @@ class FinancialRSSPipelineTests(unittest.TestCase):
         # Full-suite module import order may load the production .env before
         # this test module.  Keep the fixture deterministic and offline.
         config.INTEL_LLM_ENABLED = False
+        # conftest 把 DATABASE_TYPE/DATABASE_PATH 指向临时 SQLite，但 config 在
+        # 导入时就固化了 .env 的 DATABASE_TYPE=postgres，于是 SQLiteDatabase
+        # 把 backend 判成 postgres，db_connection.connect_database() 也一律走
+        # 共享主库。本用例的候选入库/派发必须落在这台临时库上，否则共享主库
+        # 里堆积的候选会抢走认领额度（实测 claim → 0，派发 → 0）。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "financial-pipeline.sqlite3")
         self.db = SQLiteDatabase(self.db_path)

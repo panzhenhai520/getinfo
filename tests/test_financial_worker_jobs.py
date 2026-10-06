@@ -3,7 +3,9 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import config
 from financial_worker_jobs import (
     FINANCIAL_JOB_TYPES,
     FinancialJobDispatcher,
@@ -18,6 +20,11 @@ ENABLED_SETTINGS = {
     "TRADING_AGENTS_ENABLED": True,
     "FINANCIAL_AUTO_RESEARCH_ENABLED": True,
     "TRADING_SIMULATION_ENABLED": True,
+    # 生产 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），会先于这些
+    # 开关把任务判成 rollout_stage_*_not_reached。本文件验证的是"开关打开后
+    # 作业队列（优先级/租约/重试/心跳/取消）的既有行为"，因此把灰度阶段显式
+    # 放到最高级。
+    "FINANCIAL_ROLLOUT_STAGE": "simulation_backtest",
 }
 
 
@@ -28,6 +35,24 @@ class _RetryableFixtureError(RuntimeError):
 
 class FinancialWorkerJobTest(unittest.TestCase):
     def setUp(self):
+        # IntelWorker.__init__ 在 config.FINANCIAL_INTELLIGENCE_ENABLED /
+        # TRADING_AGENTS_ENABLED 都为假时会直接丢弃显式传入的
+        # financial_dispatcher（生产上的启动优化），本机 .env 默认就是全关，
+        # 于是 5 个金融 handler 全都注册不上。这里只把"是否初始化金融模块"
+        # 打开；真正的开关判定仍由各用例传给 dispatcher 的 settings 决定。
+        self._worker_flags = [
+            patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True),
+            patch.object(config, "TRADING_AGENTS_ENABLED", True),
+            patch.object(config, "TRADING_SIMULATION_ENABLED", True),
+            # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是
+            # postgres），SQLiteDatabase(path) 只改路径不改后端，作业行会真的
+            # 写进共享主库 intel_jobs。
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ]
+        for item in self._worker_flags:
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(
             str(Path(self.temp_dir.name) / "financial-worker.sqlite3")

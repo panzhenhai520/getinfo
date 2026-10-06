@@ -15,6 +15,15 @@ from sqlite_database import SQLiteDatabase
 
 class FinancialSimulationGateTest(unittest.TestCase):
     def setUp(self):
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # 而 SQLiteDatabase(path) 只改路径不改后端：不强制切 sqlite，本文件入队的
+        # 作业会真的写进共享主库 intel_jobs。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(str(Path(self.temp_dir.name) / "simulation-gate.sqlite3"))
         self.assertTrue(self.database.connect())
@@ -38,6 +47,10 @@ class FinancialSimulationGateTest(unittest.TestCase):
             ),
             patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", financial),
             patch.object(config, "TRADING_SIMULATION_ENABLED", simulation),
+            # 生产 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），
+            # 本用例只验证开关与行业包闸门，因此把灰度阶段放到最高级，
+            # 避免灰度闸门提前短路成 rollout_stage_*_not_reached。
+            patch.object(config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"),
         ):
             yield self.app.test_client()
 

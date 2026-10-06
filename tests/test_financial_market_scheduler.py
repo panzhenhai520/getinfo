@@ -5,7 +5,9 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
+import config
 from financial_market_scheduler import (
     DEFAULT_PULSE_UNIVERSE,
     FIXED_HOME_INDEX_SCOPES,
@@ -158,6 +160,22 @@ class _RetryableFixtureRouter:
 
 class FinancialMarketSchedulerTest(unittest.TestCase):
     def setUp(self):
+        # IntelWorker.__init__ 在 config 的金融开关全关时会直接丢弃显式传入的
+        # financial_dispatcher（生产启动优化）；本机 .env 默认就是全关，
+        # 于是 worker 里没有任何金融 handler，作业全部停在排队状态。
+        # 这里只打开"是否初始化金融模块"，具体开关仍由各用例的 settings 决定。
+        for item in (
+            patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True),
+            patch.object(config, "TRADING_AGENTS_ENABLED", True),
+            patch.object(config, "TRADING_SIMULATION_ENABLED", True),
+            # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是
+            # postgres），SQLiteDatabase(path) 只改路径不改后端，本文件的
+            # 快照/报告会真的写进共享主库。
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(
             str(Path(self.temp_dir.name) / "financial-market-scheduler.sqlite3")

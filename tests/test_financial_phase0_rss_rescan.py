@@ -56,7 +56,13 @@ class _Extractor:
                 f"The Securities and Futures Commission announced {slug} as a capital market "
                 "regulatory framework for securities market trading and disclosure. "
             )
-            * 24,
+            * 24
+            # 正文质量闸门（intel_content_quality_gate._content_sanity）要求
+            # ≥800 字的内容至少有 2 个真实段落/实质行，单块长文本会被判
+            # no_real_paragraphs 并进 retry_wait。这里补上真实分段。
+            + "\n\nThe framework covers disclosure duties, market conduct and "
+            "supervisory reporting for licensed intermediaries.\n\n"
+            "It applies to all regulated securities market participants.",
             "publish_date": "2026-07-31",
             "site_name": "Official SFC",
             "extraction_method": "fixture",
@@ -70,6 +76,22 @@ class FinancialRSSRescanTests(unittest.TestCase):
         self.original_llm_enabled = config.INTEL_LLM_ENABLED
         config.CRAWL_REQUIRE_KEYWORD_MATCH = False
         config.INTEL_LLM_ENABLED = False
+        # 金融 RSS 源会被 rollout_capability_enabled("rss", config) 过滤，
+        # 而本机 .env 是 FINANCIAL_ROLLOUT_STAGE=off（fail-closed）；
+        # 扫描末尾的 Tavily 搜索分支（本地已配 Key）会额外走外网并写入
+        # intel_scan_runs，污染本文的重扫断言。两者都与本文件验证的
+        # "重复条目幂等/新条目只流转一次"无关，显式关掉。
+        for item in (
+            patch.object(config, "FINANCIAL_ROLLOUT_STAGE", "simulation_backtest"),
+            patch.object(config, "TAVILY_ENABLED", False),
+            # conftest 的 DATABASE_TYPE=sqlite 被 .env 覆盖，config 里仍是
+            # postgres；这里让 SQLiteDatabase/db_connection 真正落在临时库，
+            # 避免读写共享主库。
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = os.path.join(self.temp_dir.name, "financial-rescan.sqlite3")
         self.db = SQLiteDatabase(self.db_path)

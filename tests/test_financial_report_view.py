@@ -46,9 +46,23 @@ class FinancialReportViewTests(unittest.TestCase):
         self.original_flags = (
             config.FINANCIAL_INTELLIGENCE_ENABLED,
             config.TRADING_AGENTS_ENABLED,
+            config.FINANCIAL_ROLLOUT_STAGE,
         )
         config.FINANCIAL_INTELLIGENCE_ENABLED = True
         config.TRADING_AGENTS_ENABLED = True
+        # 生产 .env 默认 FINANCIAL_ROLLOUT_STAGE=off（fail-closed），会让报告
+        # 接口因灰度闸门 404（rollout_stage_stock_research_not_reached），
+        # 与本用例验证的开关语义无关，因此显式放到最高级。
+        config.FINANCIAL_ROLLOUT_STAGE = "simulation_backtest"
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # SQLiteDatabase(path) 只改路径不改后端，本文件 seed 的报告会真的写进
+        # 共享主库；这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(str(Path(self.temp_dir.name) / "report-view.sqlite3"))
         self.assertTrue(self.database.connect())
@@ -65,6 +79,7 @@ class FinancialReportViewTests(unittest.TestCase):
         (
             config.FINANCIAL_INTELLIGENCE_ENABLED,
             config.TRADING_AGENTS_ENABLED,
+            config.FINANCIAL_ROLLOUT_STAGE,
         ) = self.original_flags
 
     def _seed_report(self, *, version=1, status="verified", run_id="stock-run") -> int:

@@ -13,6 +13,7 @@ from unittest.mock import patch
 from flask import Flask
 
 import chat_api
+import config
 from chat_route_orchestrator import ChatFinancialRouteStore, ChatRouteOrchestrator
 from financial_chat_market_scope import FinancialMarketScopeRouter
 from financial_instruments import InstrumentRegistry
@@ -25,6 +26,7 @@ from sqlite_database import SQLiteDatabase
 
 UTC = timezone.utc
 FROZEN_NOW = datetime(2026, 7, 31, 2, 0, tzinfo=UTC)
+AUTH_HEADERS = {"Authorization": "Bearer fixture"}
 SETTINGS = {
     "INTEL_DEFAULT_INDUSTRY_PACK": "family_office",
     "FINANCIAL_INTELLIGENCE_ENABLED": True,
@@ -56,6 +58,15 @@ def _events(response) -> list[dict]:
 
 class FinancialStage3EndToEndTests(unittest.TestCase):
     def setUp(self):
+        # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+        # SQLiteDatabase(path) 只改路径不改后端，本文件的路由表/作业会真的写进
+        # 共享主库；这里强制回到临时 SQLite。
+        for item in (
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = SQLiteDatabase(str(Path(self.temp_dir.name) / "stage3-e2e.sqlite3"))
         self.assertTrue(self.database.connect())
@@ -153,9 +164,23 @@ class FinancialStage3EndToEndTests(unittest.TestCase):
             chat_api, "_web_search"
         ) as web, patch.object(
             chat_api, "_save_chat_metric", return_value=None
+        ), patch.object(
+            # 本用例验证的是 send_chat_message 的旧链路（legacy SSE + 歧义暂停）。
+            # 统一 QA 网关一旦可用就会接管 /api/chat/send，其 SSE 由后台 run
+            # 驱动，在本进程内会一直发 keep-alive（实测挂死），因此显式关闭。
+            chat_api, "_unified_qa_available", return_value=False
+        ), patch(
+            # /api/chat/send 走 @login_required；本用例只验证同一端点的路由
+            # 与 SSE 契约，因此提供一个管理员会话。
+            "user_database.user_db.verify_session",
+            return_value={"user_id": 1, "role": "admin"},
         ):
             ordinary = _events(
-                client.post("/api/chat/send", json=_payload("写一首诗", "http-ordinary"))
+                client.post(
+                    "/api/chat/send",
+                    json=_payload("写一首诗", "http-ordinary"),
+                    headers=AUTH_HEADERS,
+                )
             )
             self.assertEqual(
                 [item["type"] for item in ordinary],
@@ -165,7 +190,11 @@ class FinancialStage3EndToEndTests(unittest.TestCase):
             model.reset_mock()
             config_loader.reset_mock()
             ambiguous = _events(
-                client.post("/api/chat/send", json=_payload("000001 怎么样", "http-finance"))
+                client.post(
+                    "/api/chat/send",
+                    json=_payload("000001 怎么样", "http-finance"),
+                    headers=AUTH_HEADERS,
+                )
             )
         self.assertEqual([item["type"] for item in ambiguous], ["status", "chunk", "done"])
         self.assertIn("000001.SH", ambiguous[1]["content"])

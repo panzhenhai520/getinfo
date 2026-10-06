@@ -3,8 +3,18 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from tools.check_financial_stage5_gate import (
+import config
+
+# conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是 postgres），
+# 而 tools.check_financial_stage5_gate 里的 SQLiteDatabase(path) 只改路径不改
+# 后端，会把黄金用例的建表/回测/纸面账本真的写进共享主库；这里强制回到
+# 各用例自己声明的临时 SQLite 文件。必须在导入该工具模块之前改。
+config.DATABASE_TYPE = "sqlite"
+patch("db_connection.database_type", lambda: "sqlite").start()
+
+from tools.check_financial_stage5_gate import (  # noqa: E402
     FIXTURE,
     evaluate_stage5_fixture,
     load_golden_fixture,

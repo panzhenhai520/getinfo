@@ -4,7 +4,9 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import config
 import financial_schema
 from financial_recovery import (
     FINANCIAL_RECOVERY_VERSION,
@@ -35,6 +37,21 @@ ENABLED_SETTINGS = {
 
 class FinancialProductionRecoveryTest(unittest.TestCase):
     def setUp(self):
+        # IntelWorker.__init__ 在 config 的金融开关全关时会直接丢弃显式传入的
+        # financial_dispatcher（生产启动优化），本机 .env 默认如此，
+        # worker 侧就完全没有金融 handler。这里只打开"是否初始化金融模块"。
+        for item in (
+            patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True),
+            patch.object(config, "TRADING_AGENTS_ENABLED", True),
+            patch.object(config, "TRADING_SIMULATION_ENABLED", True),
+            # conftest 的 DATABASE_TYPE=sqlite 会被 .env 覆盖（config 里仍是
+            # postgres），SQLiteDatabase(path) 只改路径不改后端，本文件的作业
+            # 恢复用例会真的写进共享主库 intel_jobs。
+            patch.object(config, "DATABASE_TYPE", "sqlite"),
+            patch("db_connection.database_type", lambda: "sqlite"),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database_path = Path(self.temp_dir.name) / "recovery.sqlite3"
         self.database = SQLiteDatabase(str(self.database_path))
