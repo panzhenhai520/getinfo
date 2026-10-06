@@ -36,6 +36,11 @@ CASE
 END
 """.strip()
 
+# 分类作业的优先级（数值越大越先被领取：claim 是 ORDER BY priority + 等待时长积分 DESC）。
+# 维护类作业的优先级在 -45 ~ +5 之间，这里给 150 让分类稳定排在它们前面。
+# 为什么不干脆用无穷大：aging 积分仍会让"等得极久"的作业最终插回来，避免饿死其它类型。
+_CLASSIFICATION_JOB_PRIORITY = 150
+
 # A classification may legitimately finish as ``other`` when it has no industry
 # relevance at all.  That is useful for audit and model evaluation, but it must
 # never enter a user's industry dashboard.  The dashboard gate therefore uses
@@ -2511,9 +2516,13 @@ class IntelRepository:
             payload,
             request_id=request_id,
             created_by=created_by,
-            # 分类是"新内容上线"的关键路径：高于常规批量任务（默认 0），
-            # 新文章入库后分类立即排到队列前部，避免"不及时的信息失去先机"。
-            priority=10,
+            # 分类是"新内容上线"的关键路径：既决定行业包归属/看板分类，也是问答检索的准入依据。
+            # 实测教训：之前用 priority=10，而 INTEL_JOB_PRIORITY_AGING_SECONDS=30（每等 30 秒 +1），
+            # 于是任何等待超过约 1 分钟的维护类作业都会盖过它 —— 优先级形同虚设、退化成纯 FIFO，
+            # 分类被 31 小时未处理的 trend_aggregate/topic_cluster 长期插队（14 小时只完成 11 个）。
+            # 现在给一个明显高于维护类作业的优先级，让它稳定排到前面；aging 仍会保证
+            # 极老的作业最终能插回来，不会把其它类型饿死。
+            priority=_CLASSIFICATION_JOB_PRIORITY,
         )
         if ragflow_upload and not created:
             with self.db.lock:

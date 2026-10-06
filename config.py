@@ -247,7 +247,11 @@ INTEL_WORKER_BATCH_SIZE = _env_int('INTEL_WORKER_BATCH_SIZE', 20, 1, 500)
 INTEL_JOB_LEASE_SECONDS = _env_int('INTEL_JOB_LEASE_SECONDS', 300, 30, 3600)
 INTEL_JOB_MAX_RETRIES = _env_int('INTEL_JOB_MAX_RETRIES', 3, 0, 10)
 INTEL_JOB_PRIORITY_AGING_SECONDS = _env_int(
-    'INTEL_JOB_PRIORITY_AGING_SECONDS', 30, 1, 3600
+    # 每等待多少秒给作业 +1 优先级积分。原来 30 秒太小：任何等待超过约 1 分钟的作业
+    # 都会盖过任意优先级设置，优先级完全失效、退化成纯 FIFO（实测分类被 31 小时未处理的
+    # 维护类作业长期插队）。改成 600 秒后，优先级在约 10 分钟窗口内说了算，
+    # 同时保留"等得极久最终会插回来"的防饿死性质。
+    'INTEL_JOB_PRIORITY_AGING_SECONDS', 600, 1, 3600
 )
 
 SERPAPI_API_KEY = _env_str('SERPAPI_API_KEY', '')

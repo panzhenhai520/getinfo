@@ -51,6 +51,30 @@ from financial_paper_trading import FinancialPaperTradingJobService
 LOGGER = logging.getLogger(__name__)
 
 
+def _enrich_failure_is_permanent(result: Dict, content: str) -> bool:
+    """VPN 精炼返回空内容时，判断这次失败是"该放弃"还是"该重试"。
+
+    实测背景：55 个 enrich 作业累计 220 次尝试全部以「VPN 返回空精炼内容」告终，
+    其中多数是内容本身就没有可提炼的东西（列表页/无实质正文/与行业包完全无关），
+    重试 4 次只是白烧 lane 容量。判据：
+      - VPN 明确标成无相关内容（relevance=none）；
+      - VPN 判定的内容类型不是文章（列表/聚合/导航/索引页）；
+      - 原文本身短到不可能提炼出摘要。
+    以上任一成立 → 永久失败；否则按瞬时故障（模型抖动/超时）继续重试。
+    """
+    try:
+        meta = result if isinstance(result, dict) else {}
+        relevance = str(meta.get("relevance") or "").strip().lower()
+        content_type = str(meta.get("content_type") or "").strip().lower()
+    except Exception:
+        relevance, content_type = "", ""
+    if relevance in {"none", "irrelevant", "unrelated"}:
+        return True
+    if content_type in {"list", "aggregation", "navigation", "index", "listing"}:
+        return True
+    return len(str(content or "").strip()) < 120
+
+
 class IntelWorker:
     def __init__(
         self,
@@ -240,9 +264,10 @@ class IntelWorker:
         title = str(payload.get("title") or "")
         content = str(payload.get("content") or "")
         if not article_id:
-            return {"success": False, "error": "article_id 缺失"}
+            return {"success": False, "error": "article_id 缺失", "retryable": False}
         if not (config.REMOTE_PIPELINE_URL and config.REMOTE_PIPELINE_TOKEN):
-            return {"success": False, "error": "VPN 未被配置"}
+            # 配置缺失是运维问题，重试同一个作业不会自愈：交给修复配置后的人工重试
+            return {"success": False, "error": "VPN 未被配置", "retryable": False}
         # 有界并发：同时最多 _ENRICH_CONCURRENCY 个 enrich 打 VPN（背压/防满载）
         try:
             self._enrich_semaphore.acquire(timeout=config.REMOTE_PIPELINE_JOB_TIMEOUT_SECONDS)
@@ -315,8 +340,20 @@ class IntelWorker:
             _refined = _re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", _refined)
             _refined = _re.sub(r"\n{3,}", "\n\n", _refined).strip()
             # VPN 侧精炼为空（模型异常/内容不可用）不能算成功：必须重试，
-            # 否则正文永远停留在原始噪声状态
+            # 否则正文永远停留在原始噪声状态。
+            #
+            # 但要区分"该重试"与"该放弃"：实测 55 个 enrich 作业累计 220 次尝试
+            # 全部以「VPN 返回空精炼内容」告终，其中绝大多数是**内容本身就没有可提炼的东西**
+            # （列表页/无实质正文/与行业包完全无关），重试 4 次只是白烧 lane 容量。
+            # 判据：VPN 明确把它标成无相关内容（relevance=none / content_type 为非正文类型），
+            # 或原文本身短到不可能提炼 → 永久失败，不再重试；否则按瞬时故障重试。
             if not _refined:
+                if _enrich_failure_is_permanent(result, content):
+                    return {
+                        "success": False,
+                        "error": "VPN 返回空精炼内容（无实质正文，判定为永久失败，不再重试）",
+                        "retryable": False,
+                    }
                 return {"success": False, "error": "VPN 返回空精炼内容"}
             # 分层提炼元数据（先算好：替换正文与写 derivative 两处共用）
             _refine_meta = {
