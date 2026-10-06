@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 from datetime import timedelta, timezone
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -40,6 +41,9 @@ END
 # 维护类作业的优先级在 -45 ~ +5 之间，这里取 enqueue_job 允许的上限 100
 # （coerce_int(priority, 0, -100, 100)），让分类稳定排在它们前面。
 _CLASSIFICATION_JOB_PRIORITY = 100
+
+# intel 侧建表/补列的一次性守卫（见 IntelRepository._ensure_intel_schema_once）
+_SCHEMA_ENSURE_LOCK = threading.Lock()
 
 # A classification may legitimately finish as ``other`` when it has no industry
 # relevance at all.  That is useful for audit and model evaluation, but it must
@@ -138,6 +142,36 @@ class IntelRepository:
 
     def _ensure(self):
         self.db._ensure_connection()
+        self._ensure_intel_schema_once()
+
+    def _ensure_intel_schema_once(self) -> None:
+        """每个进程只跑一次 intel 侧建表/补列。
+
+        为什么必须有这一步：PostgreSQL 主库模式下 `create_tables()` 直接跳过所有 DDL
+        （日志："跳过 SQLite DDL，使用已迁移 schema"），所以**代码里新增的表/列不会自动落到生产库**
+        （本轮实测：`intel_jobs.started_at` 与 `intel_worker_heartbeats` 在 A/B 上都不存在，
+        心跳与巡检因此报 UndefinedTable）。这里在首次使用 intel 仓储时补一次，
+        `CREATE TABLE IF NOT EXISTS` + `_ensure_column` 都是幂等的。
+        """
+        if getattr(self, "_intel_schema_ready", False):
+            return
+        with _SCHEMA_ENSURE_LOCK:
+            if getattr(self, "_intel_schema_ready", False):
+                return
+            try:
+                from intel_schema import ensure_intel_core_tables
+
+                with self.db.lock:
+                    cursor = self.db.connection.cursor()
+                    try:
+                        ensure_intel_core_tables(cursor)
+                        self.db.connection.commit()
+                    finally:
+                        cursor.close()
+                self._intel_schema_ready = True
+            except Exception as exc:
+                # 建表失败不能阻断主流程（只读查询仍应可用），但要留下明确日志
+                print("⚠️ intel schema 迁移失败（将重试）: %s" % str(exc)[:200])
 
     def active_industry_pack_id(self) -> str:
         self._ensure()
@@ -3456,3 +3490,4 @@ class IntelRepository:
 
 
 intel_repository = IntelRepository()
+
