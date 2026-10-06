@@ -129,7 +129,9 @@ class IndustryPackV2Test(unittest.TestCase):
                 "show_financial_news": True,
                 "show_market_index_cards": True,
                 "show_watched_stock_cards": True,
-                "show_spatiotemporal_map": True,
+                # 时空地图首页已下线（5fc1f61/ab945b9）：family_office 首页改成主题驾驶舱，
+                # 出厂包显式把 show_spatiotemporal_map 关掉，首页固定走资讯流 Dashboard。
+                "show_spatiotemporal_map": False,
             },
         )
 
@@ -185,6 +187,7 @@ class IndustryPackV2Test(unittest.TestCase):
             set(primary_ids),
             {
                 "ai_news",
+                "automotive_industry",
                 "bolean_security_compute",
                 "education_news",
                 "family_office",

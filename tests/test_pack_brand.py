@@ -105,7 +105,11 @@ class PackBrandTests(unittest.TestCase):
         with patch.object(pack_tenant, "_LOGO_UPLOAD_DIR", str(tmp_upload)):
             rel = pack_tenant.set_user_logo(uid, FakeFile())
         self.assertTrue(rel.startswith("/static/uploads/pack_logo_"))
-        saved = Path(tmp_upload) / f"pack_logo_{uid}.png"
+        # 文件名带时间戳版本（pack_logo_{uid}_{ts}{ext}）：URL 每次都变，避免
+        # nginx/微信 og:image 缓存继续显示旧 Logo。
+        saved_name = rel.rsplit("/", 1)[-1]
+        self.assertRegex(saved_name, rf"^pack_logo_{uid}_\d+\.png$")
+        saved = Path(tmp_upload) / saved_name
         self.assertTrue(saved.exists())
         profile = pack_tenant.get_profile(uid)
         self.assertEqual(profile["logo_url"], rel)

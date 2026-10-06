@@ -202,12 +202,18 @@ def verify_sqlite_backup(
     actual_sha256 = digest.hexdigest()
     actual_size = int(target.stat().st_size)
     uri = f"{target.as_uri()}?mode=ro&immutable=1"
-    with sqlite3.connect(uri, uri=True, timeout=30) as connection:
+    # 注意：sqlite3.Connection 的 with 上下文管理器只提交/回滚，**不关闭连接**。
+    # 用 with 会让只读句柄一直占着备份文件：Windows 上备份无法删除/轮转
+    # （实测 verify_sqlite_backup 之后 os.unlink 报 WinError 32），Linux 上每次激活泄漏一个 fd。
+    connection = sqlite3.connect(uri, uri=True, timeout=30)
+    try:
         integrity_row = connection.execute("PRAGMA integrity_check").fetchone()
         integrity = str(integrity_row[0] if integrity_row else "")
         schema_row = connection.execute("PRAGMA schema_version").fetchone()
         schema_version = int(schema_row[0] if schema_row else 0)
         table_counts = _sqlite_table_counts(connection)
+    finally:
+        connection.close()
     expected_counts = {
         str(key): int(value)
         for key, value in (expected_table_counts or {}).items()

@@ -190,6 +190,20 @@ class FinancialSpacexLatestE2ETest(unittest.TestCase):
         app.config.update(TESTING=True, SECRET_KEY="fixture")
         app.register_blueprint(chat_api.chat_bp)
         self.client = app.test_client()
+        # /api/chat/send 带 @login_required（问答 run 归属需要登录身份），本文件断言的是
+        # 旧链路/金融 SSE 契约，所以这里显式给一个管理员会话。
+        auth_patcher = patch(
+            "decorators.user_db.verify_session",
+            return_value={"user_id": 1, "username": "tester", "role": "admin"},
+        )
+        auth_patcher.start()
+        self.addCleanup(auth_patcher.stop)
+        self.client.set_cookie("localhost", "session_token", "test-session-token")
+        # 统一 QA 网关可用时会接管 /api/chat/send（走 QA 链路，不再产生金融 SSE 事件），
+        # 而本文件测的是该网关不可用时的回落链路，所以固定为不可用。
+        unified_patcher = patch.object(chat_api, "_unified_qa_available", return_value=False)
+        unified_patcher.start()
+        self.addCleanup(unified_patcher.stop)
         self.golden = json.loads(
             (ROOT / "tests" / "fixtures" / "financial_latest_information_golden.json").read_text(
                 encoding="utf-8"

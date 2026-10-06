@@ -37,6 +37,15 @@ from intel_database import IntelRepository
 from intel_worker import IntelWorker
 from sqlite_database import SQLiteDatabase
 
+# 入库闸门（intel_boilerplate）会判废"去框架后有效正文 < 40 字"的近空内容。
+# 本文件的用例验证的是分类/看板/归属行为，不是闸门本身，因此用占位正文补足长度；
+# 占位文本刻意不含任何行业关键词、框架特征词与行业强信号词，避免污染命中判定。
+GATE_FILLER = "本条正文为单元测试夹具生成的占位内容，仅用于满足入库闸门的正文字数下限。"
+
+
+def _gate_safe_content(content: str) -> str:
+    return content if len(content) >= 40 else content + GATE_FILLER
+
 
 class IntelStageOneTests(unittest.TestCase):
     def setUp(self):
@@ -62,7 +71,7 @@ class IntelStageOneTests(unittest.TestCase):
             {
                 "url": url,
                 "title": title,
-                "content": content,
+                "content": _gate_safe_content(content),
                 "publish_date": datetime.now().date().isoformat(),
                 "matched_keywords": [],
             }
@@ -74,20 +83,23 @@ class IntelStageOneTests(unittest.TestCase):
         seed_loader = IndustryPackLoader(use_published_store=False)
         metadata = seed_loader.metadata()
         by_id = {item["id"]: item for item in metadata}
+        # 出厂种子包快照（与 config/industry_packs/*.json 的 pack_version 一一对应）：
+        # 行业包版本升级必须同步更新这里，否则契约失效。
+        expected_versions = {
+            "ai_news": "2.0.3",
+            "automotive_industry": "1.0.0",
+            "bolean_security_compute": "1.0.0",
+            "education_news": "2.0.3",
+            "family_office": "2.2.0",
+            "financial_markets": "2.0.0",
+            "healthcare_news": "2.0.15",
+            "short_video_news": "2.0.0",
+        }
+        self.assertEqual(set(by_id), set(expected_versions))
         self.assertEqual(
-            set(by_id),
-            {
-                "ai_news",
-                "education_news",
-                "family_office",
-                "financial_markets",
-                "healthcare_news",
-                "short_video_news",
-            },
+            {pack_id: item["pack_version"] for pack_id, item in by_id.items()},
+            expected_versions,
         )
-        self.assertEqual(by_id["family_office"]["pack_version"], "2.2.0")
-        for pack_id in set(by_id) - {"family_office"}:
-            self.assertEqual(by_id[pack_id]["pack_version"], "2.0.0")
         self.assertTrue(all(item["schema_version"] == 3 for item in by_id.values()))
         with self.assertRaises(IndustryPackError):
             seed_loader.load("../family_office")
@@ -125,7 +137,12 @@ class IntelStageOneTests(unittest.TestCase):
         self.assertEqual(trend["final_category"], "trend")
         self.assertEqual(event["final_category"], "event")
         self.assertEqual(non_financial["final_category"], "other")
-        self.assertEqual(non_financial["score_details"]["hits"]["anchor"], [])
+        # "通用行业过滤器"短路分支固定返回 hits={}（产品自身消费者一律按
+        # (score_details.get("hits") or {}).get("anchor") or [] 读取），
+        # 这里沿用同一口径，只断言"没有任何锚点命中"，不额外断言字典形状。
+        self.assertEqual(
+            (non_financial["score_details"].get("hits") or {}).get("anchor") or [], []
+        )
         self.assertEqual(english["final_category"], "trend")
 
     def test_financial_pack_configuration_api_is_read_only(self):
@@ -189,18 +206,21 @@ class IntelStageOneTests(unittest.TestCase):
                 {
                     "key": "nvh_acoustics",
                     "name": "NVH与声学",
-                    "keywords": ["主动道路噪声控制"],
+                    "keywords": ["主动道路噪声控制", "声学包"],
                 },
                 {
                     "key": "active_noise_control",
                     "name": "主动降噪",
-                    "keywords": ["主动道路噪声控制"],
+                    "keywords": ["主动道路噪声控制", "主动降噪"],
                 },
             ],
         }
+        # 主题判别力门限：同时出现在半数以上主题里的关键词（这里两个主题都写了
+        # "主动道路噪声控制"）不再参与主题归属。多标签归属因此必须由各主题**独有**
+        # 的关键词支撑——夹具按该契约给每个主题一个独有关键词。
         result = classify_article(
             {
-                "title": "某车型主动道路噪声控制系统正式量产",
+                "title": "某车型声学包与主动降噪系统正式量产",
                 "content": "该汽车技术已进入量产阶段。",
             },
             pack,
@@ -219,7 +239,9 @@ class IntelStageOneTests(unittest.TestCase):
             {"title": "普通公司量产新系统", "content": "声学研究取得进展。"},
             pack,
         )
-        self.assertEqual(rejected["score_details"]["hits"]["anchor"], [])
+        self.assertEqual(
+            (rejected["score_details"].get("hits") or {}).get("anchor") or [], []
+        )
 
     def test_recent_high_relevance_articles_get_light_trend_today_fallback(self):
         pack = {
@@ -605,7 +627,10 @@ class IntelStageOneTests(unittest.TestCase):
                 self.assertEqual(dashboard_payload["industry_pack"]["name"], "家族办公室")
                 self.assertIn("trend", dashboard_payload["sections"])
                 self.assertGreaterEqual(dashboard_payload["sections"]["trend"]["total"], 1)
-                self.assertIn("today_new_articles", dashboard_payload["statistics"])
+                self.assertIn("today_crawled_articles", dashboard_payload["statistics"])
+                self.assertIn(
+                    "today_news_parsed_articles", dashboard_payload["statistics"]
+                )
                 queued = client.post(
                     f"/api/intel/reclassify/{article_id}",
                     headers={**headers, "Idempotency-Key": "test-key"},
@@ -620,27 +645,38 @@ class IntelStageOneTests(unittest.TestCase):
             encoding="utf-8",
         ) as template_file:
             template = template_file.read()
-        for view in ("dashboard", "map"):
-            self.assertIn(f'data-home-view="{view}"', template)
+        # 首页视图已固定为资讯流 Dashboard：时空地图首页下线后 body 上不再有 map 视图
+        # （对应 data-show-spatiotemporal-map="false"），模板里也只保留 dashboard 标记。
+        self.assertIn('data-home-view="dashboard"', template)
+        self.assertIn('data-show-spatiotemporal-map="false"', template)
+        self.assertNotIn('data-home-view="map"', template)
         self.assertIn('id="intelDashboard"', template)
         self.assertIn("function setHomeView", template)
         self.assertIn('data-industry-pack-id="{{ active_industry_pack.id }}"', template)
-        self.assertIn("active_industry_pack.name ~ '时空信息图'", template)
+        # 地图标签由 Jinja 拼接改为前端模板串（时空地图首页下线后仍保留该视图标签）
+        self.assertIn("${state.intelIndustryName}时空信息图", template)
         self.assertIn(
             "intelIndustryPackId: document.body.dataset.industryPackId",
             template,
         )
-        self.assertIn('id="intelIngestedArticles"', template)
-        self.assertIn('id="intelValidArticles730d"', template)
-        self.assertIn('id="intelHomepageArticles"', template)
+        # 首页统计维度不再是模板里的静态 id，而是 STAT_DIMENSION_MAP 注册 + _setStat 写入；
+        # 契约改为断言三个维度名与维度键的映射（严格字面量）。
+        self.assertIn("intelIngestedArticles: 'ingested'", template)
+        self.assertIn("intelValidArticles730d: 'valid_730d'", template)
+        self.assertIn("intelHomepageArticles: 'classified'", template)
         self.assertIn("正在按最新资讯自动分区；无内容的分类会自动隐藏…", template)
-        self.assertIn("近 730 天有效文章", template)
-        self.assertIn("首页已分类资讯", template)
-        self.assertIn("近期新发布、宣布、签约、投资、合作、峰会与任命等事件信号", template)
-        self.assertIn("近期持续出现的政策、监管、市场与长期结构性变化", template)
-        self.assertIn("仅展示命中当前行业包关键词的补充资讯；无内容时自动隐藏", template)
+        self.assertIn("_setStat('intelTodayLabel', '当日有效文章')", template)
+        self.assertIn("_setStat('intelWindowLabel', '当日已分类资讯')", template)
+        # 资讯流分区已改为数据驱动渲染，分区文案不再是模板静态文本；
+        # 契约改为断言分区键集合与各分区容器 id 映射。
+        self.assertIn(
+            "['today', 'trend', 'policy', 'recent', 'other'].forEach(key => renderIntelSection(key, [], 0));",
+            template,
+        )
+        self.assertIn("trend: ['intelTrendCards', 'intelTrendCount'],", template)
+        self.assertIn("other: ['intelOtherCards', 'intelOtherCount'],", template)
         self.assertIn("section.hidden = true", template)
-        self.assertIn("const INTEL_DASHBOARD_TIME_RANGE = '730d'", template)
+        self.assertIn("const INTEL_DASHBOARD_TIME_RANGE = '7d'", template)
         self.assertIn("const INTEL_DASHBOARD_PER_CATEGORY = 10", template)
         self.assertIn("time_range: INTEL_DASHBOARD_TIME_RANGE", template)
         self.assertIn("per_category: String(INTEL_DASHBOARD_PER_CATEGORY)", template)
@@ -690,7 +726,9 @@ class IntelStageOneTests(unittest.TestCase):
         self.assertIsNotNone(unclassified_id)
         unrelated_id = self.insert_article(
             "完全无关的社会新闻",
-            "这条内容没有命中家办行业关键词。",
+            # 注意：正文不能出现任何行业包锚点词（历史上这里写了"家办"字样，
+            # 反而让这条"无关"文章被入库归属兜底判定为家办命中）。
+            "这条内容与目标行业没有任何关系，仅用于验证残留资讯的行业相关性过滤。",
             "https://example.com/intel/unrelated",
         )
         self.assertIsNotNone(unrelated_id)
@@ -750,6 +788,7 @@ class IntelStageOneTests(unittest.TestCase):
         app = Flask(__name__)
         app.register_blueprint(intel_bp)
         window = {"time_range": "7d", "from": "2026-08-01T00:00:00Z", "to": "2026-08-08T00:00:00Z", "timezone": "Asia/Hong_Kong"}
+
         trend_article = {
             "article_id": 101,
             "title": "趋势文章",
@@ -817,7 +856,18 @@ class IntelStageOneTests(unittest.TestCase):
             "timezone": "Asia/Hong_Kong",
             "counts": {"trend": 1, "today": 1, "other": 0},
             "total": 2,
-        }), patch.object(self.repo, "list_classified_articles", side_effect=classified_articles_side_effect), patch.object(self.repo, "list_dashboard_other_articles", return_value=([], 0, window)), patch.object(self.repo, "dashboard_followed_articles", return_value=[]), patch.object(self.repo, "list_ai_recent_articles", return_value=([], 0)), patch.object(self.repo, "dashboard_activity_statistics", return_value={"today_date": "2026-08-08"}), patch.object(self.repo.db, "get_statistics", return_value={"total_articles": 0}):
+        }), patch.object(self.repo, "list_classified_articles", side_effect=classified_articles_side_effect), patch.object(self.repo, "list_dashboard_other_articles", return_value=([], 0, window)), patch.object(self.repo, "dashboard_followed_articles", return_value=[]), patch.object(self.repo, "list_ai_recent_articles", return_value=([], 0)), patch.object(self.repo, "dashboard_activity_statistics", return_value={
+            # 必须与 IntelRepository.dashboard_activity_statistics 的真实返回结构一致：
+            # 看板路由直接取 activity_statistics['today_crawled_articles']，缺键会 500。
+            "today_date": "2026-08-08",
+            "today_crawled_articles": 0,
+            "today_news_parsed_articles": 0,
+            "today_google_search_articles": 0,
+            "today_google_ingested_articles": 0,
+            "today_source_ingested_articles": 0,
+            "last_crawl_time": "",
+            "news_kb_id": "",
+        }), patch.object(self.repo.db, "get_statistics", return_value={"total_articles": 0}):
             client = app.test_client()
             headers = {"Authorization": "Bearer test-token"}
             dashboard = client.get(

@@ -12,12 +12,18 @@ class FakeDB:
         self.connection = sqlite3.connect(':memory:')
         self.connection.row_factory = sqlite3.Row
         self.connection.execute('PRAGMA foreign_keys=ON')
-        self.connection.execute('CREATE TABLE articles(id INTEGER PRIMARY KEY AUTOINCREMENT,url TEXT UNIQUE)')
+        # raw_content/status 是入库后 ingest_remote_result 会回写的列（原稿留存 + 展示状态），
+        # 早期的 FakeDB 只有 id/url，导致回写时 no such column。
+        self.connection.execute(
+            'CREATE TABLE articles(id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT UNIQUE, '
+            'raw_content TEXT, status TEXT)'
+        )
 
     def _ensure_connection(self):
         return None
 
-    def insert_article(self, article):
+    def insert_article(self, article, *, skip_pipeline: bool = False):
+        # article_ingest.ingest_article 统一走 insert_article(..., skip_pipeline=...) 入口
         self.connection.execute('INSERT OR IGNORE INTO articles(url) VALUES(?)', (article['url'],))
         row = self.connection.execute('SELECT id FROM articles WHERE url=?', (article['url'],)).fetchone()
         return row['id']
@@ -28,10 +34,18 @@ class FakeDB:
 
 def test_remote_result_is_idempotent_and_keeps_derivative_separate():
     db = FakeDB()
+    # 正文必须长于入库闸门阈值：remote_result_ingestor 会丢弃「精炼文 <200 字且原稿 <100 字」
+    # 的空心页（ARTICLE_MIN_REFINED_CHARS/ARTICLE_MIN_RAW_CHARS），
+    # 早期夹具只有 44 字，会被当成无正文页跳过（articles_found=0）。
     result = {
         'job_id': 'remote-1', 'status': 'completed',
         'articles': [{
-            'url': 'https://example.com/a', 'title': 'AI manufacturing', 'content': 'AI changes manufacturing quality inspection.',
+            'url': 'https://example.com/a', 'title': 'AI manufacturing',
+            'content': (
+                'AI changes manufacturing quality inspection: vision models now flag surface '
+                'defects on the assembly line within milliseconds, and the same models predict '
+                'tool wear from vibration data before a machine actually fails.'
+            ),
             'derivative': {
                 'source_hash': 'hash', 'source_language': 'en', 'target_language': 'zh',
                 'summary': 'summary', 'translated_title': '标题', 'translated_content': '译文',

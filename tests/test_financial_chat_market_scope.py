@@ -10,6 +10,7 @@ from unittest.mock import patch
 from flask import Flask
 
 import chat_api
+import config
 from chat_route_orchestrator import ChatFinancialRouteStore, ChatRouteOrchestrator
 from financial_chat_market_scope import (
     FinancialMarketScopeRouter,
@@ -189,17 +190,23 @@ class FinancialChatMarketScopeTest(unittest.TestCase):
         dispatcher = FinancialJobDispatcher(
             service.runners(), settings=BASE_FINANCIAL_SETTINGS
         )
-        worker = IntelWorker(
-            repository=self.repository,
-            worker_id="chat-market-scope-fixture-worker",
-            financial_dispatcher=dispatcher,
-            financial_market_scheduler=self.scheduler,
-            # Fixture jobs finish synchronously; a long heartbeat interval
-            # avoids test-only concurrent SQLite probes while still exercising
-            # the production worker dispatcher and lease completion path.
-            heartbeat_seconds=10.0,
-            job_lease_seconds=30,
-        )
+        # IntelWorker.__init__ 用全局 config 的 FINANCIAL_INTELLIGENCE_ENABLED /
+        # TRADING_AGENTS_ENABLED 判断要不要挂上「注入的」financial_dispatcher：
+        # 本机 .env 两项都是 false，不显式打开的话注入的 dispatcher 会被丢掉，
+        # worker 不注册任何金融 handler，run_once 领不到作业（completed=0）。
+        # 这里只影响构造期，和本用例要验证的「一次刷新只排一个 universe」无关。
+        with patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True):
+            worker = IntelWorker(
+                repository=self.repository,
+                worker_id="chat-market-scope-fixture-worker",
+                financial_dispatcher=dispatcher,
+                financial_market_scheduler=self.scheduler,
+                # Fixture jobs finish synchronously; a long heartbeat interval
+                # avoids test-only concurrent SQLite probes while still exercising
+                # the production worker dispatcher and lease completion path.
+                heartbeat_seconds=10.0,
+                job_lease_seconds=30,
+            )
         worker.enqueue_due_periodic_jobs = lambda: None
         stats = worker.run_once(job_types=FINANCIAL_JOB_TYPES, limit=100)
         return fixture_router, stats
@@ -334,8 +341,24 @@ class FinancialChatMarketScopeTest(unittest.TestCase):
         app.config.update(TESTING=True)
         app.register_blueprint(chat_api.chat_bp)
         client = app.test_client()
+        # /api/chat/send 带 @login_required（统一 QA 网关按登录身份归属问答 run）：
+        # 未登录时接口返回 401 JSON，SSE 一个事件都没有。这里给一个管理员会话
+        # （与 tests/test_chat_sse_compatibility.py 同一套夹具做法）。
+        auth = patch(
+            "decorators.user_db.verify_session",
+            return_value={"user_id": 1, "username": "tester", "role": "admin"},
+        )
+        auth.start()
+        self.addCleanup(auth.stop)
+        client.set_cookie("localhost", "session_token", "test-session-token")
         payload = _payload("今天A股怎么样", "chat-pending")
-        with patch.object(chat_api, "chat_route_orchestrator", self.orchestrator), patch.object(
+        # 本用例验证的是「旧版金融路由」这条链路（chat_route_orchestrator + market scope 文案：
+        # 不输出行情数值 / 证据覆盖 N/N / 报告编号）。统一 QA 网关接管后，同一入口会先走
+        # QA 链路，而且它的运行态（并发 run）存在共享库里，会随别的运行残留变成 429，
+        # 用例结果就随环境漂移。这里把被测链路钉死为旧版金融路由。
+        with patch.object(chat_api, "_unified_qa_available", return_value=False), patch.object(
+            chat_api, "chat_route_orchestrator", self.orchestrator
+        ), patch.object(
             chat_api, "_stream_openai"
         ) as model, patch.object(chat_api, "_web_search") as web, patch.object(
             chat_api, "_load_config"
@@ -350,7 +373,9 @@ class FinancialChatMarketScopeTest(unittest.TestCase):
         config_loader.assert_not_called()
 
         self._run_existing_worker()
-        with patch.object(chat_api, "chat_route_orchestrator", self.orchestrator), patch.object(
+        with patch.object(chat_api, "_unified_qa_available", return_value=False), patch.object(
+            chat_api, "chat_route_orchestrator", self.orchestrator
+        ), patch.object(
             chat_api, "_stream_openai"
         ) as model, patch.object(chat_api, "_web_search") as web:
             ready_events = _events(client.post("/api/chat/send", json=payload))

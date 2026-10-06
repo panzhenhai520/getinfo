@@ -18,6 +18,13 @@ from sqlite_database import SQLiteDatabase
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _hk_today() -> str:
+    """香港时区的今天（与 intel_database 的时间窗口口径一致）。"""
+    from utils import get_china_time
+
+    return get_china_time().date().isoformat()
+
+
 class IndustryPackSchedulerIsolationTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -224,7 +231,9 @@ class IndustryPackSchedulerIsolationTest(unittest.TestCase):
                     "医疗健康政策更新",
                     "医疗健康行业政策发生重要变化。",
                     "health.example.test",
-                    "2026-08-06",
+                    # publish_date 用"今天"：用例按 30d 窗口查询分类文章，
+                    # 写死历史日期会随时间滑出窗口导致断言失效。
+                    _hk_today(),
                 ),
             ).lastrowid
         )
@@ -280,8 +289,11 @@ class IndustryPackSchedulerIsolationTest(unittest.TestCase):
         discovered = candidates.discover(
             {
                 "url": "https://late.example.test/health",
-                "title": "医疗健康行业政策更新",
-                "summary": "医疗健康产业出现新事件。",
+                # 候选项必须命中行业包锚点词才会 should_queue=1：
+                # healthcare_news 的锚点是 HIS/电子病历/智慧医院 这类专有词，
+                # "医疗健康行业政策更新"这种泛描述命中不了。
+                "title": "智慧医院集成平台新政策",
+                "summary": "电子病历评级与智慧医院建设出现新事件。",
             },
             industry_pack_id="healthcare_news",
             activation_id="activation-education",
@@ -304,8 +316,9 @@ class IndustryPackSchedulerIsolationTest(unittest.TestCase):
         candidates = IntelCandidateRepository(self.database)
         item = {
             "url": "https://retry.example.test/health-policy",
-            "title": "医疗健康行业政策更新",
-            "summary": "医疗健康产业出现新事件。",
+            # 同前：候选项必须命中行业包锚点词才会 should_queue=1。
+            "title": "智慧医院集成平台新政策",
+            "summary": "电子病历评级与智慧医院建设出现新事件。",
         }
         first = candidates.discover(
             item,

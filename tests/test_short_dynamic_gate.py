@@ -93,9 +93,14 @@ class ShortDynamicClassifierTest(unittest.TestCase):
         "brands": [],
         "candidate_gate": {"anchor_keywords": ["网络安全"]},
         "classification": {
-            "core_weight": 3, "expanded_weight": 1, "trend_weight": 2,
+            # 锚点只有"网络安全"一个，规则相关性恒为 core_weight；
+            # 归属必填契约要求 relevance >= minimum_relevance_score 才是真实规则分类，
+            # 同时本类用例要求"无趋势/事件信号"时规则置信度 0.55+relevance/30 低于
+            # llm_confidence_threshold=0.6（否则全量档文章的 LLM 分支不可达）。
+            # core_weight=1、minimum_relevance_score=1 同时满足这两个条件。
+            "core_weight": 1, "expanded_weight": 1, "trend_weight": 2,
             "event_weight": 2, "negative_weight": -3,
-            "minimum_relevance_score": 6,
+            "minimum_relevance_score": 1,
             "llm_confidence_threshold": 0.6,
             "tie_break_order": ["trend", "event", "other"],
         },
@@ -116,8 +121,15 @@ class ShortDynamicClassifierTest(unittest.TestCase):
 
             def article_content_hash(self, article):
                 return "hash1"
+
+            def upsert_classification(self, result):
+                # 归属必填契约：规则分类产出一定会落库（classify_article_id 末尾
+                # 必然调用 upsert_classification），桩需支持该调用。
+                self.saved.append(dict(result))
+                return 1
         repo = Repo()
         repo.article = self.article
+        repo.saved = []
         pack_loader = type("Loader", (), {"load": lambda self, pack_id: self.PACK})()
         pack_loader.PACK = self.PACK
         return IntelClassificationService(repository=repo, pack_loader=pack_loader, llm_client=llm_client)

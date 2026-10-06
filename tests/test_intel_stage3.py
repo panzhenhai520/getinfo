@@ -5,7 +5,7 @@ import json
 import os
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 _BOOTSTRAP_TEMP_DIR = tempfile.TemporaryDirectory()
@@ -115,13 +115,19 @@ class IntelStageThreeTests(unittest.TestCase):
         config.CRAWL_REQUIRE_KEYWORD_MATCH = self._original_keyword_guard
         config.INTEL_LLM_ENABLED = self._original_llm_enabled
 
-    def _discover(self, url, title, pack="family_office", observation="rss"):
+    def _discover(self, url, title, pack="family_office", observation="rss", published_at=None):
+        if published_at is None:
+            # 候选项发布时间保持"相对今天"的近期日期：写死日期会随时间滑出
+            # API 的 30d/7d 时间窗（文件末尾的候选列表接口按 30d 过滤）。
+            published_at = (
+                datetime.now(timezone.utc) - timedelta(days=1)
+            ).isoformat()
         return self.candidates.discover(
             {
                 "url": url,
                 "title": title,
                 "summary": "香港家族办公室政策及税务宽免报告",
-                "published_at": "2026-07-27",
+                "published_at": published_at,
             },
             industry_pack_id=pack,
             observation_type=observation,

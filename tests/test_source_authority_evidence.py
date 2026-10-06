@@ -76,7 +76,10 @@ class SourceAuthorityEvidenceTests(unittest.TestCase):
             {
                 "url": url,
                 "title": title,
-                "content": f"{title}。香港家族办公室政策与行业统计信息。",
+                "content": (
+                    f"{title}。香港家族办公室政策与行业统计信息，"
+                    "用于来源权威与证据冲突判定的回归验证，正文长度需满足入库闸门要求。"
+                ),
                 "publish_date": "2026-08-05",
                 "matched_keywords": ["家族办公室", "政策", "统计"],
             }
@@ -160,8 +163,14 @@ class SourceAuthorityEvidenceTests(unittest.TestCase):
             self.loader.load("family_office"),
         )
         self.assertEqual(result["final_category"], "other")
-        self.assertEqual(result["score_details"]["hits"]["anchor"], [])
-        self.assertNotIn("authority", result["score_details"]["components"])
+        # "通用行业过滤器"短路分支固定返回 hits={}（产品自身消费者一律按
+        # (score_details.get("hits") or {}).get("anchor") or [] 读取），
+        # 这里沿用同一口径，只断言"没有任何锚点命中"。
+        self.assertEqual(
+            (result["score_details"].get("hits") or {}).get("anchor") or [], []
+        )
+        # 同上：短路分支的 score_details 没有 components 键，按"没有该评分维度"读取。
+        self.assertNotIn("authority", (result["score_details"].get("components") or {}))
 
     def test_official_scope_can_prefer_but_never_hide_conflict(self):
         official = self._source(

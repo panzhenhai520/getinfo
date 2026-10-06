@@ -91,11 +91,23 @@ class TtsMasterSwitchTests(unittest.TestCase):
                  patch.object(iw.config, "SYSTEM_TTS_ENABLED", False), \
                  patch.object(iw.config, "REMOTE_PIPELINE_TTS_VOICE", "default"), \
                  patch("remote_pipeline_client.remote_pipeline_client.enrich", side_effect=fake_enrich), \
-                 patch("remote_result_ingestor._write_article_derivative", return_value=None):
+                 patch("remote_result_ingestor._write_article_derivative", return_value=None), \
+                 patch("redis.Redis", side_effect=RuntimeError("unit test: redis 不可用")):
+                # Redis 只是 _handle_enrich 的可选加速器（代码里有「redis 不可用则跳过，
+                # 回落 semaphore 兜底」分支）。本机 6379 无人监听且网络被沙箱丢包时，
+                # redis-py 会按 socket_connect_timeout=2 重试 11 次，单测白等 49 秒，
+                # 所以按「不可用」分支跑，既快又不依赖外部服务。
                 aid = db.insert_article({
                     "url": "https://x.example/tts",
                     "title": "TTS 总闸测试",
-                    "content": "原文正文内容，长度足够。",
+                    # 入库闸门会判废「去框架后有效字数 < 40」的正文（intel_boilerplate.assess），
+                    # 早期夹具只有 12 字，insert_article 直接返回 None，
+                    # 于是 _handle_enrich 收到 article_id=0 而失败。这里给一段真实长度的正文。
+                    "content": (
+                        "在制造业质检环节，视觉模型已经把表面缺陷的识别时间从人工抽检的分钟级压缩到毫秒级；"
+                        "同一批模型还能根据设备振动数据预测刀具磨损，在机器真正停机之前给出维护建议。"
+                        "三条产线的实测数据显示，这套流程在一年内把非计划停机时间降低了约两成。"
+                    ),
                     "matched_keywords": ["TTS"],
                     "publish_date": "2026-09-21",
                 })
@@ -142,7 +154,13 @@ class EmptyAudioManifestSkipTests(unittest.TestCase):
             article_id = db.insert_article({
                 "url": "https://x.example/deriv",
                 "title": "衍生数据测试",
-                "content": "正文内容，长度足够。",
+                # 同上：正文过短会被入库闸门判废，insert_article 返回 None，
+                # 断言就会「因为什么都没写」而空过。这里给真实长度的正文。
+                "content": (
+                    "精炼管线的产出需要落到衍生表里：摘要、译文与音频清单各占一行，"
+                    "由 article_id 关联回文章主表，便于展示层按需降级。"
+                    "当 TTS 总闸关闭时音频清单为空，此时不写任何音频行，避免留下空记录。"
+                ),
                 "matched_keywords": ["衍生"],
                 "publish_date": "2026-09-21",
             })

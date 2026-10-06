@@ -22,8 +22,14 @@ class IndustryPackSwitchEndToEndTest(unittest.TestCase):
     def test_backup_verifier_is_read_only_and_rejects_wrong_digest(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "backup.sqlite3"
-            with sqlite3.connect(path) as connection:
+            # sqlite3.Connection 的上下文管理器只提交/回滚，**不会关闭连接**；
+            # 未关闭的句柄会让 TemporaryDirectory 清理在 Windows 上失败，必须显式 close。
+            connection = sqlite3.connect(path)
+            try:
                 connection.execute("CREATE TABLE fixture(id INTEGER PRIMARY KEY)")
+                connection.commit()
+            finally:
+                connection.close()
             before = path.read_bytes()
             result = verify_sqlite_backup(str(path), expected_sha256="wrong")
             self.assertFalse(result["passed"])

@@ -12,6 +12,10 @@ from sqlite_database import SQLiteDatabase
 class EnrichMarkdownRefreshTests(unittest.TestCase):
     """阶段1×回填联动：vpn_ocr 文章展示 Markdown 优先用摘要；enrich 落库同步刷新 content_markdown。"""
 
+    # 入库闸门（intel_boilerplate）会判废"去框架后有效正文 < 40 字"的近空内容；
+    # 本用例验证的是 Markdown 生成链路，夹具正文补足长度（不含框架特征词）。
+    BODY_FILLER = "本条正文为单元测试夹具生成的占位内容，用于满足入库闸门对有效正文字数的要求。"
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = SQLiteDatabase(os.path.join(self.tmp.name, "enrich.sqlite3"))
@@ -25,7 +29,9 @@ class EnrichMarkdownRefreshTests(unittest.TestCase):
 
     def _insert_vpn_ocr(self):
         ocr_raw = "首页 登录 注册 导航\n\n" + "导航噪声行一\n" * 8
-        summary = "该厂商发布新一代工业控制系统，覆盖网络安全防护能力，已落地多个行业。"
+        summary = (
+            "该厂商发布新一代工业控制系统，覆盖网络安全防护能力，已落地多个行业。" + self.BODY_FILLER
+        )
         aid = self.db.insert_article({
             "url": "https://x.example/ocr-article",
             "title": "工控安全新品发布",
@@ -49,7 +55,7 @@ class EnrichMarkdownRefreshTests(unittest.TestCase):
         aid = self.db.insert_article({
             "url": "https://x.example/normal",
             "title": "行业观察",
-            "content": "这是清洗后的摘要正文内容。",
+            "content": "这是清洗后的摘要正文内容。" + self.BODY_FILLER,
             "raw_content": "<h1>行业观察</h1><p>这是清洗后的摘要正文内容，原始页面包含更多细节。</p>",
             "extraction_method": "newspaper3k",
             "matched_keywords": ["行业观察"],

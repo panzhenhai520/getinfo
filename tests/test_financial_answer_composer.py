@@ -431,6 +431,11 @@ class FinancialAnswerComposerServiceTest(unittest.TestCase):
             return_value="family_office",
         ), patch.object(
             chat_api._cfg, "FINANCIAL_INTELLIGENCE_ENABLED", True,
+        ), patch.object(
+            # 金融能力还有一层分阶段放量闸门（financial_rollout）：本机 .env 是
+            # FINANCIAL_ROLLOUT_STAGE=off（fail-closed），金融快照端点因此 404。
+            # 这里把放量阶段提到覆盖 snapshot_readonly，才能测到端点本身。
+            chat_api._cfg, "FINANCIAL_ROLLOUT_STAGE", "snapshot_readonly",
         ):
             response = client.get(
                 f"/api/financial/snapshots/{self.snapshot_id}",

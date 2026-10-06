@@ -175,7 +175,11 @@ class IndustryPackActivationTest(unittest.TestCase):
             hashlib.sha256(backup_path.read_bytes()).hexdigest(),
             result["backup"]["sha256"],
         )
-        with sqlite3.connect(backup_path) as backup:
+        # sqlite3.Connection 的上下文管理器只提交/回滚，**不会关闭连接**；
+        # 在 Windows 上未关闭的句柄会让 tearDown 的 TemporaryDirectory.cleanup()
+        # 因 "另一个程序正在使用此文件" 失败，因此必须显式 close。
+        backup = sqlite3.connect(backup_path)
+        try:
             self.assertEqual(backup.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             # Backup happens before the activation transaction by design.
             self.assertEqual(
@@ -184,6 +188,8 @@ class IndustryPackActivationTest(unittest.TestCase):
                 ).fetchone()[0],
                 0,
             )
+        finally:
+            backup.close()
         self.assertEqual(self._setting("active_industry_pack_id"), "education_news")
         self.assertEqual(
             self._setting("active_industry_pack_version_id"), str(version["id"])

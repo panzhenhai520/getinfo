@@ -7,6 +7,18 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+config.DATABASE_TYPE = "sqlite"  # noqa: E402
+
+# 本机 .env 是 DATABASE_TYPE=postgres 且指向共享主库，而 SQLiteDatabase(path) 是按
+# config.DATABASE_TYPE 选后端的（传路径并不会改后端）。不隔离时这个文件会真的连主库：
+#   * 用例里的 enqueue_job/claim_jobs 写进主库 intel_jobs（实测留下 lane-long /
+#     lane-rss / old-rss 三条测试作业，created_at 2026-10-04）；
+#   * sqlite_database 的全局单例在导入期就按 postgres 建连，直跑时打印
+#     「PostgreSQL主库连接成功: 127.0.0.1:5432/collectinfo」。
+# 本类验证的本来就是 SQLite 的锁/WAL/队列语义，所以在导入期（任何业务模块被导入之前）
+# 就强制切 sqlite。pytest 下 tests/conftest.py 已经强制过，这一行是对 unittest 直跑
+# （python tests/test_financial_resource_isolation.py）的兜底，与仓库里其它用例
+# （test_article_noise_clean.py / test_tts_master_switch.py 等）的做法一致。
 from financial_artifacts import FinancialArtifactStore, FinancialPersistenceError
 from financial_provider_contract import RateLimitedError
 from financial_provider_router import FinancialProviderRouter
@@ -79,22 +91,27 @@ class FinancialResourceIsolationTest(unittest.TestCase):
                 context.raise_if_cancelled()
             return {"status": "completed"}
 
-        long_worker = IntelWorker(
-            repository=IntelRepository(long_db),
-            worker_id="long-lane",
-            financial_dispatcher=FinancialJobDispatcher(
-                {"financial_research": long_research}, settings=ENABLED_SETTINGS
-            ),
-            heartbeat_seconds=0.02,
-        )
-        core_worker = IntelWorker(
-            repository=IntelRepository(core_db),
-            worker_id="core-lane",
-            financial_dispatcher=FinancialJobDispatcher(
-                {}, settings=ENABLED_SETTINGS
-            ),
-            heartbeat_seconds=0.02,
-        )
+        # IntelWorker.__init__ 用全局 config 的 FINANCIAL_INTELLIGENCE_ENABLED /
+        # TRADING_AGENTS_ENABLED 决定要不要挂上「注入的」financial_dispatcher：
+        # 本机 .env 两项都是 false，注入的 dispatcher 会被丢掉，长任务 lane 领不到
+        # financial_research（research_started 永远不置位）。构造期显式打开。
+        with patch.object(config, "FINANCIAL_INTELLIGENCE_ENABLED", True):
+            long_worker = IntelWorker(
+                repository=IntelRepository(long_db),
+                worker_id="long-lane",
+                financial_dispatcher=FinancialJobDispatcher(
+                    {"financial_research": long_research}, settings=ENABLED_SETTINGS
+                ),
+                heartbeat_seconds=0.02,
+            )
+            core_worker = IntelWorker(
+                repository=IntelRepository(core_db),
+                worker_id="core-lane",
+                financial_dispatcher=FinancialJobDispatcher(
+                    {}, settings=ENABLED_SETTINGS
+                ),
+                heartbeat_seconds=0.02,
+            )
         core_worker.register_handler(
             "classification", lambda payload: {"article_id": payload["article_id"]}
         )
@@ -131,27 +148,43 @@ class FinancialResourceIsolationTest(unittest.TestCase):
         self.assertEqual(long_result["completed"], 1)
 
     def test_queue_priority_aging_prevents_old_rss_starvation(self):
+        """等待积分（aging）能把久等的低优先级分类作业顶到新到的高优先级作业前面。
+
+        ⚠️ 优先级差值必须落在等待积分上限 INTEL_JOB_PRIORITY_AGING_CAP 之内：
+        该上限是 2026-10-06「优先级语义收口」刻意引入的（config.py 注释 + 
+        tests/test_job_priority_semantics.py::test_aging_cap_alone_cannot_prevent_starvation），
+        目的就是让「新鲜的高优先级作业」赢过「等得再久的低优先级作业」；
+        差值超过上限的场景不再由 aging 兜底，而是由 worker 的饥饿保留名额
+        （claim_jobs(starved_before=...)）负责。原夹具用 -20 vs 100（差值 120 > 上限 90），
+        无论等多久都不可能翻盘，属于上限引入前的旧语义。
+        这里保持断言不变，改用差值 70（-20 vs 50）：不 aging 就是新作业先领，
+        aging 生效后老作业以 70 反超 50。
+        """
         with tempfile.TemporaryDirectory() as temp_dir:
             database = SQLiteDatabase(str(Path(temp_dir) / "aging.sqlite3"))
-            self.assertTrue(database.connect())
-            self.assertTrue(database.create_tables())
-            repository = IntelRepository(database)
-            old_id, _ = repository.enqueue_job(
-                "classification", "old-rss", {"article_id": 1}, priority=-20
-            )
-            new_id, _ = repository.enqueue_job(
-                "classification", "new-high", {"article_id": 2}, priority=100
-            )
-            database.connection.execute(
-                "UPDATE intel_jobs SET created_at='2026-01-01T00:00:00Z' WHERE id=?",
-                (old_id,),
-            )
-            claimed = repository.claim_jobs(
-                "aging-worker", job_types=["classification"], limit=1
-            )
-            self.assertEqual([item["id"] for item in claimed], [old_id])
-            self.assertNotEqual(old_id, new_id)
-            database.disconnect()
+            try:
+                self.assertTrue(database.connect())
+                self.assertTrue(database.create_tables())
+                repository = IntelRepository(database)
+                old_id, _ = repository.enqueue_job(
+                    "classification", "old-rss", {"article_id": 1}, priority=-20
+                )
+                new_id, _ = repository.enqueue_job(
+                    "classification", "new-high", {"article_id": 2}, priority=50
+                )
+                database.connection.execute(
+                    "UPDATE intel_jobs SET created_at='2026-01-01T00:00:00Z' WHERE id=?",
+                    (old_id,),
+                )
+                claimed = repository.claim_jobs(
+                    "aging-worker", job_types=["classification"], limit=1
+                )
+                self.assertEqual([item["id"] for item in claimed], [old_id])
+                self.assertNotEqual(old_id, new_id)
+            finally:
+                # Windows 上临时目录清理需要先关连接，否则断言失败时会叠加
+                # PermissionError/NotADirectoryError，掩盖真正的失败原因。
+                database.disconnect()
 
     def test_provider_slots_are_bounded_per_source_and_rate_limits_cool_down(self):
         controller = ProviderAdmissionController(2, 1)

@@ -277,6 +277,20 @@ class FinancialSSETest(unittest.TestCase):
         app.config.update(TESTING=True)
         app.register_blueprint(chat_api.chat_bp)
         self.client = app.test_client()
+        # /api/chat/send 带 @login_required（问答 run 归属需要登录身份），本文件断言的是
+        # 旧链路/金融 SSE 契约，所以这里显式给一个管理员会话。
+        auth_patcher = patch(
+            "decorators.user_db.verify_session",
+            return_value={"user_id": 1, "username": "tester", "role": "admin"},
+        )
+        auth_patcher.start()
+        self.addCleanup(auth_patcher.stop)
+        self.client.set_cookie("localhost", "session_token", "test-session-token")
+        # 统一 QA 网关可用时会接管 /api/chat/send（走 QA 链路，不再产生金融 SSE 事件），
+        # 而本文件测的是该网关不可用时的回落链路，所以固定为不可用。
+        unified_patcher = patch.object(chat_api, "_unified_qa_available", return_value=False)
+        unified_patcher.start()
+        self.addCleanup(unified_patcher.stop)
         self.payload = {
             "model": "local",
             "messages": [{"role": "user", "content": "腾讯现在股价"}],
@@ -435,54 +449,63 @@ class FinancialSSETest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database = SQLiteDatabase(str(Path(directory) / "financial-report.sqlite3"))
             self.assertTrue(database.connect())
-            self.assertTrue(database.create_tables())
-            database.connection.execute(
-                "INSERT INTO financial_research_runs(id, trigger_type, scope_type, status) "
-                "VALUES('research-run-fixture', 'chat', 'market', 'completed')"
-            )
-            cursor = database.connection.execute(
-                """
-                INSERT INTO financial_final_reports(
-                    research_run_id, report_status, recommendation, confidence,
-                    title, executive_summary, report_markdown, risk_summary_json,
-                    suitability_notice, disclaimer, observed_at, fetched_at, verified_at
-                ) VALUES(?, 'verified', 'hold', 0.7, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    "research-run-fixture",
-                    "终极报告",
-                    "测试摘要",
-                    "# 终极报告\n\n正文",
-                    '{"risk":"medium"}',
-                    "仅适用于测试范围",
-                    "不构成投资建议",
-                    "2026-07-31T02:59:00Z",
-                    "2026-07-31T02:59:30Z",
-                    "2026-07-31T03:00:00Z",
-                ),
-            )
-            report_id = int(cursor.lastrowid)
-            with patch("sqlite_database.sqlite_db", database), patch(
-                "decorators.user_db.verify_session",
-                return_value={"user_id": 1, "role": "admin"},
-            ), patch(
-                "intel_database.intel_repository.active_industry_pack_id",
-                return_value="family_office",
-            ), patch.object(
-                chat_api._cfg, "FINANCIAL_INTELLIGENCE_ENABLED", True,
-            ), patch.object(
-                chat_api._cfg, "TRADING_AGENTS_ENABLED", True,
-            ):
-                response = self.client.get(
-                    f"/api/financial/reports/{report_id}",
-                    headers={"Authorization": "Bearer fixture"},
+            # Windows 上临时目录删除要求 SQLite 连接先关闭；用 finally 保证断言失败时
+            # 也会释放，否则清理阶段抛 WinError 32/267 会盖掉真正的失败原因。
+            try:
+                self.assertTrue(database.create_tables())
+                database.connection.execute(
+                    "INSERT INTO financial_research_runs(id, trigger_type, scope_type, status) "
+                    "VALUES('research-run-fixture', 'chat', 'market', 'completed')"
                 )
-            self.assertEqual(response.status_code, 200)
-            payload = response.get_json()["report"]
-            self.assertEqual(payload["report_id"], report_id)
-            self.assertEqual(payload["report_status"], "verified")
-            self.assertNotIn("report_json", payload)
-            database.disconnect()
+                cursor = database.connection.execute(
+                    """
+                    INSERT INTO financial_final_reports(
+                        research_run_id, report_status, recommendation, confidence,
+                        title, executive_summary, report_markdown, risk_summary_json,
+                        suitability_notice, disclaimer, observed_at, fetched_at, verified_at
+                    ) VALUES(?, 'verified', 'hold', 0.7, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "research-run-fixture",
+                        "终极报告",
+                        "测试摘要",
+                        "# 终极报告\n\n正文",
+                        '{"risk":"medium"}',
+                        "仅适用于测试范围",
+                        "不构成投资建议",
+                        "2026-07-31T02:59:00Z",
+                        "2026-07-31T02:59:30Z",
+                        "2026-07-31T03:00:00Z",
+                    ),
+                )
+                report_id = int(cursor.lastrowid)
+                with patch("sqlite_database.sqlite_db", database), patch(
+                    "decorators.user_db.verify_session",
+                    return_value={"user_id": 1, "role": "admin"},
+                ), patch(
+                    "intel_database.intel_repository.active_industry_pack_id",
+                    return_value="family_office",
+                ), patch.object(
+                    chat_api._cfg, "FINANCIAL_INTELLIGENCE_ENABLED", True,
+                ), patch.object(
+                    chat_api._cfg, "TRADING_AGENTS_ENABLED", True,
+                ), patch.object(
+                    # 金融能力还有一层分阶段放量闸门（financial_rollout）：本机 .env 是
+                    # FINANCIAL_ROLLOUT_STAGE=off（fail-closed），报告能力因此整体关闭并返回
+                    # 404。这里把放量阶段提到覆盖 stock_research，才能测到报告端点本身。
+                    chat_api._cfg, "FINANCIAL_ROLLOUT_STAGE", "stock_research",
+                ):
+                    response = self.client.get(
+                        f"/api/financial/reports/{report_id}",
+                        headers={"Authorization": "Bearer fixture"},
+                    )
+                self.assertEqual(response.status_code, 200)
+                payload = response.get_json()["report"]
+                self.assertEqual(payload["report_id"], report_id)
+                self.assertEqual(payload["report_status"], "verified")
+                self.assertNotIn("report_json", payload)
+            finally:
+                database.disconnect()
 
 
 if __name__ == "__main__":

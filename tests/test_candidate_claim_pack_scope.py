@@ -75,8 +75,10 @@ class CandidateClaimPackScopeTests(unittest.TestCase):
 
     def test_claim_without_pack_keeps_legacy_activation_filter(self):
         fresh = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        # 候选项必须命中行业包锚点词才会 should_queue=1：healthcare_news 的锚点是
+        # HIS/电子病历/智慧医院 这类专有词，"医疗健康产业新事件"这种泛描述命中不了。
         found = self._discover(
-            "healthcare_news", "https://health.example/h2", "医疗健康产业新事件",
+            "healthcare_news", "https://health.example/h2", "电子病历评级新政策",
             published_at=fresh, activation_id="activation-education",
         )
         self.assertTrue(found["should_queue"])

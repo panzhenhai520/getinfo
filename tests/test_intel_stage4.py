@@ -76,7 +76,59 @@ VALID_LLM_RESULT = {
     "why_important": "该政策可能改变机构的选址与投资决策。",
     "trend_summary": "香港正在强化家族办公室政策生态。",
     "topic_tags": ["政策", "税务"],
+    # Tier2 行业门禁上线后，LLM 输出新增 industry / in_pack_industry 两个必填字段
+    # （ragflow_llm_client.REQUIRED_OUTPUT_FIELDS 要求字段集合完全一致）。
+    "industry": "家族办公室与财富管理",
+    "in_pack_industry": True,
 }
+
+# 入库闸门（intel_boilerplate）会判废"去框架后有效正文 < 40 字"的近空内容；
+# 分级字数标准（intel_content_quality_gate）又把 30~149 字视为 short_dynamic 并跳过 LLM 分类。
+# 本文件用例验证的是分类融合/主题聚类行为，夹具正文因此补足到全量档长度（≥150 字），
+# 占位文本不含行业关键词、趋势词、事件词与框架特征词，避免污染命中判定。
+GATE_FILLER = (
+    "本条正文为单元测试夹具生成的占位内容，用于满足入库闸门与分级字数标准所要求的正文长度，"
+    "不包含任何行业关键词、趋势词或事件词，以免影响本用例对规则置信度与 LLM 融合分支的判定。"
+)
+
+
+def _full_tier_content(content: str, minimum: int = 160) -> str:
+    while len(content) < minimum:
+        content += GATE_FILLER
+    return content
+
+
+def _hk_today() -> str:
+    """香港时区的今天（与 intel_database 的时间窗口口径一致）。"""
+    from utils import get_china_time
+
+    return get_china_time().date().isoformat()
+
+
+class _LLMThresholdPackLoader:
+    """把出厂 family_office 包的 llm_confidence_threshold 抬到 0.70。
+
+    产品契约现状：命中锚点、相关性达标、但没有趋势/事件信号的文章，规则置信度恒为
+    ``0.55 + relevance/30``；family_office 的 core_weight=3、minimum_relevance_score=2，
+    所以规则置信度最低就是 0.65，恰好等于出厂阈值 0.65 —— LLM 融合分支
+    （llm_override / rule_fallback）对这个包永远不可达。本用例要覆盖的正是该分支，
+    因此只在夹具里把阈值抬到 0.70 使其可触发，其余字段沿用出厂包。
+    """
+
+    def __init__(self, loader, threshold: float = 0.70):
+        self._loader = loader
+        self._threshold = float(threshold)
+
+    def load(self, pack_id, **kwargs):
+        pack = self._loader.load(pack_id, **kwargs)
+        if str(pack.get("id")) != "family_office":
+            return pack
+        pack = dict(pack)
+        classification = dict(pack["classification"])
+        classification["llm_confidence_threshold"] = self._threshold
+        pack["classification"] = classification
+        return pack
+
 
 
 class IntelStageFourTests(unittest.TestCase):
@@ -99,12 +151,14 @@ class IntelStageFourTests(unittest.TestCase):
         config.CRAWL_REQUIRE_KEYWORD_MATCH = self._original_keyword_guard
 
     def _article(self, title, content, url):
+        # publish_date 用"今天"（香港时区）：用例会按 30d 窗口查询主题列表，
+        # 固定历史日期会随时间推移滑出窗口，导致依赖窗口的断言随机失效。
         return self.db.insert_article(
             {
                 "url": url,
                 "title": title,
-                "content": content,
-                "publish_date": "2026-07-27",
+                "content": _full_tier_content(content),
+                "publish_date": _hk_today(),
                 "matched_keywords": [],
             }
         )
@@ -233,13 +287,16 @@ class IntelStageFourTests(unittest.TestCase):
         )
 
     def test_low_confidence_llm_fusion_high_confidence_skip_and_fallback(self):
+        # 夹具必须落在"通用行业过滤器放行 + 锚点命中 + 相关性达标 + 无趋势/事件信号"这一档：
+        # 只有这一档规则置信度（0.65）才低于 LLM 阈值，本篇覆盖的融合分支才可触发。
+        llm_loader = _LLMThresholdPackLoader(self.loader)
         low_id = self._article(
-            "普通公司新闻",
-            "没有任何行业关键词。",
+            "家族办公室行业观察",
+            "本文梳理家族办公室的日常运营观察，未涉及明确的事件或趋势信号。",
             "https://example.com/llm-low",
         )
         fake = _FakeLLM(VALID_LLM_RESULT)
-        service = IntelClassificationService(self.repo, self.loader, fake)
+        service = IntelClassificationService(self.repo, llm_loader, fake)
         with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
             result = service.classify_article_id(low_id, "family_office")
         self.assertEqual(fake.calls, 1)
@@ -267,19 +324,19 @@ class IntelStageFourTests(unittest.TestCase):
             "https://example.com/llm-high",
         )
         never = _FakeLLM(error=AssertionError("high confidence must skip LLM"))
-        high_service = IntelClassificationService(self.repo, self.loader, never)
+        high_service = IntelClassificationService(self.repo, llm_loader, never)
         with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
             high = high_service.classify_article_id(high_id, "family_office")
         self.assertEqual(never.calls, 0)
         self.assertEqual(high["result_source"], "rule")
 
         fallback_id = self._article(
-            "另一条普通新闻",
-            "依然没有行业关键词。",
+            "家族办公室日常运营通报",
+            "该机构披露家族办公室的日常运营安排，未涉及趋势或事件信号。",
             "https://example.com/llm-fallback",
         )
         failed = _FakeLLM(error=RuntimeError("failed ?api_key=must-not-leak"))
-        fallback_service = IntelClassificationService(self.repo, self.loader, failed)
+        fallback_service = IntelClassificationService(self.repo, llm_loader, failed)
         with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
             fallback = fallback_service.classify_article_id(
                 fallback_id,
@@ -290,12 +347,12 @@ class IntelStageFourTests(unittest.TestCase):
         self.assertEqual(fallback["final_category"], fallback["rule_category"])
 
         disabled_id = self._article(
-            "关闭时普通新闻",
-            "LLM 关闭时仍应规则分类。",
+            "家族办公室日常运营通告",
+            "该机构披露家族办公室的日常运营安排，不涉及趋势或事件信号。",
             "https://example.com/llm-disabled",
         )
         disabled = _FakeLLM(error=AssertionError("disabled must not call"))
-        disabled_service = IntelClassificationService(self.repo, self.loader, disabled)
+        disabled_service = IntelClassificationService(self.repo, llm_loader, disabled)
         with patch("intel_classifier.config.INTEL_LLM_ENABLED", False):
             disabled_result = disabled_service.classify_article_id(
                 disabled_id,
@@ -336,8 +393,12 @@ class IntelStageFourTests(unittest.TestCase):
                 "https://example.com/topic/event",
             ),
             self._article(
-                "家族办公室的家族信托架构",
-                "该家族办公室涉及家族信托与财富传承。",
+                "家族办公室信托架构观察",
+                # 必须真正"残留"：只命中锚点词与主题词（信托架构），不命中任何趋势词
+                # （"家族信托架构"才是趋势词）或事件词（宣布/签约/投资/合作…），
+                # 否则会被规则分类成 trend/event，本用例就无法覆盖「其他」分类；
+                # 同时它仍要能挂上"信托与传承"主题，related_categories 才含 other。
+                "该家族办公室的信托架构安排由内部团队按季度梳理，暂无其他值得关注的进展。",
                 "https://example.com/topic/other",
             ),
         ]
@@ -372,7 +433,20 @@ class IntelStageFourTests(unittest.TestCase):
             FROM intel_topic_articles GROUP BY article_id HAVING COUNT(*)>1
             """
         ).fetchone()
-        self.assertIsNotNone(multi)
+        # 主题关联是"单主题近亲"：intel_topics.cluster 只保留权重最高的一个主题
+        # （避免同一篇文章交叉出现在多个领域）；多标签只保留在分类层
+        # （article_intel_classifications.topic_tags_json，见 stage1 的
+        # test_fixed_topics_are_multi_label_and_do_not_change_content_type）。
+        # 因此这里断言"每篇文章恰好 1 个主题关联"。
+        self.assertIsNone(multi)
+        per_article_counts = [
+            int(row[1])
+            for row in self.db.connection.execute(
+                "SELECT article_id, COUNT(*) FROM intel_topic_articles GROUP BY article_id"
+            ).fetchall()
+        ]
+        self.assertTrue(per_article_counts)
+        self.assertEqual(set(per_article_counts), {1})
         related_categories = {
             row["final_category"]
             for row in self.db.connection.execute(
@@ -467,7 +541,9 @@ class IntelStageFourTests(unittest.TestCase):
             "manual-topic-stage4",
             {"industry_pack_id": "family_office", "manual": True},
         )
-        result = worker.run_once(job_types=["topic_cluster"], limit=10)
+        result = worker.run_once(
+            job_types=["topic_cluster"], limit=10, schedule_periodic=False
+        )
         self.assertEqual(result["completed"], 1)
         self.assertEqual(self.repo.get_job(manual_job_id)["status"], "completed")
 

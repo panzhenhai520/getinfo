@@ -16,6 +16,17 @@ from sqlite_database import SQLiteDatabase  # noqa: E402
 class ManualArticlesTests(unittest.TestCase):
     """手动发文：草稿保存/发布直入 articles，不送 LLM 管线"""
 
+    # 入库闸门（intel_boilerplate）会判废"去框架后有效正文 < 40 字"的近空内容，
+    # 手动发文的正文同样过闸门；本类用例验证的是发布链路而不是闸门本身，
+    # 因此给编辑器正文补足真实长度（占位文本不含行业关键词与框架特征词）。
+    BODY_FILLER = (
+        "<p>本条正文为单元测试夹具生成的占位内容，用于满足入库闸门对有效正文字数的要求，"
+        "不包含任何行业关键词，以免影响本用例对发布链路行为的判定。</p>"
+    )
+
+    def _body(self, body_html: str) -> str:
+        return body_html + self.BODY_FILLER
+
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db = SQLiteDatabase(str(Path(self.temp_dir.name) / "manual.sqlite3"))
@@ -69,7 +80,7 @@ class ManualArticlesTests(unittest.TestCase):
             "topic_key": "model_releases", "topic_name": "模型发布",
             "url": "", "title": "手动 AI 文章",
             "tags": ["大模型"], "keywords": ["大模型"], "trend_words": ["模型发布"],
-            "content_html": "<p>正文。</p>",
+            "content_html": self._body("<p>正文。</p>"),
         })
         result = manual_articles.publish_manual_article(self.db, draft["id"])
         cur = self.db.connection.cursor()
@@ -97,10 +108,14 @@ class ManualArticlesTests(unittest.TestCase):
     def test_published_draft_cannot_re_publish(self):
         import manual_articles
         draft = manual_articles.save_manual_article(self.db, {
-            "industry_pack_id": "ai_news", "title": "发布一次", "content_html": "<p>x</p>",
+            # 手动发文同样过入库闸门（CRAWL_REQUIRE_KEYWORD_MATCH=true 时必须有
+            # 关键词命中），否则第一次发布就会因闸门拒绝而不是"已发布"报错。
+            "industry_pack_id": "ai_news", "title": "发布一次",
+            "keywords": ["大模型"], "tags": ["大模型"],
+            "content_html": self._body("<p>x</p>"),
         })
         manual_articles.publish_manual_article(self.db, draft["id"])
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "该草稿已发布"):
             manual_articles.publish_manual_article(self.db, draft["id"])
 
 

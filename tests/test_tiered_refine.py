@@ -188,7 +188,12 @@ class RefineMetaPersistenceTests(unittest.TestCase):
             article_id = db.insert_article({
                 "url": "https://x.example/meta",
                 "title": "分层元数据测试",
-                "content": "正文内容，长度足够。",
+                # 入库闸门（intel_boilerplate）会判废"去框架后有效正文 < 40 字"的近空内容，
+                # 这里补足真实长度（占位文本不含框架特征词）。
+                "content": (
+                    "正文内容，长度足够。"
+                    "本条正文为单元测试夹具生成的占位内容，用于满足入库闸门对有效正文字数的要求。"
+                ),
                 "matched_keywords": ["元数据"],
                 "publish_date": "2026-09-21",
             })

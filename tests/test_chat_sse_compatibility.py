@@ -65,6 +65,12 @@ class ChatSSECompatibilityTest(unittest.TestCase):
         auth_patcher.start()
         self.addCleanup(auth_patcher.stop)
         self.client.set_cookie("localhost", "session_token", "test-session-token")
+        # 统一 QA 网关可用时会接管 /api/chat/send：请求进入 QA 链路，本文件断言的
+        # 旧链路 SSE 事件（status/chunk/done、searching/search_done、error 等）不再出现。
+        # 本文件测的正是"网关不可用时的旧链路兼容契约"，所以固定为不可用。
+        unified_patcher = patch.object(chat_api, "_unified_qa_available", return_value=False)
+        unified_patcher.start()
+        self.addCleanup(unified_patcher.stop)
         self.payload = {
             "model": "local",
             "topic": "general",
@@ -250,7 +256,13 @@ class ChatSSECompatibilityTest(unittest.TestCase):
             "historyContextPending: false",
             "function showHistoryLoadIndicator()",
             "正在加载历史会话内容",
-            "requestPayload.history_context = state.loadedHistoryContext",
+            # 历史会话仍然"只在用户主动加载且待消费时"挂到请求上；8005 QA 前端移植后
+            # （提交 51a3d18）原来的单行赋值改写成了受 historyContextPending 约束的合并写法，
+            # 这里按新实现钉住同一契约。
+            "const historyContextAttached = Boolean(",
+            "state.historyContextPending && state.loadedHistoryContext.length,",
+            "requestPayload.history_context = [",
+            "requestPayload.history_source_session_id = state.loadedHistorySessionId",
             "industry_pack_id: state.intelIndustryPackId",
             "markLoadedHistoryContextConsumed()",
             "function currentAssistantName()",
