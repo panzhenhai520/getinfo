@@ -37,9 +37,9 @@ END
 """.strip()
 
 # 分类作业的优先级（数值越大越先被领取：claim 是 ORDER BY priority + 等待时长积分 DESC）。
-# 维护类作业的优先级在 -45 ~ +5 之间，这里给 150 让分类稳定排在它们前面。
-# 为什么不干脆用无穷大：aging 积分仍会让"等得极久"的作业最终插回来，避免饿死其它类型。
-_CLASSIFICATION_JOB_PRIORITY = 150
+# 维护类作业的优先级在 -45 ~ +5 之间，这里取 enqueue_job 允许的上限 100
+# （coerce_int(priority, 0, -100, 100)），让分类稳定排在它们前面。
+_CLASSIFICATION_JOB_PRIORITY = 100
 
 # A classification may legitimately finish as ``other`` when it has no industry
 # relevance at all.  That is useful for audit and model evaluation, but it must
@@ -1941,6 +1941,10 @@ class IntelRepository:
                     select_params.extend(types)
                 select_params.extend(
                     [
+                        now_text,                                   # next_retry_at 比较
+                        int(config.INTEL_JOB_PRIORITY_AGING_SECONDS),
+                        float(config.INTEL_JOB_PRIORITY_AGING_CAP),
+                        float(config.INTEL_JOB_PRIORITY_AGING_CAP),
                         now_text,
                         int(config.INTEL_JOB_PRIORITY_AGING_SECONDS),
                         limit,
@@ -1955,11 +1959,19 @@ class IntelRepository:
                       {type_sql}
                     ORDER BY (
                         priority + CAST(
-                            MAX(
-                                0.0,
-                                (julianday(?) - julianday(created_at))
-                                * 86400.0 / ?
-                            ) AS INTEGER
+                            CASE
+                                WHEN MAX(
+                                    0.0,
+                                    (julianday(?) - julianday(created_at))
+                                    * 86400.0 / ?
+                                ) > ?
+                                THEN ?
+                                ELSE MAX(
+                                    0.0,
+                                    (julianday(?) - julianday(created_at))
+                                    * 86400.0 / ?
+                                )
+                            END AS INTEGER
                         )
                     ) DESC, created_at ASC, id ASC
                     LIMIT ?

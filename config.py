@@ -249,9 +249,16 @@ INTEL_JOB_MAX_RETRIES = _env_int('INTEL_JOB_MAX_RETRIES', 3, 0, 10)
 INTEL_JOB_PRIORITY_AGING_SECONDS = _env_int(
     # 每等待多少秒给作业 +1 优先级积分。原来 30 秒太小：任何等待超过约 1 分钟的作业
     # 都会盖过任意优先级设置，优先级完全失效、退化成纯 FIFO（实测分类被 31 小时未处理的
-    # 维护类作业长期插队）。改成 600 秒后，优先级在约 10 分钟窗口内说了算，
-    # 同时保留"等得极久最终会插回来"的防饿死性质。
+    # 维护类作业长期插队）。改成 600 秒后，优先级在约 10 分钟窗口内说了算。
     'INTEL_JOB_PRIORITY_AGING_SECONDS', 600, 1, 3600
+)
+INTEL_JOB_PRIORITY_AGING_CAP = _env_int(
+    # 等待时长最多折算多少优先级积分。不设上限时"等得够久"仍会盖过一切、优先级又成摆设：
+    # 实测 28.8 小时未处理的 trend_aggregate(-45) 折算 +172，照样压过优先级 100 的分类作业。
+    # 取 90 的算法：维护类里最高的 candidate_dispatch/candidate_rescore 是 +5，
+    # 5+90=95 < 分类的 100 → 分类只要在排队就一定先被领取；分类队列空时其它类型照常执行，
+    # 不会饿死。要让维护类重新插队，把这个值调大即可。
+    'INTEL_JOB_PRIORITY_AGING_CAP', 90, 0, 3600
 )
 
 SERPAPI_API_KEY = _env_str('SERPAPI_API_KEY', '')
