@@ -2340,7 +2340,7 @@ class IntelRepository:
             rows = self.db.connection.execute(
                 """
                 SELECT worker_id, lane, pid, host, started_at, last_seen, status,
-                       inflight_count, timeout_streak, note,
+                       inflight_count, timeout_streak, note, detail_json,
                        round(EXTRACT(EPOCH FROM (now() - last_seen::timestamptz))) AS since_seen_s
                   FROM intel_worker_heartbeats ORDER BY last_seen DESC LIMIT ?
                 """,

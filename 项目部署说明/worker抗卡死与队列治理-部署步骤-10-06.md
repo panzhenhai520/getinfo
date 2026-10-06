@@ -115,7 +115,25 @@ docker exec collectinfo-intel-worker env | grep -E 'INTEL_WORKER_JOB_CONCURRENCY
 
 ## 4. 数据库自动迁移（无需手工 SQL，但要验一下）
 
-应用启动时会自动补：`intel_jobs.started_at` 列、`intel_worker_heartbeats` 表（含索引）。
+**背景（本轮实测踩到）**：PostgreSQL 主库模式下 `create_tables()` 会直接跳过所有 DDL
+（日志："PostgreSQL主库模式：跳过 SQLite DDL，使用已迁移 schema"），因此**代码新增的表/列不会自动落到生产库** ——
+第一次发布后 A/B 上 `intel_jobs.started_at` 与 `intel_worker_heartbeats` 都不存在，心跳与巡检报 `UndefinedTable`。
+本批已在 `IntelRepository._ensure()` 里加了"每进程一次"的 `ensure_intel_core_tables`（幂等），
+**只要完成了 §2 的代码发布，重启容器即自动补列建表**。
+
+若你的发布包早于该修复（或想手工确认），在两台机各跑一次一次性迁移：
+
+```bash
+docker exec -w /app collectinfo-web python -c "
+from sqlite_database import sqlite_db as db
+from intel_schema import ensure_intel_core_tables
+db._ensure_connection()
+with db.lock:
+    cur = db.connection.cursor(); ensure_intel_core_tables(cur); db.connection.commit(); cur.close()
+print('迁移完成')
+"
+```
+
 验证（任一容器内均可）：
 
 ```bash
@@ -175,13 +193,18 @@ print('分类排队:', tuple(cls))
 
 **验收标准**
 
-| 指标 | 发布前（实测基线） | 目标 |
-|---|---|---|
-| 单条作业最长运行时长 | 19.3 小时 | < 硬超时 + 巡检宽限（默认 ≤ 35 分钟） |
-| core lane 总吞吐 | 53.4 作业/小时 | ≥ 200 作业/小时（并发 8 + 不再被卡死阻塞） |
-| classification 完成 | 0.8 作业/小时 | 稳态到达（约 11 篇/小时）可被完全消化，队列深度不再单调增长 |
-| `embed_articles` 成功率 | 0%（输入超 512 token 全 500） | ≥ 95% |
-| 容器 | 全部 healthy | 全部 healthy，无重启循环 |
+| 指标 | 发布前（实测基线） | 目标 | 本轮 A 机实测（10-06 发布后） |
+|---|---|---|---|
+| 单条作业最长运行时长 | 19.3 小时 | < 硬超时 + 巡检宽限（默认 ≤ 35 分钟） | **0.05 小时**（3 分钟），无超长作业 |
+| core lane 总吞吐 | 53.4 作业/小时 | ≥ 200 作业/小时 | **129 作业/小时**（20 分钟窗口）；积压高峰小时完成 **5206 个** |
+| classification 完成 | 0.8 作业/小时 | 稳态到达可被完全消化 | **42 个/30 分钟**；积压从 **5343 → 96** |
+| classification 排队深度 | 5343 且单调增长 | 不再单调增长 | **96**（已排空），随后转入维护类作业 |
+| `embed_articles` 成功率 | 0%（超 512 token 全 500） | ≥ 95% | 客户端按 token 截断 + 缩小重试后不再整批失败（服务端 `-ub` 重启后可不截断） |
+| worker 心跳 | 无该能力 | 30 秒内有上报 | 3 条泳道心跳，`inflight=8`、`连续超时=0` |
+| 容器 | 全部 healthy | 全部 healthy，无重启循环 | web / intel-worker / qa-worker 全部 healthy |
+
+> B 机（122.10.99.195）同样验证通过：schema 自动迁移 ✓、心跳 3 条 ✓、最长运行 0.25 小时 ✓、
+> `classification` 排队 = 0（该机本就没有积压，发布后无需排空）。
 
 ---
 
