@@ -1178,7 +1178,9 @@ class CandidateCrawlerAdapter:
             ]
         else:
             matched_keywords = self.candidates.get_candidate_industry_keywords(candidate_id)
-        article_id = self.db.insert_article(
+        from article_ingest import ingest_article
+
+        article_id = ingest_article(
             {
                 "url": article_url,
                 "canonical_url": candidate["canonical_url"],
@@ -1194,7 +1196,9 @@ class CandidateCrawlerAdapter:
                 "source_method": "intel_candidate_dispatch",
                 "source_task_id": crawler_task_id,
                 "source_task_name": f"intel candidate {candidate_id}",
-            }
+            },
+            source_kind="candidate_crawler",
+            db=self.db,
         )
         if not article_id:
             article_id = self.candidates.find_article_for_candidate(candidate)

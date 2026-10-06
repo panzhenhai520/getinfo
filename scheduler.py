@@ -1672,7 +1672,9 @@ class TaskScheduler:
                             rejected_articles.append(str(review.get('reason') or '内容未准入'))
                             expanded_urls += int(review.get('expanded') or 0)
                             continue
-                        article_id = sqlite_db.insert_article(article)
+                        from article_ingest import ingest_article
+
+                        article_id = ingest_article(article, source_kind="scheduled_crawl")
                         if article_id:
                             article_ids.append(article_id)
                             if crawl_task_id:

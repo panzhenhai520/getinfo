@@ -546,13 +546,15 @@ def smart_extract_articles():
                 try:
                     # 检查是否已存在
                     if not sqlite_db.check_article_exists(link['url']):
-                        sqlite_db.add_article({
+                        from article_ingest import ingest_article
+
+                        ingest_article({
                             'url': link['url'],
                             'title': link['title'],
                             'source_url': data.get('task_url', ''),
                             'crawl_time': get_china_time().strftime('%Y-%m-%d %H:%M:%S'),
                             'extraction_method': 'link_only'
-                        })
+                        }, source_kind='smart_extraction_link')
                         link_saved_count += 1
                 except Exception as e:
                     print(f"⚠️ 链接入库失败: {link['url']}: {e}")
@@ -698,7 +700,11 @@ def smart_extract_articles():
                                 if source_info and source_info['category_name']:
                                     print(f"📁 自动关联分类: {source_info['category_name']}")
                                 
-                                article_id = sqlite_db.insert_article(article_data)
+                                from article_ingest import ingest_article
+
+                                article_id = ingest_article(
+                                    article_data, source_kind='smart_extraction'
+                                )
                                 if article_id:
                                     print(f"✅ SQLite入库成功 (ID: {article_id}): {title[:30]}...")
                                 else:

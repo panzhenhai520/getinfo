@@ -444,7 +444,11 @@ def incremental_crawl_task():
                                     'extraction_method': 'incremental_crawl',
                                     'quality_score': result.get('score', 0)
                                 }
-                                article_id = sqlite_db.insert_article(article_data)
+                                from article_ingest import ingest_article
+
+                                article_id = ingest_article(
+                                    article_data, source_kind="incremental_crawl"
+                                )
                                 if article_id:
                                     print(f"✅ SQLite入库成功 (ID: {article_id}): {title[:30]}... 发布日期: {link.get('publish_date', '无')}")
                                 else:

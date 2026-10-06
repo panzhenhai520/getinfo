@@ -656,7 +656,13 @@ class AuthenticatedCrawler:
                                         'matched_keywords': matched_keywords_str
                                     }
                                     
-                                    saved = sqlite_db.insert_article(article_data)
+                                    from article_ingest import ingest_article
+
+                                    saved = ingest_article(
+                                        article_data,
+                                        source_kind="article_link_crawl",
+                                        db=sqlite_db,
+                                    )
                                     if saved:
                                         new_count += 1
                                         print(f"    ✅ 成功 (内容: {len(content)} 字符)")
@@ -738,7 +744,13 @@ class AuthenticatedCrawler:
                                     'crawled_at': get_china_time().isoformat(),
                                     'matched_keywords': matched_keywords_str
                                 }
-                                saved = sqlite_db.insert_article(article_data)
+                                from article_ingest import ingest_article
+
+                                saved = ingest_article(
+                                    article_data,
+                                    source_kind="article_link_crawl",
+                                    db=sqlite_db,
+                                )
                                 if saved:
                                     new_count += 1
                                 else:

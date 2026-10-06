@@ -224,7 +224,9 @@ def ingest_remote_result(db, result: dict[str, Any], *, configured_url: str, key
             'source_task_name': task_name,
             'remote_job_id': job_id,
         }
-        article_id = db.insert_article(article_data)
+        from article_ingest import ingest_article
+
+        article_id = ingest_article(article_data, source_kind="remote_result", db=db)
         if not article_id:
             continue
         # 记录原稿(未展示用)与展示状态：精炼后 active(可见)，否则 processing(不展示)

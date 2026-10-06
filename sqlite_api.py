@@ -110,7 +110,9 @@ def insert_article():
                 'error': '缺少文章数据'
             }), 400
         
-        article_id = sqlite_db.insert_article(data)
+        from article_ingest import ingest_article
+
+        article_id = ingest_article(data, source_kind="api_insert")
         if article_id:
             return jsonify({
                 'success': True,

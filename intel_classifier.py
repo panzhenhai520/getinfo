@@ -627,26 +627,30 @@ class IntelClassificationService:
                 "article_content_hash": self.repository.article_content_hash(article),
             }
         )
-        # 禁止兜底归包：未命中行业包锚点词（或相关性低于阈值）的文章不得落分类行。
-        # 历史行为会把这类"other"兜底结果也写入一行（典型：默认包混入全库噪声），
-        # 现改为跳过写入；若存在历史兜底行则一并清除，供批量重分类收敛存量数据。
+        # 归属成为必填产出：未命中行业包锚点词（或相关性低于阈值）的文章不得作为真实分类，
+        # 但也不允许"不归包"——一律降级为兜底归属，落在本包「其他」分类，
+        # 保证页面看得到、问答检索也搜得到；后续命中时会由真实分类覆盖升级。
         _score_details = result.get("score_details") or {}
         _hits = _score_details.get("hits") or {}
         _anchors = _hits.get("anchor") or []
         _relevance = float(_score_details.get("relevance_score") or 0.0)
         _minimum = float(_score_details.get("minimum_relevance_score") or 0.0)
         if not _anchors or _relevance < _minimum:
-            try:
-                self.repository.delete_article_classification(
-                    int(article_id), pack["id"]
-                )
-            except Exception as _del_exc:
-                print(
-                    f"⚠️ 清理历史兜底分类行失败 article={article_id} pack={pack['id']}: {_del_exc}"
-                )
-            result["_not_classified"] = True
+            _fallback_reason = "未命中行业包锚点词，降级为兜底归属（归入「其他」分类）"
+            result["rule_category"] = "other"
             result["final_category"] = "other"
-            result["final_reason"] = "未命中行业包锚点词，不归包（禁止兜底）"
+            result["rule_confidence"] = min(float(result.get("rule_confidence") or 0.0), 0.3)
+            result["final_confidence"] = result["rule_confidence"]
+            result["rule_reason"] = _fallback_reason
+            result["final_reason"] = _fallback_reason
+            result["result_source"] = "fallback_attribution"
+            result["_not_classified"] = True
+            try:
+                result["classification_id"] = self.repository.upsert_classification(result)
+            except Exception as _fb_exc:
+                print(
+                    f"⚠️ 兜底归属写入失败 article={article_id} pack={pack['id']}: {_fb_exc}"
+                )
             return result
         classification_id = self.repository.upsert_classification(result)
         result["classification_id"] = classification_id

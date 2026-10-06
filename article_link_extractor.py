@@ -2208,8 +2208,10 @@ class ArticleLinkExtractor:
             
             # 📅 日期已在聚合前检查过，这里不再重复检查（提高效率）
             
-            # 2. 保存到数据库
-            article_id = self.db.insert_article(article_result)
+            # 2. 保存到数据库（统一入库入口，见 article_ingest.py）
+            from article_ingest import ingest_article
+
+            article_id = ingest_article(article_result, source_kind="article_link_crawl", db=self.db)
             
             if article_id:
                 if task_id:

@@ -1931,12 +1931,39 @@ class SQLiteDatabase:
                         content_markdown
                     )
                     
+                    # 框架页判废（最终入库闸门，所有入库路径共享）：
+                    # 正文整页都是分享/评论/热文推荐等模板文字、几乎没有有效段落时直接不入库。
+                    # 实例：2016亚太财富论坛…风云榜，410 字全是页面框架，曾进库并污染知识库。
+                    try:
+                        from intel_boilerplate import assess as _assess_boilerplate
+
+                        _boiler = _assess_boilerplate(content, str(article_data.get('title') or ''))
+                        if _boiler.get("is_boilerplate"):
+                            print("⏭️ 跳过页面框架（无有效正文）: %s · %s" % (
+                                str(article_data.get('title') or '无标题')[:40],
+                                str(_boiler.get("reason") or "")[:80],
+                            ))
+                            return None
+                    except Exception:
+                        pass
                     cursor.execute(insert_sql, values)
                     article_id = cursor.lastrowid
                     self.connection.commit()
                     
                     print(f"✅ 文章入库成功: {title[:30]}... (ID: {article_id})")
                     self.analyze_article_spacetime_profile(article_id)
+                    # 归属必填（收口在这里，所有入库路径共享）：
+                    # 分类任务是异步的、且关键词门禁不达标时不写分类行，所以先落一条
+                    # 兜底归属（该包的「其他」分类），异步分类之后可升级为真实分类。
+                    # 不这么做就会出现"页面看得到、AI 搜不到"（列表按关键词筛、
+                    # 检索按包归属筛，两条链路口径不一致）。
+                    # skip_pipeline 也要走这一步——编辑者定的是标签/正文，不是包归属。
+                    try:
+                        from intel_attribution import ensure_pack_attribution
+
+                        ensure_pack_attribution(self, article_id, article_data)
+                    except Exception as exc:
+                        print("⚠️ 归属兜底异常: %s" % str(exc)[:120])
                     # 手动发文（skip_pipeline）：不送 LLM 精炼、不跑自动分类——编辑者已定好标签/主题
                     if skip_pipeline:
                         return article_id
@@ -2230,6 +2257,14 @@ class SQLiteDatabase:
                     self.connection.commit()
                     print(f"✅ 文章更新成功: ID {article_id}")
                     self.analyze_article_spacetime_profile(article_id)
+                    # 归属必填：去重命中走的是 update 分支（不经过 insert 的归属收口），
+                    # 存量无归属的老文章重新抓到时会在这里补上兜底归属。
+                    try:
+                        from intel_attribution import ensure_pack_attribution
+
+                        ensure_pack_attribution(self, article_id, article_data)
+                    except Exception as exc:
+                        print("⚠️ 归属兜底异常: %s" % str(exc)[:120])
                     self._enqueue_intel_classification(article_id)
                     return article_id
                 finally:

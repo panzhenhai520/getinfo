@@ -38,7 +38,11 @@ def init_database():
                 'quality_score': 0.95
             }
             
-            article_id = db.insert_article(test_data)
+            from article_ingest import ingest_article
+
+            article_id = ingest_article(
+                test_data, source_kind="db_init_fixture", db=db
+            )
             if article_id:
                 print(f"✅ 测试数据插入成功，文章ID: {article_id}")
                 

@@ -3552,12 +3552,12 @@ def save_chat_article():
     # 写入 SQLite
     article_id = None
     try:
-        from sqlite_database import sqlite_db
-        article_id = sqlite_db.insert_article({
+        from article_ingest import ingest_article
+        article_id = ingest_article({
             'url': virtual_url, 'title': title, 'content': content,
             'domain': 'ai.chat.local', 'matched_keywords': keyword,
             'extraction_method': 'ai_chat', 'quality_score': 80,
-        })
+        }, source_kind='ai_chat')
     except Exception as e:
         print(f'[chat] 保存文章到SQLite失败: {_safe_chat_error(e)}')
 
@@ -3710,8 +3710,8 @@ def save_chat_qa_batch():
 
     article_id = None
     try:
-        from sqlite_database import sqlite_db
-        article_id = sqlite_db.insert_article({
+        from article_ingest import ingest_article
+        article_id = ingest_article({
             'url': virtual_url,
             'title': title,
             'content': content,
@@ -3719,7 +3719,7 @@ def save_chat_qa_batch():
             'matched_keywords': topic,
             'extraction_method': 'ai_chat_qa_batch',
             'quality_score': 85,
-        })
+        }, source_kind='ai_chat')
     except Exception as e:
         print(f'[chat] 批量保存问答到SQLite失败: {_safe_chat_error(e)}')
 
@@ -3878,7 +3878,9 @@ def crawl_chat_evidence_article():
             'canonical_url': source_url,
             'source_task_name': f"AI助手证据补爬：{title_hint[:80]}",
         }
-        article_id = sqlite_db.insert_article(article_data)
+        from article_ingest import ingest_article
+
+        article_id = ingest_article(article_data, source_kind='ai_chat_evidence')
         if not article_id:
             return jsonify({'success': False, 'message': '证据原文已抓取，但写入文章库失败'}), 500
         article = sqlite_db.get_article_by_id(article_id) or article_data | {'id': article_id}

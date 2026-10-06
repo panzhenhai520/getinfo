@@ -502,7 +502,9 @@ class IntelReportService:
             child_matches = [word for word in anchors if word.casefold() in f"{child_title}\n{child_text}".casefold()]
             if not child_matches:
                 continue
-            article_id = self.db.insert_article({
+            from article_ingest import ingest_article
+
+            article_id = ingest_article({
                 'url': f'{report_url}#insight-{digest[:12]}-{index}',
                 'canonical_url': f'{report_url}#insight-{digest[:12]}-{index}',
                 'title': child_title,
@@ -516,7 +518,7 @@ class IntelReportService:
                 'resolved_target_url': resolved_url,
                 'report_title': final_title,
                 'llm_suggested_category': insight.get('category') or 'other',
-            })
+            }, source_kind='report_insight', db=self.db)
             if article_id:
                 child_articles.append(int(article_id))
         article_id = child_articles[0] if child_articles else None

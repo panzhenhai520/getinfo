@@ -211,8 +211,7 @@ def publish_manual_article(db, draft_id: int, *, created_by: str = "") -> Dict:
     tags = draft.get("tags") or []
     trend_words = draft.get("trend_words") or []
 
-    from industry_packs import industry_pack_loader
-    pack = industry_pack_loader.load(draft.get("industry_pack_id"), use_published=False) or {}
+    pack = load_manual_pack(draft.get("industry_pack_id"))
     pack_version = str(pack.get("pack_version") or "")
 
     # 卡片/动态的行业关键词门禁（INDUSTRY_KEYWORD_GATE_SQL）要求
@@ -239,43 +238,50 @@ def publish_manual_article(db, draft_id: int, *, created_by: str = "") -> Dict:
         "hits": _manual_hits,
     }
 
+    # 统一入库收口：所有入库路径都必须走 ingest_article → insert_article，禁止再直接
+    # INSERT INTO articles。这样「关键词必中 / 框架页判废 / 未来日期校验 / 归属兜底」
+    # 这几道最终闸门对手动发文同样生效；skip_pipeline=True 表示不送 LLM 精炼、
+    # 不跑自动分类（编辑者已定好标签/主题），但入库闸门与归属兜底仍然执行。
+    # 把编辑者选的包显式传下去，归属兜底就落在同一个包上，下面的分类 upsert 可直接覆盖它。
+    from article_ingest import ingest_article
+
+    article_id = ingest_article({
+        "url": url,
+        "title": title,
+        "content": content,
+        "domain": domain,
+        "publish_date": today,
+        "content_hash": content_hash,
+        "matched_keywords": ",".join(keywords),
+        "matched_keywords_raw": ",".join(keywords),
+        "keyword_match_detail": json.dumps(keywords, ensure_ascii=False),
+        "extraction_method": "manual",
+        "quality_score": 100,
+        "crawler_engine_used": "manual",
+        "crawler_engines": "manual",
+        "crawler_attempts": 1,
+        "fallback_trigger_reason": "",
+        "source_method": "manual",
+        "source_task_id": "",
+        "source_task_name": "manual-article",
+        "configured_url": "",
+        "resolved_target_url": "",
+        "canonical_url": url,
+        "published_time_source": "manual",
+        "published_precision": "day",
+        "raw_content": content,
+        "content_markdown": content,
+        "industry_pack_id": str(draft.get("industry_pack_id") or ""),
+    }, source_kind="manual_article", db=db, skip_pipeline=True)
+    if not article_id:
+        raise ValueError("文章未通过入库闸门（无关键词命中 / 页面框架 / 日期不可信），已拒绝入库")
     with db.lock:
         cur = db.connection.cursor()
-        cur.execute(
-            """
-            INSERT INTO articles (
-                url, title, content, domain, category_id, source_url_id,
-                publish_date, content_hash, content_length, extraction_method, quality_score,
-                matched_keywords, matched_keywords_raw, keyword_match_detail,
-                crawler_engine_used, crawler_engines, crawler_attempts,
-                fallback_trigger_reason, source_method, configured_url, resolved_target_url,
-                canonical_url, source_task_id, source_task_name,
-                first_crawled, last_crawled, created_at, updated_at,
-                published_time_source, published_precision, raw_content, content_markdown
-            ) VALUES (
-                ?, ?, ?, ?, NULL, NULL,
-                ?, ?, ?, 'manual', 100,
-                ?, ?, ?,
-                'manual', 'manual', 1,
-                '', 'manual', '', '',
-                ?, '', 'manual-article',
-                datetime('now'), datetime('now'), ?, ?,
-                'manual', 'day', ?, ?
-            )
-            """,
-            (
-                url, title, content, domain,
-                today, content_hash, len(content),
-                ",".join(keywords), ",".join(keywords), json.dumps(keywords, ensure_ascii=False),
-                url,
-                now, now,
-                content, content,
-            ),
-        )
-        article_id = int(cur.lastrowid)
         # 行业包 + 主题标签关联（不跑自动分类）
         topic_tags = list(dict.fromkeys([str(draft.get("topic_name") or "").strip()] + tags))
         topic_tags = [t for t in topic_tags if t][:8]
+        # 用 upsert：insert_article 的归属兜底已经为该包写过一条（final_category='other'），
+        # 这里用编辑者指定的真实分类/主题覆盖它，而不是插入第二条（唯一索引会冲突）。
         cur.execute(
             """
             INSERT INTO article_intel_classifications (
@@ -289,6 +295,23 @@ def publish_manual_article(db, draft_id: int, *, created_by: str = "") -> Dict:
             ) VALUES (?, ?, '', ?, 'manual-v1', ?, 'event', 1.0, ?, ?, ?, '',
                       '', ?, ?, 'event', 1.0, '手动发文（编辑者指定主题）', 'manual',
                       'manual-v1', '', '', '', datetime('now'), datetime('now'), datetime('now'))
+            ON CONFLICT (article_id, industry_pack_id) DO UPDATE SET
+                industry_pack_version = excluded.industry_pack_version,
+                classifier_version = excluded.classifier_version,
+                article_content_hash = excluded.article_content_hash,
+                rule_category = excluded.rule_category,
+                rule_confidence = excluded.rule_confidence,
+                rule_reason = excluded.rule_reason,
+                score_details_json = excluded.score_details_json,
+                matched_keywords_json = excluded.matched_keywords_json,
+                trend_summary = excluded.trend_summary,
+                topic_tags_json = excluded.topic_tags_json,
+                final_category = excluded.final_category,
+                final_confidence = excluded.final_confidence,
+                final_reason = excluded.final_reason,
+                result_source = excluded.result_source,
+                classified_at = excluded.classified_at,
+                updated_at = excluded.updated_at
             """,
             (
                 article_id, draft.get("industry_pack_id"), pack_version, content_hash,
@@ -529,14 +552,29 @@ def save_editor_image(db, file_storage) -> str:
     return f"/static/uploads/editor/{filename}"
 
 
+def load_manual_pack(industry_pack_id: str) -> Dict:
+    """取该行业包的运行时定义（已发布版本优先，回退安装种子文件）。
+
+    为什么不能只用 use_published=False：embodied_ai / energy_news / climate_news 这类包
+    只存在于已发布版本表里、仓库没有种子 JSON，写死读种子文件会让手动发文直接报
+    "industry pack not found"（实测本地即如此）。
+    """
+    from industry_packs import industry_pack_loader
+
+    pack_id = str(industry_pack_id or "").strip()
+    try:
+        return industry_pack_loader.load(pack_id) or {}
+    except Exception:
+        return industry_pack_loader.load(pack_id, use_published=False) or {}
+
+
 def manual_topics_for_pack(industry_pack_id: str) -> List[Dict]:
     """该行业包可选的主题/领域（fixed_topics）+ 仪表盘分类。
 
     fixed_topics 兼容两种形态：字符串列表（如医疗包 ['智慧医院', ...]）与字典列表
     （{key,name}），避免字符串被当 dict 取 .get() 报错。
     """
-    from industry_packs import industry_pack_loader
-    pack = industry_pack_loader.load(str(industry_pack_id), use_published=False) or {}
+    pack = load_manual_pack(industry_pack_id)
     topics = []
     for t in (pack.get("fixed_topics") or []):
         if isinstance(t, dict):

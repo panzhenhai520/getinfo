@@ -2238,7 +2238,9 @@ def newspaper3k_extract():
                         'extraction_method': 'newspaper3k',
                         'task_id': task_id
                     }
-                    db.add_article(article_data)
+                    from article_ingest import ingest_article
+
+                    ingest_article(article_data, source_kind="newspaper3k", db=db)
             except Exception as db_error:
                 print(f"保存到数据库失败: {db_error}")
             
@@ -2297,7 +2299,9 @@ def newspaper3k_batch():
                                 'extraction_method': 'newspaper3k',
                                 'task_id': batch_id
                             }
-                            db.add_article(article_data)
+                            from article_ingest import ingest_article
+
+                            ingest_article(article_data, source_kind="newspaper3k", db=db)
                     except Exception as db_error:
                         print(f"保存文章到数据库失败: {db_error}")
                         
@@ -2426,7 +2430,9 @@ def newspaper3k_auto_extract():
                                 'task_id': batch_id,
                                 'source_list_url': list_url
                             }
-                            db.add_article(article_data)
+                            from article_ingest import ingest_article
+
+                            ingest_article(article_data, source_kind="newspaper3k", db=db)
                     except Exception as db_error:
                         print(f"保存文章到数据库失败: {db_error}")
                         
