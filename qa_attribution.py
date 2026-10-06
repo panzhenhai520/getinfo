@@ -749,6 +749,19 @@ class _LogprobScorer:
 
     # ---------------------------------------------------------------- 能力探测
     def _base_url(self) -> str:
+        """打分端点：优先用专门的 QA_INFLUENCE_BASE_URL，否则用本次 run 的模型端点。
+
+        为什么要这个开关：对数概率能力取决于**端点**，而不是取决于在哪台机器上跑代码。
+        实测：开发机(192.168.0.18:8081) 与 A 机(10.88.0.1:8081) 的 llama.cpp 都返回 logprobs，
+        B 机的端点(192.168.0.64:8106) 不返回 → B 只能退化到重叠代理。
+        有了这个配置，任何一台机器都可以把"打分"指向任一支持 logprobs 的端点，
+        不需要在每台机器上安装打分模型。
+        """
+        import os
+
+        override = str(os.environ.get("QA_INFLUENCE_BASE_URL", "") or "").strip()
+        if override:
+            return override.rstrip("/")
         profile = self.profile
         value = getattr(profile, "base_url", "") or ""
         if not value and isinstance(profile, Mapping):
@@ -766,6 +779,11 @@ class _LogprobScorer:
         return base if base.endswith("/v1") else base + "/v1"
 
     def _api_key(self) -> str:
+        import os
+
+        override = str(os.environ.get("QA_INFLUENCE_API_KEY", "") or "").strip()
+        if override:
+            return override
         profile = self.profile
         value = getattr(profile, "api_key", "") or ""
         if not value and isinstance(profile, Mapping):
@@ -945,21 +963,29 @@ class _LogprobScorer:
             return False
 
     def _model_id(self) -> str:
+        import os
+
+        override = str(os.environ.get("QA_INFLUENCE_MODEL_ID", "") or "").strip()
+        if override:
+            return override
         profile = self.profile
         value = getattr(profile, "model_id", "") or ""
         if not value and isinstance(profile, Mapping):
             value = profile.get("model_id") or ""
         return str(value or "local")
 
-    @staticmethod
-    def _post_json(url: str, payload: dict, *, timeout: int = 20) -> dict:
+    def _post_json(self, url: str, payload: dict, *, timeout: int = 20) -> dict:
         import json as _json
         import urllib.request
 
+        headers = {"Content-Type": "application/json"}
+        api_key = self._api_key()
+        if api_key:
+            headers["Authorization"] = "Bearer " + api_key
         request = urllib.request.Request(
             url,
             data=_json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
