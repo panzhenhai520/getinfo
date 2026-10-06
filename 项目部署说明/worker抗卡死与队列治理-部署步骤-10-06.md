@@ -327,3 +327,39 @@ with db.lock:
 **巡检建议**：上线后 24 小时内每 2 小时看一次"完成速率 / 分类排队 / 最长运行时长 / 连续超时次数"；
 若 `timeout_streak` 反复触顶（≥3）说明下游（LLM 或目标站点）不稳，此时应先查下游再调
 `INTEL_LANE_TIMEOUT_BREAKER_*`，不要盲目调大超时。
+
+---
+
+## 9. 开启行业包的 RAGFlow 增强检索（qa_retrieval_enabled）
+
+**背景**：`needs_ragflow = needs_retrieval and ragflow_qa_enabled and mode != "fast"`，
+而**所有已发布包的 `ragflow_policy.qa_retrieval_enabled` 都是 False** → 任何机器、任何问题都不走
+RAGFlow（`level2_retrieval` 直接 `skipped=true`）。种子文件里 family_office 本来是 true，
+但已发布版本漂移成了 false（已发布优先）。
+
+**做法（工具已入库）**：
+
+```bash
+# A 机（无 RAGFlow 也可以执行：开关照常发布，运行期走 kb_not_configured 兜底）
+docker cp tools/enable_pack_qa_retrieval.py collectinfo-web:/app/tools/
+docker exec -w /app collectinfo-web python tools/enable_pack_qa_retrieval.py           # 预演
+docker exec -w /app collectinfo-web python tools/enable_pack_qa_retrieval.py --apply   # 发布
+# B 机同理
+```
+
+要点与实测：
+
+| 事项 | 说明 |
+|---|---|
+| 只发布、不激活 | 工具走正规 `save_draft → publish_draft`，**不调用 activation**；实测发布期间新增作业 0 个重扫作业（A 机 37 个新增全是正常爬取流量） |
+| 激活包必须切版本 | `published_manifest_for_loader` 对**当前激活包**返回 `active_industry_pack_version_id` 指向的版本，只发布不切版本读到的还是旧值（实测 family_office 已发布 v11=True 但读到 False）。工具会做一次轻量切换（等价 `/activate-version`），只改一个 runtime setting、不触发重扫 |
+| 若确实触发了重扫作业 | 用户口径：全部删除。判定特征 = `created_by`/`dedupe_key` 命中 `pack_activation` / `industry_revalidate` / `activation` / `rescan` / `reclassify`；用 §8 的速查命令先看清单再删 |
+| 知识库解析 | B 机 9 个包全部解析到同一个 News 知识库 `acb412ec4dab…`；A 机没有 RAGFlow，解析为空但仍发布开关（以后配好即生效） |
+| 已知残留问题 | `bolean_security_compute` 的**种子 manifest 校验不通过**（`default_sources[95].source_type is invalid`），该包在 B 机无法发布新版本；与开关无关，需先修该包 manifest |
+| 验证 | B 机真实问答：`level2_retrieval enhanced=True`、知识库证据 **0 → 14 条**（耗时 6.1s） |
+
+**报告阶段（`level2_research`）仍会降级**，原因已定位：RAGFlow 侧
+`POST /v1/unified_qa/research` 返回 `400 RESEARCH_REQUEST_INVALID: research assistant is not allowlisted`
+—— 需要在 **RAGFlow 服务器（192.168.0.64）** 把本项目的 assistant_id
+（`QaPolicyResolver().resolve(pack).ragflow_app_id`，当前 `7a6e0c9cc1b411…`）加入 research 白名单。
+检索本身不受影响（那才是"增强检索"的主体），研究报告只是多一轮归纳。
