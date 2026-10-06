@@ -22,7 +22,10 @@ class _FakeRepo:
         self.failed = []
         self.db = None  # 构造 IntelWorker 时其他服务只引用，不真正访问
 
-    def claim_jobs(self, worker_id, *, job_types=None, limit=None, lease_seconds=60):
+    def claim_jobs(self, worker_id, *, job_types=None, limit=None, lease_seconds=60,
+                   starved_before=None):
+        if starved_before:
+            return []
         return self._claim
 
     def complete_job(self, job_id, result, *, lease_owner=""):

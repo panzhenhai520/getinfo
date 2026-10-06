@@ -95,6 +95,16 @@ INTEL_JOB_PRIORITY_AGING_CAP=90         # 等待积分上限：不设上限则"�
 # 分类作业的优先级由代码常量给出（intel_database._CLASSIFICATION_JOB_PRIORITY=100，
 # 即 enqueue_job 允许的上限；维护类最高 +5，折算后 95 < 100 → 分类排队时优先）
 
+# ── 防饿死保留名额（10-06 二次修复，两台都要做）─────────────
+INTEL_WORKER_STARVATION_DEADLINE_SECONDS=1800   # 等超过该秒数视为"饥饿"，走 FIFO 保留通道，默认 1800
+INTEL_WORKER_STARVATION_RESERVED_SLOTS=2        # 每次领活先给饥饿作业留的并发槽位数，默认 2；0=关闭
+# 为什么必须要有：优先级+等待积分是**有封顶**的（CAP=90），而优先级带宽是 -45~+100，
+# 所以"高优先级类型只要持续到货，低优先级类型就永远赢不了"。A 机 10-06 实测：
+# 按真实排序键取出的下 20 条全是 15 小时前的 candidate_dispatch(prio=5→eff=95)；
+# topic_cluster(-40→eff=50) 积压 1564 条、trend_aggregate(-45→eff=45) 积压 434 条，
+# 最久 32 小时且 attempt_count=0（从未被领取）。保留名额让"等太久的作业"按 FIFO 必被领取，
+# 阈值之内仍然完全按优先级（分类/候选抓取等要紧的活照常插队）。
+
 # ── 可选：按类型单独设超时（默认继承全局硬超时）────────────
 # INTEL_JOB_TIMEOUT_LIGHT_SCAN=900
 # INTEL_JOB_TIMEOUT_CANDIDATE_DISPATCH=900
@@ -106,7 +116,7 @@ INTEL_JOB_PRIORITY_AGING_CAP=90         # 等待积分上限：不设上限则"�
 cd /www/CollectInfo_latest_new        # B 机为 /home/timebot/getinfo
 docker compose -f docker-compose.prod.yml up -d --force-recreate intel-worker worker web
 sleep 10
-docker exec collectinfo-intel-worker env | grep -E 'INTEL_WORKER_JOB_CONCURRENCY|INTEL_JOB_PRIORITY|INTEL_JOB_HARD|INTEL_LANE'
+docker exec collectinfo-intel-worker env | grep -E 'INTEL_WORKER_JOB_CONCURRENCY|INTEL_JOB_PRIORITY|INTEL_JOB_HARD|INTEL_LANE|INTEL_WORKER_STARVATION'
 ```
 
 > B 机的这批变量也可以直接写进 `_b_deploy.py` 的 `LLM_ENV`，再执行 `python _b_deploy.py env` 由脚本 upsert 并重建容器（避免手改）。
@@ -322,6 +332,26 @@ from sqlite_database import sqlite_db as db; db._ensure_connection()
 with db.lock:
     for r in db.connection.execute(\"select job_type, priority, count(*) from intel_jobs where status in ('queued','retry_wait') group by 1,2 order by 3 desc limit 8\").fetchall(): print(tuple(r))
 "
+
+# 防饿死保留名额是否生效：饥饿通道里有货 + 低优先级类型开始减少
+docker exec -w /app collectinfo-web python -c "
+from datetime import timedelta
+from sqlite_database import sqlite_db as db
+from intel_contracts import utc_now, utc_text
+import config
+db._ensure_connection()
+cutoff = utc_text(utc_now() - timedelta(seconds=int(config.INTEL_WORKER_STARVATION_DEADLINE_SECONDS)))
+with db.lock:
+    row = db.connection.execute(
+        \"select count(*) as n from intel_jobs where status in ('queued','retry_wait') and created_at <= ?\",
+        (cutoff,)).fetchone()
+    print('饥饿作业（等待超过阈值）:', dict(row)['n'])
+    for r in db.connection.execute(
+        \"select job_type, count(*) as n, min(created_at) as oldest from intel_jobs where status in ('queued','retry_wait') group by 1 order by 2 desc limit 8\").fetchall():
+        print(tuple(r))
+"
+# 判定：发布后低优先级类型（topic_cluster / trend_aggregate / embed_articles / light_scan）
+# 的 n 必须持续下降、oldest 必须变新；若 30 分钟后 oldest 完全不动，说明保留名额没生效。
 ```
 
 **巡检建议**：上线后 24 小时内每 2 小时看一次"完成速率 / 分类排队 / 最长运行时长 / 连续超时次数"；

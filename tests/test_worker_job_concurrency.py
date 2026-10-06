@@ -27,7 +27,11 @@ class _StubRepository:
         self.completed = []
         self.failed = []
 
-    def claim_jobs(self, worker_id, *, job_types=None, limit=None, lease_seconds=None):
+    def claim_jobs(self, worker_id, *, job_types=None, limit=None, lease_seconds=None,
+                   starved_before=None):
+        # 饥饿保留通道在本桩里不参与（本用例只关心批次并发执行）
+        if starved_before:
+            return []
         claimed, self.jobs = self.jobs[:], []
         return claimed
 

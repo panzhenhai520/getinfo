@@ -24,7 +24,12 @@ class _JobStubRepository:
         self.failed = []
         self.completed = []
 
-    def claim_jobs(self, worker_id, *, job_types=None, limit=None, lease_seconds=None):
+    def claim_jobs(self, worker_id, *, job_types=None, limit=None, lease_seconds=None,
+                   starved_before=None):
+        # 饥饿保留通道的调用（starved_before 非空）在本桩里直接返回空，
+        # 让作业仍然由优先级通道按批次给出，保持这些用例原有的批次语义。
+        if starved_before:
+            return []
         if not self.batches:
             return []
         batch = self.batches.pop(0)

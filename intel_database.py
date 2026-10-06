@@ -1927,7 +1927,14 @@ class IntelRepository:
         job_types: Optional[Iterable[str]] = None,
         limit: Optional[int] = None,
         lease_seconds: Optional[int] = None,
+        starved_before: Optional[str] = None,
     ) -> List[Dict]:
+        """领取待执行作业。
+
+        starved_before：传入时间戳（UTC 文本）时只领取 created_at <= 该时刻的「饥饿作业」，
+        并按 FIFO（最早入队优先）排序。这是防饿死的保留名额通道——单靠「优先级+等待积分」
+        无法避免低优先级类型被持续到货的高优先级类型永久压住（实测最久 32 小时未被领取）。
+        """
         self._ensure()
         limit = coerce_int(limit, config.INTEL_WORKER_BATCH_SIZE, 1, 500)
         lease_seconds = coerce_int(
@@ -1946,6 +1953,11 @@ class IntelRepository:
             placeholders = ",".join("?" for _ in types)
             type_sql = f" AND job_type IN ({placeholders})"
             params.extend(types)
+        # 饥饿保留通道：只取最早入队的那批，按 FIFO 领取，保证低优先级类型能推进
+        starve_sql = ""
+        starved_before = str(starved_before).strip() if starved_before else ""
+        if starved_before:
+            starve_sql = " AND created_at <= ?"
         params.append(limit)
 
         with self.db.lock:
@@ -1970,20 +1982,46 @@ class IntelRepository:
                     """,
                     (now_text, now_text, now_text),
                 )
-                select_params = [now_text]
-                if types:
-                    select_params.extend(types)
-                select_params.extend(
-                    [
-                        now_text,                                   # next_retry_at 比较
-                        int(config.INTEL_JOB_PRIORITY_AGING_SECONDS),
-                        float(config.INTEL_JOB_PRIORITY_AGING_CAP),
-                        float(config.INTEL_JOB_PRIORITY_AGING_CAP),
-                        now_text,
-                        int(config.INTEL_JOB_PRIORITY_AGING_SECONDS),
-                        limit,
-                    ]
-                )
+                # 饥饿通道用 FIFO（先来先服务），普通通道用「优先级 + 等待积分」
+                if starved_before:
+                    select_params = [now_text]
+                    if types:
+                        select_params.extend(types)
+                    select_params.extend([starved_before, limit])
+                    order_sql = "created_at ASC, id ASC"
+                else:
+                    select_params = [now_text]
+                    if types:
+                        select_params.extend(types)
+                    select_params.extend(
+                        [
+                            now_text,                               # next_retry_at 比较
+                            int(config.INTEL_JOB_PRIORITY_AGING_SECONDS),
+                            float(config.INTEL_JOB_PRIORITY_AGING_CAP),
+                            float(config.INTEL_JOB_PRIORITY_AGING_CAP),
+                            now_text,
+                            int(config.INTEL_JOB_PRIORITY_AGING_SECONDS),
+                            limit,
+                        ]
+                    )
+                    order_sql = """
+                        (
+                            priority + CAST(
+                                CASE
+                                    WHEN MAX(
+                                        0.0,
+                                        (julianday(?) - julianday(created_at))
+                                        * 86400.0 / ?
+                                    ) > ?
+                                    THEN ?
+                                    ELSE MAX(
+                                        0.0,
+                                        (julianday(?) - julianday(created_at))
+                                        * 86400.0 / ?
+                                    )
+                                END AS INTEGER
+                            )
+                        ) DESC, created_at ASC, id ASC"""
                 cursor.execute(
                     f"""
                     SELECT *
@@ -1991,23 +2029,8 @@ class IntelRepository:
                     WHERE status IN ('queued', 'retry_wait')
                       AND (next_retry_at IS NULL OR next_retry_at <= ?)
                       {type_sql}
-                    ORDER BY (
-                        priority + CAST(
-                            CASE
-                                WHEN MAX(
-                                    0.0,
-                                    (julianday(?) - julianday(created_at))
-                                    * 86400.0 / ?
-                                ) > ?
-                                THEN ?
-                                ELSE MAX(
-                                    0.0,
-                                    (julianday(?) - julianday(created_at))
-                                    * 86400.0 / ?
-                                )
-                            END AS INTEGER
-                        )
-                    ) DESC, created_at ASC, id ASC
+                      {starve_sql}
+                    ORDER BY {order_sql}
                     LIMIT ?
                     """,
                     select_params,

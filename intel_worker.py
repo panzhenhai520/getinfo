@@ -24,7 +24,7 @@ from industry_pack_runtime import (
 )
 from intel_candidates import IntelCandidateRepository
 from intel_classifier import IntelClassificationService
-from intel_contracts import utc_now
+from intel_contracts import utc_now, utc_text
 from intel_database import IntelRepository, intel_repository
 from intel_light_scanner import IntelLightScanner
 from intel_sources import IntelSourceRegistry
@@ -1837,9 +1837,7 @@ class IntelWorker:
         if free > 0 and not self._lane_paused():
             self._ensure_job_pool(concurrency)
             allowed = list(job_types or self.handlers.keys())
-            jobs = self.repository.claim_jobs(
-                self.worker_id, job_types=allowed, limit=free,
-                lease_seconds=self.job_lease_seconds)
+            jobs = self._claim_for_pump(allowed, free)
             for job in jobs:
                 context = self._job_context(job)
                 heartbeat_stop = threading.Event()
@@ -1865,6 +1863,46 @@ class IntelWorker:
         with self._in_flight_lock:
             stats["in_flight"] = len(self._in_flight)
         return stats
+
+    def _starvation_reserved_slots(self, concurrency: int) -> int:
+        """防饿死保留名额：把少数并发槽留给「等太久」的作业，其余槽完全按优先级分配。"""
+        try:
+            reserved = int(config.INTEL_WORKER_STARVATION_RESERVED_SLOTS)
+        except Exception:
+            reserved = 2
+        if reserved <= 0 or concurrency <= 1:
+            return 0
+        return max(1, min(reserved, concurrency - 1))
+
+    def _starvation_deadline_seconds(self) -> int:
+        try:
+            return max(60, int(config.INTEL_WORKER_STARVATION_DEADLINE_SECONDS))
+        except Exception:
+            return 1800
+
+    def _claim_for_pump(self, allowed: List[str], free: int) -> List[Dict]:
+        """两段式领活：先给饥饿作业按 FIFO 发保留名额，剩下的槽位按「优先级+等待积分」发。
+
+        背景（A 机实测）：优先级+等待积分有封顶，高优先级类型只要持续到货，低优先级类型就
+        永远赢不了——topic_cluster/trend_aggregate/embed_articles 积压 32 小时且 attempt_count=0。
+        保留名额让「等超过 INTEL_WORKER_STARVATION_DEADLINE_SECONDS 的作业」按 FIFO 必被领取，
+        在阈值之内仍然完全按优先级（分类、候选抓取等要紧的活照常插队）。
+        """
+        jobs: List[Dict] = []
+        reserve = self._starvation_reserved_slots(free)
+        if reserve:
+            cutoff = utc_text(utc_now() - timedelta(seconds=self._starvation_deadline_seconds()))
+            try:
+                jobs.extend(self.repository.claim_jobs(
+                    self.worker_id, job_types=allowed, limit=min(reserve, free),
+                    lease_seconds=self.job_lease_seconds, starved_before=cutoff))
+            except Exception as exc:
+                print("⚠️ 饥饿保留名额领取失败（继续走优先级通道）: %s" % str(exc)[:160])
+        if len(jobs) < free:
+            jobs.extend(self.repository.claim_jobs(
+                self.worker_id, job_types=allowed, limit=free - len(jobs),
+                lease_seconds=self.job_lease_seconds))
+        return jobs
 
     def run_forever(
         self,

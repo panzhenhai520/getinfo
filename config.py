@@ -283,9 +283,21 @@ INTEL_JOB_PRIORITY_AGING_CAP = _env_int(
     # 等待时长最多折算多少优先级积分。不设上限时"等得够久"仍会盖过一切、优先级又成摆设：
     # 实测 28.8 小时未处理的 trend_aggregate(-45) 折算 +172，照样压过优先级 100 的分类作业。
     # 取 90 的算法：维护类里最高的 candidate_dispatch/candidate_rescore 是 +5，
-    # 5+90=95 < 分类的 100 → 分类只要在排队就一定先被领取；分类队列空时其它类型照常执行，
-    # 不会饿死。要让维护类重新插队，把这个值调大即可。
+    # 5+90=95 < 分类的 100 → 分类只要在排队就一定先被领取。
+    # 注意：上限封顶意味着"优先级高的类型只要持续有货，低优先级类型就永远赢不了"，
+    # 单靠本参数无法防饿死（实测 A 机 topic_cluster/trend_aggregate/embed_articles
+    # 积压最久 32 小时、attempt_count=0，从未被领取过）。防饿死由下面的饥饿保留名额负责。
     'INTEL_JOB_PRIORITY_AGING_CAP', 90, 0, 3600
+)
+INTEL_WORKER_STARVATION_DEADLINE_SECONDS = _env_int(
+    # 等待超过这个秒数的作业视为"饥饿"，由保留名额按 FIFO 领取，保证任何类型都能推进；
+    # 在阈值之内仍然完全按优先级排序（分类/候选抓取等要紧的活照常插队）。
+    'INTEL_WORKER_STARVATION_DEADLINE_SECONDS', 1800, 60, 86400
+)
+INTEL_WORKER_STARVATION_RESERVED_SLOTS = _env_int(
+    # 每次领活先给"饥饿作业"留出的并发槽位数（0=关闭保留，退回纯优先级）。
+    # 实测并发 8 时保留 2 个槽，低优先级维护类可以持续推进，同时把 6 个槽留给高优先级。
+    'INTEL_WORKER_STARVATION_RESERVED_SLOTS', 2, 0, 64
 )
 
 SERPAPI_API_KEY = _env_str('SERPAPI_API_KEY', '')
