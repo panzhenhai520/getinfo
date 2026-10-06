@@ -487,6 +487,64 @@ def retry_qa_run(run_id: str):
         return _error_response(exc)
 
 
+@qa_bp.route("/api/qa/v1/runs/<run_id>/attribution", methods=["GET", "POST"])
+@qa_access_required
+def qa_run_attribution(run_id: str):
+    """【证据解析】：把答案拆成信息单元并归因到本次 run 的证据句。
+
+    GET  读缓存（没算过返回 status=not_computed）；
+    POST 生成，force=true 时重算。归因失败不影响问答本身，只返回失败原因。
+    """
+    try:
+        owner, _pack = _identity()
+        get_qa_gateway_service().get_run(run_id, owner_user_id=owner)
+        payload = request.get_json(silent=True) or {}
+        from qa_attribution import QaAttributionService
+        from sqlite_database import sqlite_db
+
+        service = QaAttributionService(sqlite_db)
+        if request.method == "GET":
+            return jsonify(service.get(run_id))
+        result = service.build(run_id, force=bool(payload.get("force")))
+        return jsonify(result), 200 if result.get("success") else 200
+    except Exception as exc:
+        return _error_response(exc)
+
+
+@qa_bp.route("/api/qa/v1/runs/<run_id>/token-influence", methods=["GET", "POST"])
+@qa_access_required
+def qa_run_token_influence(run_id: str):
+    """【词元影响力】（方案第 7 项一期）：遮挡法近似词元影响力，复用证据解析结构。
+
+    GET  读缓存；POST 计算（unit_ids 可指定只算某几个单元，top_sentences 控制每单元取几条证据句）。
+    """
+    try:
+        owner, _pack = _identity()
+        get_qa_gateway_service().get_run(run_id, owner_user_id=owner)
+        payload = request.get_json(silent=True) or {}
+        from qa_attribution import QaAttributionService
+        from sqlite_database import sqlite_db
+
+        service = QaAttributionService(sqlite_db)
+        if request.method == "GET":
+            cached = service._cached_influence(run_id)
+            if cached:
+                return jsonify(cached)
+            attribution = service.get(run_id)
+            return jsonify({"success": True, "status": attribution.get("status") or "not_computed",
+                            "run_id": run_id, "units": attribution.get("units") or [],
+                            "influence_ready": False})
+        result = service.token_influence(
+            run_id,
+            unit_ids=payload.get("unit_ids") or [],
+            top_sentences=int(payload.get("top_sentences") or 3),
+            force=bool(payload.get("force")),
+        )
+        return jsonify(result)
+    except Exception as exc:
+        return _error_response(exc)
+
+
 @qa_bp.route("/api/qa/v1/config", methods=["GET"])
 @qa_access_required
 def qa_public_config():

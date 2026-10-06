@@ -2321,6 +2321,104 @@
             color: #176f58;
             animation: qaEvidenceCrawlerWalk .65s ease-in-out infinite alternate;
         }
+        .qa-attribution-panel:empty {
+            display: none;
+        }
+        .qa-attribution-panel {
+            margin: 8px 0 10px;
+            font-size: 12px;
+            color: #2c4438;
+        }
+        .qa-attribution-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 6px 9px;
+            border: 1px dashed rgba(29, 127, 104, .26);
+            border-radius: 8px;
+            background: rgba(244, 249, 246, .9);
+            color: #315b46;
+        }
+        .qa-attribution-note {
+            color: #8a6a12;
+        }
+        .qa-attribution-list,
+        .qa-attribution-links {
+            list-style: none;
+            margin: 8px 0 0;
+            padding: 0;
+        }
+        .qa-attribution-unit {
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            border: 1px solid rgba(29, 127, 104, .18);
+            border-radius: 8px;
+            background: #fbfdfc;
+        }
+        .qa-attribution-unit-text {
+            font-weight: 600;
+            line-height: 1.6;
+            color: #1f3b2f;
+        }
+        .qa-attribution-type {
+            margin-left: 8px;
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: rgba(29, 127, 104, .1);
+            color: #176f58;
+            font-weight: 500;
+            font-size: 11px;
+        }
+        .qa-attribution-links li {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: baseline;
+            margin-top: 6px;
+            padding-left: 10px;
+            border-left: 2px solid rgba(29, 127, 104, .22);
+            color: #3c5a4b;
+        }
+        .qa-attribution-rel {
+            min-width: 30px;
+            font-weight: 700;
+        }
+        .qa-attribution-rel.is-support { color: #0f7a4f; }
+        .qa-attribution-rel.is-refute { color: #a53d2b; }
+        .qa-attribution-rel.is-irrelevant { color: #8c8c8c; }
+        .qa-attribution-rel.is-mention { color: #8a6a12; }
+        .qa-attribution-conf {
+            color: #6b7a72;
+            font-variant-numeric: tabular-nums;
+        }
+        .qa-attribution-sentence {
+            flex: 1 1 320px;
+            line-height: 1.6;
+        }
+        .qa-attribution-ref {
+            color: #93a39a;
+            font-size: 11px;
+        }
+        .qa-attribution-influence {
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: rgba(240, 180, 41, .18);
+            color: #7a5a00;
+            font-weight: 700;
+        }
+        .qa-attribution-tokens em {
+            margin-left: 5px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: rgba(29, 127, 104, .08);
+            color: #176f58;
+            font-style: normal;
+        }
+        .qa-attribution-empty {
+            margin-top: 6px;
+            color: #7b8c83;
+        }
         .qa-spider-canvas {
             position: fixed;
             inset: 0;
@@ -9338,6 +9436,109 @@
             });
         }
 
+        function qaAttributionRelationLabel(relation) {
+            return ({
+                support: '支持', refute: '反驳', irrelevant: '无关', mention: '提及',
+            })[String(relation || '')] || String(relation || '未知');
+        }
+
+        function renderQaAttribution(panel, data) {
+            if (!panel) return;
+            const units = Array.isArray(data?.units) ? data.units : [];
+            if (!units.length) {
+                const message = data?.message || '这条回答暂时没有可解析的证据（可能未启用检索，或还没有最终答案）。';
+                panel.innerHTML = `<div class="qa-attribution-empty">${escapeHtml(cleanChatUiText(message))}</div>`;
+                return;
+            }
+            const stats = data.stats || {};
+            const summary = [
+                `信息单元 ${Number(stats.units || units.length)}`,
+                `归因链路 ${Number(stats.links || 0)}`,
+                stats.coverage === undefined ? '' : `覆盖率 ${Math.round(Number(stats.coverage) * 100)}%`,
+                data.method ? `方法 ${data.method}` : '',
+            ].filter(Boolean).join(' · ');
+            const items = units.map(unit => {
+                const links = Array.isArray(unit.links) ? unit.links : [];
+                const linkHtml = links.map(link => {
+                    const influence = (link.influence_score === null || link.influence_score === undefined)
+                        ? '' : `<span class="qa-attribution-influence" title="遮挡该句后结论生成概率的落差">影响力 ${Number(link.influence_score).toFixed(3)}</span>`;
+                    const tokens = Array.isArray(link.tokens) && link.tokens.length
+                        ? `<span class="qa-attribution-tokens">${link.tokens.slice(0, 6).map(token => `<em>${escapeHtml(String(token.token || ''))} ${Number(token.influence || 0).toFixed(3)}</em>`).join('')}</span>`
+                        : '';
+                    const articleId = Number(link.article_id || 0);
+                    const openButton = articleId
+                        ? `<button type="button" class="qa-citation-link" data-article-id="${articleId}">打开原文</button>` : '';
+                    return `<li class="qa-attribution-link">
+                        <span class="qa-attribution-rel is-${escapeHtml(String(link.relation || 'unknown'))}">${escapeHtml(qaAttributionRelationLabel(link.relation))}</span>
+                        <span class="qa-attribution-conf">${Number(link.confidence || 0).toFixed(2)}</span>
+                        <span class="qa-attribution-sentence">${escapeHtml(cleanChatUiText(link.sentence || ''))}</span>
+                        <span class="qa-attribution-ref">${escapeHtml(String(link.evidence_ref || ''))}</span>
+                        ${influence}${tokens}${openButton}
+                    </li>`;
+                }).join('');
+                const claimed = unit.claim_type ? `<span class="qa-attribution-type">${escapeHtml(cleanChatUiText(unit.claim_type))}</span>` : '';
+                return `<li class="qa-attribution-unit">
+                    <div class="qa-attribution-unit-text">${escapeHtml(cleanChatUiText(unit.text || ''))}${claimed}</div>
+                    ${linkHtml ? `<ol class="qa-attribution-links">${linkHtml}</ol>` : '<div class="qa-attribution-empty">未找到对应证据句（该结论可能来自模型推断或背景知识）。</div>'}
+                </li>`;
+            }).join('');
+            panel.innerHTML = `<div class="qa-attribution-summary">${escapeHtml(cleanChatUiText(summary))}${data.scorer_note ? `<span class="qa-attribution-note">${escapeHtml(cleanChatUiText(data.scorer_note))}</span>` : ''}</div><ol class="qa-attribution-list">${items}</ol>`;
+            panel.querySelectorAll('.qa-citation-link[data-article-id]').forEach(button => {
+                button.addEventListener('click', event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const id = Number(button.dataset.articleId || 0);
+                    if (id) viewArticle(id);
+                });
+            });
+        }
+
+        async function runQaAttribution(drawer, button, { influence = false } = {}) {
+            const panel = drawer?.querySelector('.qa-attribution-panel');
+            // run id 优先取抽屉上的 data 属性（由 appendQaInsightDrawer 落上），
+            // 这样组件不依赖全局 state，也便于单独验证。
+            const runId = String(drawer?.dataset?.qaRunId || state.currentQaRunId || '');
+            if (!panel) return;
+            if (!runId) {
+                panel.innerHTML = '<div class="qa-attribution-empty">这条回答没有关联的问答 run，无法解析。</div>';
+                return;
+            }
+            const originalLabel = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.classList.add('is-running');
+                button.innerHTML = `<i class="fa fa-spinner fa-spin" aria-hidden="true"></i><span>${influence ? '计算中' : '解析中'}</span>`;
+            }
+            panel.innerHTML = `<div class="qa-attribution-empty">${influence ? '正在用遮挡法估算词元影响力（复用证据解析结构）…' : '正在分解答案并把结论归因到证据句…'}</div>`;
+            try {
+                const url = influence
+                    ? `/api/qa/v1/runs/${encodeURIComponent(runId)}/token-influence`
+                    : `/api/qa/v1/runs/${encodeURIComponent(runId)}/attribution`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(influence ? { top_sentences: 3 } : {}),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data.success === false) {
+                    renderQaAttribution(panel, { units: [], message: data.message || data.error || `解析失败（HTTP ${response.status}）` });
+                } else {
+                    renderQaAttribution(panel, data);
+                }
+                if (button) button.classList.add(data.success === false ? 'is-error' : 'is-done');
+            } catch (error) {
+                console.warn('证据解析失败', error);
+                renderQaAttribution(panel, { units: [], message: `解析失败：${error?.message || error}` });
+                if (button) button.classList.add('is-error');
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                    button.classList.remove('is-running');
+                    button.innerHTML = originalLabel;
+                }
+            }
+        }
+
         function appendQaInsightDrawer(container, result) {
             if (!container || !result || container.querySelector('.qa-insight-drawer')) return;
             const evidence = Array.isArray(result.evidence) ? result.evidence : [];
@@ -9390,9 +9591,11 @@
             const drawer = document.createElement('details');
             drawer.className = 'qa-insight-drawer';
             drawer.open = true;
+            drawer.dataset.qaRunId = String(state.currentQaRunId || '');
             drawer.innerHTML = `
-                <summary><i class="fa fa-folder-open-o" aria-hidden="true"></i><span>依据、分析与核验</span><button type="button" class="qa-evidence-batch-crawl" title="批量爬取引用文章并入库"><i class="fa fa-bug" aria-hidden="true"></i><span>入库</span></button></summary>
+                <summary><i class="fa fa-folder-open-o" aria-hidden="true"></i><span>依据、分析与核验</span><button type="button" class="qa-evidence-batch-crawl" title="批量爬取引用文章并入库"><i class="fa fa-bug" aria-hidden="true"></i><span>入库</span></button><button type="button" class="qa-evidence-batch-crawl qa-attribution-button" title="把答案拆成信息单元，并归因到具体证据句"><i class="fa fa-sitemap" aria-hidden="true"></i><span>证据解析</span></button><button type="button" class="qa-evidence-batch-crawl qa-influence-button" title="遮挡法估算词元影响力（一期近似）"><i class="fa fa-fire" aria-hidden="true"></i><span>词元影响力</span></button></summary>
                 <div class="qa-evidence-crawl-status" aria-live="polite"></div>
+                <div class="qa-attribution-panel" aria-live="polite"></div>
                 <div class="qa-insight-drawer-body">
                     ${citationItems ? `<div class="qa-insight-section"><strong>引用映射</strong><ol class="qa-insight-list">${citationItems}</ol></div>` : ''}
                     ${evidenceItems ? `<div class="qa-insight-section"><strong>证据</strong><ol class="qa-insight-list">${evidenceItems}</ol></div>` : ''}
@@ -9415,6 +9618,16 @@
                 event.preventDefault();
                 event.stopPropagation();
                 runQaEvidenceBatchCrawl(drawer, event.currentTarget, uniqueEvidenceForDrawer);
+            });
+            drawer.querySelector('.qa-attribution-button')?.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                runQaAttribution(drawer, event.currentTarget, { influence: false });
+            });
+            drawer.querySelector('.qa-influence-button')?.addEventListener('click', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                runQaAttribution(drawer, event.currentTarget, { influence: true });
             });
             drawer.querySelectorAll('.qa-citation-link[data-ref]').forEach(button => {
                 button.addEventListener('click', () => {

@@ -1,3 +1,4 @@
+import contextlib
 import os
 import unittest
 from unittest.mock import patch
@@ -115,12 +116,20 @@ class ScraplingTierTests(unittest.TestCase):
         self.adapter = CandidateCrawlerAdapter()
         self.pack = {"candidate_gate": {"anchor_keywords": ["网络安全"], "entity_keywords": []}}
         self._env_guard = os.environ.get("CRAWL_SCRAPLING_TIER_ENABLED")
+        self._session_guard = os.environ.get("CRAWL_SCRAPLING_SESSION_ENABLED")
+        # 本类用例锁定的是"每次新建 StealthyFetcher"的旧路径（patch 的是 StealthyFetcher），
+        # 关掉会话复用才能保证确定性、且不去真启浏览器
+        os.environ["CRAWL_SCRAPLING_SESSION_ENABLED"] = "0"
 
     def tearDown(self):
         if self._env_guard is None:
             os.environ.pop("CRAWL_SCRAPLING_TIER_ENABLED", None)
         else:
             os.environ["CRAWL_SCRAPLING_TIER_ENABLED"] = self._env_guard
+        if self._session_guard is None:
+            os.environ.pop("CRAWL_SCRAPLING_SESSION_ENABLED", None)
+        else:
+            os.environ["CRAWL_SCRAPLING_SESSION_ENABLED"] = self._session_guard
 
     def test_html_to_validated_content_requires_anchor_hits(self):
         html = "<html><body><p>网络安全行业年度报告正文，包含大量内容。" + "内容" * 300 + "</p></body></html>"
@@ -188,6 +197,288 @@ class ScraplingTierTests(unittest.TestCase):
             )
         self.assertFalse(result.get("success"))
         self.assertIn("Scrapling 抓取失败", result.get("error") or "")
+
+
+class ScraplingSessionReuseTests(unittest.TestCase):
+    """阶段5 优化：Scrapling 会话复用（同线程复用浏览器）+ 会话异常时的降级回退"""
+
+    ANCHOR_HTML = (
+        "<html><body><p>网络安全行业年度报告正文，包含大量内容。" + "内容" * 300 + "</p></body></html>"
+    )
+    ANCHOR_MD = "## 网络安全行业年度报告\n\n" + "清洗后的 Markdown 正文。" * 30
+
+    def setUp(self):
+        import candidate_crawler_adapter as cca
+        self.cca = cca
+        self.adapter = cca.CandidateCrawlerAdapter()
+        self.pack = {"candidate_gate": {"anchor_keywords": ["网络安全"], "entity_keywords": []}}
+        self._env_guard = {
+            name: os.environ.get(name)
+            for name in ("CRAWL_SCRAPLING_TIER_ENABLED", "CRAWL_SCRAPLING_SESSION_ENABLED")
+        }
+        os.environ["CRAWL_SCRAPLING_TIER_ENABLED"] = "1"
+        os.environ["CRAWL_SCRAPLING_SESSION_ENABLED"] = "1"
+        # 用例之间不能共享会话（会话按线程缓存，pytest 主线程复用同一个）
+        cca._drop_thread_scrapling_session()
+        self._stats_guard = dict(cca._SCRAPLING_SESSION_STATS)
+
+    def tearDown(self):
+        self.cca._drop_thread_scrapling_session()
+        self.cca._SCRAPLING_SESSION_STATS.clear()
+        self.cca._SCRAPLING_SESSION_STATS.update(self._stats_guard)
+        for name, value in self._env_guard.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+    @staticmethod
+    def _fake_page(html, markdown="", status=200, with_markdown=True):
+        """构造 Scrapling Response 的最小替身（只用到 html_content/status/markdown）。"""
+        class _Page:
+            pass
+
+        page = _Page()
+        page.html_content = html
+        page.status = status
+        if with_markdown:
+            page.markdown = lambda css_selector=None, main_content_only=False: markdown
+        return page
+
+    @staticmethod
+    def _fake_session(page=None, error=None):
+        """构造 StealthySession 的最小替身。"""
+        class _Session:
+            def __init__(self):
+                self._is_alive = True
+                self.closed = False
+                self.fetch_calls = 0
+                self.page = page
+                self.error = error
+
+            def start(self):
+                return None
+
+            def fetch(self, url, **kwargs):
+                self.fetch_calls += 1
+                if self.error is not None:
+                    raise self.error
+                return self.page
+
+            def close(self):
+                self.closed = True
+                self._is_alive = False
+
+        return _Session()
+
+    def _patch_common(self, stack):
+        stack.enter_context(patch("candidate_crawler_adapter.industry_pack_loader.load", return_value=self.pack))
+        stack.enter_context(patch("candidate_crawler_adapter.quick_score_candidate",
+                                  return_value={"anchor_hits": ["网络安全"], "score": 10}))
+        stack.enter_context(patch("candidate_crawler_adapter.sqlite_db.record_crawl_attempt", return_value=None))
+
+    def test_session_is_created_once_and_reused_across_calls(self):
+        """同线程多次兜底抓取只建一个会话（浏览器只冷启动一次）。"""
+        session = self._fake_session(page=self._fake_page(self.ANCHOR_HTML, self.ANCHOR_MD))
+        created = []
+
+        def _factory(**kwargs):
+            created.append(kwargs)
+            return session
+
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", _factory))
+            first = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+            second = self.adapter._scrapling_fallback(
+                "https://x.example/b", title="t", pack_id="family_office", candidate_id=2)
+        self.assertTrue(first.get("success"))
+        self.assertTrue(second.get("success"))
+        self.assertEqual(len(created), 1, "同一线程应复用同一个会话")
+        self.assertEqual(session.fetch_calls, 2)
+        self.assertEqual(self.cca._SCRAPLING_SESSION_STATS["created"], 1)
+        self.assertEqual(self.cca._SCRAPLING_SESSION_STATS["reused"], 1)
+
+    def test_markdown_main_content_used_as_article_content(self):
+        """Scrapling 路径优先用 markdown(main_content_only=True) 的结果当正文。"""
+        session = self._fake_session(page=self._fake_page(self.ANCHOR_HTML, self.ANCHOR_MD))
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertEqual(result.get("content"), self.ANCHOR_MD.strip())
+        self.assertEqual(result.get("source_method"), "scrapling_fetch")
+        self.assertEqual(result.get("extraction_method"), "scrapling_fetch")
+
+    def test_falls_back_to_plain_text_when_markdown_unavailable(self):
+        """取不到 markdown（无该方法/返回空）时退回原有纯文本抽取。"""
+        session = self._fake_session(
+            page=self._fake_page(self.ANCHOR_HTML, "", with_markdown=False))
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertIn("网络安全", result.get("content") or "")
+        self.assertNotIn("##", result.get("content") or "")
+
+    def test_markdown_exception_falls_back_to_plain_text(self):
+        """markdown() 抛异常也不能让兜底失效，退回纯文本。"""
+        session = self._fake_session(page=self._fake_page(self.ANCHOR_HTML, self.ANCHOR_MD))
+
+        def _boom(css_selector=None, main_content_only=False):
+            raise RuntimeError("markdownify 崩了")
+
+        session.page.markdown = _boom
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertIn("网络安全", result.get("content") or "")
+
+    def test_session_create_failure_degrades_to_one_shot_fetcher(self):
+        """会话建不起来 → 回退到每次新建 StealthyFetcher，梯队不能整体失效。"""
+        page = self._fake_page(self.ANCHOR_HTML, self.ANCHOR_MD)
+        fetcher_calls = []
+
+        class FakeFetcher:
+            def fetch(self, url, **kwargs):
+                fetcher_calls.append(url)
+                return page
+
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession",
+                                      side_effect=RuntimeError("patchright 启动失败")))
+            stack.enter_context(patch("scrapling.fetchers.StealthyFetcher", return_value=FakeFetcher()))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertEqual(fetcher_calls, ["https://x.example/a"])
+        self.assertEqual(self.cca._SCRAPLING_SESSION_STATS["create_failed"], 1)
+
+    def test_broken_session_is_dropped_and_falls_back_to_one_shot(self):
+        """会话判定损坏（浏览器被关闭）→ 先释放会话，再回退每次新建实例并成功。"""
+        page = self._fake_page(self.ANCHOR_HTML, self.ANCHOR_MD)
+        session = self._fake_session(
+            error=RuntimeError("Target page, context or browser has been closed"))
+
+        class FakeFetcher:
+            def fetch(self, url, **kwargs):
+                return page
+
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            stack.enter_context(patch("scrapling.fetchers.StealthyFetcher", return_value=FakeFetcher()))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertTrue(session.closed, "坏会话必须先释放，否则新建实例会与它冲突")
+        self.assertEqual(self.cca._SCRAPLING_SESSION_STATS["session_broken"], 1)
+        self.assertIsNone(getattr(self.cca._SCRAPLING_SESSION_LOCAL, "session", None))
+
+    def test_page_level_failure_keeps_session_and_skips_duplicate_fetch(self):
+        """坏域名（DNS 失败）→ 会话被保留，且不重复新建实例。
+
+        依据实测：同一线程里会话还活着时再 StealthyFetcher.fetch() 必然抛
+        "It looks like you are using Playwright Sync API inside the asyncio loop"，
+        重复抓取只会拿到误导性错误并白付一次浏览器冷启动。
+        """
+        session = self._fake_session(error=RuntimeError("Page.goto: net::ERR_NAME_NOT_RESOLVED"))
+        fetcher_calls = []
+
+        class FakeFetcher:
+            def fetch(self, url, **kwargs):
+                fetcher_calls.append(url)
+                return None
+
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            stack.enter_context(patch("scrapling.fetchers.StealthyFetcher", return_value=FakeFetcher()))
+            result = self.adapter._scrapling_fallback(
+                "https://bad.invalid/x", title="t", pack_id="family_office", candidate_id=1)
+        self.assertFalse(result.get("success"))
+        self.assertIn("Scrapling 抓取失败", result.get("error") or "")
+        self.assertEqual(fetcher_calls, [], "页面级失败不该重复新建实例")
+        self.assertFalse(session.closed, "页面级失败不该丢弃仍然健康的会话")
+        self.assertEqual(session.fetch_calls, 1)
+
+    def test_repeated_page_level_failures_eventually_rebuild_session(self):
+        """连续失败的兜底网：达到阈值后丢弃会话，下次重建，避免卡死在未知损坏的会话上。"""
+        session = self._fake_session(error=RuntimeError("未知异常 XYZ"))
+
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            for cid in range(1, 4):
+                result = self.adapter._scrapling_fallback(
+                    "https://x.example/bad", title="t", pack_id="family_office", candidate_id=cid)
+                self.assertFalse(result.get("success"))
+        self.assertTrue(session.closed, "连续失败到阈值应丢弃会话")
+        self.assertIsNone(getattr(self.cca._SCRAPLING_SESSION_LOCAL, "session", None))
+
+    def test_noisy_markdown_is_rejected_in_favor_of_plain_text(self):
+        """markdown 明显比纯文本臃肿（导航残留）时改用纯文本，避免把噪声带进 RAG。"""
+        noisy_md = "## 导航\n\n" + "* [栏目](https://x.example/a)\n" * 200
+        session = self._fake_session(page=self._fake_page(self.ANCHOR_HTML, noisy_md))
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertNotIn("[栏目]", result.get("content") or "")
+        self.assertIn("网络安全", result.get("content") or "")
+
+    def test_ratio_env_can_force_markdown_priority(self):
+        """CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO 调大 → 回到"永远优先 markdown"。"""
+        noisy_md = "## 导航\n\n" + "网络安全栏目正文。" * 200
+        self._env_guard["CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO"] = os.environ.get(
+            "CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO")
+        os.environ["CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO"] = "99"
+        try:
+            session = self._fake_session(page=self._fake_page(self.ANCHOR_HTML, noisy_md))
+            with contextlib.ExitStack() as stack:
+                self._patch_common(stack)
+                stack.enter_context(patch("scrapling.fetchers.StealthySession", lambda **kw: session))
+                result = self.adapter._scrapling_fallback(
+                    "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        finally:
+            if self._env_guard["CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO"] is None:
+                os.environ.pop("CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO", None)
+            else:
+                os.environ["CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO"] = \
+                    self._env_guard["CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO"]
+        self.assertTrue(result.get("success"))
+        self.assertEqual(result.get("content"), noisy_md.strip())
+
+    def test_session_reuse_disabled_by_env_uses_legacy_path(self):
+        """CRAWL_SCRAPLING_SESSION_ENABLED=0 → 完全回到旧的每次新建路径。"""
+        os.environ["CRAWL_SCRAPLING_SESSION_ENABLED"] = "0"
+        page = self._fake_page(self.ANCHOR_HTML, self.ANCHOR_MD)
+
+        class FakeFetcher:
+            def fetch(self, url, **kwargs):
+                return page
+
+        created = []
+        with contextlib.ExitStack() as stack:
+            self._patch_common(stack)
+            stack.enter_context(patch("scrapling.fetchers.StealthySession",
+                                      lambda **kw: created.append(kw) or self._fake_session(page)))
+            stack.enter_context(patch("scrapling.fetchers.StealthyFetcher", return_value=FakeFetcher()))
+            result = self.adapter._scrapling_fallback(
+                "https://x.example/a", title="t", pack_id="family_office", candidate_id=1)
+        self.assertTrue(result.get("success"))
+        self.assertEqual(created, [], "开关关闭时不应创建会话")
 
 
 if __name__ == "__main__":

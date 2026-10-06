@@ -161,6 +161,18 @@ class OpenAIJsonModelClient:
                 },
             }
         effective_timeout = max(1, int(timeout or 90))
+        # 本地模型的输出上限必须够放完整个 JSON：实测同一提示词在 max_tokens=900 时
+        # finish_reason=length、JSON 被截断（一级草稿校验必失败 → 每次都退化成证据锚定兜底），
+        # 给到 3000 时 finish_reason=stop、完整输出只需 956 token。
+        # 所以这里放宽到可配置的 2400，只对超短超时保留更保守的上限。
+        try:
+            import os as _os
+
+            local_max_tokens = max(600, int(_os.environ.get("QA_LEVEL1_LOCAL_MAX_TOKENS", "2400")))
+        except Exception:
+            local_max_tokens = 2400
+        if effective_timeout < 15:
+            local_max_tokens = min(local_max_tokens, 1200)
         response = self.session.post(
             f"{safe_base.rstrip('/')}/chat/completions",
             headers=headers,
@@ -177,7 +189,7 @@ class OpenAIJsonModelClient:
                 "think": False,
                 "num_ctx": 16384,
                 "max_tokens": (
-                    (900 if effective_timeout >= 15 else 600)
+                    local_max_tokens
                     if profile.provider_id == "local" else 2048
                 ),
                 "response_format": response_format,

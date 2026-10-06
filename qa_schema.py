@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 
 
-QA_SCHEMA_VERSION = "unified-qa-schema-v4"
+QA_SCHEMA_VERSION = "unified-qa-schema-v5"
 
 QA_TABLE_DDL = (
     """
@@ -237,6 +237,69 @@ QA_TABLE_DDL = (
         updated_by TEXT NOT NULL DEFAULT ''
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS qa_attribution_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        unit_id TEXT NOT NULL,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        text TEXT NOT NULL,
+        claim_type TEXT NOT NULL DEFAULT '',
+        needs_evidence INTEGER NOT NULL DEFAULT 1,
+        method TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(run_id, unit_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS qa_attribution_links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        unit_id TEXT NOT NULL,
+        evidence_ref TEXT NOT NULL,
+        article_id INTEGER,
+        sentence_index INTEGER NOT NULL DEFAULT 0,
+        sentence_text TEXT NOT NULL DEFAULT '',
+        relation TEXT NOT NULL DEFAULT 'mention',
+        confidence REAL NOT NULL DEFAULT 0,
+        recall_score REAL NOT NULL DEFAULT 0,
+        method TEXT NOT NULL DEFAULT '',
+        influence_score REAL,
+        influence_method TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(run_id, unit_id, evidence_ref, sentence_index)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS qa_token_influence (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        unit_id TEXT NOT NULL,
+        evidence_ref TEXT NOT NULL,
+        sentence_index INTEGER NOT NULL DEFAULT 0,
+        token TEXT NOT NULL,
+        influence REAL NOT NULL DEFAULT 0,
+        method TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(run_id, unit_id, evidence_ref, sentence_index, token)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS qa_attribution_runs (
+        run_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        method TEXT NOT NULL DEFAULT '',
+        units INTEGER NOT NULL DEFAULT 0,
+        links INTEGER NOT NULL DEFAULT 0,
+        llm_calls INTEGER NOT NULL DEFAULT 0,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        computed_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
 )
 
 QA_INDEX_DDL = (
@@ -253,6 +316,9 @@ QA_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_qa_health_component ON qa_health_snapshots(component, checked_at)",
     "CREATE INDEX IF NOT EXISTS idx_qa_cache_expiry ON qa_retrieval_cache(namespace, expires_at)",
     "CREATE INDEX IF NOT EXISTS idx_qa_rate_bucket ON qa_rate_limit_events(bucket_key, event_at)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_attr_unit ON qa_attribution_units(run_id, order_index)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_attr_link ON qa_attribution_links(run_id, unit_id)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_token_influence ON qa_token_influence(run_id, unit_id)",
 )
 
 QA_REQUIRED_TABLES = frozenset(
@@ -274,6 +340,10 @@ QA_REQUIRED_TABLES = frozenset(
         "qa_circuit_states",
         "qa_rate_limit_events",
         "qa_feature_flags",
+        "qa_attribution_units",
+        "qa_attribution_links",
+        "qa_token_influence",
+        "qa_attribution_runs",
     }
 )
 

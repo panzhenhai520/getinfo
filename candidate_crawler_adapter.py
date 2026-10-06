@@ -7,10 +7,14 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Optional
 
+import atexit
 import os
 import re
 import socket
+import threading
 import time
+from contextlib import suppress
+
 import config
 import requests
 from intel_candidates import IntelCandidateRepository, quick_score_candidate
@@ -183,6 +187,156 @@ def _derive_real_title(title: str, content: str, url: str = "") -> str:
     if len(first) > 40:
         first = first[:28].rstrip("，,、 ") + "…"
     return first if first else (t or url or "无标题")
+
+
+# ── 阶段5 优化：Scrapling 会话复用（浏览器只启一次，多次兜底抓取共享） ──────────────
+# 为什么不能"全进程一个会话"：Scrapling 0.4.15 的 StealthySession 继承 SyncSession
+# （scrapling/engines/_browsers/_base.py，且由 scrapling/fetchers/stealth_chrome.py 导出），
+# 底层是 patchright(playwright) 的**同步** API。它的 greenlet 与创建它的线程绑定，
+# 实测在别的线程调用同一个 session.fetch() 会直接抛：
+#     greenlet.error: Cannot switch to a different thread
+# 并把该会话的页面池留成"挂起任务"的坏状态。而本项目的调度是多线程的
+# （scheduler.py 的 ThreadPoolExecutor，见 CRAWL_SCHEDULER_MAX_CONCURRENT），
+# 所以这里改成「每个线程各持一个会话」（threading.local）：同一个线程内跨多次调用
+# 复用同一个浏览器，线程之间互不串用。会话的创建/销毁与全局登记由模块级锁保护，
+# 进程退出时统一关闭。
+# 降级保证：会话建不起来、或判定会话已损坏时，一律回退到改动前的
+# "每次新建 StealthyFetcher()" 路径，兜底梯队不会因为会话问题整体失效。
+_SCRAPLING_SESSION_LOCK = threading.Lock()
+_SCRAPLING_SESSION_LOCAL = threading.local()
+# 线程id -> (Thread 对象, session)。留着 Thread 对象是为了能回收"已死线程"的会话，
+# 避免短命线程（如每个任务新起一个 Thread 的调用点）把浏览器进程泄漏在后台。
+_SCRAPLING_SESSIONS: Dict[int, tuple] = {}
+# 会话生命周期计数，仅用于排障观测（并发下可能少记 1，不影响功能）
+_SCRAPLING_SESSION_STATS = {"created": 0, "reused": 0, "create_failed": 0, "session_broken": 0}
+_SCRAPLING_SESSION_CLOSED = False
+# 会话"已损坏"的错误特征：命中就释放会话，下次重建。只放浏览器/会话级信号，
+# 不放 DNS/TLS/HTTP 这类页面级错误——后者会话本身是好的，丢掉只会白付一次冷启动。
+_SCRAPLING_SESSION_DEAD_HINTS = (
+    "context or browser has been closed",
+    "browser has been closed",
+    "browserclosederror",
+    "targetclosederror",
+    "target page, context or browser has been closed",
+    "target crashed",
+    "page crashed",
+    "session has been already started",
+    "cannot switch to a different thread",
+    "greenlet",
+)
+# 连续失败到这个次数（中间没有一次成功）就丢弃会话重建，兜住特征词没覆盖到的未知损坏。
+_SCRAPLING_SESSION_FAILURE_LIMIT = 3
+
+
+def _scrapling_markdown_max_ratio() -> float:
+    """CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO（默认 1.5）：markdown 正文相对纯文本的最大容许倍数。"""
+    try:
+        return max(1.0, float(os.environ.get("CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO", "1.5")))
+    except (TypeError, ValueError):
+        return 1.5
+
+
+def _scrapling_session_enabled() -> bool:
+    """CRAWL_SCRAPLING_SESSION_ENABLED（默认开启）：1/true/yes/on 开，0/false/no/off 关。"""
+    value = os.environ.get("CRAWL_SCRAPLING_SESSION_ENABLED")
+    if value is None:
+        return True
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _close_scrapling_session(session) -> None:
+    """尽力关闭一个会话；失败只打日志，绝不向上抛（清理路径不能影响主链路）。"""
+    if session is None:
+        return
+    try:
+        session.close()
+    except Exception as exc:
+        print(f"[scrapling] 会话关闭异常: {type(exc).__name__}: {str(exc)[:120]}", flush=True)
+
+
+def _drop_thread_scrapling_session() -> None:
+    """丢弃并关闭"当前线程"持有的会话（关闭动作与创建动作在同一线程内，避免跨线程）。"""
+    session = getattr(_SCRAPLING_SESSION_LOCAL, "session", None)
+    _SCRAPLING_SESSION_LOCAL.session = None
+    with _SCRAPLING_SESSION_LOCK:
+        _SCRAPLING_SESSIONS.pop(threading.get_ident(), None)
+    _close_scrapling_session(session)
+
+
+def _reap_dead_thread_scrapling_sessions() -> None:
+    """回收已退出线程留下的会话。
+
+    调用方必须已持有 _SCRAPLING_SESSION_LOCK。跨线程关闭别人的会话只能尽力而为
+    （其 greenlet 已随线程结束），所以用 suppress 兜住，只保证不泄漏浏览器进程。
+    """
+    current = threading.get_ident()
+    for tid, (thread, session) in list(_SCRAPLING_SESSIONS.items()):
+        if tid == current or (thread is not None and thread.is_alive()):
+            continue
+        _SCRAPLING_SESSIONS.pop(tid, None)
+        with suppress(Exception):
+            session.close()
+
+
+@atexit.register
+def _close_all_scrapling_sessions() -> None:
+    """进程退出时关闭所有会话，避免残留浏览器进程。"""
+    global _SCRAPLING_SESSION_CLOSED
+    with _SCRAPLING_SESSION_LOCK:
+        _SCRAPLING_SESSION_CLOSED = True
+        sessions = [session for _, session in _SCRAPLING_SESSIONS.values()]
+        _SCRAPLING_SESSIONS.clear()
+    _SCRAPLING_SESSION_LOCAL.session = None
+    for session in sessions:
+        _close_scrapling_session(session)
+
+
+def _scrapling_session():
+    """取当前线程的 Scrapling 会话（没有就建一个），建不起来返回 None 由调用方降级。
+
+    只允许在"将要使用它的那个线程"里调用：StealthySession 是同步 playwright 会话，
+    跨线程使用会抛 greenlet 错误（见上方说明）。
+    """
+    session = getattr(_SCRAPLING_SESSION_LOCAL, "session", None)
+    if session is not None:
+        if getattr(session, "_is_alive", True):
+            _SCRAPLING_SESSION_STATS["reused"] += 1
+            return session
+        # 本线程的旧会话已经不存活，丢掉重建
+        _drop_thread_scrapling_session()
+    if _SCRAPLING_SESSION_CLOSED:
+        return None
+    try:
+        from scrapling.fetchers import StealthySession
+        # Scrapling 的 timeout 单位是毫秒；15s 起步，避免拖慢兜底链路
+        timeout_ms = max(5000, int((config.INTEL_SCAN_READ_TIMEOUT_SECONDS or 15) * 1000))
+        session = StealthySession(headless=True, timeout=timeout_ms)
+        session.start()
+    except Exception as exc:
+        _SCRAPLING_SESSION_STATS["create_failed"] += 1
+        print(
+            f"[scrapling] 会话创建失败，本次回退每次新建实例: {type(exc).__name__}: {str(exc)[:160]}",
+            flush=True,
+        )
+        return None
+    # 建会话（含浏览器冷启动，实测 7~30s）放在锁外，避免拖住其他线程
+    _SCRAPLING_SESSION_LOCAL.session = session
+    _SCRAPLING_SESSION_LOCAL.failures = 0
+    with _SCRAPLING_SESSION_LOCK:
+        _reap_dead_thread_scrapling_sessions()
+        _SCRAPLING_SESSIONS[threading.get_ident()] = (threading.current_thread(), session)
+        _SCRAPLING_SESSION_STATS["created"] += 1
+    return session
+
+
+def _scrapling_session_looks_dead(session, error_text: str) -> bool:
+    """判断会话是否已经损坏（用于决定丢弃重建，而不是决定是否降级）。"""
+    if session is None:
+        return False
+    if getattr(session, "_is_alive", True) is False:
+        return True
+    text = str(error_text or "").lower()
+    return any(hint in text for hint in _SCRAPLING_SESSION_DEAD_HINTS)
 
 
 class CandidateCrawlerAdapter:
@@ -518,12 +672,18 @@ class CandidateCrawlerAdapter:
         )
 
     def _html_to_validated_content(
-        self, url: str, *, title: str, html: str, pack, label: str = ""
+        self, url: str, *, title: str, html: str, pack, label: str = "", markdown_text: str = ""
     ) -> Dict:
         """阶段5：本地 HTML → 去标签纯文本 → 行业锚点校验（直连与 Scrapling 共用）。
 
         关键：保留换行（get_text("\n")）。若把整页压成一行，clean_article_markdown
         的"页脚锅炉板/面包屑"等按行规则会把整行（含正文）误删，锚点词随之丢失。
+
+        markdown_text：只有 Scrapling 路径会传，来自 Response.markdown(main_content_only=True)。
+        传了就先拿它当正文，出现下列情况之一再退回原有纯文本抽取：
+        取不到（空/异常/过短）、不命中行业锚点词、或它比纯文本臃肿到噪声明显
+        （见下方 CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO 说明）。
+        直连路径不传（默认空串），行为与改动前完全一致。
         """
         try:
             from bs4 import BeautifulSoup
@@ -542,37 +702,62 @@ class CandidateCrawlerAdapter:
             text = re.sub(r"[ \t\r\f\v]+", " ", text)
             lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
             text = "\n".join(lines)
-        print(f"[{label}] html={len(html)} text={len(text)}", flush=True)
-        if len(text) < 200:
-            # JS 渲染空壳页（如 SPA）拿不到正文，不值得作为正文入库
-            return {"success": False, "error": "本地 HTML 纯文本过短（疑似 JS 渲染空壳）"}
-        # 锚点校验：纯文本必须命中行业锚点词，否则退给下一梯队
-        score = quick_score_candidate(title, text, pack)
-        anchor_hits = score.get("anchor_hits") or []
-        print(f"[{label}] anchor_hits={anchor_hits} score={score.get('score')}", flush=True)
-        if not anchor_hits:
-            return {"success": False, "error": "本地 HTML 纯文本未命中行业锚点词"}
-        return {
-            "success": True,
-            "url": url,
-            "title": title,
-            "content": text,
-            "publish_date": "",
-            "extraction_method": "scrapling_fetch" if label.startswith("scrapling") else "direct_text",
-            "quality_score": len(text),
-            "permanent": False,
-            "source_method": "scrapling_fetch" if label.startswith("scrapling") else "direct_text_fallback",
-        }
+        markdown_text = str(markdown_text or "").strip()
+        print(f"[{label}] html={len(html)} text={len(text)} markdown={len(markdown_text)}", flush=True)
+        # 正文来源优先级：Scrapling 的 main_content_only Markdown → 原有纯文本抽取。
+        # 但实测 markdown(main_content_only=True) 只是"取 <body>" + 去 head/script/style/
+        # hidden，并不会去掉 body 里的导航/页脚：在门户页与列表页上它比"已去 header/footer/nav
+        # 的纯文本"长 1.75~2.62 倍，还带回几十行导航链接 markdown（HN 195 行、gov.cn 239 行），
+        # 直接当正文会把导航噪声带进入库和 RAG。所以只在 markdown 不比自己明显臃肿时才用它；
+        # CRAWL_SCRAPLING_MARKDOWN_MAX_RATIO 调大即可放宽（设成很大的值 ≈ 永远优先 markdown）。
+        _md_usable = len(markdown_text) >= 200
+        if _md_usable and len(text) >= 200:
+            _limit = max(int(len(text) * _scrapling_markdown_max_ratio()), len(text) + 300)
+            if len(markdown_text) > _limit:
+                print(
+                    f"[{label}] markdown 比纯文本臃肿（{len(markdown_text)} > {_limit}），改用纯文本",
+                    flush=True,
+                )
+                _md_usable = False
+        for _source, _body in (("markdown", markdown_text if _md_usable else ""), ("text", text)):
+            if not _body or len(_body) < 200:
+                # JS 渲染空壳页（如 SPA）拿不到正文，不值得作为正文入库
+                if _source == "text":
+                    return {"success": False, "error": "本地 HTML 纯文本过短（疑似 JS 渲染空壳）"}
+                continue
+            # 锚点校验：正文必须命中行业锚点词，否则换下一个来源/退给下一梯队
+            score = quick_score_candidate(title, _body, pack)
+            anchor_hits = score.get("anchor_hits") or []
+            print(f"[{label}] {_source} anchor_hits={anchor_hits} score={score.get('score')}", flush=True)
+            if not anchor_hits:
+                continue
+            return {
+                "success": True,
+                "url": url,
+                "title": title,
+                "content": _body,
+                "publish_date": "",
+                "extraction_method": "scrapling_fetch" if label.startswith("scrapling") else "direct_text",
+                "quality_score": len(_body),
+                "permanent": False,
+                "source_method": "scrapling_fetch" if label.startswith("scrapling") else "direct_text_fallback",
+            }
+        return {"success": False, "error": "本地 HTML 纯文本未命中行业锚点词"}
 
     def _scrapling_fallback(
         self, url: str, *, title: str, pack_id: str, candidate_id: int = 0,
         task_id: str = "",
     ) -> Dict:
-        """阶段5：Scrapling StealthyFetcher 隐身抓取 —— 本地第一梯队（VPN 之前）。
+        """阶段5：Scrapling 隐身抓取 —— 本地第一梯队（VPN 之前）。
 
         浏览器级 TLS 指纹 + 隐身补丁，能过相当一部分 requests 拿不到的反爬；
         无正文/失败静默降级到 VPN，绝不阻塞主链路。默认启用，可用环境变量
         CRAWL_SCRAPLING_TIER_ENABLED=0 关闭（回退原直连→VPN 链路）。
+
+        取页路径（阶段5 优化）：优先复用进程内会话（CRAWL_SCRAPLING_SESSION_ENABLED，
+        默认开，浏览器只启一次，实测单次抓取从 ~15s 降到 ~1s）；会话建不起来、
+        或判定会话已损坏时，回退到改动前的"每次新建 StealthyFetcher()"路径。
+        返回结构与字段名与改动前完全一致。
         """
         if not pack_id:
             return {"success": False, "error": "无行业包，跳过 Scrapling"}
@@ -583,29 +768,89 @@ class CandidateCrawlerAdapter:
         except Exception:
             return {"success": False, "error": "行业包加载失败，跳过 Scrapling"}
         started = time.time()
-        try:
-            from scrapling.fetchers import StealthyFetcher
-            fetcher = StealthyFetcher()
-            # Scrapling 的 timeout 单位是毫秒；15s 超时上限，避免拖慢兜底链路
-            _timeout_ms = max(5000, int((config.INTEL_SCAN_READ_TIMEOUT_SECONDS or 15) * 1000))
-            page = fetcher.fetch(
-                url,
-                headless=True,
-                network_idle=False,
-                timeout=_timeout_ms,
-            )
-            html = str(getattr(page, "html_content", "") or page or "")
-            status = getattr(page, "status", 0)
-        except Exception as exc:
-            error = f"Scrapling 抓取失败: {sanitize_external_error(exc) or str(exc)}"
-            self._record_scrapling_attempt(candidate_id, url, task_id, status="failed", error=error, elapsed=time.time() - started)
-            return {"success": False, "error": error}
+        # Scrapling 的 timeout 单位是毫秒；15s 超时上限，避免拖慢兜底链路
+        _timeout_ms = max(5000, int((config.INTEL_SCAN_READ_TIMEOUT_SECONDS or 15) * 1000))
+        page = None
+        session = _scrapling_session() if _scrapling_session_enabled() else None
+        # 是否允许在会话失败后走"每次新建实例"的降级路径。
+        # 关键约束（实测）：同一个线程里不能同时存在两个 playwright/patchright 同步实例——
+        # 会话还活着时再 StealthyFetcher.fetch() 只会拿到
+        # "Error: It looks like you are using Playwright Sync API inside the asyncio loop."。
+        # 所以只有"没有会话"或"会话已释放"时才允许新建。
+        _allow_one_shot = session is None
+        if session is not None:
+            try:
+                # 注意：只能在本线程用它（同线程创建、同线程取页）
+                page = session.fetch(url, network_idle=False, timeout=_timeout_ms)
+                _SCRAPLING_SESSION_LOCAL.failures = 0
+            except Exception as exc:
+                _session_error = f"{type(exc).__name__}: {str(exc)[:160]}"
+                print(f"[scrapling] cid={candidate_id} 会话取页失败: {_session_error}", flush=True)
+                page = None
+                if _scrapling_session_looks_dead(session, _session_error):
+                    # 会话已损坏：必须先释放会话，否则新建实例必然冲突；然后走旧路径兜底
+                    _SCRAPLING_SESSION_STATS["session_broken"] += 1
+                    print(
+                        f"[scrapling] cid={candidate_id} 判定会话损坏，释放会话后回退每次新建实例",
+                        flush=True,
+                    )
+                    _drop_thread_scrapling_session()
+                    _allow_one_shot = True
+                else:
+                    # 页面级失败（DNS/TLS/超时/协议错误）：会话本身是好的（实测坏域名之后
+                    # 同一会话仍能继续抓取），这里再新建一次只会白等一次浏览器冷启动，
+                    # 拿不到额外信息，所以直接按失败返回，把机会留给下游 VPN 梯队。
+                    # 连续失败到阈值仍会丢弃会话，兜住特征词没覆盖到的未知损坏。
+                    failures = int(getattr(_SCRAPLING_SESSION_LOCAL, "failures", 0) or 0) + 1
+                    _SCRAPLING_SESSION_LOCAL.failures = failures
+                    if failures >= _SCRAPLING_SESSION_FAILURE_LIMIT:
+                        print(
+                            f"[scrapling] cid={candidate_id} 会话连续失败 {failures} 次，丢弃会话下次重建",
+                            flush=True,
+                        )
+                        _drop_thread_scrapling_session()
+                    error = f"Scrapling 抓取失败: {sanitize_external_error(exc) or str(exc)}"
+                    self._record_scrapling_attempt(
+                        candidate_id, url, task_id, status="failed", error=error,
+                        elapsed=time.time() - started,
+                    )
+                    return {"success": False, "error": error}
+        if page is None and _allow_one_shot:
+            # 降级路径：改动前的行为（每次新建实例）。
+            # 会话建不起来、或会话判定损坏并已释放时，都走这里，保证兜底梯队不会整体失效。
+            try:
+                from scrapling.fetchers import StealthyFetcher
+                fetcher = StealthyFetcher()
+                page = fetcher.fetch(
+                    url,
+                    headless=True,
+                    network_idle=False,
+                    timeout=_timeout_ms,
+                )
+            except Exception as exc:
+                error = f"Scrapling 抓取失败: {sanitize_external_error(exc) or str(exc)}"
+                self._record_scrapling_attempt(candidate_id, url, task_id, status="failed", error=error, elapsed=time.time() - started)
+                return {"success": False, "error": error}
+        html = str(getattr(page, "html_content", "") or page or "")
+        status = getattr(page, "status", 0)
         if int(status or 0) >= 400 or len(html) < 200:
             error = f"Scrapling 响应不可用（HTTP {status}, html={len(html)}）"
             self._record_scrapling_attempt(candidate_id, url, task_id, status="failed", error=error, elapsed=time.time() - started)
             return {"success": False, "error": error}
+        # 阶段5 优化：markdown(main_content_only=True) 直接给出干净正文（去掉 head/script/
+        # style/hidden），优先用它；取不到就由 _html_to_validated_content 退回纯文本抽取。
+        _markdown = ""
+        try:
+            _markdown = str(page.markdown(main_content_only=True) or "").strip()
+        except Exception as exc:
+            print(
+                f"[scrapling] cid={candidate_id} markdown 抽取失败，退回纯文本: "
+                f"{type(exc).__name__}: {str(exc)[:120]}",
+                flush=True,
+            )
         result = self._html_to_validated_content(
-            url, title=title, html=html, pack=pack, label=f"scrapling:{candidate_id}"
+            url, title=title, html=html, pack=pack, label=f"scrapling:{candidate_id}",
+            markdown_text=_markdown,
         )
         self._record_scrapling_attempt(
             candidate_id, url, task_id,
