@@ -607,7 +607,25 @@ def ensure_postgres_shims(connection) -> None:
         connection,
         "ALTER TABLE IF EXISTS intel_scan_runs "
         "ADD CONSTRAINT intel_scan_runs_scanner_type_check "
-        "CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', 'ggzy_api')) NOT VALID",
+        "CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', 'ggzy_api', 'agent_reach')) NOT VALID",
         "intel_scan_runs_scanner_type_check.add",
+    )
+    # candidate_observations 的 observation_type 同样是"新增来源类型就写不进去"的老陷阱：
+    # 老约束只有 rss/list_page/website/serpapi，tavily 和 agent_reach 的观测行会被直接拒绝
+    # （Tavily 默认关闭，所以一直没人踩到；Agent-Reach 分支一开就会踩）。
+    # 注意：这里与 intel_schema 中的建表文本必须保持一致。
+    _execute(
+        connection,
+        "ALTER TABLE IF EXISTS intel_candidate_observations "
+        "DROP CONSTRAINT IF EXISTS intel_candidate_observations_observation_type_check",
+        "intel_candidate_observations_observation_type_check.drop",
+    )
+    _execute(
+        connection,
+        "ALTER TABLE IF EXISTS intel_candidate_observations "
+        "ADD CONSTRAINT intel_candidate_observations_observation_type_check "
+        "CHECK (observation_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', "
+        "'ggzy_api', 'agent_reach')) NOT VALID",
+        "intel_candidate_observations_observation_type_check.add",
     )
 

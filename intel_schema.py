@@ -956,7 +956,7 @@ def ensure_intel_candidate_tables(cursor) -> None:
             scan_window_key TEXT NOT NULL DEFAULT '',
             requested_pack_ids_json TEXT NOT NULL DEFAULT '[]',
             scanner_type TEXT NOT NULL
-                CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily')),
+                CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', 'ggzy_api', 'agent_reach')),
             status TEXT NOT NULL DEFAULT 'running'
                 CHECK (status IN (
                     'running', 'completed', 'partial', 'failed',
@@ -987,8 +987,11 @@ def ensure_intel_candidate_tables(cursor) -> None:
         "requested_pack_ids_json",
         "TEXT NOT NULL DEFAULT '[]'",
     )
-    # 扫描类型 CHECK 约束演进（PG 老表不含 'tavily'，需显式重建；SQLite 老库由新库建表文本覆盖）：
-    # DROP/ADD 均幂等，失败静默跳过（SQLite 不支持 ALTER 约束，新库建表文本已含 tavily）。
+    # 扫描类型 CHECK 约束演进（PG 老表不含 'tavily'/'ggzy_api'/'agent_reach'，需显式重建；
+    # SQLite 老库由新库建表文本覆盖）：
+    # DROP/ADD 均幂等，失败静默跳过（SQLite 不支持 ALTER 约束，新库建表文本已含这些值）。
+    # 注意：postgres_shims 里还有一处同名的 DROP/ADD，两处必须保持一致，
+    # 否则后执行的一处会把这里的取值覆盖回去（ggzy_api 就踩过这个坑）。
     try:
         cursor.execute(
             "ALTER TABLE intel_scan_runs DROP CONSTRAINT IF EXISTS intel_scan_runs_scanner_type_check"
@@ -998,7 +1001,8 @@ def ensure_intel_candidate_tables(cursor) -> None:
     try:
         cursor.execute(
             "ALTER TABLE intel_scan_runs ADD CONSTRAINT intel_scan_runs_scanner_type_check "
-            "CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily')) NOT VALID"
+            "CHECK (scanner_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', "
+            "'ggzy_api', 'agent_reach')) NOT VALID"
         )
     except Exception:
         pass
@@ -1011,7 +1015,7 @@ def ensure_intel_candidate_tables(cursor) -> None:
             scan_run_id INTEGER,
             activation_id TEXT NOT NULL DEFAULT '',
             observation_type TEXT NOT NULL
-                CHECK (observation_type IN ('rss', 'list_page', 'website', 'serpapi')),
+                CHECK (observation_type IN ('rss', 'list_page', 'website', 'serpapi', 'tavily', 'ggzy_api', 'agent_reach')),
             observation_key TEXT NOT NULL,
             query_text TEXT NOT NULL DEFAULT '',
             raw_url TEXT NOT NULL,

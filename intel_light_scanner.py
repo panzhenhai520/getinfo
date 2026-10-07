@@ -32,6 +32,19 @@ except ImportError:  # pragma: no cover
     def _should_skip_blocked_source(metadata, settings=None) -> bool:
         return False
 
+
+try:
+    # Agent-Reach 关键词聚焦检索（与 SerpAPI / Tavily 并列的第三个"发现 URL"来源）
+    from agent_reach_search import preview_gate as _agent_reach_preview_gate
+    from agent_reach_search import search_pack as _agent_reach_search_pack
+except ImportError:  # pragma: no cover - 未部署 Agent-Reach 时整条分支静默失效
+    def _agent_reach_preview_gate(item: Dict, pack: Dict, query_text: str = "") -> bool:
+        return False
+
+    def _agent_reach_search_pack(queries, **kwargs) -> Dict:
+        return {"items": [], "platforms": [], "errors": [], "elapsed_seconds": 0.0,
+                "timeout": False, "queries": [], "unavailable": []}
+
 from intel_candidates import (
     IntelCandidateRepository,
     intel_candidate_repository,
@@ -632,6 +645,12 @@ class IntelLightScanner:
                 pack = industry_pack_loader.load(industry_pack_id)
                 item_bypass_gate = serpapi_preview_gate(item, pack, query_text)
                 force_unqueued = not item_bypass_gate
+            elif observation_type == "agent_reach":
+                # 社媒/社区噪声大：只有标题或摘要命中行业锚点时，才允许它绕过打分
+                # 直接占一个全文抓取槽；没命中的不强行作废，交给正常打分流程判断
+                # （避免把"标题短但确实是行业内容"的线索一刀切掉）。
+                pack = industry_pack_loader.load(industry_pack_id)
+                item_bypass_gate = _agent_reach_preview_gate(item, pack, query_text)
             results = [
                 self.candidates.discover(
                     item,
@@ -663,6 +682,7 @@ class IntelLightScanner:
         source_ids: Optional[Iterable[int]] = None,
         scan_sources: bool = True,
         include_serpapi: bool = True,
+        include_agent_reach: bool = True,
         max_sources: Optional[int] = None,
         max_items_per_source: Optional[int] = None,
         manual: bool = False,
@@ -1088,6 +1108,136 @@ class IntelLightScanner:
                     )
             except Exception:
                 pass
+        # ── Agent-Reach：社媒/社区平台的"关键词聚焦检索" ──────────────────────
+        # 与 SerpAPI / Tavily 完全对称：只负责发现 URL → 入候选队列（仍走候选门禁）
+        # → 抓正文 → 分类 → 主题归属。默认关闭（AGENT_REACH_ENABLED），先在单机验证。
+        # 预算：平台数 × 关键词数 × 单次结果数 + 总耗时上限，全部硬边界，宁可少跑。
+        _ar_queries = [
+            str(value).strip() for value in (
+                _attention_watch_queries(industry_pack_id)
+                + list(pack.get("serpapi_queries") or [])
+            ) if str(value or "").strip()
+        ][: config.SEARCH_KEYWORDS_PER_PACK]
+        if (
+            include_agent_reach
+            and getattr(config, "AGENT_REACH_ENABLED", False)
+            and _ar_queries
+        ):
+            run_started = time.monotonic()
+            _ar_budget = max(1, int(getattr(config, "AGENT_REACH_MAX_CALLS_PER_RUN", 6) or 6))
+            allocated = self.candidates.reserve_api_usage(
+                "agent_reach", min(len(_ar_queries), _ar_budget), _ar_budget
+            )
+            run_id = self.candidates.create_scan_run(
+                source_id=None,
+                industry_pack_id=industry_pack_id,
+                scanner_type="agent_reach",
+                metadata={
+                    "request_id": request_id,
+                    "queries": _ar_queries,
+                    "platforms": str(getattr(config, "AGENT_REACH_PLATFORMS", "") or ""),
+                },
+                activation_id=activation_id,
+            )
+            ar_stats = {
+                "status": "completed",
+                "request_count": 0,
+                "discovered_count": 0,
+                "queued_count": 0,
+                "duplicate_count": 0,
+                "below_threshold_count": 0,
+                "platforms": [],
+                "unavailable_platforms": [],
+                "error_type": "",
+                "error_message": "",
+            }
+            if allocated == 0:
+                ar_stats.update({
+                    "status": "rate_limited",
+                    "error_type": "run_budget_exhausted",
+                    "error_message": "Agent-Reach 每轮检索预算已用完（到顶跳过，不硬跑）",
+                })
+                report["rate_limited"] = True
+            else:
+                try:
+                    _ar = _agent_reach_search_pack(_ar_queries)
+                    ar_stats["platforms"] = list(_ar.get("platforms") or [])
+                    ar_stats["unavailable_platforms"] = [
+                        f"{item.get('platform')}:{item.get('reason')}"
+                        for item in (_ar.get("unavailable") or [])
+                    ]
+                    ar_stats["request_count"] = len(ar_stats["platforms"]) * len(_ar_queries)
+                    if _ar.get("timeout"):
+                        ar_stats["status"] = "partial"
+                        ar_stats["error_message"] = "超出总耗时预算，已提前停止"
+                    _ar_items = _filter_items_to_window(
+                        _ar.get("items") or [], initialization_from, initialization_to
+                    )
+                    if _ar_items:
+                        item_stats = self._record_items(
+                            _ar_items,
+                            industry_pack_id=industry_pack_id,
+                            source_id=None,
+                            run_id=run_id,
+                            observation_type="agent_reach",
+                            query_text="",
+                            bypass_industry_gate=True,
+                            activation_id=activation_id,
+                            industry_pack_ids=[industry_pack_id],
+                        )
+                        for field, value in item_stats.items():
+                            ar_stats[field] += value
+                except Exception as exc:
+                    ar_stats["status"] = "failed"
+                    ar_stats["error_type"] = type(exc).__name__[:100]
+                    ar_stats["error_message"] = sanitize_external_error(exc)
+                    report["failed_count"] += 1
+            duration_ms = round((time.monotonic() - run_started) * 1000)
+            ar_stats["metadata"] = {
+                "request_id": request_id,
+                "duration_ms": duration_ms,
+                "queries": _ar_queries,
+            }
+            self.candidates.finish_scan_run(run_id, ar_stats)
+            report["runs"].append({
+                "run_id": run_id,
+                "request_id": request_id,
+                "duration_ms": duration_ms,
+                "source_id": None,
+                **ar_stats,
+            })
+            report["discovered_count"] += ar_stats["discovered_count"]
+            report["queued_count"] += ar_stats["queued_count"]
+            print(
+                f"🔎 Agent-Reach 聚焦检索：平台={ar_stats['platforms']} "
+                f"查询={len(_ar_queries)} 发现={ar_stats['discovered_count']} "
+                f"入队={ar_stats['queued_count']} 耗时={duration_ms}ms",
+                flush=True,
+            )
+            # 与 Tavily 一样：检索完立即催一次候选派发，让新 URL 秒级进入抓取
+            # （依然要过候选门禁，不绕过）。
+            try:
+                _ar_repo = None
+                for _mod_name in ("intel_repository", "intel_database"):
+                    try:
+                        _mod = __import__(_mod_name, fromlist=["intel_repository"])
+                    except Exception:
+                        continue
+                    _ar_repo = getattr(_mod, "intel_repository", None)
+                    if _ar_repo is not None and hasattr(_ar_repo, "enqueue_job"):
+                        break
+                    _ar_repo = None
+                if _ar_repo is not None:
+                    _ar_repo.enqueue_job(
+                        "candidate_dispatch",
+                        f"agent-reach-dispatch:{industry_pack_id}:{request_id}",
+                        {"industry_pack_id": industry_pack_id, "manual": True},
+                        priority=5,
+                        request_id=request_id,
+                        created_by="agent-reach-search",
+                    )
+            except Exception:
+                pass
         report["duration_ms"] = round((time.monotonic() - scan_started) * 1000)
         return report
 
@@ -1100,6 +1250,7 @@ def main() -> int:
     parser.add_argument("--industry", default=config.INTEL_DEFAULT_INDUSTRY_PACK)
     parser.add_argument("--source-id", action="append", type=int, default=[])
     parser.add_argument("--without-serpapi", action="store_true")
+    parser.add_argument("--without-agent-reach", action="store_true")
     parser.add_argument("--max-sources", type=int, default=config.INTEL_SCAN_MAX_SOURCES_PER_RUN)
     parser.add_argument("--max-items", type=int, default=config.INTEL_SCAN_MAX_ITEMS_PER_SOURCE)
     args = parser.parse_args()
@@ -1107,6 +1258,7 @@ def main() -> int:
         industry_pack_id=args.industry,
         source_ids=args.source_id or None,
         include_serpapi=not args.without_serpapi,
+        include_agent_reach=not args.without_agent_reach,
         max_sources=args.max_sources,
         max_items_per_source=args.max_items,
         manual=True,

@@ -220,8 +220,25 @@ def _fetch_bilibili(keywords, limit):
         r.raise_for_status()
     except Exception:
         return []
+    # 2026-10 实测：B 站对该接口启用了风控，未登录时返回的是 HTML 校验页（不是 JSON）。
+    # 以前这里直接 r.json() 会抛 JSONDecodeError，被上层吞掉后表现为"搜不到"，
+    # 分不清"没匹配"和"被风控"。这里显式区分并把原因打出来，方便排查。
+    content_type = str(r.headers.get("Content-Type") or "")
+    if "json" not in content_type.casefold():
+        print(f"[bilibili] 搜索接口被风控拦截（返回 {content_type or '未知类型'}，非 JSON），"
+              f"需要登录态 Cookie 才能用", flush=True)
+        return []
+    try:
+        payload = r.json() or {}
+    except ValueError:
+        print("[bilibili] 搜索接口返回无法解析的内容，跳过", flush=True)
+        return []
+    if int(payload.get("code") or 0) != 0:
+        print(f"[bilibili] 搜索接口报错 code={payload.get('code')} "
+              f"message={str(payload.get('message') or '')[:80]}", flush=True)
+        return []
     arts, seen = [], set()
-    for it in ((r.json() or {}).get("data", {}) or {}).get("result") or []:
+    for it in ((payload.get("data") or {}).get("result") or []):
         title = str(it.get("title") or "").strip()
         bvid = str(it.get("bvid") or "").strip()
         if not bvid or bvid in seen:

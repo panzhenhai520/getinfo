@@ -370,6 +370,21 @@ if TAVILY_SEARCH_DEPTH not in {'basic', 'advanced'}:
 TAVILY_TIMEOUT_SECONDS = _env_int('TAVILY_TIMEOUT_SECONDS', 20, 5, 120)
 TAVILY_MAX_RETRIES = _env_int('TAVILY_MAX_RETRIES', 1, 0, 5)
 
+# Agent-Reach 关键词聚焦检索（2026-10-07）：把社媒/社区平台的检索结果当候选 URL 来源，
+# 与 SerpAPI / Tavily 并列，只负责"发现 URL"，仍走候选门禁→抓正文→分类。
+# 默认关闭：它会占用扫描时间，先在单机打开验证清楚再由运营决定是否全量开启。
+#   开启前提：AGENT_REACH_ENABLED=true，且目标平台在设置页打开
+#   PLATFORM_SOURCE_<ID>_ENABLED=true（零配置平台可直接开，需凭据的平台还要填 AUTH）。
+AGENT_REACH_ENABLED = _env_bool('AGENT_REACH_ENABLED', False)
+# 参与检索的平台（逗号分隔）；留空则用零配置平台
+AGENT_REACH_PLATFORMS = _env_str('AGENT_REACH_PLATFORMS', 'v2ex,bilibili,github')
+AGENT_REACH_MAX_PLATFORMS_PER_RUN = _env_int('AGENT_REACH_MAX_PLATFORMS_PER_RUN', 3, 1, 10)
+AGENT_REACH_MAX_QUERIES_PER_PLATFORM = _env_int('AGENT_REACH_MAX_QUERIES_PER_PLATFORM', 2, 1, 10)
+AGENT_REACH_MAX_ITEMS_PER_QUERY = _env_int('AGENT_REACH_MAX_ITEMS_PER_QUERY', 5, 1, 30)
+# 单轮总耗时上限（秒）：超时立即停止检索，把已拿到的结果交出去，不拖垮整轮扫描
+AGENT_REACH_TIMEOUT_SECONDS = _env_int('AGENT_REACH_TIMEOUT_SECONDS', 90, 10, 900)
+AGENT_REACH_MAX_CALLS_PER_RUN = _env_int('AGENT_REACH_MAX_CALLS_PER_RUN', 6, 1, 100)
+
 # 财经新闻刷新：默认关闭；即使开启也只提示"高级版本目前不支持"，不产生任何外部调用。
 FINANCIAL_NEWS_REFRESH_ENABLED = _env_bool('FINANCIAL_NEWS_REFRESH_ENABLED', False)
 
