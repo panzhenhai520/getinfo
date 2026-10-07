@@ -37,7 +37,10 @@ patchright>=1.62.3   # Scrapling 依赖：打补丁的真实浏览器（需 pyth
 # 🔥 增强内容提取库（多种算法对比选择最佳结果）
 trafilatura>=1.6.0          # 强大的网页正文提取
 readability-lxml>=0.8.1     # Mozilla的文章提取算法（Firefox阅读视图）
-cssselect==1.3.0            # 兼容 readability-lxml 0.9 (<1.4) 与 pyquery (<=1.4.99)
+cssselect==1.5.0            # 由 scrapling>=0.4.15（要求 cssselect>=1.5.0）决定；原先钉 1.3.0 与 scrapling 互斥，
+                            # 现代 pip 解析会直接 ResolutionImpossible（实测），镜像里实际装的也一直是 1.5.0。
+                            # 代价：readability-lxml 0.9(<1.4) 与 pyquery(<=1.4.99) 的声明不再被满足（pip check 会提示），
+                            # 但两者在当前版本下运行正常，抓取/正文提取链路实测无恙。
 htmldate>=1.4.0             # 专业的网页日期提取
 justext>=3.0.0              # 基于启发式的正文提取
 boilerpy3>=1.0.6            # boilerpipe样板内容移除算法

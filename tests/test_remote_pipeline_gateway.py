@@ -80,9 +80,8 @@ def test_robots_disallow_is_respected(monkeypatch):
 
 
 def test_unfinished_jobs_are_requeued_after_restart(tmp_path, monkeypatch):
-    # ⚠️ 与当前实现不一致，故意保留原断言待产品侧确认：
-    # _recover_jobs_once 现在把 queued/running 的作业直接置为 failed（phase='recovered'，
-    # error='interrupted by rebuild'），不再重新入队、也不重新 submit。
+    # 产品口径（2026-10-07 确认）：未完成的作业要"重新入队重跑"——排队中（还没执行）的必须去执行，
+    # 正在跑的重新跑一遍；已经失败的保持失败，不复活。重做次数有上限（RECOVERY_MAX_ATTEMPTS）。
     monkeypatch.setattr(gateway, 'DB_PATH', tmp_path / 'jobs.db')
     submitted = []
     monkeypatch.setattr(gateway._crawl_pool, 'submit', lambda fn, job_id, payload: submitted.append((job_id, payload)))
@@ -97,6 +96,68 @@ def test_unfinished_jobs_are_requeued_after_restart(tmp_path, monkeypatch):
         row = connection.execute("SELECT status,phase FROM jobs WHERE id='recover-1'").fetchone()
     assert (row['status'], row['phase']) == ('queued', 'recovered')
     assert submitted == [('recover-1', {'url': 'https://example.com'})]
+
+
+def test_queued_job_that_never_ran_is_executed_after_restart(tmp_path, monkeypatch):
+    """排队中、一次都没跑过的作业：重启后必须真的被执行，而不是被静默丢掉。"""
+    monkeypatch.setattr(gateway, 'DB_PATH', tmp_path / 'jobs.db')
+    submitted = []
+    monkeypatch.setattr(gateway._crawl_pool, 'submit', lambda fn, job_id, payload: submitted.append((job_id, payload)))
+    with gateway._db() as connection:
+        connection.execute(
+            "INSERT INTO jobs(id,idempotency_key,status,phase,request_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+            ('queued-1', 'queued-key', 'queued', 'queued', json.dumps({'url': 'https://example.com/never-ran'}), 1, 1),
+        )
+    monkeypatch.setattr(gateway, '_recovery_done', False)
+    gateway._recover_jobs_once()
+    with gateway._db() as connection:
+        row = connection.execute("SELECT status,phase,attempts FROM jobs WHERE id='queued-1'").fetchone()
+    assert row['status'] == 'queued'
+    assert row['phase'] == 'recovered'
+    assert int(row['attempts']) == 1, "重做次数要记账，避免反复重启无限重跑"
+    assert submitted == [('queued-1', {'url': 'https://example.com/never-ran'})]
+
+
+def test_failed_jobs_stay_failed_and_are_not_resubmitted(tmp_path, monkeypatch):
+    """已经失败的作业按失败处理：不复活、不重跑。"""
+    monkeypatch.setattr(gateway, 'DB_PATH', tmp_path / 'jobs.db')
+    submitted = []
+    monkeypatch.setattr(gateway._crawl_pool, 'submit', lambda fn, job_id, payload: submitted.append(job_id))
+    with gateway._db() as connection:
+        connection.execute(
+            "INSERT INTO jobs(id,idempotency_key,status,phase,request_json,error,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+            ('failed-1', 'failed-key', 'failed', 'failed', json.dumps({'url': 'https://example.com/bad'}),
+             'boom', 1, 1),
+        )
+    monkeypatch.setattr(gateway, '_recovery_done', False)
+    gateway._recover_jobs_once()
+    with gateway._db() as connection:
+        row = connection.execute("SELECT status,phase,error FROM jobs WHERE id='failed-1'").fetchone()
+    assert row['status'] == 'failed'
+    assert row['phase'] == 'failed'
+    assert row['error'] == 'boom'
+    assert submitted == [], "失败作业不得被重新提交"
+
+
+def test_recovery_gives_up_after_attempt_limit(tmp_path, monkeypatch):
+    """重做次数用尽：判失败并写明原因，避免"重启一次跑一次"的活锁。"""
+    monkeypatch.setattr(gateway, 'DB_PATH', tmp_path / 'jobs.db')
+    submitted = []
+    monkeypatch.setattr(gateway._crawl_pool, 'submit', lambda fn, job_id, payload: submitted.append(job_id))
+    with gateway._db() as connection:
+        connection.execute(
+            "INSERT INTO jobs(id,idempotency_key,status,phase,request_json,attempts,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+            ('tired-1', 'tired-key', 'running', 'crawling', json.dumps({'url': 'https://example.com/tired'}),
+             gateway.RECOVERY_MAX_ATTEMPTS, 1, 1),
+        )
+    monkeypatch.setattr(gateway, '_recovery_done', False)
+    gateway._recover_jobs_once()
+    with gateway._db() as connection:
+        row = connection.execute("SELECT status,phase,error FROM jobs WHERE id='tired-1'").fetchone()
+    assert row['status'] == 'failed'
+    assert row['phase'] == 'recovered'
+    assert 'recovery limit reached' in row['error']
+    assert submitted == []
 
 
 def test_invalid_voice_is_rejected(client, monkeypatch):

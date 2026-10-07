@@ -421,6 +421,7 @@ def classify_article(article: Dict, industry_pack: Dict) -> Dict:
         category = "other"
         confidence = _clamp(0.45 + max(0.0, relevance_score) / max(10.0, minimum * 5.0))
         reason = "核心相关性低于行业包阈值"
+        rule_signal = "below_threshold"
     elif trend_score <= 0 and event_score <= 0:
         recent_fallback = _recent_fallback_category(
             article,
@@ -432,6 +433,7 @@ def classify_article(article: Dict, industry_pack: Dict) -> Dict:
             category = str(recent_fallback["category"])
             confidence = float(recent_fallback["confidence"])
             reason = str(recent_fallback["reason"])
+            rule_signal = "temporal_fallback"
             score_details_fallback = {
                 "category": category,
                 "age_days": recent_fallback["age_days"],
@@ -441,6 +443,7 @@ def classify_article(article: Dict, industry_pack: Dict) -> Dict:
             category = "other"
             confidence = _clamp(0.55 + relevance_score / 30.0)
             reason = "文章与行业相关，但未命中明确趋势或事件信号"
+            rule_signal = "no_signal"
             score_details_fallback = {}
     else:
         category_scores = {"trend": trend_score, "event": event_score, "other": 0.0}
@@ -454,6 +457,7 @@ def classify_article(article: Dict, industry_pack: Dict) -> Dict:
         confidence = _clamp(0.60 + relevance_score / 40.0 + (winner - runner_up) / 20.0)
         signal_name = "趋势" if category == "trend" else "事件"
         reason = f"行业相关性达到阈值，并命中{signal_name}信号"
+        rule_signal = "signal"
         score_details_fallback = {}
 
     ordered_matches = []
@@ -470,6 +474,11 @@ def classify_article(article: Dict, industry_pack: Dict) -> Dict:
         "hits": hits,
         "tie_break_order": list(weights.get("tie_break_order") or []),
         "topic_tagging_version": TOPIC_TAGGING_VERSION,
+        # 规则自己是否给出了明确信号。no_signal = 只判断出"行业相关"、没命中趋势/事件，
+        # 这种结论本身就不确定，必须交给 LLM 复核（见 classify_article_id 的调用条件）。
+        # 背景：family_office 等包的规则置信度下限（0.55 + 最低相关性/30）恰好等于
+        # llm_confidence_threshold，只靠"置信度 < 阈值"判断会让 LLM 通道永远进不去。
+        "rule_signal": rule_signal,
     }
     if score_details_fallback:
         score_details["temporal_fallback"] = score_details_fallback
@@ -503,6 +512,27 @@ def _rule_importance(article: Dict, result: Dict) -> str:
     if result["rule_category"] == "trend":
         return f"趋势判断：{title or '该变化'}可能影响行业政策、市场结构或长期决策。"
     return ""
+
+
+def _rule_needs_llm(rule_result: Dict, llm_threshold: float) -> bool:
+    """规则结论是否"不够确定"，需要 LLM 复核。
+
+    两个条件满足其一即需要：
+      1. 规则置信度低于该包的 llm_confidence_threshold（原有语义）；
+      2. 规则自己给出了 no_signal —— 只判断出"行业相关"、没命中趋势/事件，
+         这种结论本身就不确定。
+
+    为什么必须补第 2 条：family_office 等包的规则置信度在这条分支上是
+    `0.55 + 相关性/30`，而锚点权重（core_weight=3）与最低相关性（2）使相关性至少为 3
+    ⇒ 置信度下限 0.65 恰好等于该包的 llm_confidence_threshold，`< 阈值` 永不成立，
+    于是"带锚点文章"永远进不了 LLM 复核 —— 该包的 LLM 分类通道等于死代码
+    （实测：LLM 返回 trend/0.91 也只在无锚点分支被调用、且随后被兜底归属覆盖）。
+    """
+    confidence = float(rule_result.get("rule_confidence") or 0.0)
+    if confidence < float(llm_threshold):
+        return True
+    signal = str((rule_result.get("score_details") or {}).get("rule_signal") or "")
+    return signal == "no_signal"
 
 
 def fuse_rule_and_llm(rule_result: Dict, llm_result: Dict, industry_pack: Dict) -> Dict:
@@ -589,7 +619,7 @@ class IntelClassificationService:
         from intel_content_quality_gate import MIN_ARTICLE_CHARS, MIN_SHORT_DYNAMIC_CHARS
         _content_len = len(str(article.get("content") or ""))
         _short_dynamic = MIN_SHORT_DYNAMIC_CHARS <= _content_len < MIN_ARTICLE_CHARS
-        if config.INTEL_LLM_ENABLED and not _short_dynamic and float(result["rule_confidence"]) < llm_threshold:
+        if config.INTEL_LLM_ENABLED and not _short_dynamic and _rule_needs_llm(result, llm_threshold):
             result["llm_model_id"] = self.llm_client.model_id
             result["llm_prompt_version"] = LLM_PROMPT_VERSION
             try:

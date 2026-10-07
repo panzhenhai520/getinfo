@@ -202,12 +202,23 @@ class IntelWorker:
             getattr(config, "FINANCIAL_INTELLIGENCE_ENABLED", False)
             or getattr(config, "TRADING_AGENTS_ENABLED", False)
         )
-        if not _financial_enabled:
-            # 财务未启用：跳过财务模块初始化，避免其在 PostgreSQL 环境下
+        # 显式注入优先于环境开关：调用方（测试、或按需单独部署）把 dispatcher/scheduler
+        # 传进来时就必须用它，环境开关只决定"要不要自动装配"。
+        # 旧实现先看开关，关着就直接把注入的 dispatcher 丢掉（静默失效），
+        # 而且 financial_market_scheduler 形参从未赋值 —— 开关打开时该属性根本不存在，
+        # 周期行情调度直接 AttributeError、永不执行。
+        if financial_dispatcher is not None:
+            self.financial_dispatcher = financial_dispatcher
+            if financial_market_scheduler is not None:
+                self.financial_market_scheduler = financial_market_scheduler
+            else:
+                self.financial_market_scheduler = self._build_market_scheduler()
+        elif not _financial_enabled:
+            # 财务未启用且没有注入：跳过财务模块初始化，避免其在 PostgreSQL 环境下
             # 因 PRAGMA/SAVEPOINT 等 SQLite 特性不兼容而阻塞 intel 调度器启动。
             self.financial_dispatcher = None
             self.financial_market_scheduler = None
-        elif financial_dispatcher is None:
+        else:
             market_runners = FinancialMarketJobService(
                 self.repository,
                 settings=config,
@@ -223,12 +234,17 @@ class IntelWorker:
                 market_runners,
                 settings=config,
             )
-        else:
-            self.financial_dispatcher = financial_dispatcher
+            self.financial_market_scheduler = (
+                financial_market_scheduler or self._build_market_scheduler()
+            )
         if self.financial_dispatcher is not None:
             self.financial_dispatcher.register_with(self)
         self._financial_market_scheduler_started = False
         self._financial_market_scheduler_log_state = None
+
+    def _build_market_scheduler(self) -> FinancialMarketScheduler:
+        """按当前配置装配行情调度器（显式注入缺席时使用）。"""
+        return FinancialMarketScheduler(self.repository, settings=config)
 
     def register_handler(
         self,
