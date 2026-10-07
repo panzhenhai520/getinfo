@@ -295,6 +295,42 @@
     .status-chip.neutral { color: #53636c; background: #edf1f2; }
     .source-empty { display: none; padding: 26px; color: var(--admin-muted); text-align: center; }
 
+    /* ── 反爬拦截看板（信源管理页内嵌区块）── */
+    .antibot-board { margin-top: 18px; padding: 14px 15px; border: 1px solid var(--admin-line); border-radius: 13px; background: #fff; }
+    .antibot-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .antibot-head h3 { margin: 0 0 4px; font-size: 16px; }
+    .antibot-head p { margin: 0; color: var(--admin-muted); font-size: 12px; line-height: 1.6; }
+    .antibot-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .antibot-head-actions .action { white-space: nowrap; }
+    .antibot-head-actions .action.is-busy, .antibot-recover.is-busy { opacity: .55; pointer-events: none; }
+    .antibot-metrics { margin: 12px 0 14px; }
+    .antibot-metrics .metric.healthy strong { color: #087067; }
+    .antibot-metrics .metric.warn strong { color: #92400e; }
+    .antibot-metrics .metric.blocked strong { color: #b42318; }
+    .antibot-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 14px; }
+    .antibot-card { min-width: 0; border: 1px solid var(--admin-line); border-radius: 12px; overflow: hidden; }
+    .antibot-card > h4 { margin: 0; padding: 10px 12px; background: #f3f7f7; font-size: 13px; }
+    .antibot-scroll { overflow-x: auto; }
+    .antibot-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 12px; }
+    /* 厂商表只有 3 个短列，窄卡片里不必横向滚动 */
+    .antibot-table.vendor { min-width: 320px; }
+    .antibot-table th, .antibot-table td { padding: 8px 10px; border-top: 1px solid #edf1f2; text-align: left; vertical-align: top; }
+    .antibot-table th { color: var(--admin-muted); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .antibot-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    /* 首列（厂商/信源）给足宽度：手机上表格靠横向滚动看，不能让名称被压成一字一行 */
+    .antibot-table th:first-child, .antibot-table td:first-child { min-width: 150px; }
+    .antibot-name { font-weight: 600; word-break: break-word; }
+    .antibot-url { display: block; margin-top: 2px; color: var(--admin-muted); font-size: 11px; word-break: break-all; }
+    .antibot-flags { display: block; margin-top: 3px; color: #92400e; font-size: 11px; }
+    .antibot-status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .antibot-status.blocked { color: #b42318; background: #fee4e2; }
+    .antibot-status.warn { color: #92400e; background: #fef3c7; }
+    .antibot-empty { padding: 20px 12px; color: var(--admin-muted); font-size: 12px; line-height: 1.7; text-align: center; }
+    .antibot-recover { padding: 5px 9px; font-size: 12px; white-space: nowrap; }
+    .antibot-note { display: none; margin: 0 0 10px; padding: 9px 11px; border-radius: 10px; font-size: 12px; line-height: 1.6; }
+    .antibot-note.info { color: #0f766e; background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .antibot-note.warn { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+
     .release-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); gap: 16px; }
     .release-card { min-width: 0; border: 1px solid var(--admin-line); border-radius: 14px; background: #fff; overflow: hidden; }
     .release-card h3 { margin: 0; padding: 14px 16px; border-bottom: 1px solid var(--admin-line); font-size: 16px; }
@@ -439,6 +475,15 @@
       .source-metrics { grid-template-columns: 1fr 1fr; }
       .tab-panel { padding-top: 16px; }
     }
+    /* 手机竖屏（≤767px）：反爬看板改单列，表格横向滚动，不压缩到看不清 */
+    @media (max-width: 767px) {
+      .antibot-grid { grid-template-columns: 1fr; }
+      .antibot-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .antibot-head { display: block; }
+      .antibot-head-actions { margin-top: 10px; }
+      .antibot-head-actions .action { flex: 1 1 44%; }
+      .antibot-table { min-width: 560px; }
+    }
   </style>
   <style>
   /* ── 深蓝大屏：行业包管理页（所有页面统一深蓝皮肤） ── */
@@ -543,6 +588,14 @@
   body.skin-darkblue .badge.custom{background:rgba(56,189,248,.16);color:#9ed2f7}
   body.skin-darkblue .badge.draft{background:rgba(245,158,11,.16);color:#fbbf24}
   body.skin-darkblue .badge.deleted{background:rgba(239,68,68,.16);color:#fca5a5}
+  /* 深蓝：反爬拦截看板 */
+  body.skin-darkblue .antibot-board,body.skin-darkblue .antibot-card{background:#0e1d3a !important;border-color:rgba(96,165,250,.22) !important}
+  body.skin-darkblue .antibot-card>h4{background:#12233f;color:#dbeafe}
+  body.skin-darkblue .antibot-table th,body.skin-darkblue .antibot-table td{border-color:rgba(96,165,250,.18) !important;color:#dbeafe}
+  body.skin-darkblue .antibot-table th{color:#93a9cc}
+  body.skin-darkblue .antibot-empty,body.skin-darkblue .antibot-url{color:#8ea6c8}
+  body.skin-darkblue .antibot-note.info{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.3);color:#6ee7b7}
+  body.skin-darkblue .antibot-note.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.3);color:#fbbf24}
   </style>
 </head>
 <body>
@@ -880,6 +933,53 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <div id="sourceEmpty" class="source-empty">没有符合筛选条件的来源。</div>
           </div>
+
+          <!-- 反爬拦截看板：看清「被谁拦」，并把永远抓不到的信源从轮询里摘出去 -->
+          <div class="antibot-board" id="antibotBoard">
+            <div class="antibot-head">
+              <div>
+                <h3>反爬拦截看板</h3>
+                <p>数据来自反爬厂商识别器（只识别、不绕过）：Cloudflare / Akamai / 瑞数 / 极验这类厂商拦下多少次、哪几个信源已经被放弃派发。「已放弃」的信源不会再有抓取任务，人工确认能抓之后点「恢复派发」即可重新纳入轮询。</p>
+              </div>
+              <div class="antibot-head-actions">
+                <button class="action secondary" type="button" id="antibotRefreshBtn" onclick="loadAntibotBoard()">刷新</button>
+                <button class="action secondary" type="button" id="antibotReloadBtn" onclick="reloadAntibotRules()" title="改完 config/antibot_rules.json 后无需重启进程，点这里立即生效">热加载规则</button>
+              </div>
+            </div>
+
+            <div class="antibot-note" id="antibotNote"></div>
+
+            <div class="source-metrics antibot-metrics">
+              <div class="metric healthy"><strong id="antibotSourceTotal">0</strong><span>信源总数（本行业包）</span></div>
+              <div class="metric healthy"><strong id="antibotHealthy">0</strong><span>健康（无拦截记录）</span></div>
+              <div class="metric warn"><strong id="antibotWarn">0</strong><span>预警（被拦但仍在派发）</span></div>
+              <div class="metric blocked"><strong id="antibotBlocked">0</strong><span>已放弃（不再派发）</span></div>
+            </div>
+
+            <div class="antibot-grid">
+              <div class="antibot-card">
+                <h4>被拦厂商 Top</h4>
+                <div class="antibot-scroll">
+                  <table class="antibot-table vendor">
+                    <thead><tr><th>厂商</th><th>拦截次数</th><th>涉及信源数</th></tr></thead>
+                    <tbody id="antibotVendorRows"></tbody>
+                  </table>
+                </div>
+                <div class="antibot-empty" id="antibotVendorEmpty">暂无拦截记录：这个行业包的信源还没有被任何反爬厂商拦过。</div>
+              </div>
+
+              <div class="antibot-card">
+                <h4>信源健康</h4>
+                <div class="antibot-scroll">
+                  <table class="antibot-table">
+                    <thead><tr><th>信源</th><th>状态</th><th>被拦次数</th><th>最后拦截厂商</th><th>最后拦截时间</th><th>备注</th><th>操作</th></tr></thead>
+                    <tbody id="antibotSourceRows"></tbody>
+                  </table>
+                </div>
+                <div class="antibot-empty" id="antibotSourceEmpty">暂无被拦截的信源。所有信源都处于健康状态，不需要额外处置。</div>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="tab-panel" data-panel="releases">
@@ -1170,6 +1270,7 @@ function setTab(name) {
   } catch (_) { /* 滚动失败不影响切换 */ }
   if (name === 'remote') loadRemoteConfig();
   if (name === 'attention') loadAttention();
+  if (name === 'sources') loadAntibotBoard();
 }
 
 // ── 注意力方向（周报「下周关注」→ 追踪关键词 → 动态主题）──
@@ -1660,6 +1761,102 @@ function updateSourceStats() {
   $('sourceEnabled').textContent = rows.filter(row => row.querySelector('[data-key="is_enabled"]').checked).length;
   $('sourceRss').textContent = rows.filter(row => row.querySelector('[data-key="source_type"]').value === 'rss').length;
   $('sourceIssues').textContent = rows.filter(row => !['manual', 'active'].includes(row.dataset.validation || 'manual')).length;
+}
+
+// ── 反爬拦截看板：被谁拦、哪些信源已放弃派发、人工恢复 ──
+// 数据按当前行业包收口（后端 /api/intel/antibot/health-report 负责隔离）。
+function antibotNote(text, kind = 'info') {
+  const box = $('antibotNote');
+  if (!box) return;
+  box.textContent = text || '';
+  box.className = 'antibot-note ' + kind;
+  box.style.display = text ? 'block' : 'none';
+}
+
+function renderAntibotBoard(payload = {}) {
+  const setText = (id, value) => { const node = $(id); if (node) node.textContent = Number(value || 0); };
+  setText('antibotSourceTotal', payload.source_total);
+  setText('antibotHealthy', payload.healthy_count);
+  setText('antibotWarn', payload.warn_count);
+  setText('antibotBlocked', payload.blocked_count);
+
+  // 表格一：被拦厂商 Top
+  const ranking = payload.vendor_ranking || [];
+  $('antibotVendorRows').innerHTML = ranking.map(item => `
+    <tr><td>${esc(item.label || item.vendor || '')}</td>
+    <td class="num">${Number(item.count || 0)}</td>
+    <td class="num">${Number(item.sources || 0)}</td></tr>`).join('');
+  $('antibotVendorEmpty').style.display = ranking.length ? 'none' : 'block';
+
+  // 表格二：信源健康（已放弃在前，预警在后，均为后端排序后的顺序）
+  const rows = [...(payload.blocked_sources || []), ...(payload.warn_sources || [])];
+  $('antibotSourceRows').innerHTML = rows.map(item => {
+    const blocked = String(item.status) === 'blocked';
+    const badge = blocked
+      ? '<span class="antibot-status blocked">已放弃</span>'
+      : '<span class="antibot-status warn">预警</span>';
+    // 需人工/需代理是厂商类型决定的事实（验证码型机器过不去），提示给运营
+    const flags = [item.needs_manual ? '需人工处理' : '', item.needs_proxy ? '需代理' : ''].filter(Boolean).join(' · ');
+    return `<tr>
+      <td><span class="antibot-name">${esc(item.name || '未命名信源')}</span><span class="antibot-url">${esc(item.source_url || '')}</span></td>
+      <td>${badge}</td>
+      <td class="num">${Number(item.total || 0)}</td>
+      <td>${esc(item.last_label || item.last_vendor || '—')}</td>
+      <td>${esc(item.last_at || '—')}</td>
+      <td>${esc(item.reason || '—')}${flags ? `<span class="antibot-flags">${esc(flags)}</span>` : ''}</td>
+      <td><button class="action secondary antibot-recover" type="button" onclick="recoverAntibotSource(${Number(item.source_id || 0)}, this)">恢复派发</button></td>
+    </tr>`;
+  }).join('');
+  $('antibotSourceEmpty').style.display = rows.length ? 'none' : 'block';
+}
+
+async function loadAntibotBoard() {
+  if (!$('antibotSourceRows')) return;
+  if (!selected) {
+    antibotNote('请先在左侧选择一个行业包，再看该包的反爬拦截情况。', 'warn');
+    return;
+  }
+  antibotNote('正在加载反爬拦截数据…');
+  try {
+    const payload = await api('/api/intel/antibot/health-report?industry_pack_id=' + encodeURIComponent(selected));
+    renderAntibotBoard(payload);
+    antibotNote(payload.detector_warning || '', payload.detector_warning ? 'warn' : 'info');
+  } catch (error) {
+    antibotNote('反爬拦截数据加载失败：' + (error.message || error), 'warn');
+  }
+}
+
+async function recoverAntibotSource(sourceId, button) {
+  if (!sourceId) return;
+  if (button) { button.disabled = true; button.classList.add('is-busy'); }
+  try {
+    const payload = await api(`/api/intel/antibot/sources/${sourceId}/recover`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({industry_pack_id: selected}),
+    });
+    if (payload.report) renderAntibotBoard(payload.report);
+    antibotNote(payload.message || '已恢复派发。');
+  } catch (error) {
+    // 预警中的信源本来就在正常派发，后端会如实返回「无需恢复」，这里原样提示
+    antibotNote('恢复派发未执行：' + (error.message || error), 'warn');
+  } finally {
+    if (button) { button.disabled = false; button.classList.remove('is-busy'); }
+  }
+}
+
+async function reloadAntibotRules() {
+  const button = $('antibotReloadBtn');
+  if (button) { button.disabled = true; button.classList.add('is-busy'); }
+  try {
+    const payload = await api('/api/intel/antibot/reload-rules', {method: 'POST'});
+    antibotNote(payload.message || '反爬规则已热加载。');
+    await loadAntibotBoard();
+  } catch (error) {
+    antibotNote('反爬规则热加载失败：' + (error.message || error), 'warn');
+  } finally {
+    if (button) { button.disabled = false; button.classList.remove('is-busy'); }
+  }
 }
 
 function moveTopic(row, direction) {
@@ -2470,6 +2667,8 @@ function renderDraft(payload) {
   $('sourceFilter').value = 'all';
   updateSourceStats();
   filterSources();
+  // 切包后同步刷新反爬看板（仅在来源管理页时请求，避免多余调用）
+  if (currentTab === 'sources') loadAntibotBoard();
   $('diff').textContent = JSON.stringify(payload.diff, null, 2);
   $('summary').textContent = `草稿修订 ${revision} · 配置版本 ${draft.pack_version} · schema v${draft.schema_version}`;
   $('editorMeta').innerHTML = [

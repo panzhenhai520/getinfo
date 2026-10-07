@@ -415,7 +415,12 @@ class AntibotSelfCheckTests(unittest.TestCase):
 
 
 class _FakeSourceDb:
-    """最小 intel_sources 替身：只需要 record_source_block 用到的几列。"""
+    """最小 intel_sources 替身：列名必须与 intel_schema 一致。
+
+    故意使用真实列名 source_name（不是 name）：如果 detector 把列名写错，
+    这里的查询会抛错 → _all_source_rows 吞掉异常返回空 → 看板统计用例失败，
+    从而把「看板恒返回全 0」这类静默 Bug 挡在提交之前。
+    """
 
     def __init__(self):
         self.connection = sqlite3.connect(":memory:")
@@ -423,18 +428,16 @@ class _FakeSourceDb:
         self.lock = __import__("threading").RLock()
         self.connection.execute(
             "CREATE TABLE intel_sources ("
-            " id INTEGER PRIMARY KEY, name TEXT, source_url TEXT,"
+            " id INTEGER PRIMARY KEY, source_name TEXT, source_url TEXT,"
             " authority_level INTEGER, is_enabled INTEGER,"
             " metadata_json TEXT, updated_at TEXT)"
         )
         self.connection.execute(
-            "INSERT INTO intel_sources(id,name,source_url,authority_level,is_enabled,metadata_json,updated_at)"
+            "INSERT INTO intel_sources(id,source_name,source_url,authority_level,is_enabled,metadata_json,updated_at)"
             " VALUES(1,'源A','https://a.example/feed',3,1,'{}',''),"
             "       (2,'源B','https://b.example/feed',2,1,'{}','')"
         )
         self.connection.commit()
-        # 与 sqlite_database 的行为对齐：这里不需要额外连接管理
-        self._noop = True
 
     def _ensure_connection(self):
         return None

@@ -930,9 +930,11 @@ def _all_source_rows(db=None) -> List[Dict]:
         with db.lock:
             cursor = db.connection.cursor()
             try:
+                # 列名必须与 intel_schema.intel_sources 一致：信源名称列是 source_name，
+                # 不是 name（写错会被下面的 except 吞掉，导致看板恒返回全 0）。
                 cursor.execute(
-                    "SELECT id, name, source_url, authority_level, is_enabled, metadata_json"
-                    " FROM intel_sources"
+                    "SELECT id, source_name AS name, source_url, authority_level,"
+                    " is_enabled, metadata_json FROM intel_sources"
                 )
                 return [dict(row) for row in cursor.fetchall()]
             finally:

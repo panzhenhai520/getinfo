@@ -4032,6 +4032,240 @@ def update_intel_source(source_id: int):
         return _error("市场资讯来源更新失败", 500, request_id=request_id)
 
 
+# ────────────────────────── 反爬拦截看板 ──────────────────────────
+# 数据全部来自 antibot_detector（只做识别与统计，不做任何绕过）；
+# 这里只负责三件事：按行业包收口统计、人工恢复派发、规则热加载。
+
+def _antibot_pack_rows(pack_id: str) -> list:
+    """取该行业包关联的信源行（id/名称/URL/可信度/启用/metadata_json）。"""
+    sqlite_db._ensure_connection()
+    with sqlite_db.lock:
+        cursor = sqlite_db.connection.cursor()
+        try:
+            rows = cursor.execute(
+                "SELECT DISTINCT s.id, s.source_name, s.source_url, s.authority_level, "
+                "s.is_enabled, s.metadata_json "
+                "FROM intel_sources s JOIN intel_source_industries si ON si.source_id = s.id "
+                "WHERE si.industry_pack_id = ? AND COALESCE(si.is_active, 1) = 1",
+                (str(pack_id),),
+            ).fetchall()
+        finally:
+            cursor.close()
+    return [dict(row) for row in rows]
+
+
+def _antibot_metadata(raw) -> dict:
+    """安全解析信源 metadata_json（坏了就当成空，与 detector 同口径）。"""
+    try:
+        value = json.loads(str(raw or "") or "{}")
+        return value if isinstance(value, dict) else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _antibot_report_for_pack(pack_id: str, limit: int = 500) -> dict:
+    """按行业包生成反爬健康报告（返回结构与 source_health_report() 保持一致）。
+
+    · 信源总数 = 本包关联的信源数；
+    · 健康 = 本包信源数 - 已放弃 - 预警（与 detector 口径一致：没有拦截记录即健康）；
+    · 厂商 Top 由本包信源的厂商计数重新聚合，避免出现别的行业包的厂商。
+
+    说明：detector 的 _all_source_rows() 曾用错列名（intel_sources.name，真实列是
+    source_name），异常被内部兜底吞掉后恒返回空、看板全 0；该列名已修正为
+    source_name AS name，全库查询恢复正常，因此正常情况下走直连路径。
+    若将来 detector 又失效（报告为空但库里明明有信源），这里会自动退回本地按包
+    重算，并在 detector_warning 里说明原因，保证看板不至于静默显示全 0。
+    """
+    import antibot_detector  # 局部导入：未部署反爬识别器时不影响本模块其它接口
+
+    try:
+        limit = max(1, int(limit))
+    except (TypeError, ValueError):
+        limit = 500
+    rows = _antibot_pack_rows(pack_id)
+    pack_source_ids = {int(row.get("id") or 0) for row in rows}
+    detector_warning = ""
+    try:
+        report = antibot_detector.source_health_report(limit=limit)
+    except Exception:
+        report = {}
+    if int(report.get("source_total") or 0) > 0:
+        # 直连路径：detector 正常，按行业包过滤
+        blocked = [
+            item
+            for item in (report.get("blocked_sources") or [])
+            if int(item.get("source_id") or 0) in pack_source_ids
+        ]
+        warn = [
+            item
+            for item in (report.get("warn_sources") or [])
+            if int(item.get("source_id") or 0) in pack_source_ids
+        ]
+        healthy = max(0, len(pack_source_ids) - len(blocked) - len(warn))
+    else:
+        # 兜底路径：detector 全库查询失效，用它的公开状态读取器 source_block_state() 本地重算
+        blocked = []
+        warn = []
+        healthy = 0
+        for row in rows:
+            state = antibot_detector.source_block_state(
+                _antibot_metadata(row.get("metadata_json"))
+            )
+            record = {
+                "source_id": int(row.get("id") or 0),
+                "name": str(row.get("source_name") or ""),
+                "source_url": str(row.get("source_url") or ""),
+                "authority_level": row.get("authority_level"),
+                "enabled": bool(row.get("is_enabled")),
+                "status": state["status"],
+                "reason": state["reason"],
+                "total": state["total"],
+                "last_vendor": state["last_vendor"],
+                "last_label": state["last_label"],
+                "last_at": state["last_at"],
+                "needs_proxy": state["needs_proxy"],
+                "needs_manual": state["needs_manual"],
+                "vendors": state["vendors"],
+            }
+            if record["status"] == "blocked":
+                blocked.append(record)
+            elif record["total"] > 0:
+                warn.append(record)
+            else:
+                healthy += 1
+        blocked.sort(key=lambda item: -item["total"])
+        warn.sort(key=lambda item: -item["total"])
+        if pack_source_ids:
+            detector_warning = (
+                "antibot_detector.source_health_report() 全库查询失效"
+                "（intel_sources 没有 name 列，应为 source_name），已改用本地按包统计；"
+                "修复 detector 后此处自动恢复直连。"
+            )
+    # 厂商 Top：按本包信源的厂商计数重新聚合（标签取规则库里的展示名）
+    vendors: dict = {}
+    for item in blocked + warn:
+        for vendor_id, count in (item.get("vendors") or {}).items():
+            entry = vendors.setdefault(
+                str(vendor_id),
+                {"vendor": str(vendor_id), "label": str(vendor_id), "count": 0, "sources": 0},
+            )
+            entry["count"] += int(count or 0)
+            entry["sources"] += 1
+    try:
+        catalog = antibot_detector.load_antibot_rules().get("vendors") or {}
+    except Exception:
+        catalog = {}
+    for vendor_id, entry in vendors.items():
+        entry["label"] = str((catalog.get(vendor_id) or {}).get("label") or vendor_id)
+    total = len(pack_source_ids)
+    return {
+        "source_total": total,
+        "healthy_count": healthy,
+        "blocked_count": len(blocked),
+        "warn_count": len(warn),
+        "blocked_sources": blocked,
+        "warn_sources": warn,
+        "vendor_ranking": sorted(
+            vendors.values(), key=lambda item: (-item["count"], item["vendor"])
+        )[:20],
+        "detector_warning": detector_warning,
+    }
+
+
+@intel_bp.route("/antibot/health-report", methods=["GET"])
+@login_required
+def antibot_health_report():
+    """反爬健康报告（行业包管理页「反爬拦截看板」）。
+
+    返回结构与 antibot_detector.source_health_report() 一致，但按行业包收口：
+    {source_total, healthy_count, blocked_count, warn_count,
+     blocked_sources:[{source_id,name,source_url,authority_level,enabled,status,reason,
+                       total,last_vendor,last_label,last_at,needs_proxy,needs_manual,vendors}],
+     warn_sources:[同上], vendor_ranking:[{vendor,label,count,sources}],
+     detector_warning: str（detector 全库查询失效时的说明，正常时为空串）}
+    """
+    request_id = _request_id()
+    try:
+        pack_id = _industry_pack_id(str(request.args.get("industry_pack_id") or ""))
+        limit = coerce_int(request.args.get("limit"), 500, 1, 2000)
+        report = _antibot_report_for_pack(pack_id, limit)
+        return jsonify(
+            {
+                "success": True,
+                "request_id": request_id,
+                "industry_pack_id": pack_id,
+                **report,
+            }
+        )
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("反爬健康报告查询失败", 500, request_id=request_id)
+
+
+@intel_bp.route("/antibot/sources/<int:source_id>/recover", methods=["POST"])
+@admin_required
+def antibot_recover_source(source_id: int):
+    """人工恢复派发：清掉该信源「不再派发任务」标记，重新纳入轮询，并回传最新报告。"""
+    request_id = _request_id()
+    pack_id = ""
+    try:
+        import antibot_detector
+
+        result = antibot_detector.record_source_success(int(source_id))
+        if not result.get("cleared"):
+            # 只有「已放弃」状态（status=blocked）才有标记可清；
+            # 预警中的信源本来就在正常派发，这里如实告知而不是假报成功。
+            return _error(
+                "该信源当前是健康或仅预警状态（没有「不再派发任务」标记），无需恢复派发",
+                400,
+                request_id=request_id,
+            )
+        pack_id = _industry_pack_id(
+            str((request.get_json(silent=True) or {}).get("industry_pack_id") or "")
+        )
+        report = _antibot_report_for_pack(pack_id, 500)
+        return jsonify(
+            {
+                "success": True,
+                "request_id": request_id,
+                "source_id": int(source_id),
+                "industry_pack_id": pack_id,
+                "message": "已恢复派发，该信源重新纳入轮询（历史拦截计数保留，便于复盘）",
+                "report": report,
+            }
+        )
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("信源恢复派发失败", 500, request_id=request_id)
+
+
+@intel_bp.route("/antibot/reload-rules", methods=["POST"])
+@admin_required
+def antibot_reload_rules():
+    """热加载反爬规则库（config/antibot_rules.json 改完后无需重启进程）。"""
+    request_id = _request_id()
+    try:
+        import antibot_detector
+
+        catalog = antibot_detector.reload_antibot_rules()
+        vendors = sorted(str(key) for key in (catalog.get("vendors") or {}))
+        return jsonify(
+            {
+                "success": True,
+                "request_id": request_id,
+                "message": f"反爬规则已热加载：{len(vendors)} 个厂商",
+                "schema_version": str(catalog.get("schema_version") or ""),
+                "vendor_count": len(vendors),
+                "vendors": vendors,
+            }
+        )
+    except Exception as exc:
+        # 规则文件写坏时 reload 会抛 AntibotRulesError，这里把真实原因带回页面
+        return _error(f"反爬规则热加载失败：{exc}", 500, request_id=request_id)
+
+
 @intel_bp.route("/reclassify/<int:article_id>", methods=["POST"])
 @admin_required
 def reclassify_article(article_id: int):
