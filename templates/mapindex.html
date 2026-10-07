@@ -2851,17 +2851,12 @@
             .model-select-list { grid-template-columns: 1fr; }
             .model-select-item { padding: 14px 16px; }
             /* ── 手机布局：输入行两行排布 ──
-               第一行：[地球 联网搜索] [输入框(含[-]清空)]
-               第二行：[模型选择(自适应宽)] [发送(自适应宽)] */
-            .chat-input-row {
-                flex-wrap: wrap;
-                row-gap: 8px;
-            }
-            .chat-input-row .web-search-button { order: 1; flex: 0 0 44px; }
-            .chat-input-row .chat-input-box { order: 2; flex: 1 1 calc(100% - 52px); }
-            .chat-input-row .chat-model-select { order: 3; flex: 1 1 0%; max-width: none; justify-content: flex-start; }
-            .chat-input-row .send-button { order: 4; flex: 0 0 64px; }
-            .chat-input-row .save-kb-button { order: 5; flex: 0 0 44px; }
+               第一行：[输入框（整宽，含右侧擦除按钮走 .send-button）]
+               第二行：[模型选择(自适应宽)] [发送 44px] [擦除 44px] [加入知识库 44px]
+               具体 flex/order 规则统一放在 static/css/responsive.css（它在模板内联样式之后加载、
+               带 !important，是移动端规则的权威位置）。这里原先写的
+               `.chat-input-row .web-search-button / .chat-input-box` 是死规则：
+               联网搜索按钮实际在 .model-row 里，本模板也没有 .chat-input-box 元素。 */
             .retrieval-drawer { width: 100vw; }
             .retrieval-body { padding: 10px 12px; }
         }
@@ -3199,7 +3194,7 @@
             .chat-progress-label { animation: none !important; transition-duration: 1ms !important; }
         }
     </style>
-    <link rel="stylesheet" href="/static/css/responsive.css?v=17">
+    <link rel="stylesheet" href="/static/css/responsive.css?v=18">
     <link rel="stylesheet" href="/static/css/article-detail-modal.css">
 </head>
 <body data-home-view="dashboard" data-show-spatiotemporal-map="false" data-financial-workspace="{{ 'true' if financial_workspace else 'false' }}" data-industry-pack-id="{{ active_industry_pack.id }}" data-industry-name="{{ active_industry_pack.name }}" data-is-admin="{{ 'true' if is_admin else 'false' }}">

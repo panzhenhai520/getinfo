@@ -295,26 +295,66 @@ img {
     .model-row {
         flex-wrap: wrap !important;
     }
-    .chat-input-row,
-    #chatInput {
-        min-width: 0 !important;
-    }
-    /* 引用长文本后输入行不再被撑破：textarea 宽度由剩余空间决定（flex-basis:0），
-       长行在输入框内部滚动；发送按钮固定 44px 始终留在屏内 */
+    /* ── AI 助手输入区（手机竖屏）──
+       实测问题：390px 视口下输入框只有 103px 宽（桌面 1188px），打字几乎没法用。
+       根因：输入框与"模型选择"都是 flex:1 1 0%，两个 grow 项把同一行平分；
+       而模板里给输入行写的两行排布（flex-wrap + order）因为两项 flex-basis 都是 0、
+       整行塞得下，所以从不换行 → 排布形同失效。
+       现在：输入框独占一整行，控制按钮排到第二行；触控目标一律 ≥44px。 */
     .chat-compose {
         grid-template-columns: minmax(0, 1fr) !important;
     }
     .chat-input-row {
+        flex-wrap: wrap !important;
+        align-items: stretch !important;
+        row-gap: 8px !important;
         width: 100% !important;
         max-width: 100% !important;
     }
     #chatInput {
-        width: auto !important;
-        flex: 1 1 0% !important;
+        order: 1 !important;
+        flex: 1 1 100% !important;      /* 整宽独占一行 */
+        width: 100% !important;
         max-width: 100% !important;
+        min-width: 0 !important;
+        /* 手机上 resize:vertical 拖不动，只能靠最小高度给足书写空间（约 3 行） */
+        min-height: 96px !important;
+        /* 小于 16px 时 iOS 聚焦会自动放大整页，导致输入区被顶出屏幕 */
+        font-size: 16px !important;
+    }
+    .chat-input-row .chat-model-select {
+        order: 2 !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: 44px !important;
     }
     .chat-input-row .send-button {
+        order: 3 !important;
         flex: 0 0 44px !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        height: 44px !important;
+    }
+    .chat-input-row .save-kb-button {
+        order: 4 !important;
+        flex: 0 0 44px !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        height: 44px !important;
+    }
+    /* 手机上的其余触控目标：头部图标按钮 34x34、联网搜索 38px 高，
+       都比拇指友好尺寸（44px）小，容易点错或点不中 —— 统一抬到 44px。 */
+    .chat-drawer .chat-head .icon-button {
+        width: 44px !important;
+        height: 44px !important;
+        font-size: 20px !important;
+    }
+    .chat-drawer .chat-head { padding: 10px 10px !important; }
+    .chat-drawer .chat-actions { gap: 6px !important; }
+    .model-row .web-search-button {
+        min-height: 44px !important;
+        height: 44px !important;
     }
     .chat-actions {
         flex-shrink: 0 !important;
