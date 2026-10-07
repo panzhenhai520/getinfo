@@ -57,9 +57,26 @@ def looks_like_listing_url(url: str) -> bool:
     )
 
 
-def _record_anti_bot_backoff(candidate: Dict, error_text: str, db=None) -> None:
+def _detect_protection(*, status_code=None, headers=None, body="", url="") -> Optional[Dict]:
+    """识别拦截厂商（自研规则引擎）。识别不出返回 None，绝不影响主链路。"""
+    try:
+        from antibot_detector import detect_antibot
+
+        return detect_antibot(
+            status_code=status_code, headers=headers, body=body or "", url=url or ""
+        )
+    except Exception:
+        return None
+
+
+def _record_anti_bot_backoff(candidate: Dict, error_text: str, db=None, protection: Dict = None) -> None:
     """T4.3 反爬降频：命中反爬信号 → 域名退避窗口 +1 档（指数递增）；
-    绝不做任何绕过，只降频等待。失败不阻塞主流程。"""
+    绝不做任何绕过，只降频等待。失败不阻塞主流程。
+
+    2026-10-07 起同时做「信源级拦截统计」：把拦我们的厂商记到
+    intel_sources.metadata_json，达到阈值就把该信源标记为「不再派发任务」，
+    把有限的爬取槽位还给能出正文的信源。
+    """
     try:
         from urllib.parse import urlparse
         from crawl_policy import classify_anti_bot, record_backoff
@@ -70,16 +87,32 @@ def _record_anti_bot_backoff(candidate: Dict, error_text: str, db=None) -> None:
             record_backoff(domain, 403, db=db)
     except Exception:
         pass
+    # 信源级统计（与域名退避相互独立：一个降频，一个止损）
+    try:
+        if not protection:
+            return
+        from antibot_detector import record_source_block
+
+        record_source_block((candidate or {}).get("source_id"), protection, db=db)
+    except Exception:
+        pass
 
 
-def _record_anti_bot_success(url: str, db=None) -> None:
-    """成功抓取 → 清空该域名退避计数（站点恢复）。失败不阻塞主流程。"""
+def _record_anti_bot_success(url: str, db=None, source_id=None) -> None:
+    """成功抓取 → 清空该域名退避计数（站点恢复）；信源若曾被标记放弃，同时解除。"""
     try:
         from urllib.parse import urlparse
         from crawl_policy import record_backoff_success
         domain = urlparse(str(url or "")).netloc
         if domain:
             record_backoff_success(domain, db=db)
+    except Exception:
+        pass
+    try:
+        if source_id:
+            from antibot_detector import record_source_success
+
+            record_source_success(source_id, db=db)
     except Exception:
         pass
 
@@ -833,10 +866,17 @@ class CandidateCrawlerAdapter:
                 return {"success": False, "error": error}
         html = str(getattr(page, "html_content", "") or page or "")
         status = getattr(page, "status", 0)
+        # 反爬识别：Scrapling 拿回来的可能是挑战页/拦截页而不是正文。
+        # 识别出厂商就随返回值带出去，交给上层做统计与止损（不做绕过）。
+        protection = _detect_protection(status_code=status, body=html, url=url)
+        if protection and protection.get("is_block"):
+            error = f"Scrapling 被{protection.get('label')}拦截（{protection.get('method')}）"
+            self._record_scrapling_attempt(candidate_id, url, task_id, status="failed", error=error, elapsed=time.time() - started)
+            return {"success": False, "error": error, "protection": protection}
         if int(status or 0) >= 400 or len(html) < 200:
             error = f"Scrapling 响应不可用（HTTP {status}, html={len(html)}）"
             self._record_scrapling_attempt(candidate_id, url, task_id, status="failed", error=error, elapsed=time.time() - started)
-            return {"success": False, "error": error}
+            return {"success": False, "error": error, "protection": protection}
         # 阶段5 优化：markdown(main_content_only=True) 直接给出干净正文（去掉 head/script/
         # style/hidden），优先用它；取不到就由 _html_to_validated_content 退回纯文本抽取。
         _markdown = ""
@@ -1174,7 +1214,9 @@ class CandidateCrawlerAdapter:
                 self.db.update_crawl_task_status(
                     crawler_task_id, "failed", error_message=error
                 )
-                _record_anti_bot_backoff(candidate, error, self.db)
+                _record_anti_bot_backoff(
+                    candidate, error, self.db, protection=extracted.get("protection")
+                )
                 return {
                     "success": False,
                     "outcome": "crawler_failed",
@@ -1232,7 +1274,10 @@ class CandidateCrawlerAdapter:
                 self.db.update_crawl_task_status(
                     crawler_task_id, "failed", error_message=error
                 )
-                _record_anti_bot_backoff(candidate, error, self.db)
+                _record_anti_bot_backoff(
+                    candidate, error, self.db,
+                    protection=(fallback.get("protection") or extracted.get("protection")),
+                )
                 return {
                     "success": False,
                     "outcome": "crawler_failed",
@@ -1461,8 +1506,9 @@ class CandidateCrawlerAdapter:
                 "permanent": False,
             }
         self.db.link_article_to_task(article_id, crawler_task_id)
-        # T4.3 成功抓取 → 清空该域名反爬退避计数（站点恢复）
-        _record_anti_bot_success(article_url, self.db)
+        # T4.3 成功抓取 → 清空该域名反爬退避计数（站点恢复）；
+        # 信源若曾被标记「被拦截 n 次不再派发」，同时解除并重新纳入轮询。
+        _record_anti_bot_success(article_url, self.db, source_id=candidate.get("source_id"))
         # 临时库：原文入 staging（供核对），加工成功后标记 done；3 天自动清理。
         _staging_id = self._staging_upsert(
             url=article_url, title=title, raw_content=content,

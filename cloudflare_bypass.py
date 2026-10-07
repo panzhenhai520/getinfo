@@ -37,11 +37,58 @@ except ImportError:
     HAS_TENACITY = False
 
 
+try:
+    # 自研反爬厂商识别规则引擎（config/antibot_rules.json）：
+    # 只识别「被谁拦了」并给出处置建议，不做任何绕过。
+    from antibot_detector import (
+        detect_antibot,
+        plan_engines,
+        preferred_engine,
+        protection_summary,
+        should_skip_curl_cffi,
+        needs_manual,
+    )
+
+    HAS_ANTIBOT_DETECTOR = True
+except ImportError:  # pragma: no cover - 规则引擎缺失时退回旧逻辑
+    detect_antibot = None
+    plan_engines = None
+    preferred_engine = None
+    protection_summary = None
+    should_skip_curl_cffi = None
+    needs_manual = None
+    HAS_ANTIBOT_DETECTOR = False
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
         return default
     return str(value).strip().lower() in ("1", "true", "yes", "on", "y")
+
+
+def _detect_from_response(response, html_content: str = "", url: str = "") -> Optional[Dict]:
+    """从一次 HTTP 响应里识别拦截厂商（规则引擎）。识别不了就返回 None。"""
+    if not HAS_ANTIBOT_DETECTOR:
+        return None
+    try:
+        return detect_antibot(
+            status_code=getattr(response, 'status_code', 0),
+            headers=getattr(response, 'headers', None),
+            body=html_content or (getattr(response, 'text', '') or ''),
+            url=url or str(getattr(response, 'url', '') or ''),
+        )
+    except Exception:
+        return None
+
+
+def _attach_protection(result: Dict, protection) -> Dict:
+    """把识别结果挂到返回值上（供上层做快速失败/统计/降级）。"""
+    if isinstance(result, dict) and protection:
+        result.setdefault('protection', protection)
+        if protection.get('is_block'):
+            result.setdefault('blocked_by', protection.get('vendor') or '')
+    return result
 
 
 class CloudflareBypass:
@@ -125,17 +172,52 @@ class CloudflareBypass:
         )
         return retryer(func)
     
+    def detect_protection(self, url: str, timeout: int = 10) -> Optional[Dict]:
+        """识别该 URL 的拦截厂商（规则引擎）。返回 protection dict 或 None。
+
+        与旧 detect_cloudflare 的区别：不再只看 Cloudflare 的 7 条硬编码特征，
+        而是按 config/antibot_rules.json 覆盖 Cloudflare/Akamai/DataDome/Imperva/
+        AWS WAF/PerimeterX/Kasada/阿里云 WAF/瑞数/各类验证码等厂商，并带出
+        置信度、证据与处置建议。
+        """
+        if not HAS_ANTIBOT_DETECTOR:
+            return None
+        try:
+            headers = self._browser_headers({
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            })
+            response = self._requests_get(url, headers=headers, timeout=timeout, allow_redirects=True, verify=False)
+            return detect_antibot(
+                status_code=getattr(response, 'status_code', 0),
+                headers=getattr(response, 'headers', None),
+                body=getattr(response, 'text', '') or '',
+                url=str(getattr(response, 'url', '') or url),
+            )
+        except Exception as e:
+            print(f"⚠️ 识别拦截厂商时出错: {e}")
+            return None
+
     def detect_cloudflare(self, url: str, timeout: int = 10) -> bool:
         """
         检测URL是否被Cloudflare保护
-        
+
         Args:
             url: 要检测的URL
             timeout: 超时时间（秒）
-            
+
         Returns:
             bool: 是否被Cloudflare保护
         """
+        # 规则引擎优先：厂商识别 + 证据 + 处置建议一次算出来
+        if HAS_ANTIBOT_DETECTOR:
+            protection = self.detect_protection(url, timeout=timeout)
+            if protection:
+                print(f"🛡️ 检测到拦截厂商: {protection_summary(protection)}")
+                print(f"   建议引擎: {preferred_engine(protection)} | {url}")
+                return True
+            print(f"✅ 未检测到拦截厂商: {url}")
+            return False
+
         try:
             headers = self._browser_headers({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -256,12 +338,21 @@ class CloudflareBypass:
                 html_content = response.text
                 final_url = str(response.url)
                 
-                # 检查是否遇到Cloudflare验证页面
-                if 'checking your browser' in html_content.lower() or \
-                   'just a moment' in html_content.lower() or \
-                   '__cf_bm' in html_content.lower():
+                # 检查是否遇到反爬验证页面（规则引擎判定厂商，不再只认 Cloudflare 文案）
+                _protection = _detect_from_response(response, html_content, url)
+                if _protection and _protection.get('is_block'):
                     
-                    print(f"   检测到Cloudflare验证页面，等待3秒后重试...")
+                    print(f"   {protection_summary(_protection)}")
+                    # 验证码型：机器过不去，直接失败，不再空跑重试
+                    if needs_manual(_protection):
+                        print(f"   ⛔ 验证码型拦截（{_protection.get('label')}），需要人工处理，停止重试")
+                        return {
+                            'success': False,
+                            'error': f"{_protection.get('label')}验证码拦截，需要人工处理",
+                            'protection': _protection,
+                            'needs_manual': True
+                        }
+                    print(f"   检测到反爬验证页面，等待3秒后重试...")
                     time.sleep(3)
                     
                     # 使用相同的session再次请求（保持cookies，支持代理）
@@ -278,19 +369,20 @@ class CloudflareBypass:
                     html_content = response.text
                     final_url = str(response.url)
                 
-                # 再次检查
-                if 'checking your browser' in html_content.lower() or \
-                   'just a moment' in html_content.lower():
+                # 再次检查（还是被拦 → 换指纹或退出，并把厂商信息带出去）
+                _protection = _detect_from_response(response, html_content, final_url or url)
+                if _protection and _protection.get('is_block'):
                     
                     if attempt < max_retries - 1:
-                        print(f"   ⚠️ 验证未完成，尝试下一个浏览器指纹...")
+                        print(f"   ⚠️ 验证未完成（{_protection.get('label')}），尝试下一个浏览器指纹...")
                         time.sleep(2)
                         continue
                     else:
                         print(f"   ❌ 所有尝试均失败")
                         return {
                             'success': False,
-                            'error': 'Cloudflare验证未完成（已尝试所有方法）'
+                            'error': f"{_protection.get('label')}验证未完成（已尝试所有方法）",
+                            'protection': _protection
                         }
                 
                 # 成功
@@ -543,47 +635,64 @@ class CloudflareBypass:
                 int(os.getenv("CRAWL_REQUEST_RETRY_ATTEMPTS", "2")),
             )
             
-            # 检测Cloudflare保护
-            is_cloudflare = (
-                response.status_code == 403 or
-                'cf-mitigated' in str(response.headers).lower() or
-                'checking your browser' in response.text.lower() or
-                'just a moment' in response.text.lower()
-            )
-            
-            if is_cloudflare:
-                print(f"🛡️ 检测到Cloudflare保护，尝试绕过方法")
-                
-                # 优先使用curl-cffi（兼容性更好）
+            # 规则引擎识别拦截厂商（取代原来的 4 条 Cloudflare 硬编码特征）
+            protection = _detect_from_response(response, response.text, url)
+
+            if protection and protection.get('is_block'):
+                print(f"🛡️ {protection_summary(protection)}")
+
+                # 验证码型（Turnstile/极验/reCAPTCHA/hCaptcha）：机器过不去，
+                # 直接带出结论失败，不再空跑 curl_cffi/Playwright 两级回退。
+                if needs_manual(protection):
+                    print(f"⛔ {protection.get('label')}属验证码型，需要人工处理，停止自动回退")
+                    return _attach_protection({
+                        'success': False,
+                        'error': f"{protection.get('label')}验证码拦截，需要人工处理",
+                        'needs_manual': True,
+                        'url': url,
+                    }, protection)
+
+                # 按厂商类型选择引擎：JS 传感器型跳过 curl_cffi（试一百次也没用），
+                # 指纹型/规则型 WAF 优先 curl_cffi。
+                available = []
                 if self.curl_cffi_available:
-                    print("🔄 切换到curl-cffi模式")
-                    result = self.bypass_with_curl_cffi(url)
-                    if result['success']:
-                        result['method'] = 'curl-cffi'
-                        return result
-                
-                # 备用：使用Playwright
+                    available.append('curl_cffi')
                 if self.playwright_available:
-                    print("🔄 切换到Playwright模式")
-                    result = asyncio.run(self.bypass_with_playwright(url))
-                    if result['success']:
-                        result['method'] = 'playwright'
-                        return result
-                
-                return {
+                    available.append('browser')
+                engine_order = plan_engines(protection, available) if HAS_ANTIBOT_DETECTOR else available
+                if should_skip_curl_cffi(protection):
+                    print(f"⏭️ {protection.get('label')}属JS传感器型，跳过 curl_cffi，直接上真实浏览器")
+                for engine in engine_order:
+                    if engine == 'curl_cffi':
+                        print("🔄 切换到curl-cffi模式")
+                        result = self.bypass_with_curl_cffi(url)
+                        if result.get('success'):
+                            result['method'] = 'curl-cffi'
+                            return result
+                        protection = result.get('protection') or protection
+                    elif engine == 'browser':
+                        print("🔄 切换到Playwright模式")
+                        result = asyncio.run(self.bypass_with_playwright(url))
+                        if result.get('success'):
+                            result['method'] = 'playwright'
+                            return result
+                        protection = result.get('protection') or protection
+
+                return _attach_protection({
                     'success': False,
-                    'error': 'Cloudflare保护需要curl-cffi或Playwright，但都不可用'
-                }
-            
+                    'error': f"{protection.get('label')}拦截且现有引擎均不可用/未通过",
+                    'url': url,
+                }, protection)
+
             # 普通请求成功
             print(f"✅ 普通请求成功")
-            return {
+            return _attach_protection({
                 'success': True,
                 'html': response.text,
                 'text': response.text,
                 'url': response.url,
                 'method': 'requests'
-            }
+            }, protection)
             
         except Exception as e:
             print(f"⚠️ 普通请求失败: {e}")
@@ -592,22 +701,26 @@ class CloudflareBypass:
             if self.curl_cffi_available:
                 print("🔄 切换到curl-cffi模式")
                 result = self.bypass_with_curl_cffi(url)
-                if result['success']:
+                if result.get('success'):
                     result['method'] = 'curl-cffi'
                     return result
+                protection = result.get('protection') or None
+            else:
+                protection = None
             
             # 备用：尝试Playwright
             if self.playwright_available:
                 print("🔄 切换到Playwright模式")
                 result = asyncio.run(self.bypass_with_playwright(url))
-                if result['success']:
+                if result.get('success'):
                     result['method'] = 'playwright'
                     return result
+                protection = result.get('protection') or protection
             
-            return {
+            return _attach_protection({
                 'success': False,
                 'error': f'普通请求失败且绕过方法不可用: {e}'
-            }
+            }, protection)
 
 
 # 全局实例（使用配置中的代理，按需懒加载）
@@ -656,6 +769,7 @@ def fetch_url(url: str, force_playwright: bool = False, force_curl_cffi: bool = 
     
     # 尝试获取，失败时重试
     last_error = None
+    last_protection = None
     for attempt in range(max_retries + 1):
         if attempt > 0:
             print(f"🔄 第 {attempt + 1} 次尝试获取: {url[:80]}...")
@@ -667,7 +781,23 @@ def fetch_url(url: str, force_playwright: bool = False, force_curl_cffi: bool = 
         
         # 记录错误
         last_error = result.get('error', '未知错误')
-        
+        # 保留拦截厂商结论：上层据此快速失败（如验证码型/JS 传感器型）
+        last_protection = result.get('protection') or last_protection
+
+        # 验证码型拦截：机器过不去，重试没有意义，立刻返回
+        if result.get('needs_manual') or (
+            last_protection and needs_manual and needs_manual(last_protection)
+        ):
+            print(f"⛔ {last_protection.get('label') if last_protection else ''}验证码拦截，停止重试")
+            return _attach_protection({
+                'success': False,
+                'error': last_error,
+                'html': '',
+                'text': '',
+                'needs_manual': True,
+                'url': url,
+            }, last_protection)
+
         # 如果还有重试次数，继续
         if attempt < max_retries:
             import time
@@ -677,12 +807,13 @@ def fetch_url(url: str, force_playwright: bool = False, force_curl_cffi: bool = 
     
     # 所有尝试都失败
     print(f"❌ 获取失败，已重试 {max_retries} 次: {last_error}")
-    return {
+    return _attach_protection({
         'success': False,
         'error': f'失败（已重试{max_retries}次）: {last_error}',
         'html': '',
-        'text': ''
-    }
+        'text': '',
+        'url': url,
+    }, last_protection)
 
 
 def is_cloudflare_protected(url: str) -> bool:

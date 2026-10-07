@@ -1,0 +1,267 @@
+{
+  "schema_version": "antibot-rules-v1",
+  "updated_at": "2026-10-07",
+  "notes": [
+    "自研反爬识别规则库：只做「识别是谁拦了我们 + 给出处置建议」，不做任何绕过。",
+    "判据全部是公开事实（例如 Cloudflare 会下发 cf-ray 响应头、Akamai 会下发 _abck cookie），公开事实本身不受版权保护。",
+    "规则分类 methods 与业界通行分类一致：cookie / header / url / content / dom / window / payload。",
+    "weak=true 表示「CDN 存在性」信号：正常 200 响应也会出现（如 cf-ray），只在状态码属于 block_status 时才算拦截。",
+    "confidence 为单条规则的置信度：>=0.6 视为可直接判定拦截；<0.6 只作辅助证据。",
+    "kind: fingerprint=指纹型（TLS/HTTP 指纹过关即可）| js_sensor=JS 传感器型（必须真实浏览器执行 JS）| captcha=验证码型（需人工，机器无法通过）| waf=规则型 WAF。",
+    "preferred_engine 表示下一步该试哪一级：curl_cffi / browser / manual。"
+  ],
+  "vendors": {
+    "cloudflare": {
+      "label": "Cloudflare",
+      "kind": "fingerprint",
+      "preferred_engine": "curl_cffi",
+      "fallback_engine": "browser",
+      "action": "retry_curl_cffi",
+      "block_status": [403, 429, 503],
+      "rules": [
+        {"id": "cf-ray", "method": "header", "pattern": "(?i)^cf-ray:", "confidence": 0.35, "weak": true, "note": "Cloudflare 响应头，正常 200 也存在"},
+        {"id": "cf-server", "method": "header", "pattern": "(?i)^server:\\s*cloudflare", "confidence": 0.3, "weak": true, "note": "Server: cloudflare"},
+        {"id": "cf-mitigated", "method": "header", "pattern": "(?i)^cf-mitigated:\\s*(challenge|block)", "confidence": 0.95, "note": "Cloudflare 主动拦截标记"},
+        {"id": "cf-bm-cookie", "method": "cookie", "pattern": "(?i)(^|[;\\s])__cf_bm=", "confidence": 0.45, "weak": true, "note": "Bot Management cookie 下发"},
+        {"id": "cf-clearance", "method": "cookie", "pattern": "(?i)(^|[;\\s])cf_clearance=", "confidence": 0.5, "weak": true, "note": "已通过挑战后下发的通行 cookie"},
+        {"id": "cf-chl-opt", "method": "window", "pattern": "(?i)_cf_chl_opt|__cfRLUnblockHandlers", "confidence": 0.85, "note": "挑战页注入的全局变量"},
+        {"id": "cf-interstitial", "method": "content", "pattern": "(?i)just a moment\\.\\.\\.|checking your browser|enable javascript and cookies to continue", "confidence": 0.95, "note": "5 秒盾 / 浏览器检查页文案"},
+        {"id": "cf-blocked", "method": "content", "pattern": "(?i)attention required!\\s*\\|\\s*cloudflare|you have been blocked", "confidence": 0.9, "note": "Cloudflare 拦截页标题"},
+        {"id": "cf-challenge-platform", "method": "content", "pattern": "(?i)cdn-cgi/challenge-platform|/cdn-cgi/chl", "confidence": 0.9, "note": "挑战脚本路径"},
+        {"id": "cf-chl-var", "method": "content", "pattern": "(?i)__cf_chl_|cf_chl_opt", "confidence": 0.9, "note": "挑战页内联变量"},
+        {"id": "cf-url", "method": "url", "pattern": "(?i)/cdn-cgi/(challenge-platform|chl)", "confidence": 0.85, "note": "跳转到挑战 URL"}
+      ]
+    },
+    "akamai": {
+      "label": "Akamai Bot Manager",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 429, 503],
+      "rules": [
+        {"id": "ak-abck", "method": "cookie", "pattern": "(?i)(^|[;\\s])_abck=", "confidence": 0.6, "weak": true, "note": "Bot Manager 传感器 cookie"},
+        {"id": "ak-bmsc", "method": "cookie", "pattern": "(?i)(^|[;\\s])ak_bmsc=", "confidence": 0.5, "weak": true, "note": "Bot Manager session cookie"},
+        {"id": "ak-bm-sz", "method": "cookie", "pattern": "(?i)(^|[;\\s])bm_sz=", "confidence": 0.5, "weak": true, "note": "Bot Manager 采集 cookie"},
+        {"id": "ak-bm-sv", "method": "cookie", "pattern": "(?i)(^|[;\\s])bm_sv=", "confidence": 0.5, "weak": true, "note": "Bot Manager 校验 cookie"},
+        {"id": "ak-header", "method": "header", "pattern": "(?i)^x-akamai-(transformed|config|edgescape)", "confidence": 0.5, "weak": true, "note": "Akamai 边缘改写标记"},
+        {"id": "ak-ghost", "method": "header", "pattern": "(?i)^server:\\s*akamaighost", "confidence": 0.3, "weak": true, "note": "Server: AkamaiGHost"},
+        {"id": "ak-window", "method": "window", "pattern": "(?i)\\bbmak\\b|_abck", "confidence": 0.5, "weak": true, "note": "传感器脚本注入的全局对象"},
+        {"id": "ak-ref", "method": "content", "pattern": "(?i)reference\\s*#\\d+\\.[0-9a-f]+", "confidence": 0.85, "note": "Akamai 拒绝页错误编号"},
+        {"id": "ak-denied", "method": "content", "pattern": "(?i)access denied.{0,80}(akamai|bot manager)|akamai.{0,40}bot manager", "confidence": 0.6, "weak": true, "note": "拒绝页显式提到 Bot Manager"}
+      ]
+    },
+    "datadome": {
+      "label": "DataDome",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 429, 503],
+      "rules": [
+        {"id": "dd-cookie", "method": "cookie", "pattern": "(?i)(^|[;\\s])datadome=", "confidence": 0.6, "weak": true, "note": "DataDome 主 cookie"},
+        {"id": "dd-header", "method": "header", "pattern": "(?i)^x-datadome", "confidence": 0.6, "weak": true, "note": "DataDome 响应头"},
+        {"id": "dd-set-cookie", "method": "header", "pattern": "(?i)^set-cookie:.*datadome", "confidence": 0.5, "weak": true, "note": "下发 datadome cookie"},
+        {"id": "dd-window", "method": "window", "pattern": "(?i)ddClientInfo|_dd_s\\b", "confidence": 0.6, "weak": true, "note": "采集脚本全局变量"},
+        {"id": "dd-captcha-host", "method": "url", "pattern": "(?i)captcha-delivery\\.com|datadome\\.co", "confidence": 0.9, "note": "跳转到 DataDome 验证域名"},
+        {"id": "dd-content", "method": "content", "pattern": "(?i)datadome|geo\\.captcha-delivery\\.com|dd_cookie_test", "confidence": 0.6, "weak": true, "note": "页面内 DataDome 痕迹"},
+        {"id": "dd-blocked-json", "method": "content", "pattern": "(?i)\"blocked\"\\s*:\\s*true", "confidence": 0.6, "note": "DataDome 拦截响应体"}
+      ]
+    },
+    "imperva": {
+      "label": "Imperva Incapsula",
+      "kind": "waf",
+      "preferred_engine": "curl_cffi",
+      "fallback_engine": "browser",
+      "action": "retry_curl_cffi",
+      "block_status": [403, 429, 503],
+      "rules": [
+        {"id": "im-incap-ses", "method": "cookie", "pattern": "(?i)(^|[;\\s])incap_ses_", "confidence": 0.6, "weak": true, "note": "Incapsula session cookie"},
+        {"id": "im-visid", "method": "cookie", "pattern": "(?i)(^|[;\\s])visid_incap_", "confidence": 0.5, "weak": true, "note": "Incapsula 访客 ID"},
+        {"id": "im-nlbi", "method": "cookie", "pattern": "(?i)(^|[;\\s])nlbi_\\d+", "confidence": 0.5, "weak": true, "note": "负载均衡 cookie，仅辅助"},
+        {"id": "im-x-iinfo", "method": "header", "pattern": "(?i)^x-iinfo", "confidence": 0.6, "weak": true, "note": "Imperva 诊断响应头"},
+        {"id": "im-x-cdn", "method": "header", "pattern": "(?i)^x-cdn:\\s*incapsula", "confidence": 0.5, "weak": true, "note": "X-CDN: Incapsula"},
+        {"id": "im-incident", "method": "content", "pattern": "(?i)incapsula incident id|_incapsula_resource|incident id:", "confidence": 0.9, "note": "拦截页事件编号"},
+        {"id": "im-unsuccessful", "method": "content", "pattern": "(?i)request unsuccessful\\.\\s*incapsula", "confidence": 0.9, "note": "Incapsula 标准拒绝文案"}
+      ]
+    },
+    "aws_waf": {
+      "label": "AWS WAF",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 405, 429],
+      "rules": [
+        {"id": "aws-token", "method": "cookie", "pattern": "(?i)(^|[;\\s])aws-waf-token=", "confidence": 0.6, "weak": true, "note": "WAF 挑战令牌"},
+        {"id": "aws-action", "method": "header", "pattern": "(?i)^x-amzn-waf-action", "confidence": 0.9, "note": "WAF 动作响应头"},
+        {"id": "aws-content", "method": "content", "pattern": "(?i)awswaf|challenge\\.js|aws-waf-token", "confidence": 0.6, "weak": true, "note": "挑战脚本/令牌痕迹"},
+        {"id": "aws-blocked", "method": "content", "pattern": "(?i)request blocked.{0,40}(waf|aws)", "confidence": 0.6, "weak": true, "note": "WAF 拒绝页"},
+        {"id": "aws-reqid", "method": "header", "pattern": "(?i)^x-amzn-requestid", "confidence": 0.2, "weak": true, "note": "AWS 通用请求 ID，仅辅助"}
+      ]
+    },
+    "perimeterx": {
+      "label": "PerimeterX / HUMAN",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 429, 503],
+      "rules": [
+        {"id": "px-cookie", "method": "cookie", "pattern": "(?i)(^|[;\\s])_px(2|3|hd|vid|de)?=", "confidence": 0.6, "weak": true, "note": "_px 系列 cookie"},
+        {"id": "pxvid", "method": "cookie", "pattern": "(?i)(^|[;\\s])pxvid=", "confidence": 0.5, "weak": true, "note": "访客 ID cookie"},
+        {"id": "px-header", "method": "header", "pattern": "(?i)^x-px", "confidence": 0.6, "weak": true, "note": "PX 诊断响应头"},
+        {"id": "px-window", "method": "window", "pattern": "(?i)_pxAppId|window\\.PX\\b", "confidence": 0.6, "weak": true, "note": "PX 脚本全局变量"},
+        {"id": "px-content", "method": "content", "pattern": "(?i)perimeterx|px-captcha|_pxhd|human challenge", "confidence": 0.6, "weak": true, "note": "页面内 PX 痕迹"},
+        {"id": "px-denied", "method": "content", "pattern": "(?i)access to this page has been denied", "confidence": 0.6, "note": "多家厂商共用文案，需配合 _px cookie 才能定论"}
+      ]
+    },
+    "kasada": {
+      "label": "Kasada",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 429],
+      "rules": [
+        {"id": "ks-reese84", "method": "cookie", "pattern": "(?i)(^|[;\\s])reese84=", "confidence": 0.6, "weak": true, "note": "Kasada 主 cookie"},
+        {"id": "ks-kpsdk-cookie", "method": "cookie", "pattern": "(?i)(^|[;\\s])x-kpsdk-", "confidence": 0.95, "note": "KPSDK cookie"},
+        {"id": "ks-kpsdk-header", "method": "header", "pattern": "(?i)^x-kpsdk-(ct|cd|v|cr)", "confidence": 0.95, "note": "KPSDK 传感器载荷头"},
+        {"id": "ks-window", "method": "window", "pattern": "(?i)\\bKPSDK\\b", "confidence": 0.6, "weak": true, "note": "KPSDK 全局对象"},
+        {"id": "ks-content", "method": "content", "pattern": "(?i)kpsdk|kasada", "confidence": 0.6, "weak": true, "note": "页面内 Kasada 痕迹"},
+        {"id": "ks-script", "method": "content", "pattern": "(?i)149e9513-01fa-4fb0-aad4|/ips\\.js", "confidence": 0.6, "weak": true, "note": "Kasada 脚本特征"}
+      ]
+    },
+    "aliyun_waf": {
+      "label": "阿里云 WAF",
+      "kind": "waf",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 405, 429],
+      "rules": [
+        {"id": "ali-acw-tc", "method": "cookie", "pattern": "(?i)(^|[;\\s])acw_tc=", "confidence": 0.45, "weak": true, "note": "阿里云 WAF 通行 cookie"},
+        {"id": "ali-aliyungf", "method": "cookie", "pattern": "(?i)(^|[;\\s])aliyungf_tc=", "confidence": 0.5, "weak": true, "note": "阿里云 WAF cookie"},
+        {"id": "ali-cdn-sec", "method": "cookie", "pattern": "(?i)(^|[;\\s])cdn_sec_tc=", "confidence": 0.5, "weak": true, "note": "CDN 安全 cookie"},
+        {"id": "ali-content", "method": "content", "pattern": "(?i)aliyungf|_____tmd_____|action=captcha|slidecode", "confidence": 0.85, "note": "阿里云拦截/验证页特征"},
+        {"id": "ali-blocked-cn", "method": "content", "pattern": "(?i)抱歉，您的请求被拦截|访问被拒绝.{0,20}阿里云|您的请求过于频繁", "confidence": 0.85, "note": "中文拦截文案"},
+        {"id": "ali-tengine", "method": "header", "pattern": "(?i)^server:\\s*tengine", "confidence": 0.2, "weak": true, "note": "Tengine 仅辅助"}
+      ]
+    },
+    "ruishu": {
+      "label": "瑞数信息",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [202, 403, 412, 521],
+      "rules": [
+        {"id": "rs-fssbb", "method": "cookie", "pattern": "(?i)(^|[;\\s])FSSBBIl1UgzbN7N", "confidence": 0.7, "weak": true, "note": "瑞数动态 cookie（含版本后缀）"},
+        {"id": "rs-essbb", "method": "cookie", "pattern": "(?i)(^|[;\\s])ESSBBIl1UgzbN7N", "confidence": 0.7, "weak": true, "note": "瑞数动态 cookie（ESSB 变体）"},
+        {"id": "rs-content", "method": "content", "pattern": "(?i)FSSBBIl1UgzbN7N|ESSBBIl1UgzbN7N", "confidence": 0.6, "weak": true, "note": "页面内瑞数脚本变量"},
+        {"id": "rs-202", "method": "content", "pattern": "(?i)\\$\\$\\$\\$|_\\$\\$|meta\\s+content=\"[^\"]{0,20};\\s*url=", "confidence": 0.5, "note": "瑞数混淆跳转常见形态，仅辅助"},
+        {"id": "rs-brand", "method": "content", "pattern": "(?i)瑞数|riversecurity", "confidence": 0.5, "weak": true, "note": "品牌字样"}
+      ]
+    },
+    "jsl": {
+      "label": "加速乐 (JSL)",
+      "kind": "js_sensor",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 412, 521],
+      "rules": [
+        {"id": "jsl-clearance", "method": "cookie", "pattern": "(?i)(^|[;\\s])__jsl_clearance", "confidence": 0.6, "weak": true, "note": "加速乐通行 cookie"},
+        {"id": "jsl-uid", "method": "cookie", "pattern": "(?i)(^|[;\\s])__jsluid", "confidence": 0.5, "weak": true, "note": "加速乐访客 ID"},
+        {"id": "jsl-content", "method": "content", "pattern": "(?i)__jsl_clearance|setCookie\\(['\"]__jsl", "confidence": 0.9, "note": "页面内下发脚本"}
+      ]
+    },
+    "turnstile": {
+      "label": "Cloudflare Turnstile",
+      "kind": "captcha",
+      "preferred_engine": "manual",
+      "fallback_engine": "manual",
+      "action": "needs_manual",
+      "block_status": [403, 429],
+      "rules": [
+        {"id": "ts-widget", "method": "content", "pattern": "(?i)cf-turnstile|challenges\\.cloudflare\\.com/turnstile", "confidence": 0.5, "weak": true, "note": "Turnstile 挂件"},
+        {"id": "ts-dom", "method": "dom", "pattern": "(?i)class=\"[^\"]*cf-turnstile|data-sitekey=\"0x4", "confidence": 0.5, "weak": true, "note": "DOM 中的挂件节点"},
+        {"id": "ts-api", "method": "url", "pattern": "(?i)challenges\\.cloudflare\\.com", "confidence": 0.9, "note": "挑战域名"},
+        {"id": "ts-window", "method": "window", "pattern": "(?i)\\bturnstile\\b", "confidence": 0.85, "note": "turnstile 全局对象"}
+      ]
+    },
+    "geetest": {
+      "label": "极验 Geetest",
+      "kind": "captcha",
+      "preferred_engine": "manual",
+      "fallback_engine": "manual",
+      "action": "needs_manual",
+      "block_status": [403, 429],
+      "rules": [
+        {"id": "gt-init", "method": "content", "pattern": "(?i)initgeetest|static\\.geetest\\.com|geetest\\.js", "confidence": 0.5, "weak": true, "note": "极验初始化脚本"},
+        {"id": "gt-cookie", "method": "cookie", "pattern": "(?i)(^|[;\\s])geetest_", "confidence": 0.45, "weak": true, "note": "极验 cookie"},
+        {"id": "gt-url", "method": "url", "pattern": "(?i)geetest", "confidence": 0.5, "weak": true, "note": "URL 中的极验痕迹"},
+        {"id": "gt-params", "method": "content", "pattern": "(?i)gt_captcha|gt=|challenge=|validate=", "confidence": 0.5, "note": "参数仅辅助"}
+      ]
+    },
+    "recaptcha": {
+      "label": "Google reCAPTCHA",
+      "kind": "captcha",
+      "preferred_engine": "manual",
+      "fallback_engine": "manual",
+      "action": "needs_manual",
+      "block_status": [403, 429],
+      "rules": [
+        {"id": "rc-content", "method": "content", "pattern": "(?i)g-recaptcha|google\\.com/recaptcha|grecaptcha", "confidence": 0.5, "weak": true, "note": "reCAPTCHA 挂件"},
+        {"id": "rc-window", "method": "window", "pattern": "(?i)\\bgrecaptcha\\b", "confidence": 0.45, "weak": true, "note": "grecaptcha 全局对象"},
+        {"id": "rc-url", "method": "url", "pattern": "(?i)/recaptcha/", "confidence": 0.5, "weak": true, "note": "reCAPTCHA 路径"},
+        {"id": "rc-dom", "method": "dom", "pattern": "(?i)class=\"[^\"]*g-recaptcha", "confidence": 0.5, "weak": true, "note": "DOM 中的挂件节点"}
+      ]
+    },
+    "hcaptcha": {
+      "label": "hCaptcha",
+      "kind": "captcha",
+      "preferred_engine": "manual",
+      "fallback_engine": "manual",
+      "action": "needs_manual",
+      "block_status": [403, 429],
+      "rules": [
+        {"id": "hc-content", "method": "content", "pattern": "(?i)h-captcha|hcaptcha\\.com", "confidence": 0.5, "weak": true, "note": "hCaptcha 挂件"},
+        {"id": "hc-window", "method": "window", "pattern": "(?i)\\bhcaptcha\\b", "confidence": 0.45, "weak": true, "note": "hcaptcha 全局对象"},
+        {"id": "hc-dom", "method": "dom", "pattern": "(?i)class=\"[^\"]*h-captcha", "confidence": 0.5, "weak": true, "note": "DOM 中的挂件节点"}
+      ]
+    },
+    "f5_bigip": {
+      "label": "F5 BIG-IP ASM",
+      "kind": "waf",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [403, 429],
+      "rules": [
+        {"id": "f5-ts", "method": "cookie", "pattern": "(?i)(^|[;\\s])TS[0-9a-f]{8}=", "confidence": 0.4, "weak": true, "note": "BIG-IP 令牌 cookie"},
+        {"id": "f5-bigipserver", "method": "cookie", "pattern": "(?i)(^|[;\\s])BIGipServer", "confidence": 0.4, "weak": true, "note": "BIG-IP 会话 cookie"},
+        {"id": "f5-wa-info", "method": "header", "pattern": "(?i)^x-wa-info", "confidence": 0.85, "note": "ASM 诊断头"},
+        {"id": "f5-rejected", "method": "content", "pattern": "(?i)the requested url was rejected\\. please consult with your administrator", "confidence": 0.9, "note": "ASM 标准拒绝文案"},
+        {"id": "f5-content", "method": "content", "pattern": "(?i)\\bbigip\\b|f5 networks", "confidence": 0.5, "weak": true, "note": "品牌字样仅辅助"}
+      ]
+    },
+    "unknown_waf": {
+      "label": "未知反爬/通用 WAF",
+      "kind": "waf",
+      "preferred_engine": "browser",
+      "fallback_engine": "browser",
+      "action": "retry_browser",
+      "block_status": [202, 403, 405, 406, 412, 429, 503, 521],
+      "rules": [
+        {"id": "uk-tophub-style", "method": "content", "pattern": "检测到异常访问行为|异常的访问行为|疑似自动化", "confidence": 0.5, "weak": true, "note": "中文风控文案（配合 4xx/5xx 状态码判定）"},
+        {"id": "uk-rate-cn", "method": "content", "pattern": "访问过于频繁|请求过于频繁|您的访问频率|请稍后再试", "confidence": 0.5, "weak": true, "note": "中文限流文案"},
+        {"id": "uk-blocked-cn", "method": "content", "pattern": "访问被拒绝|禁止访问|您的请求被拦截|无权限访问", "confidence": 0.5, "weak": true, "note": "中文拒绝文案"},
+        {"id": "uk-english", "method": "content", "pattern": "(?i)request blocked|access denied|you (have been|are) blocked|too many requests", "confidence": 0.5, "weak": true, "note": "通用英文拒绝文案"},
+        {"id": "uk-json-error", "method": "content", "pattern": "(?i)\"(status|code)\"\\s*:\\s*(403|429|503)\\b", "confidence": 0.45, "weak": true, "note": "JSON 接口返回的风控错误码"},
+        {"id": "uk-403-title", "method": "content", "pattern": "(?i)<title>[^<]{0,40}(403|429|forbidden|blocked|拦截|拒绝)", "confidence": 0.5, "weak": true, "note": "拦截页标题"},
+        {"id": "uk-url", "method": "url", "pattern": "(?i)/(waf|captcha|challenge|verify|blocked)\\b", "confidence": 0.4, "weak": true, "note": "跳转到风控/验证路径"}
+      ]
+    }
+  }
+}

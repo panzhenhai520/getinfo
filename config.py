@@ -393,6 +393,14 @@ INTEL_LLM_ENABLED = _env_bool('INTEL_LLM_ENABLED', False)
 INTEL_LLM_SEMANTIC_ADMISSION_ENABLED = _env_bool(
     'INTEL_LLM_SEMANTIC_ADMISSION_ENABLED', True
 )
+# 反爬厂商识别器（config/antibot_rules.json + antibot_detector.py，2026-10-07）：
+# 只识别「被谁拦了」并据此止损——跳过无效引擎、把一直抓不到的信源从轮询里摘掉，
+# 把有限的爬取槽位还给能出正文的信源。不做任何绕过（不破解验证码、不伪装指纹、不轮换代理）。
+ANTIBOT_DETECTOR_ENABLED = _env_bool('ANTIBOT_DETECTOR_ENABLED', True)
+# 放弃策略总开关：被同一厂商拦够阈值后，该信源标记「不再派发任务」
+ANTIBOT_GIVE_UP_ENABLED = _env_bool('ANTIBOT_GIVE_UP_ENABLED', True)
+# 放弃阈值；0 表示按厂商类型自动（验证码型 2 / JS 传感器型 3 / 规则型WAF 5 / 指纹型 8）
+ANTIBOT_GIVE_UP_THRESHOLD = _env_int('ANTIBOT_GIVE_UP_THRESHOLD', 0, 0, 1000)
 INTEL_LLM_PROVIDER = (
     _env_str('INTEL_LLM_PROVIDER', 'local') or 'local'
 ).casefold()

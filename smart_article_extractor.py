@@ -89,6 +89,35 @@ except ImportError as e:
     HAS_CLOUDFLARE_BYPASS = False
     print(f"⚠️ Cloudflare绕过模块导入失败: {e}")
 
+
+def _antibot_note(fetch_result) -> str:
+    """把 fetch_url 带回来的拦截结论压缩成一句可读说明（供错误信息/统计用）。"""
+    protection = (fetch_result or {}).get('protection') or {}
+    if not protection:
+        return ''
+    try:
+        from antibot_detector import protection_summary
+
+        return protection_summary(protection)
+    except Exception:
+        return str(protection.get('label') or protection.get('vendor') or '')
+
+
+def _antibot_needs_manual(fetch_result) -> bool:
+    """验证码型拦截（Turnstile/极验/reCAPTCHA/hCaptcha）：机器过不去，别再来回试。
+
+    要求 protection 确实判定为拦截，避免把页面上的普通验证码挂件当成拦截。
+    """
+    result = fetch_result or {}
+    protection = result.get('protection') or {}
+    if protection and not protection.get('is_block'):
+        return False
+    return bool(
+        result.get('needs_manual')
+        or protection.get('action') == 'needs_manual'
+        or protection.get('kind') == 'captcha'
+    )
+
 # 导入通用URL转换模块
 try:
     from url_transformation_rules import transform_url, fix_newspaper3k_url_bug
@@ -811,11 +840,15 @@ def extract_with_newspaper3k(url, proxies=None):
                 print(f"   🌐 已关闭代理，先用直连抓取HTML再交给newspaper3k解析")
                 fetch_result = fetch_url(url, proxies=proxies)
                 if not fetch_result['success']:
+                    _note = _antibot_note(fetch_result)
                     return {
                         'success': False,
-                        'error': f'直连获取页面失败: {fetch_result.get("error")}',
+                        'error': f'直连获取页面失败: {fetch_result.get("error")}'
+                                 + (f'（拦截厂商：{_note}）' if _note else ''),
                         'method': 'newspaper3k',
-                        'url': url
+                        'url': url,
+                        'protection': fetch_result.get('protection'),
+                        'needs_manual': _antibot_needs_manual(fetch_result),
                     }
                 article.html = fetch_result['html']
                 article.download_state = 2
@@ -835,11 +868,19 @@ def extract_with_newspaper3k(url, proxies=None):
                         article.download_state = 2  # 标记为已下载
                         print(f"   ✅ 使用 {fetch_result.get('method', 'unknown')} 方法获取内容")
                     else:
+                        _note = _antibot_note(fetch_result)
+                        # 验证码型拦截：换引擎/换指纹都没用，直接带结论失败，
+                        # 不再让上层继续空跑其它回退级别。
+                        if _antibot_needs_manual(fetch_result):
+                            print(f"   ⛔ {_note} 属验证码型，停止重试")
                         return {
                             'success': False,
-                            'error': f'所有下载方法都失败: {fetch_result.get("error")}',
+                            'error': f'所有下载方法都失败: {fetch_result.get("error")}'
+                                     + (f'（拦截厂商：{_note}）' if _note else ''),
                             'method': 'newspaper3k',
-                            'url': url
+                            'url': url,
+                            'protection': fetch_result.get('protection'),
+                            'needs_manual': _antibot_needs_manual(fetch_result),
                         }
                 except Exception as e2:
                     return {
@@ -1608,10 +1649,14 @@ def extract_article_content_from_url(url, proxies=None, skip_db_check=False, wai
             fetch_result = fetch_url(original_url, proxies=proxies)
             
             if not fetch_result['success']:
+                _note = _antibot_note(fetch_result)
                 return {
                     'success': False,
-                    'error': f"获取页面失败: {fetch_result.get('error')}",
-                    'url': original_url
+                    'error': f"获取页面失败: {fetch_result.get('error')}"
+                             + (f"（拦截厂商：{_note}）" if _note else ''),
+                    'url': original_url,
+                    'protection': fetch_result.get('protection'),
+                    'needs_manual': _antibot_needs_manual(fetch_result),
                 }
             html_content = fetch_result['html']
             # 🔥 使用Playwright实际访问后的URL（可能经过重定向）

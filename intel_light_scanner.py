@@ -24,6 +24,14 @@ import config
 from industry_packs import industry_pack_loader
 from financial_source_license import rss_authorization_decision
 from financial_rollout import rollout_capability_enabled
+
+try:
+    # 反爬放弃策略：被拦截达阈值的信源不再派发扫描任务（识别器只做止损，不做绕过）
+    from antibot_detector import should_skip_source as _should_skip_blocked_source
+except ImportError:  # pragma: no cover
+    def _should_skip_blocked_source(metadata, settings=None) -> bool:
+        return False
+
 from intel_candidates import (
     IntelCandidateRepository,
     intel_candidate_repository,
@@ -554,6 +562,7 @@ class IntelLightScanner:
                     if pack_id in attached and pack_id in declared
                 ]
             authorized_sources = []
+            blocked_skipped: List[int] = []
             for source in sources:
                 metadata = source.get("metadata") or {}
                 if bool(metadata.get("on_demand_only")):
@@ -572,7 +581,18 @@ class IntelLightScanner:
                     source["license_decision"] = decision
                     if not decision["authorized"]:
                         continue
+                # 反爬放弃策略：被同一厂商拦够次数（验证码型 2 次 / JS 传感器型 3 次 /
+                # 其余 5-8 次）后，不再派发扫描任务——把爬取槽位让给能出正文的信源。
+                if _should_skip_blocked_source(metadata):
+                    blocked_skipped.append(int(source["id"]))
+                    continue
                 authorized_sources.append(source)
+            if blocked_skipped:
+                print(
+                    f"🚫 跳过 {len(blocked_skipped)} 个「被反爬拦截达阈值」的信源: {blocked_skipped[:10]}",
+                    flush=True,
+                )
+            self._blocked_skipped_source_ids = blocked_skipped
             return authorized_sources
         finally:
             cursor.close()

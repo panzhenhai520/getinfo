@@ -10,6 +10,13 @@
 反爬状态码（403/406/412/429/503 等）自动对域名降频退避（指数退避窗口），
 绝不开发/启用隐身、指纹伪装、验证码破解、代理轮换等绕过手段。
 patchright 只作普通浏览器渲染（新代码不得加载对抗类插件）。
+
+2026-10-07 补充：新增 antibot_detector.py + config/antibot_rules.json，用来**识别
+是谁拦了我们**，并据此止损（跳过无效引擎、把一直抓不到的信源从轮询里摘出去、
+把爬取槽位还给能出正文的信源）。识别器本身不提供任何绕过能力：
+  · 验证码型（Turnstile/极验/reCAPTCHA/hCaptcha）判定为「需要人工」，直接停止重试；
+  · JS 传感器型（DataDome/Kasada/PerimeterX/瑞数…）只用于跳过无效的 curl_cffi 梯队；
+  · stealth_self_check() 只做指纹漏点自检，用于发现问题，不得用于增加伪装。
 """
 
 import time
