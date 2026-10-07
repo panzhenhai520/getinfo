@@ -28,11 +28,10 @@
       8003
     ],
     "compose_published_container_ports": [
-      8003,
-      5432
+      8003
     ],
     "approved_service_term_additions": {
-      "postgres": "2026-10-06 批准：主库已从 SQLite 迁到 PostgreSQL（代码已有 postgres_compat + psycopg2 适配层，生产三台机器均以前者为主库），因此它不再是'禁止引入的服务'；容器内端口 5432，宿主机映射端口由 POSTGRES_HOST_PORT 控制（生产为 5433）。",
+      "postgres": "2026-10-06 批准：主库已从 SQLite 迁到 PostgreSQL（代码已有 postgres_compat + psycopg2 适配层，生产三台机器均以前者为主库），因此它不再是'禁止引入的服务'。2026-10-07 起该服务不再向宿主机发布端口，只在 compose 网络内以 postgres:5432 提供访问（需要连库时用 docker exec collectinfo-postgres psql）。",
       "qa-worker": "2026-10-06 批准：问答 worker 独立成服务，避免长问答占用 core lane 的抓取/分类吞吐。"
     },
     "durable_relational_store": "PostgreSQL 主库 collectinfo（历史 SQLite crawler_articles.db 作为备份/回退）",

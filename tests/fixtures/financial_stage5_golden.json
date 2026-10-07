@@ -49,7 +49,7 @@
   },
   "network_policy": {
     "allowed_published_ports": [8003],
-    "allowed_compose_published_ports": [5432, 8003],
+    "allowed_compose_published_ports": [8003],
     "forbidden_broker_domains": [
       "api.alpaca.markets",
       "paper-api.alpaca.markets",

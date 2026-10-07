@@ -253,8 +253,8 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - pg_data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    # 数据库只允许容器网络内访问（不再映射到宿主机端口；需要连库用
+    # docker exec collectinfo-postgres psql）。
     logging:
       driver: json-file
       options:
