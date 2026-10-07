@@ -15,6 +15,9 @@
 param(
   [string]$VpnHost    = 'root@10.88.0.1',
   [string]$RemoteDir  = '/home/panython/CollectInfo/remote_pipeline',
+  # 健康检查地址必须用 compose 里实际发布的绑定地址（10.88.0.1:11236），
+  # 写成 127.0.0.1 会连不上（端口绑在 10.88.0.1 上），造成"部署成功却报超时"的假失败。
+  [string]$HealthUrl  = 'http://10.88.0.1:11236/v1/health',
   [int]   $HealthWait = 120
 )
 
@@ -69,7 +72,7 @@ $ok = $false
 for ($i = 1; $i -le [math]::Ceiling($HealthWait / 5); $i++) {
   Start-Sleep -Seconds 5
   & $Ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VpnHost `
-      "curl -fsS -m 5 http://127.0.0.1:11236/v1/health -o /dev/null" 2>$null
+      "curl -fsS -m 5 $HealthUrl -o /dev/null" 2>$null
   if ($LASTEXITCODE -eq 0) { $ok = $true; break }
 }
 if (-not $ok) { throw "VPN 健康检查超时（$HealthWait 秒），请查看: docker logs --tail 60 collectinfo-pipeline" }
