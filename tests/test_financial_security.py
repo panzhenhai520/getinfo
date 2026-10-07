@@ -16,6 +16,7 @@ os.environ["DATABASE_PATH"] = os.path.join(_BOOTSTRAP_TEMP_DIR.name, "bootstrap.
 from flask import Flask
 
 import config
+import financial_security
 import chat_api
 from chat_api import chat_bp
 from financial_security import (
@@ -90,6 +91,38 @@ class FinancialSecurityTests(unittest.TestCase):
         self.assertNotIn(secret, message)
         self.assertNotIn("\n", message)
         self.assertGreaterEqual(rendered.count("[REDACTED]"), 3)
+
+    def test_configured_secret_values_are_computed_once_per_payload(self):
+        """性能回归守卫：批量脱敏时密钥值集合只能算一次。
+
+        `configured_secret_values()` 要遍历 settings 的全部键名逐个做后缀匹配（单次约 1.5ms），
+        而一次 feed 构建有上千个字符串字段；原先每个字段都重算一遍，实测 120 条记录的有效载荷
+        单次脱敏要 3.0 秒（几乎全花在这上面），也让"构建耗时 < 1 秒"的契约用例在满载机器上必挂。
+        现在只在最外层算一次再往下传——这里钉住"≤1 次"，防止被改回逐字段重算。
+        """
+        secret = "perf-guard-secret-9"
+        payload = {
+            "items": [
+                {"url": f"https://example.test/a/{index}?api_key={secret}", "note": f"token={secret}"}
+                for index in range(40)
+            ]
+        }
+        calls = {"n": 0}
+        original = financial_security.configured_secret_values
+
+        def _counting(settings=None):
+            calls["n"] += 1
+            return original(settings)
+
+        with patch.object(config, "SERPAPI_API_KEY", secret), \
+                patch.object(financial_security, "configured_secret_values", _counting):
+            redacted = redact_public_payload(payload)
+
+        self.assertLessEqual(calls["n"], 1,
+                             "一次 redact_public_payload 调用最多只能算一次密钥值集合")
+        rendered = json.dumps(redacted, ensure_ascii=False)
+        self.assertNotIn(secret, rendered, "优化不得漏脱敏")
+        self.assertGreaterEqual(rendered.count("[REDACTED]"), 40)
 
     def test_public_urls_strip_credentials_and_block_local_or_unsafe_targets(self):
         self.assertEqual(
@@ -197,3 +230,4 @@ class FinancialSecurityTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

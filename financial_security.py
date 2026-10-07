@@ -73,12 +73,21 @@ def redact_sensitive_text(
     *,
     secrets: Sequence[object] = (),
     settings=None,
+    configured: Sequence[str] | None = None,
     maximum: int = 20000,
     collapse_controls: bool = False,
 ) -> str:
+    """脱敏单段文本。
+
+    ``configured`` 用于传入"已经算好的已配置密钥值集合"：`configured_secret_values()` 要遍历
+    settings 的全部键名并逐个做后缀匹配，单次约 1.5ms；一次 feed 构建里有上千个字符串字段，
+    每个字段都重算一遍会白烧掉大半构建时间（实测 120 条记录的有效载荷 3.0 秒里几乎全是它）。
+    批处理入口（redact_public_payload）因此只算一次、往下传；单段调用不传时行为不变。
+    """
     text = str(value or "")
     explicit = [str(item) for item in secrets if str(item or "")]
-    for secret in sorted(set((*explicit, *configured_secret_values(settings))), key=len, reverse=True):
+    known = configured if configured is not None else configured_secret_values(settings)
+    for secret in sorted(set((*explicit, *known)), key=len, reverse=True):
         text = text.replace(secret, "[REDACTED]")
     text = re.sub(
         rf"([?&](?:{_SENSITIVE_NAME})=)[^&#\s\"']+",
@@ -109,21 +118,28 @@ def redact_sensitive_text(
     return text[: max(0, int(maximum))]
 
 
-def redact_public_payload(value, *, settings=None, depth: int = 0):
+def redact_public_payload(value, *, settings=None, depth: int = 0, configured=None):
+    """递归脱敏任意 JSON 结构。
+
+    密钥值集合只在最外层算一次再往下传（见 redact_sensitive_text 的说明）：
+    不做跨调用缓存，避免管理员中途改了密钥、缓存却还留着旧值导致漏脱敏。
+    """
     if depth > 12:
         return "[TRUNCATED]"
+    if depth == 0 and configured is None:
+        configured = configured_secret_values(settings)
     if isinstance(value, Mapping):
         return {
-            str(key): redact_public_payload(item, settings=settings, depth=depth + 1)
+            str(key): redact_public_payload(item, settings=settings, depth=depth + 1, configured=configured)
             for key, item in value.items()
         }
     if isinstance(value, (list, tuple)):
         return [
-            redact_public_payload(item, settings=settings, depth=depth + 1)
+            redact_public_payload(item, settings=settings, depth=depth + 1, configured=configured)
             for item in value
         ]
     if isinstance(value, str):
-        return redact_sensitive_text(value, settings=settings)
+        return redact_sensitive_text(value, settings=settings, configured=configured)
     return value
 
 
