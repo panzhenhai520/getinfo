@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""检索证据池策略守卫：**零行业信号的文章不得进入 AI 证据池**。
+"""检索证据池策略守卫：**没有行业信号、也没有 LLM 语义判定的文章不得进入 AI 证据池**。
 
-这是产品决策（明确要求"不要放开零行业信号的文章这类『其他』进 AI 证据"）：
+产品决策（2026-10-07 更新）：
   - 兜底归属保证每篇入库文章都有包归属、页面上看得到（至少落在该包「其他」）；
-  - 但"能不能被 AI 当证据引用"仍由行业相关性闸门决定：
-    `intel_topics._classification_admitted(score_details)` 要求命中行业锚点
-    （或命中核心/扩展词且分量达标）。
-所以本测试同时钉两件事：
-  1. 闸门本身对"无命中"的 score_details 返回 False；
-  2. 检索侧 `ArticleRetriever._rows` 不得对 `fallback_attribution` 之类的来源开特例
+  - "能不能被 AI 当证据引用"由行业相关性闸门决定，判据是二选一：
+      1. 命中行业锚点（或命中核心/扩展词且分量达标）——原有行为；
+      2. **没命中锚点，但 LLM 明确判定"属于本行业包"并给出达阈值的分类结论** —— 新增。
+    第 2 条由 intel_classifier 写入 `score_details['admission_source']='llm_semantic'`
+    （只有 LLM 真被调用且给了肯定判定才会带；兜底归属永远不带）。
+所以本测试同时钉三件事：
+  1. 闸门对"无命中且无 LLM 判定"的 score_details 返回 False；
+  2. 闸门对带 `admission_source='llm_semantic'` 的返回 True；
+  3. 检索侧 `ArticleRetriever._rows` 不得对 `fallback_attribution` 之类的来源开特例
      （否则等于绕开闸门，把零信号文章塞进证据池）。
 """
 import ast
@@ -55,6 +58,32 @@ class EvidenceAdmissionGateTests(unittest.TestCase):
             "components": {"expanded": 2.5, "core": 0.0},
             "minimum_relevance_score": 4.0,
         }))
+
+    def test_llm_semantic_admission_is_admitted_without_anchors(self):
+        """无锚点但 LLM 判定属于本行业 → 准入（产品变更）。"""
+        self.assertTrue(_classification_admitted({
+            "hits": {"anchor": [], "core": [], "expanded": []},
+            "relevance_score": 0.0,
+            "minimum_relevance_score": 2.0,
+            "admission_source": "llm_semantic",
+        }))
+
+    def test_fallback_attribution_style_details_stay_rejected(self):
+        """兜底归属的 score_details（无 admission_source）必须继续被拒。"""
+        self.assertFalse(_classification_admitted({
+            "hits": {"anchor": [], "core": [], "expanded": []},
+            "relevance_score": 0.0,
+            "minimum_relevance_score": 2.0,
+            "components": {"core": 0.0, "expanded": 0.0},
+        }))
+
+    def test_unknown_admission_source_does_not_open_the_gate(self):
+        """只有 llm_semantic 这一个值算数，别的写法不得开门。"""
+        for value in ("", "llm", "semantic", "LLM_SEMANTIC", "fallback_attribution"):
+            self.assertFalse(_classification_admitted({
+                "hits": {"anchor": []},
+                "admission_source": value,
+            }), "admission_source=%r 不应被当作 LLM 语义准入" % value)
 
 
 class RetrievalPolicySourceTests(unittest.TestCase):

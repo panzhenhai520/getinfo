@@ -128,5 +128,117 @@ class LlmChannelReachabilityTest(unittest.TestCase):
         self.assertTrue(repo.saved, "分类结果必须落库（归属必填契约）")
 
 
+class LlmSemanticAdmissionTest(unittest.TestCase):
+    """产品变更 2026-10-07：无锚点但 LLM 判定属于本行业 → 真实分类 + 进证据池。"""
+
+    def setUp(self):
+        # 正文完全不含行业锚点词 → 规则相关性 0，走"低于阈值"分支，但 LLM 仍会被调用
+        # （规则置信度 0.45 < 阈值 0.65）
+        self.article = {
+            "id": 11,
+            "title": "某机构发布年度合规操作指引",
+            "content": "该机构发布了年度合规操作指引，" + "操作细则" * 80 + "。",
+            "publish_date": "2026-10-06",
+            "site_name": "example.com",
+        }
+
+    def _service(self, llm):
+        repo = _Repo(self.article)
+        loader = type("Loader", (), {"load": lambda self, pack_id: _family_office_pack()})()
+        return IntelClassificationService(repository=repo, pack_loader=loader, llm_client=llm), repo
+
+    def test_rule_reports_no_anchor_hit(self):
+        from intel_classifier import classify_article
+        result = classify_article(self.article, _family_office_pack())
+        hits = (result["score_details"].get("hits") or {})
+        self.assertEqual([], hits.get("anchor") or [], "夹具必须真的不含锚点词")
+
+    def test_llm_in_pack_verdict_makes_it_a_real_classification(self):
+        from intel_topics import _classification_admitted
+
+        llm = _LLM(category="trend", confidence=0.91)
+        service, repo = self._service(llm)
+        with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
+            result = service.classify_article_id(11, "family_office")
+
+        self.assertEqual(1, llm.calls, "无锚点文章的规则置信度低于阈值，必须请 LLM 判定")
+        self.assertEqual("trend", result["final_category"])
+        self.assertEqual("llm_override", result["result_source"])
+        self.assertNotEqual("fallback_attribution", result["result_source"],
+                            "LLM 说属于本行业时不得再被兜底归属覆盖")
+        self.assertFalse(result.get("_not_classified"))
+        self.assertEqual("llm_semantic",
+                         (result["score_details"] or {}).get("admission_source"))
+        self.assertTrue(_classification_admitted(result["score_details"]),
+                        "LLM 语义准入的文章必须能进 AI 证据池")
+        self.assertTrue(repo.saved, "真实分类结果要落库")
+
+    def test_llm_says_not_in_pack_keeps_it_out(self):
+        """LLM 明确说"不属于本行业" → 仍不进证据池（Tier2 门禁不变）。"""
+        from intel_topics import _classification_admitted
+
+        class NoPackLLM(_LLM):
+            def classify(self, article, pack):
+                self.calls += 1
+                return {
+                    "category": "trend", "confidence": 0.95,
+                    "reason": "与本次行业无关", "why_important": "", "trend_summary": "",
+                    "topic_tags": [], "in_pack_industry": False,
+                }
+
+        llm = NoPackLLM()
+        service, _repo = self._service(llm)
+        with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
+            result = service.classify_article_id(11, "family_office")
+
+        self.assertEqual(1, llm.calls)
+        self.assertFalse(result.get("admitted"))
+        self.assertEqual("other", result["final_category"])
+        self.assertFalse(_classification_admitted(result.get("score_details") or {}))
+
+    def test_low_confidence_llm_verdict_does_not_open_admission(self):
+        """LLM 说属于本行业但置信度不达阈值 → 保持"被前置过滤器拦下"的原样，不进证据池。"""
+        from intel_topics import _classification_admitted
+
+        llm = _LLM(category="trend", confidence=0.5)
+        service, repo = self._service(llm)
+        with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
+            result = service.classify_article_id(11, "family_office")
+
+        self.assertEqual(1, llm.calls, "既然要问，就必须真的问过")
+        self.assertEqual("industry_filter", result["result_source"],
+                         "置信度不达标时维持前置过滤结论，不做语义准入")
+        self.assertFalse(result.get("admitted"))
+        self.assertFalse(_classification_admitted(result.get("score_details") or {}))
+        self.assertEqual([], repo.saved,
+                         "被过滤的文章不由分类器落行（页面可见性由入库收口点的兜底归属负责）")
+
+    def test_semantic_admission_can_be_switched_off(self):
+        """运营开关关掉后退回"只信关键词"：不调 LLM、维持前置过滤。"""
+        llm = _LLM(category="trend", confidence=0.91)
+        service, repo = self._service(llm)
+        with patch("intel_classifier.config.INTEL_LLM_ENABLED", True), \
+                patch("intel_classifier.config.INTEL_LLM_SEMANTIC_ADMISSION_ENABLED", False):
+            result = service.classify_article_id(11, "family_office")
+
+        self.assertEqual(0, llm.calls, "开关关闭时不得为了语义准入调用 LLM")
+        self.assertEqual("industry_filter", result["result_source"])
+        self.assertFalse(result.get("admitted"))
+
+    def test_short_article_still_skips_llm_even_when_filtered(self):
+        """短行业动态（30~149 字）仍按分级字数标准跳过 LLM（省成本的口径不变）。"""
+        self.article["content"] = "某机构发布年度合规操作指引。" + "细则" * 48
+        from intel_content_quality_gate import MIN_ARTICLE_CHARS, MIN_SHORT_DYNAMIC_CHARS
+        length = len(self.article["content"])
+        self.assertTrue(MIN_SHORT_DYNAMIC_CHARS <= length < MIN_ARTICLE_CHARS,
+                        "夹具必须落在短动态档，实际 %d 字" % length)
+        llm = _LLM(category="trend", confidence=0.91)
+        service, _repo = self._service(llm)
+        with patch("intel_classifier.config.INTEL_LLM_ENABLED", True):
+            result = service.classify_article_id(11, "family_office")
+        self.assertEqual(0, llm.calls)
+        self.assertEqual("industry_filter", result["result_source"])
+
+
 if __name__ == "__main__":
     unittest.main()

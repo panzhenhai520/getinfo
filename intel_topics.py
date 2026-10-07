@@ -36,6 +36,12 @@ def _json_value(value, default):
 
 
 def _classification_admitted(score_details: Dict) -> bool:
+    # LLM 语义准入（产品变更 2026-10-07）：文章没命中行业锚点词，但 LLM 明确判定
+    # "属于本行业包"并给出了达阈值的分类结论时，按真实分类看待、允许进 AI 证据池。
+    # 标记由 intel_classifier.classify_article_id 写入（admission_source='llm_semantic'），
+    # 只有"LLM 真的被调用且给了肯定判定"才带上，兜底归属永远不会带。
+    if str(score_details.get("admission_source") or "") == "llm_semantic":
+        return True
     hits = (score_details.get("hits") or {})
     anchor = hits.get("anchor") or []
     min_score = float(score_details.get("minimum_relevance_score") or 0)

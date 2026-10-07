@@ -545,6 +545,8 @@ def fuse_rule_and_llm(rule_result: Dict, llm_result: Dict, industry_pack: Dict) 
             "llm_reason": llm_result["reason"],
             "why_important": llm_result["why_important"],
             "trend_summary": llm_result["trend_summary"],
+            # LLM 的行业判定（契约必填布尔）：无锚点文章能否当真实分类进证据池，就看它。
+            "llm_in_pack_industry": bool(llm_result.get("in_pack_industry", True)),
             "fusion_version": FUSION_VERSION,
         }
     )
@@ -606,8 +608,22 @@ class IntelClassificationService:
             raise ValueError(f"article not found: {article_id}")
         pack = self.pack_loader.load(industry_pack_id)
         result = classify_article(article, pack)
-        if not result.get("admitted"):
+        # 分级字数标准：短行业动态（30~149 字）跳过 LLM 分类，直接采用规则结果（省 LLM 消耗）
+        from intel_content_quality_gate import MIN_ARTICLE_CHARS, MIN_SHORT_DYNAMIC_CHARS
+        _content_len = len(str(article.get("content") or ""))
+        _short_dynamic = MIN_SHORT_DYNAMIC_CHARS <= _content_len < MIN_ARTICLE_CHARS
+        # 被"通用行业过滤器"前置拦下（完全没有行业信号）的文章，原先直接 return、连 LLM 都不问。
+        # 按产品变更（2026-10-07）：只要语义准入开着，也要问一次 LLM——它判定"属于本行业包"
+        # 且分类置信度达标时，按真实分类处理并允许进 AI 证据池；否则维持原样（不落分类行，
+        # 由入库收口点的兜底归属负责"页面看得到"）。
+        _industry_filtered = not result.get("admitted")
+        if _industry_filtered and not (
+            not _short_dynamic
+            and bool(getattr(config, "INTEL_LLM_SEMANTIC_ADMISSION_ENABLED", True))
+            and bool(config.INTEL_LLM_ENABLED)
+        ):
             return result  # 通用行业过滤器：不属于行业包，跳过 LLM 融合与准入
+        _filtered_result = dict(result) if _industry_filtered else None
         result["why_important"] = _rule_importance(article, result)
         result["trend_summary"] = ""
         result["fusion_version"] = FUSION_VERSION
@@ -615,11 +631,9 @@ class IntelClassificationService:
         result["llm_prompt_version"] = ""
         result["llm_error"] = ""
         llm_threshold = float(pack["classification"]["llm_confidence_threshold"])
-        # 分级字数标准：短行业动态（30~149 字）跳过 LLM 分类，直接采用规则结果（省 LLM 消耗）
-        from intel_content_quality_gate import MIN_ARTICLE_CHARS, MIN_SHORT_DYNAMIC_CHARS
-        _content_len = len(str(article.get("content") or ""))
-        _short_dynamic = MIN_SHORT_DYNAMIC_CHARS <= _content_len < MIN_ARTICLE_CHARS
-        if config.INTEL_LLM_ENABLED and not _short_dynamic and _rule_needs_llm(result, llm_threshold):
+        # 被前置过滤器拦下的文章必须问 LLM（它就是来给"关键词表覆盖不到"的文章翻案的）
+        _needs_llm = _industry_filtered or _rule_needs_llm(result, llm_threshold)
+        if config.INTEL_LLM_ENABLED and not _short_dynamic and _needs_llm:
             result["llm_model_id"] = self.llm_client.model_id
             result["llm_prompt_version"] = LLM_PROMPT_VERSION
             try:
@@ -657,15 +671,37 @@ class IntelClassificationService:
                 "article_content_hash": self.repository.article_content_hash(article),
             }
         )
-        # 归属成为必填产出：未命中行业包锚点词（或相关性低于阈值）的文章不得作为真实分类，
-        # 但也不允许"不归包"——一律降级为兜底归属，落在本包「其他」分类，
-        # 保证页面看得到、问答检索也搜得到；后续命中时会由真实分类覆盖升级。
+        # 归属成为必填产出：未命中行业包锚点词（或相关性低于阈值）的文章默认不算真实分类，
+        # 降级为兜底归属（落在本包「其他」），保证页面看得到；后续命中时会由真实分类覆盖升级。
+        #
+        # 例外（产品变更 2026-10-07）：**没有命中锚点，但 LLM 明确判定"属于本行业"**
+        # （in_pack_industry=True）并给出了达阈值的分类结论时，按真实分类处理，
+        # 且允许进 AI 证据池。理由：锚点词表永远列不全（同义表述/新提法/跨语种），
+        # 而 LLM 的行业判定就是为此存在的语义兜底；继续把这类文章压成「其他」等于白调 LLM。
         _score_details = result.get("score_details") or {}
         _hits = _score_details.get("hits") or {}
         _anchors = _hits.get("anchor") or []
         _relevance = float(_score_details.get("relevance_score") or 0.0)
         _minimum = float(_score_details.get("minimum_relevance_score") or 0.0)
-        if not _anchors or _relevance < _minimum:
+        _llm_admitted = bool(
+            result.get("llm_model_id")
+            and result.get("llm_in_pack_industry") is True
+            and float(result.get("llm_confidence") or 0.0) >= llm_threshold
+            and str(result.get("result_source") or "") in {"llm_override", "rule_llm_agree"}
+        )
+        if _llm_admitted:
+            _score_details["admission_source"] = "llm_semantic"
+            result["score_details"] = _score_details
+            result["admitted"] = True
+            result["final_reason"] = (
+                f"{result.get('final_reason') or result.get('rule_reason') or ''}"
+                "；未命中锚点词，由 LLM 判定属于本行业包（语义准入）"
+            ).lstrip("；")
+        elif _industry_filtered:
+            # 前置过滤器拦下、且 LLM 没能翻案（说不属于本行业 / 置信度不足 / 调用失败）：
+            # 保持原样返回——不落分类行，和变更前的行为一致（页面可见性由兜底归属保证）。
+            return _filtered_result if _filtered_result is not None else result
+        elif not _anchors or _relevance < _minimum:
             _fallback_reason = "未命中行业包锚点词，降级为兜底归属（归入「其他」分类）"
             result["rule_category"] = "other"
             result["final_category"] = "other"

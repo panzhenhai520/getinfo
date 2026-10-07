@@ -384,6 +384,15 @@ INTEL_CANDIDATE_DISPATCH_TIMES = _env_str('INTEL_CANDIDATE_DISPATCH_TIMES', '') 
 # The radar can reuse the homepage AI assistant's configured local model.
 # "ragflow" remains available for installations that already use a RAGFlow chat app.
 INTEL_LLM_ENABLED = _env_bool('INTEL_LLM_ENABLED', False)
+# LLM 语义准入（产品变更 2026-10-07）：文章连"通用行业过滤器"都没过（完全没有行业信号，
+# 更谈不上命中锚点）时，是否仍然问一次 LLM——它若判定"属于本行业包"且分类置信度达标，
+# 就按真实分类处理并允许进 AI 证据池。理由：关键词/锚点表永远列不全（同义表述、新提法、
+# 跨语种），而 LLM 的行业判定就是为此存在的语义兜底。
+# 代价：完全无信号的每篇文章多一次 LLM 调用（受 INTEL_LLM_ENABLED 与分级字数标准约束，
+# 短行业动态仍跳过），因此留一个运营开关，必要时可关掉退回"只信关键词"。
+INTEL_LLM_SEMANTIC_ADMISSION_ENABLED = _env_bool(
+    'INTEL_LLM_SEMANTIC_ADMISSION_ENABLED', True
+)
 INTEL_LLM_PROVIDER = (
     _env_str('INTEL_LLM_PROVIDER', 'local') or 'local'
 ).casefold()
