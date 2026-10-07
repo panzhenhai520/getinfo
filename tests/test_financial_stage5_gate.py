@@ -107,7 +107,14 @@ class FinancialStage5GateTest(unittest.TestCase):
         self.assertEqual(static["prohibited_imports"], [])
         self.assertEqual(static["forbidden_domain_hits"], [])
         self.assertEqual(static["forbidden_port_hits"], [])
-        self.assertEqual(static["published_ports"], [8003])
+        # 发布端口取 fixture 里已批准的清单（compose 里含 postgres 的 5432，
+        # Dockerfile 只暴露应用自己的 8003），避免把基线抄死在用例里
+        network = self.fixture["network_policy"]
+        self.assertEqual(
+            static["published_ports"],
+            sorted(network.get("allowed_compose_published_ports")
+                   or network["allowed_published_ports"]),
+        )
         self.assertEqual(self.result["network_attempts"], [])
         self.assertEqual(self.result["broker_calls"], 0)
 

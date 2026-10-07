@@ -220,6 +220,8 @@ _domain_lock = threading.Lock()
 _domain_last_request: dict[str, float] = {}
 _recovery_lock = threading.Lock()
 _recovery_done = False
+# 同一条作业因重启被自动重做的最多次数（超过则判失败，防止反复重启造成活锁）
+RECOVERY_MAX_ATTEMPTS = 2
 
 app = Flask(__name__)
 
@@ -261,6 +263,11 @@ def _db() -> sqlite3.Connection:
     )
     try:
         connection.execute("ALTER TABLE jobs ADD COLUMN industry_pack_id TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    # 重启恢复次数：用于给"重启后自动重做"设上限，避免反复重启把同一条作业无限重跑
+    try:
+        connection.execute("ALTER TABLE jobs ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
     except Exception:
         pass
     connection.execute(
@@ -1025,17 +1032,46 @@ def _run_job(job_id: str, payload: dict[str, Any]) -> None:
 
 
 def _recover_jobs_once() -> None:
-    """容器重启后，把仍在 queued/running 的任务改为 failed（不阻塞新任务）。"""
+    """容器重启后把未完成的作业重新入队重跑（有次数上限），而不是直接判死。
+
+    为什么这么改：这些作业（抓取/提炼/翻译/语音）都是幂等的——提交时就用 idempotency_key
+    去重，结果写在 jobs/job_articles 里；重启时把它们直接置 failed 等于把客户端正在等的
+    请求丢掉，用户只能自己重发。改成重新入队更符合预期：能自动恢复的就恢复，
+    只有反复重做仍然没做完（attempts 超过上限）才判失败，避免"重启一次跑一次"的活锁。
+    """
     global _recovery_done
     with _recovery_lock:
         if _recovery_done:
             return
         _recovery_done = True
+        requeue: list[tuple[str, dict]] = []
+        now = time.time()
         with _db() as connection:
-            connection.execute(
-                "UPDATE jobs SET status='failed', phase='recovered', error='interrupted by rebuild' "
-                "WHERE status IN ('queued','running')"
-            )
+            rows = connection.execute(
+                "SELECT id, request_json, attempts FROM jobs WHERE status IN ('queued','running')"
+            ).fetchall()
+            for row in rows:
+                attempts = int(row["attempts"] or 0)
+                if attempts >= RECOVERY_MAX_ATTEMPTS:
+                    connection.execute(
+                        "UPDATE jobs SET status='failed', phase='recovered', "
+                        "error='recovery limit reached', updated_at=? WHERE id=?",
+                        (now, row["id"]),
+                    )
+                    continue
+                connection.execute(
+                    "UPDATE jobs SET status='queued', phase='recovered', attempts=attempts + 1, "
+                    "error='', updated_at=? WHERE id=?",
+                    (now, row["id"]),
+                )
+                try:
+                    payload = json.loads(row["request_json"] or "{}")
+                except Exception:
+                    payload = {}
+                requeue.append((str(row["id"]), payload if isinstance(payload, dict) else {}))
+    # 提交必须在事务之外做，否则重跑的作业会读到还没提交的状态
+    for job_id, payload in requeue:
+        _crawl_pool.submit(_run_job, job_id, payload)
 
 
 def _component_health(url: str) -> dict[str, Any]:

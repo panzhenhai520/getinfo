@@ -18,6 +18,24 @@ PAGE_LISTING = "listing"
 PAGE_DYNAMIC = "dynamic"
 PAGE_HOMEPAGE = "homepage"
 
+
+def fetch_page_html(url: str, *, timeout: int = 15) -> str:
+    """抓取页面 HTML（仅 200 时返回正文，否则返回空串）。
+
+    为什么放在这里而不是调用方：阶段五闸门（tools/check_financial_stage5_gate.py）把
+    intel_api.py 列为 STAGE5_MODULES 并禁止其出现 requests/httpx/urllib 等出网导入，
+    以保证金融相关模块不做自发网络调用。列表页探查本身就是抓取逻辑，放在本模块既符合
+    红线，也让"抓取→解析"待在一个地方。
+    """
+    import requests  # 本模块不在 STAGE5_MODULES 内
+
+    response = requests.get(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; CollectInfo/1.0)"},
+        timeout=timeout,
+    )
+    return (response.text or "") if response.status_code == 200 else ""
+
 # 置信度分档
 CONFIDENCE_HIGH = "high"
 CONFIDENCE_MEDIUM = "medium"

@@ -31,12 +31,14 @@ DEFAULT_TIMEOUT_SECONDS = 30
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_BATCH_SIZE = 16
 # 单条输入的最大 token 数（估算口径见 _estimate_tokens）。
-# 为什么需要：生产 A 机的 bge-m3 是 llama.cpp 起的（10.88.0.1:8082），物理批大小 512，
+# 为什么需要：生产 A 机的 bge-m3 是 llama.cpp 起的（10.88.0.1:8082），原先物理批大小 512，
 # 超过就返回 500「input (859 tokens) is too large to process. increase the physical batch size」，
 # 而 embed_articles 送的是整篇正文（800 字符≈460 token 还行，1500 字符≈859 token 必失败），
 # 于是整批 100% 失败、拆单重试后仍然全失败 —— 纯烧 lane 容量且向量覆盖率永远涨不上去。
-# 这里在客户端按 token 估算截断到安全线以内；把服务端 -ub 提到 ≥2048 后可以调大这个值。
-DEFAULT_MAX_INPUT_TOKENS = 480
+# 2026-10-07：服务端 llama-server 已重启为 --batch-size 2048 --ubatch-size 2048，
+# 实测 600/1200/1800/3000 字符（约 340/677/1014/1690 token）全部返回 200，
+# 因此默认上限从 480 提到 1500（bge-m3 原生支持 8192 token，留出余量又不越过 2048 的物理批）。
+DEFAULT_MAX_INPUT_TOKENS = 1500
 
 _CJK_RE = re.compile(r"[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
 _LATIN_WORD_RE = re.compile(r"[A-Za-z0-9]+")

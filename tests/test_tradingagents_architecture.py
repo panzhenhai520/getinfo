@@ -20,15 +20,31 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class TradingAgentsArchitectureTests(unittest.TestCase):
+    def _registry_invariants(self) -> dict:
+        registry = json.loads(
+            (PROJECT_ROOT / "architecture" / "tradingagents-component-registry.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        return registry["architecture_invariants"]
+
     def test_current_registry_compose_dependencies_ports_and_tables_pass(self):
         report = check_repository(PROJECT_ROOT)
         self.assertTrue(report["acceptance"]["passed"], report)
+        # 断言对象取"已批准的基线"，而不是把服务/端口再抄一份写死在用例里：
+        # 抄死会在每次正式批准新服务（如 postgres / qa-worker）时又制造一次假失败。
+        invariants = self._registry_invariants()
         self.assertEqual(
             report["compose"]["services"],
-            ["crawler", "intel-worker", "redis", "worker"],
+            sorted(invariants["compose_services_after_stage2"]),
         )
         self.assertEqual(
-            report["ports"]["compose_published_container_ports"], [8003]
+            report["ports"]["compose_published_container_ports"],
+            sorted(invariants["compose_published_container_ports"]),
+        )
+        self.assertEqual(
+            report["ports"]["dockerfile_exposed_ports"],
+            sorted(invariants["published_container_ports"]),
         )
         self.assertEqual(report["dependencies"]["prohibited_dependencies_found"], [])
 

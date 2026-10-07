@@ -180,6 +180,12 @@ def check_repository(
     expected_services = sorted(invariants.get("compose_services_before") or [])
     stage2_services = sorted(invariants.get("compose_services_after_stage2") or [])
     allowed_ports = sorted(invariants.get("published_container_ports") or [])
+    # compose 的发布端口与本镜像 Dockerfile 的 EXPOSE 不是同一件事：compose 里还包含
+    # postgres 等基础服务的容器端口（如 5432），而应用镜像只暴露自己的 8003。
+    # 两者分开登记，避免"给 compose 放行 5432"顺带把 Dockerfile 的红线也放宽。
+    allowed_compose_ports = sorted(
+        invariants.get("compose_published_container_ports") or allowed_ports
+    )
 
     database_manifest = json.loads(
         resolve(database_manifest_path).read_text(encoding="utf-8")
@@ -209,7 +215,7 @@ def check_repository(
         "stage2_service_set_unchanged": stage2_services == expected_services,
         "no_prohibited_service_present": not prohibited_services_found,
         "published_ports_unchanged": compose_surface["published_container_ports"]
-        == allowed_ports,
+        == allowed_compose_ports,
         "dockerfile_exposed_ports_unchanged": exposed_ports == allowed_ports,
         "no_prohibited_dependency_present": not prohibited_dependencies_found,
         "mapped_existing_tables_exist": not missing_mapped_tables,

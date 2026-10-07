@@ -11,23 +11,35 @@
     "compose_services_before": [
       "crawler",
       "intel-worker",
+      "postgres",
+      "qa-worker",
       "redis",
       "worker"
     ],
     "compose_services_after_stage2": [
       "crawler",
       "intel-worker",
+      "postgres",
+      "qa-worker",
       "redis",
       "worker"
     ],
     "published_container_ports": [
       8003
     ],
-    "durable_relational_store": "现有 crawler_articles.db (SQLite)",
-    "queue_and_checkpoint_store": "现有 SQLite intel_jobs 及新增同库金融表",
+    "compose_published_container_ports": [
+      8003,
+      5432
+    ],
+    "approved_service_term_additions": {
+      "postgres": "2026-10-06 批准：主库已从 SQLite 迁到 PostgreSQL（代码已有 postgres_compat + psycopg2 适配层，生产三台机器均以前者为主库），因此它不再是'禁止引入的服务'；容器内端口 5432，宿主机映射端口由 POSTGRES_HOST_PORT 控制（生产为 5433）。",
+      "qa-worker": "2026-10-06 批准：问答 worker 独立成服务，避免长问答占用 core lane 的抓取/分类吞吐。"
+    },
+    "durable_relational_store": "PostgreSQL 主库 collectinfo（历史 SQLite crawler_articles.db 作为备份/回退）",
+    "queue_and_checkpoint_store": "同一主库内的 intel_jobs（作业队列）与 qa_* 表",
     "optional_cache_and_coordination": "现有 Redis",
     "semantic_memory": "现有 RAGFlow 专用 KB",
-    "artifact_store": "现有 data volume，文件原子替换并在 SQLite 保存 hash",
+    "artifact_store": "现有 data volume，文件原子替换并在库内保存 hash",
     "authentication": "现有 user_database + decorators + Flask 全局鉴权",
     "llm_runtime": "现有 AI 助手 local OpenAI-compatible 配置",
     "new_service_allowed": false,
@@ -68,7 +80,6 @@
     "mongodb",
     "mysql",
     "ollama",
-    "postgres",
     "qdrant",
     "rabbitmq",
     "tradingagents",

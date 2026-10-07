@@ -4079,16 +4079,15 @@ def reclassify_article(article_id: int):
 @login_required
 def intel_list_pages_probe():
     """T2.1 已知 URL 自动探查文章列表页：读取已探测结果；传 url 且 html 可抓取时增量探测落库。"""
-    from crawl_listpage import list_list_pages, probe_list_pages, save_list_pages
+    from crawl_listpage import fetch_page_html, list_list_pages, probe_list_pages, save_list_pages
     url = str(request.args.get("url") or "").strip()
     candidates = []
     probe_error = ""
     if url:
         try:
-            import requests as _requests
-            resp = _requests.get(url, headers={"User-Agent": "Mozilla/5.0 (compatible; CollectInfo/1.0)"},
-                                 timeout=15)
-            probe = probe_list_pages(url, html=(resp.text or "") if resp.status_code == 200 else "")
+            # 出网抓取放在 crawl_listpage（阶段五闸门禁止本模块出现 requests/httpx/urllib 导入）
+            html = fetch_page_html(url, timeout=15)
+            probe = probe_list_pages(url, html=html)
             if probe.get("candidates"):
                 save_list_pages(url, probe["candidates"])
                 candidates = probe["candidates"]

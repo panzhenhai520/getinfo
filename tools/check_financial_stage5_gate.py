@@ -620,7 +620,8 @@ def static_acceptance(fixture: dict | None = None) -> dict:
         "no_forbidden_broker_domain_literal": not domain_hits,
         "no_forbidden_broker_port_literal": not port_hits,
         "published_ports_unchanged": architecture["ports"]["compose_published_container_ports"]
-            == network["allowed_published_ports"],
+            == sorted(network.get("allowed_compose_published_ports")
+                      or network["allowed_published_ports"]),
         "dockerfile_ports_unchanged": architecture["ports"]["dockerfile_exposed_ports"]
             == network["allowed_published_ports"],
         "real_trading_forbidden_by_architecture":
