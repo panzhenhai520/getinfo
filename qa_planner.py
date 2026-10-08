@@ -251,6 +251,28 @@ def _normalize_adjustment_time_window(value: object) -> dict:
             "start": start, "end": end, "source": "user_adjustment"}
 
 
+def _window_phrase(time_window: Mapping) -> str:
+    """时间范围 → 能塞进检索式的**简短**说法（parse_time_window 认得出来）。
+
+    相对范围优先用"近 N 天"；绝对范围（模型只给了 label 或 start/end）用 label 里的年月。
+    完整 label 里常带"（2026-07-10 起）"这类给人看的注释，塞进检索式只会变成关键词噪声。
+    """
+    if not isinstance(time_window, Mapping):
+        return ""
+    try:
+        days = int(time_window.get("days") or 0)
+    except (TypeError, ValueError):
+        days = 0
+    if days > 0:
+        return f"近 {days} 天" if days < 3650 else "近 1 年"
+    label = str(time_window.get("label") or "").strip()
+    match = _ABS_MONTH.search(label)
+    if match:
+        return match.group(0)
+    match = re.search(r"(20\d{2})\s*年", label)
+    return match.group(0) if match else label[:20]
+
+
 def _time_phrase_in(text: str) -> str:
     """从调整文本里摘出**时间短语本身**（而不是整句话）——回执要给人看，检索式要能用。"""
     raw = str(text or "")
@@ -866,11 +888,13 @@ class QaQueryPlanner:
             for item in adjustment_queries:
                 if not item:
                     continue
-                # 时间范围调整：把"最近 N 个月/某年某月"并进检索式，
-                # 让既有 parse_time_window 直接认出来（不另造一套时间解析）
-                label = str(time_window_adjust.get("label") or "")
-                if label and label not in item:
-                    item = f"{item} {label}"
+                # 时间范围调整：把"最近 N 天/某年某月"并进检索式，
+                # 让既有 parse_time_window 直接认出来（不另造一套时间解析）。
+                # 用简短说法而不是完整 label："近 90 天（2026-07-10 起）"里的括号注释
+                # 对关键词匹配只是噪声。
+                phrase = _window_phrase(time_window_adjust)
+                if phrase and phrase not in item:
+                    item = f"{item} {phrase}"
                 queries.append(item)
             if policy:
                 queries.extend([
