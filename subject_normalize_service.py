@@ -58,10 +58,15 @@ class SubjectNormalizeService:
         self.repository = repository or IntelRepository()
         self.composition = composition or active_industry_composition_service
 
-    def run(self, *, pack_id: str = "", batch_size: int = 8) -> Dict:
-        """规则归并（稳定）+ LLM 长尾归并（自动），写 canonical 表。"""
+    def run(self, *, pack_id: str = "", batch_size: int = 8, all_packs: bool = False) -> Dict:
+        """规则归并（稳定）+ LLM 长尾归并（自动），写 canonical 表。
+
+        `all_packs=True` 时**不**回落到当前激活包，而是对该表里所有包的主体做归并：
+        回填历史文章时，待归并主体往往属于非激活包（实测：激活包 education_news，
+        而新抽出的主体属于 automotive_industry → 按激活包取永远拿到 0 个主体）。
+        """
         pack_id = str(pack_id or "").strip()
-        if not pack_id:
+        if not pack_id and not all_packs:
             try:
                 pack_id = str(self.composition.snapshot().get("active_industry_pack_id") or "")
             except Exception:
@@ -71,50 +76,73 @@ class SubjectNormalizeService:
         if not subjects:
             logger.info("subject_normalize: pack=%s 无 subject", pack_id or "*")
             return {"pack_id": pack_id, "subjects": 0, "canonicals": 0}
-        subject_texts = [s["subject"] for s in subjects]
 
-        # 1. 高置信度规则归并（确定性，消除 LLM 波动）
-        rule_canonical: Dict[str, str] = {}
-        llm_subjects: List[str] = []
-        for s in subject_texts:
-            canon = _rule_normalize(s)
-            if canon:
-                rule_canonical[s] = canon
-            else:
-                llm_subjects.append(s)
+        # 实体规范表按包隔离，所以**按包分组**归并并写回：全包模式下若统一写空包，
+        # 下游（kg_builder 按 (包, subject) 查 subject_key）就匹配不上，等于没归一。
+        by_pack: Dict[str, list] = {}
+        for item in subjects:
+            key = str(item.get("industry_pack_id") or pack_id or "")
+            by_pack.setdefault(key, []).append(str(item.get("subject") or ""))
+        by_pack = {key: sorted({s for s in values if s}) for key, values in by_pack.items()}
 
-        # 2. LLM 归并长尾（规则未覆盖）
-        llm_canonical: Dict[str, str] = {}
+        written = 0
+        total_subjects = 0
+        total_rule = 0
+        total_tail = 0
+        canonicals: set = set()
         batch_size = max(4, min(int(batch_size), 20))
-        for i in range(0, len(llm_subjects), batch_size):
-            batch = llm_subjects[i:i + batch_size]
-            try:
-                llm_canonical.update(intel_llm_client.normalize_subjects(batch))
-            except Exception as exc:
-                logger.warning("subject_normalize LLM batch %d 失败: %s", i, exc)
-                for s in batch:
-                    llm_canonical.setdefault(s, s)
+        for current_pack, subject_texts in sorted(by_pack.items()):
+            if not subject_texts:
+                continue
+            total_subjects += len(subject_texts)
 
-        all_canonical = {**llm_canonical, **rule_canonical}
-        for s in subject_texts:
-            all_canonical.setdefault(s, s)
-        mappings = [
-            (s, all_canonical.get(s, s), _norm_key(all_canonical.get(s, s)))
-            for s in subject_texts
-        ]
-        written = self.repository.save_subject_canonical(
-            industry_pack_id=pack_id, mappings=mappings
-        )
-        distinct = len(set(all_canonical.values()))
-        logger.info(
-            "subject_normalize: pack=%s subjects=%d 规则覆盖=%d LLM长尾=%d → canonical=%d",
-            pack_id or "*", len(subject_texts), len(rule_canonical), len(llm_subjects), distinct,
-        )
+            # 1. 高置信度规则归并（确定性，消除 LLM 波动）
+            rule_canonical: Dict[str, str] = {}
+            llm_subjects: List[str] = []
+            for s in subject_texts:
+                canon = _rule_normalize(s)
+                if canon:
+                    rule_canonical[s] = canon
+                else:
+                    llm_subjects.append(s)
+
+            # 2. LLM 归并长尾（规则未覆盖）
+            llm_canonical: Dict[str, str] = {}
+            for i in range(0, len(llm_subjects), batch_size):
+                batch = llm_subjects[i:i + batch_size]
+                try:
+                    llm_canonical.update(intel_llm_client.normalize_subjects(batch))
+                except Exception as exc:
+                    logger.warning("subject_normalize LLM batch %d 失败: %s", i, exc)
+                    for s in batch:
+                        llm_canonical.setdefault(s, s)
+
+            all_canonical = {**llm_canonical, **rule_canonical}
+            for s in subject_texts:
+                all_canonical.setdefault(s, s)
+            mappings = [
+                (s, all_canonical.get(s, s), _norm_key(all_canonical.get(s, s)))
+                for s in subject_texts
+            ]
+            written += self.repository.save_subject_canonical(
+                industry_pack_id=current_pack, mappings=mappings
+            )
+            total_rule += len(rule_canonical)
+            total_tail += len(llm_subjects)
+            canonicals.update((current_pack, value) for value in all_canonical.values())
+            logger.info(
+                "subject_normalize: pack=%s subjects=%d 规则覆盖=%d LLM长尾=%d → canonical=%d",
+                current_pack or "*", len(subject_texts), len(rule_canonical),
+                len(llm_subjects), len(set(all_canonical.values())),
+            )
+
+        distinct = len(canonicals)
         return {
             "pack_id": pack_id,
-            "subjects": len(subject_texts),
-            "rule_covered": len(rule_canonical),
-            "llm_tail": len(llm_subjects),
+            "packs": len(by_pack),
+            "subjects": total_subjects,
+            "rule_covered": total_rule,
+            "llm_tail": total_tail,
             "canonicals": distinct,
             "written": written,
         }

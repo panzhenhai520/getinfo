@@ -1434,6 +1434,18 @@ class CandidateCrawlerAdapter:
         candidate_published_at = str(candidate.get("published_at") or "").strip()
         extracted_published_at = str(extracted.get("publish_date") or "").strip()
         publish_date = candidate_published_at or extracted_published_at
+        # 精度与来源跟着"被采用的那个值"走：候选列表页给的时间与正文页抽出的时间精度不同，
+        # 混用会让 published_precision 说谎（阶段 4：时间要可硬约束，精度必须可信）。
+        published_precision = str(
+            (candidate.get("published_precision") if candidate_published_at
+             else extracted.get("published_precision"))
+            or ""
+        ).strip()
+        published_time_source = str(
+            (candidate.get("published_time_source") if candidate_published_at else "")
+            or extracted.get("published_time_source")
+            or ("candidate_published_at" if candidate_published_at else "")
+        ).strip()
         candidate_title = str(candidate.get("title") or "").strip()
         # Some legacy corporate sites use a generic HTML <title> such as
         # "Index" for every news detail page.  The list-page title is then the
@@ -1501,6 +1513,8 @@ class CandidateCrawlerAdapter:
                 "content": content,
                 "raw_content": extracted.get("raw_content") or "",
                 "publish_date": publish_date,
+                "published_precision": published_precision,
+                "published_time_source": published_time_source,
                 "extraction_method": extracted.get("extraction_method") or "existing_crawler",
                 "quality_score": extracted.get("quality_score") or 0,
                 "matched_keywords": matched_keywords,

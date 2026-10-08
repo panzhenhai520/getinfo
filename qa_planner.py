@@ -144,6 +144,22 @@ def _adjustment_target_ids(adjustment: str, subquestions: list[dict]) -> list[st
     return []
 
 
+_OUTPUT_FORMS = {
+    "paragraph_by_paragraph", "structured_text", "table", "brief", "timeline",
+}
+# 用户说"逐段/逐条/全文/原文"这类词 → 要的是**原文全文逐段过**，不是换个模板
+_FULLTEXT_WORDS = ("逐段", "逐条", "逐句", "全文", "原文", "条文", "整篇", "完整内容")
+_OUTPUT_FORM_HINTS = (
+    ("paragraph_by_paragraph", ("逐段", "逐条", "逐句", "按段落", "按条文", "原文顺序")),
+    ("table", ("表格", "列表对比", "横向比较", "对比表")),
+    ("timeline", ("时间轴", "时间线", "按时间顺序")),
+    ("brief", ("简洁", "简短", "只要结论", "一句话", "精简")),
+)
+_REL_MONTHS = re.compile(r"(近|最近|过去|前)\s*(\d{1,2}|[一二两三四五六七八九十]+)\s*个?月")
+_REL_DAYS = re.compile(r"(近|最近|过去|前)\s*(\d{1,3}|[一二两三四五六七八九十]+)\s*(天|日|周)")
+_ABS_MONTH = re.compile(r"(20\d{2})\s*年\s*(\d{1,2})\s*月")
+
+
 def _normalize_adjustment_patch(patch: object, subquestions: list[dict]) -> dict:
     if not isinstance(patch, Mapping):
         return {}
@@ -169,6 +185,12 @@ def _normalize_adjustment_patch(patch: object, subquestions: list[dict]) -> dict
         item for item in (_clean_query(str(item))[:80] for item in template if str(item or "").strip())
         if _valid_adjustment_template_item(item)
     ][:6] if isinstance(template, list) else []
+    output_form = str(patch.get("output_form") or "").strip().lower()
+    if output_form not in _OUTPUT_FORMS:
+        # 兼容旧字段 format（structured_text/table/brief）与中文写法
+        legacy = str(patch.get("format") or "").strip().lower()
+        output_form = legacy if legacy in _OUTPUT_FORMS else ""
+    must_fulltext = bool(patch.get("must_fetch_fulltext")) or output_form == "paragraph_by_paragraph"
     return {
         "operation": operation,
         "target_subquestions": targets,
@@ -180,7 +202,127 @@ def _normalize_adjustment_patch(patch: object, subquestions: list[dict]) -> dict
             for item in (patch.get("exclude_sections") or [])
             if str(item or "").strip()
         ][:8] if isinstance(patch.get("exclude_sections") or [], list) else [],
+        # ── 阶段 5 新增：调整必须真的改变**检索与生成**，而不只是换模板 ──
+        "retrieval_queries": [
+            clean for clean in (
+                _clean_query(str(item))[:120]
+                for item in (patch.get("retrieval_queries") or patch.get("queries") or [])
+                if str(item or "").strip()
+            ) if clean
+        ][:4] if isinstance(patch.get("retrieval_queries") or patch.get("queries") or [], list) else [],
+        "time_window": _normalize_adjustment_time_window(patch.get("time_window")),
+        "must_fetch_fulltext": must_fulltext,
+        "output_form": output_form,
     }
+
+
+def _normalize_adjustment_time_window(value: object) -> dict:
+    """调整里的时间范围 → {label, days, start, end, source}；解析不出来返回 {}。
+
+    start/end 一律存 ISO 字符串：plan 会被塞进 SSE 事件与阶段结果，放 datetime 会序列化失败
+    （实测 level1_retrieval 曾因此 INTERNAL_ERROR）。
+    """
+    if isinstance(value, str):
+        return _time_window_from_phrase(value)
+    if not isinstance(value, Mapping):
+        return {}
+    label = _clean_query(str(value.get("label") or value.get("text") or ""))[:60]
+    raw_days = value.get("days")
+    days = 0
+    try:
+        days = int(raw_days)
+    except (TypeError, ValueError):
+        days = 0
+    start = str(value.get("start") or "")
+    end = str(value.get("end") or "")
+    if not (label or days > 0 or start):
+        return {}
+    if not (start or end) and label:
+        # 模型只给了自然语言 → 用同一个解析器补出区间
+        derived = _time_window_from_phrase(label)
+        start, end = derived.get("start", ""), derived.get("end", "")
+        days = days or int(derived.get("days") or 0)
+        label = str(derived.get("label") or label)
+    if days <= 0 and label:
+        days = _days_from_label(label)
+    if days:
+        days = max(1, min(3650, days))
+    return {"label": label or (f"近 {days} 天" if days else ""), "days": days,
+            "start": start, "end": end, "source": "user_adjustment"}
+
+
+def _time_phrase_in(text: str) -> str:
+    """从调整文本里摘出**时间短语本身**（而不是整句话）——回执要给人看，检索式要能用。"""
+    raw = str(text or "")
+    for pattern, group in ((_REL_MONTHS, 0), (_REL_DAYS, 0), (_ABS_MONTH, 0)):
+        match = pattern.search(raw)
+        if match:
+            return match.group(group).strip()
+    match = re.search(r"(20\d{2})\s*年", raw)
+    if match:
+        return match.group(0).strip()
+    return ""
+
+
+def _time_window_from_phrase(phrase: str) -> dict:
+    """时间短语 → 计划里的时间范围（**存 ISO 字符串**，因为 plan 会被塞进 SSE 事件）。
+
+    复用既有的 parse_time_window，不另造一套时间解析：
+    相对说法（最近 3 个月）给 days；绝对说法（2026 年 1 月）给 start/end。
+    """
+    text = str(phrase or "").strip()
+    if not text:
+        return {}
+    result = {"label": text, "days": _days_from_label(text), "start": "", "end": "",
+              "source": "user_adjustment"}
+    try:
+        from qa_query_normalize import parse_time_window
+
+        parsed = parse_time_window(text)
+    except Exception:
+        parsed = {}
+    if parsed.get("has_time"):
+        if parsed.get("start") is not None:
+            result["start"] = parsed["start"].isoformat()
+        if parsed.get("end") is not None:
+            result["end"] = parsed["end"].isoformat()
+        result["label"] = str(parsed.get("label") or text)
+        try:
+            result["days"] = int(parsed.get("days") or result["days"] or 0)
+        except (TypeError, ValueError):
+            pass
+    return result
+
+
+def _days_from_label(label: str) -> int:
+    text = str(label or "")
+    match = _REL_MONTHS.search(text)
+    if match:
+        return _cn_number(match.group(2)) * 30
+    match = _REL_DAYS.search(text)
+    if match:
+        amount = _cn_number(match.group(2))
+        unit = match.group(3)
+        return amount * {"天": 1, "日": 1, "周": 7}.get(unit, 1)
+    if _ABS_MONTH.search(text):
+        return 30
+    if re.search(r"(20\d{2})\s*年", text):
+        return 365
+    return 0
+
+
+def _cn_number(raw: str) -> int:
+    text = str(raw or "").strip()
+    if text.isdigit():
+        return int(text)
+    table = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+             "七": 7, "八": 8, "九": 9, "十": 10}
+    if text in table:
+        return table[text]
+    match = re.fullmatch(r"十([一二三四五六七八九])", text)
+    if match:
+        return 10 + table.get(match.group(1), 0)
+    return 0
 
 
 def _rule_based_adjustment_patch(adjustment: str, subquestions: list[dict]) -> dict:
@@ -204,7 +346,41 @@ def _rule_based_adjustment_patch(adjustment: str, subquestions: list[dict]) -> d
             "format": "",
             "exclude_sections": [],
         }
-    return {}
+    # ── 阶段 5：规则路也要能改**检索条件**，不能只认 confirm/filter ──
+    # 实测问题：用户说「查看政策全文，逐段解释」，plan 里只有 answer_template 变了，
+    # queries 与送模证据原封不动 → "听话了但没做到"。这里把这类话落成
+    # output_form / must_fetch_fulltext / retrieval_queries / time_window。
+    retrieval_queries = []
+    output_form = ""
+    for form, words in _OUTPUT_FORM_HINTS:
+        if any(word in text for word in words):
+            output_form = form
+            break
+    must_fulltext = any(word in text for word in _FULLTEXT_WORDS)
+    if must_fulltext and not output_form:
+        output_form = "paragraph_by_paragraph"
+    if must_fulltext:
+        retrieval_queries.append("官方原文 全文 逐条")
+    if any(word in text for word in ("官方原文", "原文", "文件全称", "政策全称", "全文")):
+        retrieval_queries.append("政策全称 发文机关 发文字号 原文")
+    time_window = {}
+    phrase = _time_phrase_in(text)
+    if phrase:
+        time_window = _time_window_from_phrase(phrase)
+    if not (retrieval_queries or output_form or time_window):
+        return {}
+    return {
+        "operation": "augment",
+        "target_subquestions": [],
+        "answer_template": [],
+        "answer_strategy": "用户调整了检索与输出要求，已把调整落到检索式与输出形式上。",
+        "format": "",
+        "exclude_sections": [],
+        "retrieval_queries": retrieval_queries,
+        "time_window": time_window,
+        "must_fetch_fulltext": must_fulltext,
+        "output_form": output_form,
+    }
 
 
 def _material_cleaning_from_adjustment(adjustment: str) -> dict:
@@ -252,7 +428,62 @@ def _apply_plan_patch_to_plan(plan: dict, adjustment: str, patch: Mapping) -> di
         if operation:
             result["adjustment_operation"] = operation
     result["adjustment_patch"] = normalized
+    # ── 阶段 5：把调整落到**检索条件与输出形式**上（不只是回答模板）──
+    # 专项检索式插在列表最前，保证在 query_cap 截断前一定被保留。
+    existing_queries = [str(item) for item in result.get("retrieval_queries") or []]
+    for item in normalized.get("retrieval_queries") or []:
+        if item and item not in existing_queries:
+            existing_queries.append(item)
+    if existing_queries:
+        result["retrieval_queries"] = existing_queries[:4]
+    if normalized.get("output_form"):
+        result["output_form"] = normalized["output_form"]
+    if normalized.get("must_fetch_fulltext"):
+        result["must_fetch_fulltext"] = True
+    if normalized.get("time_window"):
+        result["time_window"] = normalized["time_window"]
+    result["adjustment_receipt"] = _adjustment_receipt(result, adjustment, normalized)
     return result
+
+
+def _adjustment_receipt(plan: Mapping, adjustment: str, normalized: Mapping) -> dict:
+    """把"解析成了什么"写成给用户看的回执（前端直接展示，不另外调模型）。"""
+    items = []
+    output_form = str(plan.get("output_form") or "")
+    form_labels = {
+        "paragraph_by_paragraph": "逐段解释",
+        "table": "表格对比",
+        "timeline": "时间轴",
+        "brief": "只给结论",
+        "structured_text": "结构化文本",
+    }
+    if output_form:
+        items.append("已按「%s」组织回答" % form_labels.get(output_form, output_form))
+    if plan.get("must_fetch_fulltext"):
+        items.append("会先把原文全文取出来再逐段生成")
+    queries = list(plan.get("retrieval_queries") or [])
+    if queries:
+        items.append("检索式已加入专项查询：%s" % "、".join(queries[:3]))
+    time_window = plan.get("time_window") or {}
+    if time_window.get("label"):
+        items.append("时间范围已改为：%s" % time_window["label"])
+    target_ids = [str(item) for item in normalized.get("target_subquestions") or []]
+    if target_ids:
+        items.append("只回答指定的子问题：%s" % "、".join(target_ids))
+    if normalized.get("exclude_sections"):
+        items.append("已排除：%s" % "、".join(str(item) for item in normalized["exclude_sections"][:4]))
+    operation = str(plan.get("adjustment_operation") or "")
+    return {
+        "adjustment": str(adjustment or "")[:200],
+        "operation": operation,
+        "output_form": output_form,
+        "must_fetch_fulltext": bool(plan.get("must_fetch_fulltext")),
+        "retrieval_queries": queries,
+        "time_window": dict(time_window) if isinstance(time_window, Mapping) else {},
+        "items": items,
+        "summary": ("已按你的调整执行：" + "；".join(items)) if items
+                   else "已记录你的调整（未改变检索条件与输出形式）",
+    }
 
 
 def _apply_adjustment_to_plan(plan: dict, adjustment: str, *, forced_target_ids: list[str] | None = None, patch: Mapping | None = None) -> dict:
@@ -621,9 +852,26 @@ class QaQueryPlanner:
                 if any(str(keyword).casefold() in planning_question.casefold() for keyword in keywords if keyword):
                     topics.append(str(topic.get("key") or name))
 
+        # 用户调整产生的专项检索式：插在最前，确保在 query_cap 截断前一定保留
+        # （阶段 5：调整要真的改变检索，不能只换回答模板）。
+        adjustment_queries = [
+            _clean_query(str(item))[:120]
+            for item in question_plan.get("retrieval_queries") or []
+            if str(item or "").strip()
+        ]
         queries = []
         if needs_retrieval:
             queries.append(planning_question)
+            time_window_adjust = question_plan.get("time_window") or {}
+            for item in adjustment_queries:
+                if not item:
+                    continue
+                # 时间范围调整：把"最近 N 个月/某年某月"并进检索式，
+                # 让既有 parse_time_window 直接认出来（不另造一套时间解析）
+                label = str(time_window_adjust.get("label") or "")
+                if label and label not in item:
+                    item = f"{item} {label}"
+                queries.append(item)
             if policy:
                 queries.extend([
                     f"{planning_question} 官方原文 生效日期 适用主体",
@@ -698,6 +946,10 @@ class QaQueryPlanner:
             "source_profiles": source_profiles[:120],
             "research_axes": list(dict.fromkeys(axes)),
             "queries": normalized_queries,
+            "output_form": str(question_plan.get("output_form") or ""),
+            "must_fetch_fulltext": bool(question_plan.get("must_fetch_fulltext")),
+            "time_window_adjustment": dict(question_plan.get("time_window") or {}),
+            "adjustment_receipt": dict(question_plan.get("adjustment_receipt") or {}),
             "answer_language": "zh-CN",
         }
 

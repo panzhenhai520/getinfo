@@ -684,6 +684,9 @@ HARD_ERROR_RULES = (
         "no module named 'patchright'",
     )),
     ("disk_or_permission", ("read-only file system", "no space left on device")),
+    # 出站策略判定"受限网络地址"：本机没放行该网段（实测 B 机没放行自建 RSSHub 10.88.0.0/24，
+    # 而 A 机放行了 → 同一份种子在 A 机正常、在 B 机每轮白跑）。这也是确定性失败，重试无意义。
+    ("restricted_network", ("解析到受限网络地址",)),
 )
 META_HARD_ERROR = "hard_error"
 META_HARD_ERROR_DETAIL = "hard_error_detail"

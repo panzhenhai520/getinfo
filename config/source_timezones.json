@@ -1,0 +1,53 @@
+{
+  "schema_version": "source-timezone-v1",
+  "notice": "源站发布时间的本地时区**显式声明表**：不做时区猜测。查不到声明时用 fallback_timezone（本项目全局展示时区，与各行业包 timezone 一致），并把实际使用的时区写进 articles.published_timezone，便于回溯与纠正。",
+  "lookup_order": ["publishers", "markets", "fallback_timezone"],
+  "fallback_timezone": "Asia/Hong_Kong",
+  "markets": {
+    "CN": "Asia/Shanghai",
+    "CN_FUND": "Asia/Shanghai",
+    "HK": "Asia/Hong_Kong",
+    "XHKG": "Asia/Hong_Kong",
+    "US": "America/New_York",
+    "EU": "Europe/Berlin",
+    "JP": "Asia/Tokyo",
+    "SG": "Asia/Singapore",
+    "GLOBAL": "Asia/Hong_Kong"
+  },
+  "publishers": {
+    "tmtpost.com": "Asia/Shanghai",
+    "cyzone.cn": "Asia/Shanghai",
+    "wallstreetcn.com": "Asia/Shanghai",
+    "dedicated.wallstreetcn.com": "Asia/Shanghai",
+    "36kr.com": "Asia/Shanghai",
+    "huxiu.com": "Asia/Shanghai",
+    "jiemian.com": "Asia/Shanghai",
+    "yicai.com": "Asia/Shanghai",
+    "cls.cn": "Asia/Shanghai",
+    "caixin.com": "Asia/Shanghai",
+    "chinaventure.com.cn": "Asia/Shanghai",
+    "stcn.com": "Asia/Shanghai",
+    "21jingji.com": "Asia/Shanghai",
+    "eastmoney.com": "Asia/Shanghai",
+    "xueqiu.com": "Asia/Shanghai",
+    "10jqka.com.cn": "Asia/Shanghai",
+    "pedaily.cn": "Asia/Shanghai",
+    "news.gov.hk": "Asia/Hong_Kong",
+    "hkma.gov.hk": "Asia/Hong_Kong",
+    "sfc.hk": "Asia/Hong_Kong",
+    "hkex.com.hk": "Asia/Hong_Kong",
+    "hkexnews.hk": "Asia/Hong_Kong",
+    "sec.gov": "America/New_York",
+    "federalreserve.gov": "America/New_York",
+    "ecb.europa.eu": "Europe/Berlin",
+    "mas.gov.sg": "Asia/Singapore"
+  },
+  "domain_suffixes": {
+    ".gov.cn": "Asia/Shanghai",
+    ".gov.hk": "Asia/Hong_Kong",
+    ".edu.cn": "Asia/Shanghai",
+    ".com.cn": "Asia/Shanghai",
+    ".cn": "Asia/Shanghai",
+    ".hk": "Asia/Hong_Kong"
+  }
+}

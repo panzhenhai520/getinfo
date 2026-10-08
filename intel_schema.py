@@ -205,6 +205,11 @@ def ensure_intel_event_tables(cursor) -> None:
             object TEXT NOT NULL DEFAULT '',
             entities_json TEXT NOT NULL DEFAULT '[]',
             event_time TEXT NOT NULL DEFAULT '',
+            -- 状态维度（阶段 7）：事件发生前后主体所处的状态。
+            -- "发布/处罚/获批"这类动作只说清发生了什么，说清"从什么变成什么"才能支持
+            -- 建图后的因果与趋势推理；抽不到就留空（绝不编造）。
+            state_before TEXT NOT NULL DEFAULT '',
+            state_after TEXT NOT NULL DEFAULT '',
             event_type TEXT NOT NULL DEFAULT 'other'
                 CHECK (event_type IN ('regulation','enforcement','release','market','transaction','other')),
             subject_type TEXT NOT NULL DEFAULT 'entity'
@@ -221,6 +226,12 @@ def ensure_intel_event_tables(cursor) -> None:
     )
     _ensure_column(
         cursor, "intel_article_events", "subject_type", "TEXT NOT NULL DEFAULT 'entity'"
+    )
+    _ensure_column(
+        cursor, "intel_article_events", "state_before", "TEXT NOT NULL DEFAULT ''"
+    )
+    _ensure_column(
+        cursor, "intel_article_events", "state_after", "TEXT NOT NULL DEFAULT ''"
     )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_intel_events_article "
@@ -259,6 +270,72 @@ def ensure_intel_subject_tables(cursor) -> None:
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_intel_subject_canonical_pack "
         "ON intel_subject_canonical(industry_pack_id, subject_text)"
+    )
+
+
+def ensure_intel_kg_tables(cursor) -> None:
+    """知识图谱派生表（阶段 8）：kg_nodes / kg_edges。
+
+    图是**派生视图**，源表（intel_article_events / intel_subject_canonical / intel_topics）
+    才是准；所以这里只存"归并结果 + 幂等键 + 来源指纹"，随时可以删表重建。
+    不引在线图数据库：PostgreSQL/SQLite 表 + 索引足够支撑邻域查询。
+
+      · 节点：实体（subject_key）与主题（topic_key）。
+      · 边：事件三元组（主体 → 客体），带 article_id / event_time / confidence / evidence_ref；
+        边身份 = (src, action, dst, article_id)，保证**同一篇文章重跑不产生重复边**。
+    """
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS kg_nodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            node_key TEXT NOT NULL,
+            node_type TEXT NOT NULL DEFAULT 'entity'
+                CHECK (node_type IN ('entity', 'topic')),
+            label TEXT NOT NULL DEFAULT '',
+            industry_pack_id TEXT NOT NULL DEFAULT '',
+            article_count INTEGER NOT NULL DEFAULT 0,
+            event_count INTEGER NOT NULL DEFAULT 0,
+            first_seen TEXT NOT NULL DEFAULT '',
+            last_seen TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            UNIQUE(industry_pack_id, node_type, node_key)
+        )
+        """
+    )
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS kg_edges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            edge_key TEXT NOT NULL,
+            src_key TEXT NOT NULL DEFAULT '',
+            dst_key TEXT NOT NULL DEFAULT '',
+            action TEXT NOT NULL DEFAULT '',
+            event_type TEXT NOT NULL DEFAULT 'other',
+            industry_pack_id TEXT NOT NULL DEFAULT '',
+            article_id INTEGER,
+            event_time TEXT NOT NULL DEFAULT '',
+            confidence REAL NOT NULL DEFAULT 0.5,
+            evidence_ref TEXT NOT NULL DEFAULT '',
+            state_before TEXT NOT NULL DEFAULT '',
+            state_after TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            UNIQUE(edge_key)
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kg_edges_src ON kg_edges(industry_pack_id, src_key)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kg_edges_dst ON kg_edges(industry_pack_id, dst_key)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kg_edges_time ON kg_edges(industry_pack_id, event_time)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kg_edges_article ON kg_edges(article_id)"
     )
 
 
@@ -448,6 +525,7 @@ def ensure_intel_core_tables(cursor) -> None:
     ensure_intel_trend_tables(cursor)
     ensure_intel_event_tables(cursor)
     ensure_intel_subject_tables(cursor)
+    ensure_intel_kg_tables(cursor)
     ensure_intel_article_field_tables(cursor)
     ensure_intel_report_candidate_tables(cursor)
     cursor.execute("CREATE TABLE IF NOT EXISTS intel_runtime_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT " + UTC_NOW_SQL + ")")

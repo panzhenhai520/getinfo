@@ -2093,6 +2093,34 @@
             font: inherit;
             font-size: 13px;
         }
+        /* 澄清闸门升级（阶段 5）：常用调整项一键可用，不必手打 */
+        .chat-plan-clarify {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: -4px 0 10px;
+            padding: 8px 9px;
+            border: 1px dashed rgba(29, 127, 104, 0.28);
+            border-radius: 8px;
+            background: rgba(250, 252, 250, 0.9);
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .chat-plan-clarify button {
+            border: 1px solid rgba(29, 127, 104, 0.24);
+            border-radius: 999px;
+            background: #fff;
+            color: #265b46;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 5px 11px;
+        }
+        .chat-plan-clarify button:hover {
+            background: #eef7f2;
+            border-color: rgba(29, 127, 104, 0.45);
+        }
         .chat-plan-actions[data-plan-actions="true"] {
             border-color: rgba(29, 127, 104, 0.36);
             background: rgba(236, 247, 240, 0.94);
@@ -7364,6 +7392,36 @@
             await node._planContinueGate.promise;
         }
 
+        // 暂停当前输出、进入"等待调整"状态（【调整思路】按钮与澄清选项条共用）。
+        function beginPlanAdjustment(node, question, planText, bar, placeholderText) {
+            resolvePlanContinueGate(node, { silent: true });
+            const pausedRunId = state.currentQaRunId || '';
+            state.pendingPlanAdjustment = { question, planText: cleanChatUiText(planText || ''), runId: pausedRunId, node };
+            state.chatStreamSerial += 1;
+            if (state.chatStreamController) {
+                try { state.chatStreamController.abort(); } catch (error) {}
+                state.chatStreamController = null;
+            }
+            node.dataset.streamFrozen = 'true';
+            node.dataset.planAwaitingAction = 'false';
+            node.dataset.adjustmentPaused = 'true';
+            clearChatProgress(node);
+            stopInlineAnswerProgress(node);
+            state.isStreaming = false;
+            const input = document.getElementById('chatInput');
+            const submitButton = document.querySelector('#chatForm .send-button');
+            const qaButton = document.getElementById('qaSaveOpenBtn');
+            input.disabled = false;
+            if (submitButton) submitButton.disabled = false;
+            if (qaButton) qaButton.disabled = false;
+            input.placeholder = placeholderText || '请补充你希望调整的回答思路，然后发送';
+            input.value = '';
+            input.focus();
+            if (bar) bar.innerHTML = '<span>已暂停当前输出；请输入调整意见，发送后会按新思路重新组织答案。</span>';
+            setStatus('已暂停当前输出，等待调整思路');
+            return input;
+        }
+
         function showPlanControlActions(node, question, planText) {
             if (!node || node.querySelector('[data-plan-actions="true"]')) return;
             resolvePlanContinueGate(node, { silent: true });
@@ -7376,6 +7434,17 @@
                 <span>系统会按上述思路继续生成，你也可以先调整。<b data-plan-countdown style="font-weight:500;color:#176f58;">5秒后自动继续</b></span>
                 <button type="button" data-plan-continue>继续</button>
                 <button type="button" data-plan-adjust>调整思路</button>
+            `;
+            // 澄清闸门升级（阶段 5）：不只"等着用户打字"，直接给 3 个常用调整项，
+            // 点一下就按同一套调整链路重新生成（走的是同一条 pendingPlanAdjustment 通路）。
+            const clarify = document.createElement('div');
+            clarify.className = 'chat-plan-clarify';
+            clarify.dataset.planClarify = 'true';
+            clarify.innerHTML = `
+                <span>常用调整：</span>
+                <button type="button" data-plan-chip="只看官方原文，逐段解释">逐段解释原文</button>
+                <button type="button" data-plan-chip="只看最近3个月的资料">只看最近3个月</button>
+                <button type="button" data-plan-chip="用表格对比不同来源的口径差异">用表格对比</button>
             `;
             const countdown = bar.querySelector('[data-plan-countdown]');
             const continueAt = Date.now() + 5000;
@@ -7393,35 +7462,29 @@
             bar.querySelector('[data-plan-continue]').addEventListener('click', () => {
                 resolvePlanContinueGate(node, { manual: true });
             });
-            bar.querySelector('[data-plan-adjust]').addEventListener('click', async () => {
-                resolvePlanContinueGate(node, { silent: true });
-                const pausedRunId = state.currentQaRunId || '';
-                state.pendingPlanAdjustment = { question, planText: cleanChatUiText(planText || ''), runId: pausedRunId, node };
-                state.chatStreamSerial += 1;
-                if (state.chatStreamController) {
-                    try { state.chatStreamController.abort(); } catch (error) {}
-                    state.chatStreamController = null;
-                }
-                node.dataset.streamFrozen = 'true';
-                node.dataset.planAwaitingAction = 'false';
-                node.dataset.adjustmentPaused = 'true';
-                clearChatProgress(node);
-                stopInlineAnswerProgress(node);
-                state.isStreaming = false;
-                const input = document.getElementById('chatInput');
-                const submitButton = document.querySelector('#chatForm .send-button');
-                const qaButton = document.getElementById('qaSaveOpenBtn');
-                input.disabled = false;
-                if (submitButton) submitButton.disabled = false;
-                if (qaButton) qaButton.disabled = false;
-                input.placeholder = '请补充你希望调整的回答思路，然后发送';
-                input.value = '';
-                input.focus();
-                bar.innerHTML = '<span>已暂停当前输出；请输入调整意见，发送后会按新思路重新组织答案。</span>';
-                setStatus('已暂停当前输出，等待调整思路');
+            bar.querySelector('[data-plan-adjust]').addEventListener('click', () => {
+                beginPlanAdjustment(node, question, planText, bar);
+            });
+            clarify.querySelectorAll('[data-plan-chip]').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const text = chip.getAttribute('data-plan-chip') || '';
+                    if (!text) return;
+                    const chips = node.querySelector('[data-plan-clarify="true"]');
+                    if (chips) chips.remove();
+                    const input = beginPlanAdjustment(node, question, planText, bar,
+                        '请补充你希望调整的回答思路，然后发送');
+                    input.value = text;
+                    const form = document.getElementById('chatForm');
+                    if (form && typeof form.requestSubmit === 'function') {
+                        form.requestSubmit();
+                    } else if (form) {
+                        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                    }
+                });
             });
             updateCountdown();
             node.appendChild(bar);
+            node.appendChild(clarify);
         }
 
         function chatEvidenceHint(event) {

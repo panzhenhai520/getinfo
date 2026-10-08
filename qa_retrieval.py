@@ -8,13 +8,223 @@ import hashlib
 import html
 import ipaddress
 import json
+import os
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Iterable, Mapping
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from intel_topics import _classification_admitted
 from qa_policy_evidence import detect_policy_anchors, infer_policy_document_metadata
+
+
+# ── 时间窗硬约束（阶段 4）─────────────────────────────────────────────────
+# 原实现只给"区间内"加 8 分、不做过滤：问"2026 年 1 月工信部说了什么"，
+# 2026-10-04 的新文照样能被选进证据。这里升级为「硬过滤 + 排序」双条件，
+# 并配一把可配的分级扩窗梯子：窗口内一条都没有时逐级放宽，
+# 每放宽一级都回报给用户（绝不静默给过期答案，也绝不静默滤空）。
+_DISPLAY_ZONE = "Asia/Hong_Kong"
+_LADDER_UNITS = {"d": 1, "w": 7, "m": 30, "y": 365}
+
+
+def _env_flag(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    return str(raw).strip().casefold() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int, low: int, high: int) -> int:
+    try:
+        value = int(str(os.getenv(name, str(default))).strip())
+    except (TypeError, ValueError):
+        value = default
+    return max(low, min(high, value))
+
+
+def _time_ladder() -> list:
+    """`QA_TIME_EXPAND_LADDER`（默认 3m,6m,1y）→ [90, 180, 365]，逐级放宽的天数。"""
+    raw = str(os.getenv("QA_TIME_EXPAND_LADDER", "3m,6m,1y") or "").strip()
+    steps = []
+    for token in raw.split(","):
+        token = token.strip().casefold()
+        match = re.fullmatch(r"(\d+)\s*([dwmy]?)", token)
+        if not match:
+            continue
+        days = int(match.group(1)) * _LADDER_UNITS.get(match.group(2) or "d", 1)
+        if days > 0 and days not in steps:
+            steps.append(days)
+    return sorted(steps) or [90, 180, 365]
+
+
+def _ladder_label(days: int) -> str:
+    if days % 365 == 0:
+        return "近 %d 年" % (days // 365)
+    if days % 30 == 0:
+        return "近 %d 个月" % (days // 30)
+    return "近 %d 天" % days
+
+
+def _zone(name: str):
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(name)
+    except Exception:
+        return timezone.utc
+
+
+def _parse_day(value) -> "date | None":
+    text = str(value or "").strip()
+    match = re.match(r"(\d{4})-(\d{2})-(\d{2})", text)
+    if not match:
+        return None
+    try:
+        return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return None
+
+
+def _article_day(row):
+    """文章"源站本地日期"；判断不了返回 None（None = 不参与硬过滤）。
+
+    约定与写入方一致：precision ∈ {date,day,url} 时 published_at_utc 前 10 位就是源站本地日期；
+    精确瞬间则换算到 published_timezone；precision='discovered'（只有抓取时间）一律视作未知。
+    """
+    precision = str(row.get("published_precision") or "").strip().casefold()
+    if precision == "discovered":
+        return None
+    instant = str(row.get("published_at_utc") or "").strip()
+    if instant:
+        if precision in {"date", "day", "url"} or "T" not in instant:
+            return _parse_day(instant)
+        parsed = None
+        try:
+            from financial_evidence import _parse_stored_datetime
+
+            parsed = _parse_stored_datetime(instant)
+        except Exception:
+            try:
+                parsed = datetime.fromisoformat(instant.replace("Z", "+00:00"))
+            except ValueError:
+                parsed = None
+        if parsed is None:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        zone = _zone(str(row.get("published_timezone") or "") or _DISPLAY_ZONE)
+        return parsed.astimezone(zone).date()
+    return _parse_day(row.get("publish_date"))
+
+
+def _window_days(time_window):
+    """时间窗口 → (起, 止) 两个"展示时区日期"；拿不到返回 None。"""
+    start = time_window.get("start")
+    end = time_window.get("end")
+    if not start or not end:
+        return None
+    zone = _zone(_DISPLAY_ZONE)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    return start.astimezone(zone).date(), end.astimezone(zone).date()
+
+
+def _item_day(item):
+    return item[5] if len(item) > 5 else None
+
+
+def _window_from_adjustment(plan: Mapping):
+    """用户在调整里明确给出的时间范围 → 检索窗口（阶段 5）；没有则返回 None。
+
+    plan 里存的是 ISO 字符串（plan 会进 SSE 事件，放 datetime 会序列化失败）。
+    """
+    adjustment = plan.get("time_window_adjustment") if isinstance(plan, Mapping) else None
+    if not isinstance(adjustment, Mapping):
+        return None
+    days = adjustment.get("days")
+    start = _parse_iso(str(adjustment.get("start") or ""))
+    end = _parse_iso(str(adjustment.get("end") or ""))
+    if start is None and end is None:
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            return None
+        if days <= 0:
+            return None
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=days)
+    if start is None:
+        start = (end or datetime.now(timezone.utc)) - timedelta(days=int(days or 30))
+    if end is None:
+        end = datetime.now(timezone.utc)
+    return {
+        "has_time": True,
+        "days": int(days or max(1, (end - start).days)),
+        "start": start,
+        "end": end,
+        "label": str(adjustment.get("label") or "用户指定的时间范围"),
+        "source": "user_adjustment",
+    }
+
+
+def _parse_iso(value: str):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def apply_time_gate(ranked, time_window, *, hard_filter=True, min_in_window=1, ladder=None):
+    """时间硬过滤 + 分级扩窗（阶段 4 核心，独立成函数便于单测）。
+
+    ranked 元素形如 (score, 排序日期, article_id, row, reason, 本地日期|None)。
+    规则：
+      1. 关掉硬过滤 / 问题没带时间 → 原样返回（退回旧的"只加权"行为）；
+      2. 先用问题窗口硬过滤；窗口内不足 min_in_window 条 → 按梯子逐级向前放宽
+         （默认 3 个月 → 6 个月 → 1 年）；
+      3. 本地日期未知的文章**不丢**，排在窗口内证据之后并计数——宁可少过滤，
+         也不静默丢证据。
+    返回 (保留条目, 回执 dict)；回执带 dropped_out_of_window / unknown_time_kept /
+    ladder_step / ladder_days / note，供上层原样回报给用户。
+    """
+    receipt = {"hard_filter": False, "ladder_step": 0, "ladder_days": 0,
+               "dropped_out_of_window": 0, "unknown_time_kept": 0, "note": ""}
+    if not hard_filter or not ranked or not time_window.get("has_time"):
+        return ranked, receipt
+    bounds = _window_days(time_window)
+    if bounds is None:
+        return ranked, receipt
+    start_day, end_day = bounds
+    known = [item for item in ranked if _item_day(item) is not None]
+    unknown = [item for item in ranked if _item_day(item) is None]
+    steps = [0] + list(ladder if ladder is not None else _time_ladder())
+    kept, used_days, used_step = [], 0, 0
+    for step_index, extra_days in enumerate(steps):
+        lower = start_day - timedelta(days=extra_days)
+        kept = [item for item in known if lower <= _item_day(item) <= end_day]
+        used_days, used_step = extra_days, step_index
+        if len(kept) >= int(min_in_window):
+            break
+    receipt.update({
+        "hard_filter": True,
+        "ladder_step": used_step,
+        "ladder_days": used_days,
+        "dropped_out_of_window": max(0, len(known) - len(kept)),
+        "unknown_time_kept": len(unknown),
+    })
+    if used_step > 0:
+        receipt["note"] = (
+            "在 %s 内的资料不足 %d 条，已把时间窗向前放宽到%s（时间窗内证据 %d 条）"
+            % (time_window.get("label") or "指定时间范围", int(min_in_window),
+               _ladder_label(used_days), len(kept))
+        )
+    return kept + unknown, receipt
 
 
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{1,48}|[\u3400-\u9fff]{2,24}")
@@ -471,7 +681,8 @@ def _policy_match_score(row: Mapping, spec: Mapping) -> tuple[float, list[str]]:
     return score, list(dict.fromkeys(reasons))
 
 
-def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, source_type: str = "article") -> dict:
+def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, source_type: str = "article",
+                      excerpt_chars: int = 5000) -> dict:
     article_id = int(row.get("id") or 0)
     content = " ".join(repair_mojibake(row.get("content") or row.get("preview") or "").split())
     policy_meta = infer_policy_document_metadata(row)
@@ -500,7 +711,7 @@ def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, s
         "source_type": source_type,
         "title": repair_mojibake(row.get("title") or "未命名文章")[:1000],
         "source_url": policy_url or article_url,
-        "content_excerpt": content[:5000],
+        "content_excerpt": content[:max(500, int(excerpt_chars or 5000))],
         "published_at": str(row.get("publish_date") or "") or None,
         "fetched_at": str(row.get("first_crawled") or "") or None,
         "article_id": article_id,
@@ -548,6 +759,7 @@ class ArticleRetriever:
                 """
                 SELECT a.id,a.title,a.url,a.domain,a.content,a.publish_date,a.first_crawled,
                        a.status,a.quality_score,a.content_length,
+                       a.published_at_utc,a.published_timezone,a.published_precision,
                        c.industry_pack_id,c.activation_id,c.score_details_json,
                        c.matched_keywords_json,c.topic_tags_json,c.final_category,
                        ard.doc_type AS policy_doc_type, ard.doc_no AS policy_doc_no,
@@ -678,6 +890,7 @@ class ArticleRetriever:
             SELECT a.id,a.title,COALESCE(NULLIF(ard.source_url,''),a.url) AS url,
                    a.domain,a.content,a.publish_date,a.first_crawled,a.status,
                    a.quality_score,a.content_length,
+                   a.published_at_utc,a.published_timezone,a.published_precision,
                    NULL AS industry_pack_id,NULL AS activation_id,NULL AS score_details_json,
                    NULL AS matched_keywords_json,NULL AS topic_tags_json,NULL AS final_category,
                    ard.doc_type AS policy_doc_type, ard.doc_no AS policy_doc_no,
@@ -813,10 +1026,8 @@ class ArticleRetriever:
         phrase_terms = _expand(_query_phrases(_qsrc))
 
         # 时间窗口：把「最近/最新/本周/本月/某年某月」落成明确区间。
-        # 时效是资讯类检索的第一要素，但原先时间词完全不参与检索，
-        # 导致 2026-01-21 的旧文和 2026-10-04 的新文在同一次打分里裸拼。
-        # 这里不做硬过滤（避免窗口判断错误时把答案整个滤空），
-        # 而是给区间内文章加权，并把区间与"是否已扩窗"回报给上层展示。
+        # 阶段 4 起：区间**参与硬过滤**（不再只是加权），并配分级扩窗梯子；
+        # 关掉 QA_TIME_HARD_FILTER 时完全回到旧的"只加权不过滤"行为。
         try:
             from qa_query_normalize import parse_time_window
 
@@ -824,22 +1035,29 @@ class ArticleRetriever:
         except Exception:
             _time_window = {"has_time": False, "days": None, "start": None, "end": None,
                             "label": "", "source": "none"}
+        # 用户调整里的时间范围**优先**于问题文本解析结果（阶段 5：调整要真的改变检索）。
+        _adjusted_window = _window_from_adjustment(plan)
+        if _adjusted_window is not None:
+            _time_window = _adjusted_window
+        _hard_filter = _env_flag("QA_TIME_HARD_FILTER", True)
+        _min_in_window = _env_int("QA_TIME_MIN_IN_WINDOW", 1, 1, 50)
+        # 全文通道（阶段 5）：用户要"全文/逐段解释"时，把证据正文扩到库里存的原文全文，
+        # 让生成端能逐段过；不新增网络依赖、不绕过证据闸门。
+        _need_fulltext = bool(plan.get("must_fetch_fulltext"))
+        _excerpt_chars = (
+            _env_int("QA_FULLTEXT_EXCERPT_CHARS", 12000, 5000, 40000) if _need_fulltext else 5000
+        )
         window_ids = set()
 
         def _in_window(row):
-            """文章是否落在时间区间内；无法判断时返回 None（不加权也不计缺失）。"""
+            """文章是否落在时间区间内；无法判断时返回 None（不参与硬过滤，也不加分）。"""
             if not _time_window.get("has_time") or _time_window.get("start") is None:
                 return None
-            raw = str(row.get("publish_date") or row.get("first_crawled") or "")[:10]
-            if len(raw) != 10 or raw[4] != "-":
+            bounds = _window_days(_time_window)
+            day = _article_day(row)
+            if bounds is None or day is None:
                 return None
-            try:
-                from datetime import date as _date
-
-                day = _date(int(raw[0:4]), int(raw[5:7]), int(raw[8:10]))
-            except (TypeError, ValueError):
-                return None
-            return _time_window["start"].date() <= day <= _time_window["end"].date()
+            return bounds[0] <= day <= bounds[1]
         amount_constraints = []
         for query in queries or [str(plan.get("question") or "")]:
             for item in _amount_constraints(query):
@@ -918,17 +1136,30 @@ class ArticleRetriever:
                 reasons.append(f"语义相似度 {semantic:.2f}")
             if in_window:
                 reasons.append("时间在问题指定的范围内")
-            ranked.append((score, str(row.get("publish_date") or row.get("first_crawled") or ""), article_id, row, "；".join(reasons) or "正文相关"))
+            ranked.append((score, str(row.get("publish_date") or row.get("first_crawled") or ""),
+                           article_id, row, "；".join(reasons) or "正文相关",
+                           _article_day(row)))
         ranked.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
         cap = max(1, min(int(limit or 12), 30))
-        for score, _date, article_id, row, reason in ranked:
+
+        # ── 时间硬过滤 + 分级扩窗（阶段 4）──
+        # ① 先用问题给的窗口硬过滤；② 窗口内不足 min_in_window 条时，按梯子
+        #    （默认 3 个月 → 6 个月 → 1 年）逐级向前放宽；③ 时间未知的文章**不丢**，
+        #    排在窗口内证据之后并在回执里计数——宁可少过滤，也不静默丢证据。
+        gated, gate_receipt = apply_time_gate(
+            ranked, _time_window, hard_filter=_hard_filter, min_in_window=_min_in_window
+        )
+        for score, _date, article_id, row, reason, _day in gated:
             if len(selected) >= cap:
                 break
-            selected.append(_article_evidence(row, score=score, method="hybrid" if article_id in semantic_scores else "keyword", reason=reason))
+            selected.append(_article_evidence(
+                row, score=score,
+                method="hybrid" if article_id in semantic_scores else "keyword",
+                reason=reason, excerpt_chars=_excerpt_chars))
             seen_articles.add(article_id)
         # 扩窗判定：问题带了时间、但区间内一条都没进证据 → 说明区间太窄，
-        # 此时已经退回全部历史资料（因为没做硬过滤），把这件事明确回报给上层，
-        # 由答复或追问告知用户"已扩大到全部历史"，而不是默默给一个过期答案。
+        # 把"放宽到了哪一级"明确回报给上层，由答复或追问告知用户，
+        # 而不是默默给一个过期答案。
         _tw_out = dict(_time_window)
         # 对外输出必须是 JSON 安全的：start/end 是 datetime，
         # 直接放进阶段结果/SSE 事件负载会让序列化失败（实测 level1_retrieval INTERNAL_ERROR）。
@@ -940,8 +1171,13 @@ class ArticleRetriever:
             1 for item in selected if int(item.get("article_id") or 0) in window_ids
         )
         _tw_out["in_window_adopted"] = _adopted_in_window
-        _tw_out["expanded"] = bool(_tw_out.get("has_time")) and _adopted_in_window == 0
-        if _tw_out["expanded"]:
+        _tw_out.update(gate_receipt)
+        _tw_out["expanded"] = bool(_tw_out.get("has_time")) and (
+            _adopted_in_window == 0 or gate_receipt["ladder_step"] > 0
+        )
+        if gate_receipt.get("note"):
+            _tw_out["note"] = gate_receipt["note"]
+        elif _tw_out["expanded"]:
             _tw_out["note"] = (
                 "在 %s 内没有找到直接证据，已自动扩大到全部历史资料"
                 % (_tw_out.get("label") or "指定时间范围")

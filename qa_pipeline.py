@@ -72,6 +72,11 @@ def _make_adjustment_parser(provider_registry):
                 "answer_strategy": "一句话说明如何按调整后的思路回答",
                 "format": "structured_text|table|brief",
                 "exclude_sections": ["可选"],
+                # 阶段 5：调整必须能改检索与输出形式，否则"逐段解释原文"这类要求落不了地
+                "retrieval_queries": ["要新增的专项检索式，最多 4 条；没有就留空数组"],
+                "time_window": {"label": "近 3 个月|2026 年 1 月", "days": 90},
+                "must_fetch_fulltext": "true|false，用户要看原文/全文/逐段解释时为 true",
+                "output_form": "paragraph_by_paragraph|structured_text|table|timeline|brief",
             },
         }
         system = (
@@ -79,6 +84,10 @@ def _make_adjustment_parser(provider_registry):
             "只输出一个 JSON 对象，不要 Markdown。"
             "如果用户要求只回答某个子问题，operation=filter，并填写已有 target_subquestions。"
             "如果用户增加例子、格式、顺序、排除内容，分别使用 augment/format/reorder/exclude。"
+            "如果用户要看原文/全文/逐段解释，把 output_form 设为 paragraph_by_paragraph、"
+            "must_fetch_fulltext 设为 true，并在 retrieval_queries 里给出能命中官方原文的专项检索式"
+            "（例如「政策全称 发文机关 发文字号 原文」）。"
+            "如果用户限定了时间范围，填写 time_window（相对说法给 days，绝对说法给 label）。"
             "不得创造不存在的 q 编号；不确定时使用 augment，并在 answer_strategy 中保守说明。"
         )
         raw = OpenAIJsonModelClient()(
@@ -494,6 +503,14 @@ def build_qa_stage_handlers(
         if callable(emit_stage_event) and question_plan:
             message = render_question_plan_status(question_plan)
             emit_stage_event("stage_progress", {"message": message, "question_plan": question_plan})
+            # 阶段 5 回执：把"你的调整被解析成了什么"直接告诉用户。
+            # 实测问题：调整只换了回答模板，用户看不到任何变化 → 以为系统没听懂。
+            receipt = question_plan.get("adjustment_receipt") or result.get("adjustment_receipt") or {}
+            if isinstance(receipt, Mapping) and receipt.get("summary"):
+                emit_stage_event("stage_progress", {
+                    "message": str(receipt["summary"]),
+                    "adjustment_receipt": dict(receipt),
+                })
             emit_stage_event("stage_progress", {"message": "正在检查本地 LLM 可用性；若响应过慢，将自动改用证据约束结果继续。", "stage": "prewarm"})
         _prewarm_synthesis_provider(context, reason="plan")
         return result
@@ -523,6 +540,11 @@ def build_qa_stage_handlers(
             "检索策略": question_plan.get("retrieval_strategy"),
             "回答大纲": question_plan.get("answer_outline"),
             "动态回答模板": question_plan.get("answer_template"),
+            # 阶段 5：调整落到检索与输出形式后，生成端必须真的照做
+            "输出形式": question_plan.get("output_form"),
+            "原文全文逐段": bool(question_plan.get("must_fetch_fulltext")),
+            "时间范围（用户调整）": question_plan.get("time_window"),
+            "调整回执": question_plan.get("adjustment_receipt"),
             "子问题": question_plan.get("subquestions"),
         }
         return standalone + "\n\n问题拆解与回答计划：" + json.dumps(summary, ensure_ascii=False)

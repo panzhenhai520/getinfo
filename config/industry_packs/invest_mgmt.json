@@ -1,0 +1,651 @@
+{
+  "brands": [
+    "华为投资控股有限公司",
+    "一汽股权投资（天津）有限公司",
+    "重庆渝富控股集团有限公司",
+    "国投创合基金管理有限公司",
+    "建信金融资产投资有限公司",
+    "无锡市创新投资集团有限公司",
+    "中银金融资产投资有限公司",
+    "浙江省创新投资集团有限公司",
+    "中国石化集团资本有限公司",
+    "中移资本控股有限责任公司",
+    "联通资本投资控股有限公司",
+    "山东省财金投资集团有限公司",
+    "山东省鲁信投资控股集团有限公司",
+    "中银集团投资有限公司",
+    "厦门金圆投资集团有限公司",
+    "上海浦东科创集团有限公司",
+    "广东省粤科金融集团有限公司",
+    "中国石油集团昆仑资本有限公司",
+    "腾讯投资",
+    "深圳市腾讯产业投资基金有限公司",
+    "中金基金管理有限公司",
+    "凯辉基金",
+    "国开金融有限责任公司",
+    "海尔集团公司",
+    "建信信托有限责任公司",
+    "华泰资产管理有限公司",
+    "宁波通商基金管理有限公司",
+    "深创投不动产基金管理（深圳）有限公司",
+    "盈峰控股集团有限公司",
+    "国科嘉和（北京）投资管理有限公司",
+    "诚通基金管理有限公司",
+    "合肥兴泰资本管理有限公司",
+    "歌斐资产管理有限公司",
+    "交通银行股份有限公司"
+  ],
+  "candidate_gate": {
+    "anchor_keywords": [
+      "私募基金管理人",
+      "创业投资基金",
+      "股权投资基金",
+      "产业投资基金",
+      "并购基金",
+      "母基金",
+      "基金备案",
+      "基金管理人登记",
+      "基金业协会",
+      "合伙协议",
+      "有限合伙",
+      "基金份额",
+      "基金合同",
+      "业绩报酬",
+      "管理费",
+      "投资协议",
+      "投资决策委员会"
+    ],
+    "entity_keywords": [
+      "中国证券投资基金业协会",
+      "中基协",
+      "中国证券监督管理委员会",
+      "证监会",
+      "国家金融监督管理总局",
+      "国务院国有资产监督管理委员会",
+      "国务院国资委",
+      "中华人民共和国财政部",
+      "国家发展和改革委员会",
+      "上海证券交易所",
+      "深圳证券交易所",
+      "北京证券交易所",
+      "全国社会保障基金理事会",
+      "中国保险资产管理业协会",
+      "中国证券业协会",
+      "中国银行业协会",
+      "国家集成电路产业投资基金",
+      "国家制造业转型升级基金",
+      "国家中小企业发展基金",
+      "华为投资控股",
+      "一汽股权投资",
+      "重庆渝富控股集团",
+      "国投创合基金管理",
+      "建信金融资产投资",
+      "无锡市创新投资集团",
+      "中银金融资产投资",
+      "浙江省创新投资集团",
+      "中国石化集团资本",
+      "中移资本控股",
+      "联通资本投资控股",
+      "山东省财金投资集团",
+      "山东省鲁信投资控股集团",
+      "中银集团投资",
+      "厦门金圆投资集团",
+      "上海浦东科创集团",
+      "广东省粤科金融集团",
+      "中国石油集团昆仑资本",
+      "腾讯投资",
+      "深圳市腾讯产业投资基金",
+      "中金基金管理",
+      "凯辉基金",
+      "国开金融",
+      "海尔集团",
+      "建信信托",
+      "华泰资产管理",
+      "宁波通商基金管理",
+      "深创投不动产基金管理",
+      "盈峰控股集团",
+      "国科嘉和",
+      "诚通基金管理",
+      "合肥兴泰资本管理",
+      "歌斐资产管理",
+      "交通银行"
+    ]
+  },
+  "capabilities": [
+    {
+      "enabled": true,
+      "implementation_status": "configured",
+      "key": "invest_mgmt_content_intelligence",
+      "name": "投资管理资讯聚合与分类"
+    }
+  ],
+  "classification": {
+    "core_weight": 3,
+    "event_weight": 2,
+    "expanded_weight": 1,
+    "llm_confidence_threshold": 0.65,
+    "minimum_relevance_score": 2,
+    "negative_weight": -3,
+    "recent_today_window_days": 5,
+    "recent_trend_window_days": 21,
+    "tie_break_order": [
+      "trend",
+      "event",
+      "other"
+    ],
+    "trend_weight": 2
+  },
+  "core_keywords": [
+    "投资管理",
+    "股权投资",
+    "创业投资",
+    "私募股权",
+    "私募基金",
+    "风险投资",
+    "VC",
+    "PE",
+    "母基金",
+    "政府引导基金",
+    "产业投资基金",
+    "基金管理人",
+    "基金管理",
+    "募资",
+    "投后管理",
+    "项目退出",
+    "耐心资本",
+    "长期资本",
+    "一级市场",
+    "产业投资",
+    "资本运作",
+    "国有资本投资运营"
+  ],
+  "crawl_schedule": {
+    "allow_continuous_dispatch": false,
+    "daily_times": [
+      "02:00"
+    ],
+    "enabled": true,
+    "max_sources_per_run": 45,
+    "polling_interval_minutes": 1440
+  },
+  "dashboard_capabilities": {
+    "show_financial_news": true,
+    "show_market_index_cards": true,
+    "show_spatiotemporal_map": false,
+    "show_watched_stock_cards": false
+  },
+  "dashboard_categories": [
+    {
+      "enabled": true,
+      "implementation_status": "configured",
+      "key": "invest_mgmt_industry_information",
+      "name": "投资管理行业信息"
+    }
+  ],
+  "default_market": "GLOBAL",
+  "default_sources": [
+    {
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "钛媒体",
+      "polling_interval_minutes": 720,
+      "publisher_key": "tmtpost.com",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.tmtpost.com/"
+    },
+    {
+      "authority_level": 2,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "华尔街见闻",
+      "polling_interval_minutes": 360,
+      "publisher_key": "dedicated.wallstreetcn.com",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://dedicated.wallstreetcn.com/"
+    },
+    {
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "创业邦",
+      "polling_interval_minutes": 720,
+      "publisher_key": "cyzone.cn",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.cyzone.cn/"
+    },
+    {
+      "name": "投中网 CVSource（RSSHub）",
+      "url": "http://10.88.0.1:1200/chinaventure/news",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "chinaventure.com.cn"
+    },
+    {
+      "name": "36氪快讯（RSSHub）",
+      "url": "http://10.88.0.1:1200/36kr/newsflashes",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 360,
+      "publisher_key": "36kr.com"
+    },
+    {
+      "name": "36氪热榜（RSSHub）",
+      "url": "http://10.88.0.1:1200/36kr/hot-list",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "36kr.com"
+    },
+    {
+      "name": "虎嗅（RSSHub）",
+      "url": "http://10.88.0.1:1200/huxiu/article",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "huxiu.com"
+    },
+    {
+      "name": "财新（RSSHub）",
+      "url": "http://10.88.0.1:1200/caixin/latest",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "caixin.com"
+    },
+    {
+      "name": "第一财经简报（RSSHub）",
+      "url": "http://10.88.0.1:1200/yicai/brief",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "yicai.com"
+    },
+    {
+      "name": "财联社热门（RSSHub）",
+      "url": "http://10.88.0.1:1200/cls/hot",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 360,
+      "publisher_key": "cls.cn"
+    },
+    {
+      "name": "华尔街见闻资讯（RSSHub）",
+      "url": "http://10.88.0.1:1200/wallstreetcn/news/global",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 2,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 360,
+      "publisher_key": "wallstreetcn.com"
+    },
+    {
+      "name": "钛媒体 RSS",
+      "url": "https://www.tmtpost.com/rss.xml",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "tmtpost.com"
+    },
+    {
+      "name": "界面新闻 RSS",
+      "url": "https://a.jiemian.com/index.php?m=article&a=rss",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "professional_trade_media",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "polling_interval_minutes": 720,
+      "publisher_key": "jiemian.com"
+    },
+    {
+      "name": "美国 SEC 新闻稿",
+      "url": "https://www.sec.gov/news/pressreleases.rss",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule"
+      ],
+      "polling_interval_minutes": 1440,
+      "publisher_key": "sec.gov",
+      "content_type": "official",
+      "language": "en",
+      "market": "US",
+      "expected_classifications": [
+        "event",
+        "trend",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss"
+    },
+    {
+      "name": "美联储货币政策新闻稿",
+      "url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_statistics"
+      ],
+      "polling_interval_minutes": 1440,
+      "publisher_key": "federalreserve.gov",
+      "content_type": "official",
+      "language": "en",
+      "market": "US",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss"
+    },
+    {
+      "name": "欧洲央行新闻",
+      "url": "https://www.ecb.europa.eu/rss/press.html",
+      "source_type": "rss",
+      "is_enabled": true,
+      "source_role": "government_regulator",
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_statistics"
+      ],
+      "polling_interval_minutes": 1440,
+      "publisher_key": "ecb.europa.eu",
+      "content_type": "official",
+      "language": "en",
+      "market": "EU",
+      "expected_classifications": [
+        "trend",
+        "event",
+        "other"
+      ],
+      "api_key_required": false,
+      "access_cost": "free_public_rss"
+    }
+  ],
+  "enabled": true,
+  "event_keywords": [
+    "IPO",
+    "上市",
+    "过会",
+    "注册生效",
+    "递表",
+    "完成募资",
+    "首关",
+    "终关",
+    "基金成立",
+    "基金备案",
+    "揭牌",
+    "签约",
+    "战略合作",
+    "增资",
+    "并购",
+    "收购",
+    "合并",
+    "股权转让",
+    "退出",
+    "减持",
+    "回购",
+    "清算",
+    "清算注销",
+    "人事变动",
+    "任免",
+    "换届",
+    "获批",
+    "落地"
+  ],
+  "expanded_keywords": [
+    "天使轮",
+    "种子轮",
+    "A轮",
+    "B轮",
+    "C轮",
+    "Pre-IPO",
+    "战略融资",
+    "尽职调查",
+    "估值",
+    "对赌",
+    "回购条款",
+    "投委会",
+    "投资决策委员会",
+    "项目储备",
+    "组合管理",
+    "LP出资",
+    "出资人",
+    "有限合伙",
+    "基金备案",
+    "管理人登记",
+    "返投",
+    "让利",
+    "容错机制",
+    "退出通道",
+    "并购重组",
+    "二手份额",
+    "S基金",
+    "S交易",
+    "FA",
+    "财务顾问",
+    "投资者关系",
+    "DPI",
+    "IRR",
+    "首关",
+    "终关",
+    "科创债",
+    "保险资金",
+    "社保基金"
+  ],
+  "fixed_topics": [
+    {
+      "key": "topic_1",
+      "keywords": [
+        "监管 / 新规 / 征求意见稿 / 自律处分 / 基金备案 / 基金管理人登记"
+      ],
+      "name": "监管与备案"
+    },
+    {
+      "key": "topic_2",
+      "keywords": [
+        "募资 / 基金成立 / 首关 / 终关 / LP出资 / 母基金"
+      ],
+      "name": "募资与基金设立"
+    },
+    {
+      "key": "topic_3",
+      "keywords": [
+        "IPO / 上市 / 过会 / 退出 / 减持 / 回购"
+      ],
+      "name": "退出与IPO"
+    }
+  ],
+  "id": "invest_mgmt",
+  "includes": [
+    {
+      "pack_id": "financial_markets",
+      "required": true
+    }
+  ],
+  "name": "投资管理",
+  "negative_keywords": [],
+  "pack_kind": "primary",
+  "pack_version": "1.1.0",
+  "ragflow_policy": {
+    "upload_crawled_articles": true,
+    "knowledge_base_key": "news",
+    "qa_retrieval_enabled": true
+  },
+  "schema_version": 3,
+  "serpapi_queries": [
+    "投资管理 行业 最新动态",
+    "私募股权 募资 最新",
+    "创业投资 投后管理 案例",
+    "政府引导基金 设立 公告",
+    "母基金 出资 LP 动态",
+    "私募基金管理人 备案 变更",
+    "基金业协会 自律处分",
+    "股权投资 项目退出 IPO",
+    "并购基金 设立 公告",
+    "耐心资本 政策 落地",
+    "国有资本投资运营 改革",
+    "S基金 二手份额 交易",
+    "私募股权 监管 新规",
+    "创投 税收优惠 政策",
+    "保险资金 股权投资 试点",
+    "华为投资控股 投资管理 动态",
+    "一汽股权投资 基金 设立",
+    "重庆渝富控股集团 股权投资 动态",
+    "国投创合基金管理 母基金 动态",
+    "建信金融资产投资 债转股 动态",
+    "无锡市创新投资集团 产业投资 动态",
+    "中银金融资产投资 股权投资 动态",
+    "浙江省创新投资集团 政府引导基金 动态",
+    "中国石化集团资本 产业投资基金 动态",
+    "中移资本控股 股权投资 动态",
+    "联通资本投资控股 基金 设立",
+    "山东省财金投资集团 母基金 动态",
+    "山东省鲁信投资控股集团 股权投资 动态",
+    "中银集团投资 股权投资 动态",
+    "厦门金圆投资集团 产业投资 动态",
+    "上海浦东科创集团 创业投资 动态",
+    "广东省粤科金融集团 创业投资 动态",
+    "中国石油集团昆仑资本 产业投资基金 动态",
+    "腾讯投资 股权投资 动态",
+    "深圳市腾讯产业投资基金 基金 备案",
+    "中金基金管理 基金 成立",
+    "凯辉基金 募资 动态",
+    "国开金融 股权投资 动态",
+    "海尔集团 产业投资 动态",
+    "建信信托 股权投资 动态",
+    "华泰资产管理 保险资金 股权投资",
+    "宁波通商基金管理 基金 设立",
+    "深创投不动产基金管理 基金 设立",
+    "盈峰控股集团 产业投资 动态",
+    "国科嘉和 创业投资 动态",
+    "诚通基金管理 基金 设立",
+    "合肥兴泰资本管理 母基金 动态",
+    "歌斐资产管理 募资 动态",
+    "交通银行 债转股 股权投资"
+  ],
+  "serpapi_query_gates": {},
+  "show_spatiotemporal_map": false,
+  "timezone": "Asia/Hong_Kong",
+  "topic_search_queries": {
+    "topic_1": [
+      "私募基金 备案 新规",
+      "基金业协会 自律处分",
+      "私募基金管理人 注销"
+    ],
+    "topic_2": [
+      "私募股权 募资",
+      "母基金 出资 LP",
+      "基金 设立 备案"
+    ],
+    "topic_3": [
+      "股权投资 项目退出",
+      "IPO 过会 私募股权",
+      "减持新规 创业投资"
+    ]
+  },
+  "trend_keywords": [
+    "监管",
+    "新规",
+    "征求意见稿",
+    "管理办法",
+    "指导意见",
+    "自律处分",
+    "行业报告",
+    "白皮书",
+    "募资规模",
+    "投资规模",
+    "退出数据",
+    "IPO收紧",
+    "注册制",
+    "减持新规",
+    "返投比例",
+    "让利政策",
+    "容错机制",
+    "长期资本入市",
+    "险资入市",
+    "国资布局",
+    "募资寒冬",
+    "行业洗牌",
+    "投资节奏",
+    "退出环境"
+  ],
+  "trend_topics": [
+    "国资与政府引导基金",
+    "一级市场募资趋势",
+    "退出通道（IPO/并购/回购）",
+    "S基金与二手份额交易",
+    "耐心资本与长期资本",
+    "硬科技与AI产业投资",
+    "并购重组与产业整合",
+    "投后管理与价值创造",
+    "跨境与出海投资",
+    "监管政策与合规",
+    "基金管理人洗牌与出清",
+    "保险资金与社保资金入市"
+  ]
+}

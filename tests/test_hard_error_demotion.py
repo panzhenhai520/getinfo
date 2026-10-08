@@ -30,6 +30,8 @@ class HardErrorClassificationTests(unittest.TestCase):
                 "sync_api_in_async",
             "No module named 'patchright'": "browser_engine_missing",
             "Read-only file system": "disk_or_permission",
+            # 出站策略拒了本机未放行的网段（本机 RSSHub 内网源在未放行的机器上必失败）
+            "UnsafeExternalURLError: 外部网址解析到受限网络地址": "restricted_network",
         }
         for text, expected in cases.items():
             with self.subTest(text=text[:40]):

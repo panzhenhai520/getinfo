@@ -93,6 +93,8 @@ class IntelStageOneTests(unittest.TestCase):
             "family_office": "2.2.0",
             "financial_markets": "2.0.0",
             "healthcare_news": "2.0.15",
+            # invest_mgmt 由"仅存在于已发布库"补成出厂种子：1.0.0 → 1.1.0（补 13 个实测可订阅 RSS）
+            "invest_mgmt": "1.1.0",
             "short_video_news": "2.0.0",
         }
         self.assertEqual(set(by_id), set(expected_versions))

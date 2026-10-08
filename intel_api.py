@@ -4388,6 +4388,47 @@ def rss_health_report():
         return _error("RSS 订阅体检失败", 500, request_id=request_id)
 
 
+@intel_bp.route("/knowledge-graph/neighborhood", methods=["GET"])
+@login_required
+def knowledge_graph_neighborhood():
+    """知识图谱邻域查询（阶段 8，只读）。
+
+    参数：entity（实体/主题名或 node_key）、industry_pack_id、depth（1~2，默认 1）、
+          since / until（YYYY-MM-DD，按事件时间过滤）、limit（默认 50，上限 200）。
+
+    返回 {success, request_id, industry_pack_id, node, neighbors, edges, stats}；
+    每条边都带 article_id / evidence_ref / event_time / confidence，可回溯到原始事件行与文章。
+    图是**派生视图**（源表为准），没有节点时返回 node=None 而不是报错。
+    """
+    request_id = _request_id()
+    try:
+        pack_id = _industry_pack_id(str(request.args.get("industry_pack_id") or ""))
+        entity = str(request.args.get("entity") or request.args.get("node_key") or "").strip()
+        if not entity:
+            return _error("缺少 entity 参数（实体或主题名称）", 400, request_id=request_id)
+        depth = coerce_int(request.args.get("depth"), 1, 1, 2)
+        limit = coerce_int(request.args.get("limit"), 50, 1, 200)
+        from kg_builder import KnowledgeGraphBuilder
+
+        result = KnowledgeGraphBuilder().neighborhood(
+            entity, pack_id=pack_id, depth=depth,
+            since=str(request.args.get("since") or ""),
+            until=str(request.args.get("until") or ""),
+            limit=limit,
+        )
+        return jsonify({
+            "success": True,
+            "request_id": request_id,
+            "industry_pack_id": pack_id,
+            "query": entity,
+            **result,
+        })
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("知识图谱邻域查询失败", 500, request_id=request_id)
+
+
 @intel_bp.route("/antibot/sources/<int:source_id>/recover", methods=["POST"])
 @admin_required
 def antibot_recover_source(source_id: int):

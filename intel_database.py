@@ -1100,6 +1100,8 @@ class IntelRepository:
                 str(e.get("object") or "")[:160],
                 json.dumps(e.get("entities") or [], ensure_ascii=False),
                 str(e.get("event_time") or "")[:20],
+                str(e.get("state_before") or "")[:120],
+                str(e.get("state_after") or "")[:120],
                 str(e.get("event_type") or "other"),
                 str(e.get("event_hash") or ""),
                 chash, model, now, now,
@@ -1116,9 +1118,9 @@ class IntelRepository:
                         """
                         INSERT INTO intel_article_events (
                             article_id, event_index, industry_pack_id, subject, subject_type, action, object,
-                            entities_json, event_time, event_type, event_hash,
+                            entities_json, event_time, state_before, state_after, event_type, event_hash,
                             content_hash, llm_model_id, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         rows,
                     )
@@ -1128,9 +1130,9 @@ class IntelRepository:
                         """
                         INSERT INTO intel_article_events (
                             article_id, event_index, industry_pack_id, subject, subject_type, action, object,
-                            entities_json, event_time, event_type, event_hash,
+                            entities_json, event_time, state_before, state_after, event_type, event_hash,
                             content_hash, llm_model_id, created_at, updated_at
-                        ) VALUES (?, 0, ?, '__no_event__', 'entity', '', '', '[]', '', 'other', '', ?, ?, ?, ?)
+                        ) VALUES (?, 0, ?, '__no_event__', 'entity', '', '', '[]', '', '', '', 'other', '', ?, ?, ?, ?)
                         """,
                         (int(article_id), pack, chash, model, now, now),
                     )
@@ -1291,7 +1293,11 @@ class IntelRepository:
         return result
 
     def list_event_subjects(self, *, pack_id: str = "") -> List[Dict]:
-        """返回该 pack 的所有 subject + 频次（供主体归并）。"""
+        """返回该 pack 的所有 subject + 频次（供主体归并）。
+
+        带 industry_pack_id：实体规范表是**按包隔离**的（UNIQUE(industry_pack_id, subject_text)），
+        全包归并时若丢掉包标识，映射会写成空包、下游（建图）就匹配不上。
+        """
         self._ensure()
         pack = str(pack_id or "").strip()
         pack_where = "AND e.industry_pack_id=?" if pack else ""
@@ -1301,12 +1307,13 @@ class IntelRepository:
             try:
                 cursor.execute(
                     f"""
-                    SELECT e.subject AS subject, COUNT(*) AS freq
+                    SELECT e.industry_pack_id AS industry_pack_id,
+                           e.subject AS subject, COUNT(*) AS freq
                     FROM intel_article_events e
                     JOIN articles a ON a.id=e.article_id AND a.status='active'
                     WHERE e.subject NOT IN ('__no_event__', '__error__') AND e.subject != ''
                     {pack_where}
-                    GROUP BY e.subject
+                    GROUP BY e.industry_pack_id, e.subject
                     """,
                     params,
                 )

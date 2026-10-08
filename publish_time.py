@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
@@ -249,6 +250,176 @@ def extract(
     if parsed[0]:
         return {"published_at": parsed[0], "precision": parsed[1], "source": "url"}
     return {"published_at": "", "precision": PRECISION_DISCOVERED, "source": "none"}
+
+
+# ── 落到 articles 的四个时间列（published_at_utc / timezone / precision / source）──
+# 时区必须**显式声明**（config/source_timezones.json），不做猜测：
+# 声明的时区决定"这一天的 00:00 对应哪个 UTC 瞬间"，实际用到的时区会写进
+# published_timezone，所以任何一条都能反推回源站本地日期。
+_TIMEZONE_CONFIG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "config", "source_timezones.json"
+)
+_TIMEZONE_CONFIG: Optional[Dict[str, Any]] = None
+
+# 历史值 → 本模块的精度口径（DB 里既有 day/datetime，也有 exact/date/url）
+_PRECISION_ALIASES = {
+    "exact": PRECISION_EXACT,
+    "datetime": PRECISION_EXACT,
+    "second": PRECISION_EXACT,
+    "date": PRECISION_DATE,
+    "day": PRECISION_DATE,
+    "url": PRECISION_URL,
+    "discovered": PRECISION_DISCOVERED,
+    "unknown": PRECISION_DISCOVERED,
+    "none": PRECISION_DISCOVERED,
+    "": "",
+}
+
+
+def _timezone_config() -> Dict[str, Any]:
+    global _TIMEZONE_CONFIG
+    if _TIMEZONE_CONFIG is None:
+        try:
+            with open(_TIMEZONE_CONFIG_PATH, "r", encoding="utf-8") as handle:
+                loaded = json.load(handle)
+            _TIMEZONE_CONFIG = loaded if isinstance(loaded, dict) else {}
+        except Exception:
+            _TIMEZONE_CONFIG = {}
+    return _TIMEZONE_CONFIG
+
+
+def normalize_precision(value: Any) -> str:
+    """把各种历史写法归一到 exact/date/url/discovered；不认识的一律当作未知。"""
+    return _PRECISION_ALIASES.get(str(value or "").strip().casefold(), "")
+
+
+def declared_timezone(*, publisher_key: str = "", domain: str = "", market: str = "") -> str:
+    """查显式声明的源站时区（publishers → markets → fallback）。查不到返回内核默认。"""
+    config = _timezone_config()
+    publishers = config.get("publishers") or {}
+    suffixes = config.get("domain_suffixes") or {}
+    for raw in (publisher_key, domain):
+        host = str(raw or "").strip().casefold().lstrip(".")
+        if host.startswith("www."):
+            host = host[4:]
+        if not host:
+            continue
+        if host in publishers:
+            return str(publishers[host])
+        for key, name in publishers.items():
+            key = str(key).casefold()
+            if host == key or host.endswith("." + key):
+                return str(name)
+        for suffix, name in suffixes.items():
+            if host.endswith(str(suffix).casefold()):
+                return str(name)
+    markets = config.get("markets") or {}
+    market_key = str(market or "").strip().upper()
+    if market_key and market_key in markets:
+        return str(markets[market_key])
+    return str(config.get("fallback_timezone") or "Asia/Hong_Kong")
+
+
+def _zone(name: str):
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(str(name))
+    except Exception:
+        pass
+    try:  # Windows 缺 tzdata 时退回 pytz
+        import pytz
+
+        return pytz.timezone(str(name))
+    except Exception:
+        return None
+
+
+def to_utc(value: Any, *, timezone_name: str = "") -> str:
+    """把"源站本地时间"归一成 published_at_utc。
+
+    与既有读取方约定一致（financial_evidence._article_time_interval /
+    financial_news_query._published_fields）：
+      · 只有日期（precision=date）→ 写成 `<本地日期>T00:00:00Z`：**前 10 位必须仍是源站本地日期**，
+        读取方配合 published_timezone 才能拼出"这一天的本地区间"；若换算成 UTC 会整体错一天。
+      · 带时分且带时区（`+08:00`/`Z`）→ 直接用自身时区换成真实 UTC 瞬间。
+      · 带时分但没写时区 → 按**显式声明**的源站时区解释，换算成真实 UTC 瞬间。
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    normalized = text.replace("/", "-").replace(" ", "T")
+    match = re.match(
+        r"^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T](\d{1,2}):(\d{2})(?::(\d{2}))?)?"
+        r"(Z|[+-]\d{2}:?\d{2})?",
+        normalized,
+    )
+    if not match:
+        return ""
+    try:
+        day = "%04d-%02d-%02d" % (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return ""
+    if not match.group(4):
+        # 只有日期：保留本地日期字面量
+        return f"{day}T00:00:00Z"
+    explicit_zone = match.group(7)
+    if explicit_zone:
+        moment = parse_iso_datetime(text)
+        if not moment[0]:
+            return ""
+        return moment[0] if moment[0].endswith("Z") else moment[0] + "Z"
+    zone = _zone(timezone_name)
+    if zone is None:
+        return ""
+    try:
+        local = datetime(
+            int(match.group(1)), int(match.group(2)), int(match.group(3)),
+            int(match.group(4)), int(match.group(5)), int(match.group(6) or 0),
+            tzinfo=zone,
+        )
+    except ValueError:
+        return ""
+    return local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def article_time_fields(
+    *,
+    published_at: Any,
+    precision: Any = "",
+    source: Any = "",
+    publisher_key: str = "",
+    domain: str = "",
+    market: str = "",
+) -> Dict[str, str]:
+    """把抽到的发布时间归一到 articles 的四个时间列（入库唯一收口调用）。
+
+    入参 published_at 允许是 `2026-10-07`、`2026-10-07T14:30:00`、
+    `2026-10-07T14:30:00+08:00`、`2026/10/07 14:30` 等形态。
+    """
+    text = str(published_at or "").strip()
+    fields = {
+        "published_at_utc": "",
+        "published_timezone": "",
+        "published_precision": normalize_precision(precision),
+        "published_time_source": str(source or "").strip(),
+    }
+    if not text:
+        return fields
+    has_time = bool(re.search(r"\d{1,2}:\d{2}", text))
+    if not fields["published_precision"]:
+        fields["published_precision"] = PRECISION_EXACT if has_time else PRECISION_DATE
+    zone_name = declared_timezone(
+        publisher_key=publisher_key, domain=domain, market=market
+    )
+    utc_text = to_utc(text, timezone_name=zone_name)
+    if utc_text:
+        fields["published_at_utc"] = utc_text
+        fields["published_timezone"] = zone_name
+        if not fields["published_time_source"]:
+            fields["published_time_source"] = "published_at"
+    return fields
 
 
 def prefer(current_at: str, current_precision: str, candidate: Dict[str, Any]) -> bool:

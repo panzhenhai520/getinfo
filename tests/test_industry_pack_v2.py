@@ -192,6 +192,7 @@ class IndustryPackV2Test(unittest.TestCase):
                 "education_news",
                 "family_office",
                 "healthcare_news",
+                "invest_mgmt",
                 "short_video_news",
             },
         )

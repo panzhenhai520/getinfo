@@ -146,5 +146,55 @@ class PreferTests(unittest.TestCase):
                                    {"published_at": "", "precision": pt.PRECISION_DISCOVERED}))
 
 
+class ArticleTimeFieldsTests(unittest.TestCase):
+    """入库唯一收口用的四个时间列（阶段 4：时间要能参与硬约束）。
+
+    约定（与读取方 financial_evidence / financial_news_query 一致）：
+      · precision ∈ {date, day, url} → published_at_utc 的**前 10 位必须是源站本地日期**，
+        读取方再配合 published_timezone 拼"那一天的本地区间"；换算成 UTC 会整体错一天。
+      · 带时分的精确时间 → 换成真实 UTC 瞬间。
+      · 时区取显式声明表 config/source_timezones.json，查不到用全局默认（不做本地时区猜测）。
+    """
+
+    def test_date_only_keeps_local_date_literal(self):
+        fields = pt.article_time_fields(published_at="2026-10-07", domain="tmtpost.com")
+        self.assertEqual(fields["published_at_utc"], "2026-10-07T00:00:00Z")
+        self.assertEqual(fields["published_timezone"], "Asia/Shanghai")
+        self.assertEqual(fields["published_precision"], pt.PRECISION_DATE)
+
+    def test_exact_time_with_declared_timezone_is_converted(self):
+        fields = pt.article_time_fields(published_at="2026-10-07T14:30:00", domain="tmtpost.com")
+        self.assertEqual(fields["published_at_utc"], "2026-10-07T06:30:00Z")
+        self.assertEqual(fields["published_precision"], pt.PRECISION_EXACT)
+
+    def test_explicit_offset_wins_over_declared_timezone(self):
+        fields = pt.article_time_fields(published_at="2026-10-07T14:30:00+08:00")
+        self.assertEqual(fields["published_at_utc"], "2026-10-07T06:30:00Z")
+
+    def test_market_and_suffix_declarations_are_used(self):
+        self.assertEqual(pt.declared_timezone(market="US"), "America/New_York")
+        self.assertEqual(pt.declared_timezone(domain="www.sec.gov"), "America/New_York")
+        self.assertEqual(pt.declared_timezone(domain="abc.gov.cn"), "Asia/Shanghai")
+        self.assertEqual(pt.declared_timezone(domain="who-knows.example"), "Asia/Hong_Kong")
+
+    def test_legacy_precision_vocabulary_is_normalised(self):
+        self.assertEqual(pt.normalize_precision("day"), pt.PRECISION_DATE)
+        self.assertEqual(pt.normalize_precision("datetime"), pt.PRECISION_EXACT)
+        self.assertEqual(pt.normalize_precision("weird"), "")
+
+    def test_existing_source_and_precision_are_preserved(self):
+        fields = pt.article_time_fields(
+            published_at="2026-10-05", precision="day",
+            source="crawl_watermark:high", domain="sec.gov")
+        self.assertEqual(fields["published_time_source"], "crawl_watermark:high")
+        self.assertEqual(fields["published_precision"], pt.PRECISION_DATE)
+        self.assertEqual(fields["published_timezone"], "America/New_York")
+
+    def test_empty_and_invalid_never_invent_a_time(self):
+        self.assertEqual(pt.article_time_fields(published_at="")["published_at_utc"], "")
+        self.assertEqual(pt.article_time_fields(published_at="2026-13-45")["published_at_utc"], "")
+        self.assertEqual(pt.article_time_fields(published_at="无日期")["published_at_utc"], "")
+
+
 if __name__ == "__main__":
     unittest.main()

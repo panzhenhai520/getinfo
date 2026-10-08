@@ -12,7 +12,7 @@ import hashlib
 import os
 import re
 import threading
-from datetime import datetime
+from datetime import date, datetime
 import config
 from utils import coerce_int, get_china_time, strip_url_presentation_params
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -42,6 +42,52 @@ def _add_parsed_keyword(target: set, keyword) -> None:
         clean = clean[3:].strip()
     if clean and not re.fullmatch(r'\d+', clean):
         target.add(clean)
+
+
+def _coerce_publish_date(value):
+    """把发布日期宽松地解析成 date（解析不出返回 None）。
+
+    为什么需要：RSS / JSON-LD 给的往往是带时分的 ISO 串（`2026-10-07T14:30:00+08:00`），
+    原实现只认 `%Y-%m-%d`，多一个时分就把整条日期丢成 None —— 实测 RSS 源因此大面积丢日期。
+    这里只取日期部分；精确瞬间由 publish_time.article_time_fields 落到 published_at_utc。
+    """
+    if value is None or value == '':
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    match = re.match(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})', text)
+    if not match:
+        return None
+    try:
+        return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return None
+
+
+def _article_time_fields(article_data: Dict, domain: str = '') -> Dict:
+    """算出要写进 articles 的发布时间列（published_at_utc / timezone / precision / source）。
+
+    任何异常都退回空字典，绝不因为时间归一失败而挡住入库。
+    """
+    try:
+        from publish_time import article_time_fields
+
+        return article_time_fields(
+            published_at=article_data.get('publish_date'),
+            precision=article_data.get('published_precision'),
+            source=article_data.get('published_time_source'),
+            publisher_key=str(article_data.get('publisher_key') or ''),
+            domain=str(article_data.get('domain') or '') or str(domain or ''),
+            market=str(article_data.get('market') or ''),
+        )
+    except Exception as exc:
+        print(f"⚠️ 发布时间归一失败（按原样入库）: {str(exc)[:120]}")
+        return {}
 
 
 def _parse_matched_keyword_text(value) -> List[str]:
@@ -1804,13 +1850,13 @@ class SQLiteDatabase:
                     content_markdown = _dedup_title_heading_lines(content_markdown, title)
                     
                     
-                    # 处理发布日期
-                    publish_date = article_data.get('publish_date')
-                    if publish_date and isinstance(publish_date, str):
-                        try:
-                            publish_date = datetime.strptime(publish_date, '%Y-%m-%d').date()
-                        except:
-                            publish_date = None
+                    # 处理发布日期（宽松解析：带时分的 ISO 串不再被丢掉，见 _coerce_publish_date）
+                    publish_date = _coerce_publish_date(article_data.get('publish_date'))
+
+                    # 发布时间归一（唯一入库收口）：publish_date 只有日期，而排序、时效判定、
+                    # 时间窗硬约束都需要可比较的瞬间。这里统一算出 published_at_utc /
+                    # published_timezone（时区取显式声明表 config/source_timezones.json，不猜）。
+                    _time_fields = _article_time_fields(article_data, domain)
                     
                     # ========== 🔥 多重去重检查 ==========
                     existing_id = None
@@ -1886,10 +1932,11 @@ class SQLiteDatabase:
                         fallback_trigger_reason, source_method, configured_url, resolved_target_url,
                         canonical_url, source_task_id, source_task_name,
                         first_crawled, last_crawled, created_at, updated_at,
-                        published_time_source, published_precision, raw_content, content_markdown
+                        published_time_source, published_precision, raw_content, content_markdown,
+                        published_at_utc, published_timezone
                     ) VALUES (
                         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?
+                        datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """
                     
@@ -1925,10 +1972,12 @@ class SQLiteDatabase:
                         article_data.get('source_task_name') or '',
                         china_time,
                         china_time,
-                        article_data.get('published_time_source') or '',
-                        article_data.get('published_precision') or '',
+                        _time_fields.get('published_time_source') or article_data.get('published_time_source') or '',
+                        _time_fields.get('published_precision') or article_data.get('published_precision') or '',
                         raw_content,
-                        content_markdown
+                        content_markdown,
+                        _time_fields.get('published_at_utc') or '',
+                        _time_fields.get('published_timezone') or ''
                     )
                     
                     # 框架页判废（最终入库闸门，所有入库路径共享）：
@@ -2099,14 +2148,13 @@ class SQLiteDatabase:
                     )
                     
                     
-                    # 处理发布日期
-                    publish_date = article_data.get('publish_date')
-                    if publish_date and isinstance(publish_date, str):
-                        try:
-                            publish_date = datetime.strptime(publish_date, '%Y-%m-%d').date()
-                        except:
-                            publish_date = None
-
+                    # 处理发布日期（与 insert_article 同一口径：带时分的 ISO 串不再丢失）
+                    publish_date = _coerce_publish_date(article_data.get('publish_date'))
+                    _time_fields = _article_time_fields(
+                        article_data,
+                        str(article_data.get('domain') or '')
+                        or self._extract_domain(str(article_data.get('url') or '')),
+                    )
                     matched_keywords = article_data.get('matched_keywords')
                     if isinstance(matched_keywords, list):
                         matched_keywords = ','.join(matched_keywords)
@@ -2193,6 +2241,22 @@ class SQLiteDatabase:
                             WHEN ? IS NULL OR ? = '' THEN canonical_url
                             ELSE ?
                         END,
+                        published_at_utc = CASE
+                            WHEN ? IS NULL OR ? = '' THEN published_at_utc
+                            ELSE ?
+                        END,
+                        published_timezone = CASE
+                            WHEN ? IS NULL OR ? = '' THEN published_timezone
+                            ELSE ?
+                        END,
+                        published_precision = CASE
+                            WHEN ? IS NULL OR ? = '' THEN published_precision
+                            ELSE ?
+                        END,
+                        published_time_source = CASE
+                            WHEN ? IS NULL OR ? = '' THEN published_time_source
+                            ELSE ?
+                        END,
                         crawl_count = crawl_count + 1,
                         last_crawled = datetime('now'),
                         updated_at = datetime('now', 'localtime')
@@ -2250,6 +2314,18 @@ class SQLiteDatabase:
                         article_data.get('canonical_url'),
                         article_data.get('canonical_url'),
                         article_data.get('canonical_url'),
+                        _time_fields.get('published_at_utc'),
+                        _time_fields.get('published_at_utc'),
+                        _time_fields.get('published_at_utc'),
+                        _time_fields.get('published_timezone'),
+                        _time_fields.get('published_timezone'),
+                        _time_fields.get('published_timezone'),
+                        _time_fields.get('published_precision') or article_data.get('published_precision'),
+                        _time_fields.get('published_precision') or article_data.get('published_precision'),
+                        _time_fields.get('published_precision') or article_data.get('published_precision'),
+                        _time_fields.get('published_time_source') or article_data.get('published_time_source'),
+                        _time_fields.get('published_time_source') or article_data.get('published_time_source'),
+                        _time_fields.get('published_time_source') or article_data.get('published_time_source'),
                         article_id
                     )
                     
