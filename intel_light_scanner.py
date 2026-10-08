@@ -28,9 +28,18 @@ from financial_rollout import rollout_capability_enabled
 try:
     # 反爬放弃策略：被拦截达阈值的信源不再派发扫描任务（识别器只做止损，不做绕过）
     from antibot_detector import should_skip_source as _should_skip_blocked_source
+    # 确定性硬错误（缺浏览器/异步里用同步 API/磁盘只读…）：第一次出现就止损
+    from antibot_detector import classify_hard_error as _classify_hard_error
+    from antibot_detector import record_source_hard_error as _record_source_hard_error
 except ImportError:  # pragma: no cover
     def _should_skip_blocked_source(metadata, settings=None) -> bool:
         return False
+
+    def _classify_hard_error(error_text: str) -> str:
+        return ""
+
+    def _record_source_hard_error(source_id, label, detail="", *, db=None):
+        return {"recorded": False}
 
 
 try:
@@ -890,6 +899,21 @@ class IntelLightScanner:
                     }
                 )
                 report["failed_count"] += 1
+                # 确定性硬错误（缺浏览器 / 异步里用同步 API / 磁盘只读…）：
+                # 重试一万次结果都一样，第一次出现就标记该信源并停止派发，同时留痕。
+                # 实测依据：A 机镜像缺 chromium-1091 导致 1588 次扫描一秒失败却长期无人发现。
+                try:
+                    _hard = _classify_hard_error(error_text)
+                    if _hard:
+                        stats["hard_error"] = _hard
+                        _record_source_hard_error(
+                            int(source["id"]), _hard, error_text,
+                            db=getattr(self.sources, "db", None),
+                        )
+                        print(f"🚫 信源 #{source['id']} 确定性失败（{_hard}），已标记停止派发",
+                              flush=True)
+                except Exception:
+                    pass
             duration_ms = round((time.monotonic() - run_started) * 1000)
             stats["metadata"] = {
                 "request_id": request_id,
@@ -1005,7 +1029,10 @@ class IntelLightScanner:
         # 只负责"发现 URL"：结果先入候选队列，后续仍走候选门禁（锚点/机构词 + 质量）→
         # 抓正文 → 分类 → 主题归属（由正文关键词决定，与搜索词无关）。
         # 模式：separate=每个关键词各搜一次（结果更全）；merged=多词 OR 合并成一次（省额度）。
-        if config.TAVILY_ENABLED and self.tavily.configured:
+        # include_serpapi=False 的语义是"本轮不要跑付费搜索源"——Tavily 同属付费搜索源，
+        # 过去不受这个开关约束（实测 A 机在 include_serpapi=False 时 Tavily 照样跑，
+        # 累计 5454 次"每轮调用上限已用完"），这里一并尊重该开关。
+        if include_serpapi and config.TAVILY_ENABLED and self.tavily.configured:
             run_started = time.monotonic()
             # 追踪词同样进 Tavily：与 SerpAPI 对称，保证"上周追踪"的线索一定有搜索覆盖
             queries = (_attention_watch_queries(industry_pack_id)

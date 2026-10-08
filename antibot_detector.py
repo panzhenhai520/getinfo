@@ -667,6 +667,105 @@ def source_health_report(db=None, *, limit: int = 200) -> Dict:
     }
 
 
+# ── 确定性硬错误：不是"被反爬"，而是环境/代码坏了 ──────────────────────
+# 这类错误**重试一万次结果都一样**，所以第一次出现就该止损并留痕。
+# 它们比"被反爬拦"更该先覆盖：反爬要靠累计次数判断，这里是确定性失败。
+# 实测依据（A 机 intel_scan_runs）：镜像缺浏览器导致 1588 次扫描一秒内失败，
+# 却长时间没人发现，产能一直在漏。
+HARD_ERROR_RULES = (
+    ("browser_missing", (
+        "executable doesn't exist",
+        "please run the following command to download new browsers",
+    )),
+    ("sync_api_in_async", ("sync api inside the asyncio loop",)),
+    ("browser_engine_missing", (
+        "playwright is not installed",
+        "no module named 'playwright'",
+        "no module named 'patchright'",
+    )),
+    ("disk_or_permission", ("read-only file system", "no space left on device")),
+)
+META_HARD_ERROR = "hard_error"
+META_HARD_ERROR_DETAIL = "hard_error_detail"
+META_HARD_ERROR_AT = "hard_error_at"
+
+
+def classify_hard_error(error_text: str) -> str:
+    """把确定性失败归类（返回标签）；不是硬错误返回空串。"""
+    text = str(error_text or "").casefold()
+    if not text:
+        return ""
+    for label, patterns in HARD_ERROR_RULES:
+        if any(pattern in text for pattern in patterns):
+            return label
+    return ""
+
+
+def record_source_hard_error(source_id, label: str, detail: str = "", *, db=None) -> Dict:
+    """确定性硬错误 → 第一次出现就把该信源标记为「不再派发任务」。
+
+    与反爬放弃策略共用同一套 metadata 键，所以扫描器的跳过判定
+    （should_skip_source）不需要任何改动就会生效；恢复也自动：
+    该信源某轮真的抓到内容时，record_source_success 会解除标记。
+    """
+    result: Dict = {"recorded": False}
+    try:
+        source_id = int(source_id or 0)
+        if source_id <= 0 or not label:
+            return result
+        from utils import get_china_time
+
+        if db is None:
+            from sqlite_database import sqlite_db
+
+            db = sqlite_db
+        db._ensure_connection()
+        with db.lock:
+            cursor = db.connection.cursor()
+            try:
+                row = cursor.execute(
+                    "SELECT metadata_json FROM intel_sources WHERE id=?", (source_id,)
+                ).fetchone()
+                if row is None:
+                    return result
+                try:
+                    metadata = json.loads((row["metadata_json"] if row else "") or "{}")
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    metadata = {}
+                now_text = get_china_time().strftime("%Y-%m-%d %H:%M:%S")
+                metadata[META_HARD_ERROR] = label
+                metadata[META_HARD_ERROR_DETAIL] = str(detail or "")[:400]
+                metadata[META_HARD_ERROR_AT] = now_text
+                metadata[META_STATUS] = "blocked"
+                metadata[META_REASON] = (
+                    f"确定性失败（{label}），第一次出现即停止派发；修复后抓到内容会自动恢复"
+                )
+                metadata[META_LAST_AT] = now_text
+                cursor.execute(
+                    "UPDATE intel_sources SET metadata_json=?, updated_at=? WHERE id=?",
+                    (json.dumps(metadata, ensure_ascii=False, sort_keys=True), now_text, source_id),
+                )
+                db.connection.commit()
+                result = {"recorded": True, "source_id": source_id, "label": label,
+                          "reason": metadata[META_REASON]}
+            finally:
+                cursor.close()
+    except Exception as exc:
+        print(f"[antibot] 硬错误标记写入失败（已忽略）: {type(exc).__name__}: {str(exc)[:160]}",
+              flush=True)
+    return result
+
+
+def source_hard_error(metadata: Optional[Mapping]) -> Dict:
+    """读出一条信源记录过的硬错误（供看板显示）。"""
+    meta = metadata or {}
+    return {
+        "label": str(meta.get(META_HARD_ERROR) or ""),
+        "detail": str(meta.get(META_HARD_ERROR_DETAIL) or ""),
+        "at": str(meta.get(META_HARD_ERROR_AT) or ""),
+    }
+
+
 def _vendor_label(vendor_id: str) -> str:
     try:
         vendor = load_antibot_rules()["vendors"].get(str(vendor_id)) or {}
