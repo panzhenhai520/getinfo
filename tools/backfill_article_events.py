@@ -114,6 +114,9 @@ def main(argv=None) -> int:
                              "到点就停并打印进度，下次重跑会自动接着跑（断点续跑）")
     parser.add_argument("--normalize-subjects", action="store_true",
                         help="抽完后跑实体归一（写 intel_subject_canonical）")
+    parser.add_argument("--refresh-attributes", action="store_true",
+                        help="补属性模式：对「抽过事件但没有属性行」的存量文章重抽"
+                             "（同一次调用同时刷新事件与属性，幂等）")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
     args = parser.parse_args(argv)
 
@@ -169,6 +172,9 @@ def main(argv=None) -> int:
     workers = max(1, min(int(args.workers), int(getattr(config, "INTEL_LLM_MAX_CONCURRENCY", 2))))
     batch_size = max(1, int(args.batch_size))
     target = int(args.until_coverage * state["active"]) if args.until_coverage else 0
+    refresh_attributes = bool(args.refresh_attributes)
+    if refresh_attributes:
+        print("模式：补属性（对象 = 抽过事件但还没有属性行的存量文章）")
 
     processed = succeeded = failed = events_total = 0
     batches = 0
@@ -191,9 +197,16 @@ def main(argv=None) -> int:
         if args.max_articles:
             remaining_budget = max(1, args.max_articles - processed)
         fetch = min(batch_size, remaining_budget) if remaining_budget else batch_size
-        batch = intel_repository.list_articles_missing_events(
-            pack_id=str(args.pack or ""), limit=fetch
-        )
+        if refresh_attributes:
+            # 补属性模式：对象是"抽过事件、但还没有属性行"的文章（存量文章在旧 prompt 下
+            # 只抽了事件）。同一次调用会同时刷新事件与属性，幂等。
+            batch = intel_repository.list_articles_missing_attributes(
+                pack_id=str(args.pack or ""), limit=fetch
+            )
+        else:
+            batch = intel_repository.list_articles_missing_events(
+                pack_id=str(args.pack or ""), limit=fetch
+            )
         if not batch:
             print("\n没有更多待抽取文章，停止。")
             break

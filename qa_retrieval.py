@@ -135,6 +135,230 @@ def _item_day(item):
     return item[5] if len(item) > 5 else None
 
 
+# ── 知识图谱证据通道（阶段 8 扩展）────────────────────────────────────────
+# 检索/推理必须**按边类型区分权重**：把"某模型是高精度的"（属性边）当成"发生了一件事"
+# （事件边）会让答案跑偏。所以这里按问题意图给两类边不同权重，并按有效期过滤属性边。
+_GRAPH_ATTRIBUTE_INTENT = (
+    "是什么", "属于", "定位", "状态", "现状", "是多少", "占比", "包括", "有哪些",
+    "有没有", "现在", "目前", "当前", "多少", "哪些",
+)
+_GRAPH_EVENT_INTENT = (
+    "发生", "动态", "最新", "变化", "进展", "时间线", "什么时候", "宣布", "发布",
+    "新规", "落地", "调整", "事件", "刚", "近期", "最近",
+)
+
+
+def graph_intent(question: str) -> dict:
+    """问题意图 → 两类边的权重（event / attribute）。
+
+    问"是什么/定位/现状" → 属性边为主；问"发生了什么/最新动态" → 事件边为主；
+    分不出或两者都有 → 都给较高权重（事件略高，因为新闻库以事件为主）。
+    """
+    text = str(question or "")
+    wants_attribute = any(word in text for word in _GRAPH_ATTRIBUTE_INTENT)
+    wants_event = any(word in text for word in _GRAPH_EVENT_INTENT)
+    if wants_attribute and not wants_event:
+        return {"event": 0.55, "attribute": 1.0}
+    if wants_event and not wants_attribute:
+        return {"event": 1.0, "attribute": 0.55}
+    return {"event": 1.0, "attribute": 0.8}
+
+
+def _graph_fact_text(edge: Mapping, src_label: str, dst_label: str) -> str:
+    """把一条边说成一句人话（送模型与展示共用同一句，避免两边口径不一致）。"""
+    kind = str(edge.get("relation_kind") or "event")
+    subject = src_label or str(edge.get("src_key") or "")
+    obj = dst_label or str(edge.get("dst_key") or "")
+    if kind == "attribute":
+        fact = "%s 的%s：%s" % (subject, str(edge.get("attr_key") or edge.get("action") or "属性"), obj)
+        window = []
+        if edge.get("valid_from"):
+            window.append("自 %s" % edge["valid_from"])
+        if edge.get("valid_to"):
+            window.append("至 %s" % edge["valid_to"])
+        if edge.get("as_of"):
+            window.append("截至 %s" % edge["as_of"])
+        if window:
+            fact += "（%s）" % "，".join(window)
+    else:
+        fact = "%s %s %s" % (subject, str(edge.get("action") or ""), obj)
+        if edge.get("event_time"):
+            fact += "（%s）" % edge["event_time"]
+        states = []
+        if edge.get("state_before"):
+            states.append(str(edge["state_before"]))
+        if edge.get("state_after"):
+            states.append(str(edge["state_after"]))
+        if len(states) == 2:
+            fact += "；状态：%s → %s" % (states[0], states[1])
+        elif states:
+            fact += "；状态：%s" % states[0]
+    quote = str(edge.get("evidence_quote") or "").strip()
+    if quote:
+        fact += "；原文：%s" % quote
+    return fact
+
+
+def graph_evidence(
+    plan: Mapping,
+    *,
+    industry_pack_id: str,
+    limit: int = 4,
+    builder=None,
+) -> dict:
+    """从知识图谱取证据（事件边 + 属性边），按意图加权、按有效期过滤。
+
+    为什么把它做成独立通道，而不是塞进文章打分里：
+      · 图的边是**派生事实**（一条边 = 一个可引用的判断），与"某篇文章相关"是两回事；
+      · 边的类型（event/attribute）决定它在不同问题下的价值，需要单独加权；
+      · 属性边必须按**有效期**判定"在查询时点是否成立"，这与文章时间窗不是一回事。
+
+    返回 {evidence: [...], stats: {...]}；图是派生视图，取不到就是空列表，绝不影响主检索。
+    """
+    stats = {"enabled": False, "edges": 0, "used": 0, "event": 0, "attribute": 0,
+             "filtered_by_validity": 0, "note": ""}
+    if not _env_flag("QA_GRAPH_EVIDENCE_ENABLED", True):
+        stats["note"] = "图证据通道已关闭（QA_GRAPH_EVIDENCE_ENABLED=0）"
+        return {"evidence": [], "stats": stats}
+    question = str(plan.get("question") or "")
+    queries = [str(item) for item in plan.get("queries") or []]
+    weights = graph_intent(" ".join([question, *queries]))
+
+    # 候选节点：行业包词表命中的实体 + 问题分词 + 政策锚点主体
+    candidates = []
+    candidates.extend(str(item) for item in plan.get("entities") or [])
+    candidates.extend(_semantic_anchor_terms([question, *queries]))
+    candidates.extend(_terms([question, *queries]))
+    try:
+        for anchor in (plan.get("policy_anchors") or {}).get("subjects") or []:
+            candidates.append(str(anchor))
+    except Exception:
+        pass
+    node_keys = []
+    for item in candidates:
+        key = _graph_node_key(item)
+        if key and key not in node_keys:
+            node_keys.append(key)
+    if not node_keys:
+        stats["note"] = "问题里没有可用于图检索的主体"
+        return {"evidence": [], "stats": stats}
+
+    try:
+        from kg_builder import KnowledgeGraphBuilder
+
+        graph = builder or KnowledgeGraphBuilder()
+        as_of = str(plan.get("as_of") or "")[:10]
+        rows = graph.edges_for_nodes(
+            node_keys, pack_id=str(industry_pack_id), as_of=as_of, limit=max(20, limit * 8))
+    except Exception as exc:
+        stats["note"] = "图查询失败（已忽略）：%s" % str(exc)[:80]
+        return {"evidence": [], "stats": stats}
+    stats["enabled"] = True
+    stats["edges"] = len(rows)
+
+    # 有效期过滤的条数（在 edges_for_nodes 里已剔除，这里补一个可解释的计数）
+    try:
+        all_rows = graph.edges_for_nodes(node_keys, pack_id=str(industry_pack_id),
+                                         limit=max(20, limit * 8))
+        stats["filtered_by_validity"] = max(0, len(all_rows) - len(rows))
+    except Exception:
+        pass
+
+    meta = {}
+    try:
+        meta = graph.article_meta([row.get("article_id") for row in rows])
+    except Exception:
+        meta = {}
+
+    scored = []
+    for edge in rows:
+        kind = str(edge.get("relation_kind") or "event")
+        weight = float(weights.get(kind, 0.5))
+        confidence = float(edge.get("confidence") or 0.5)
+        article = meta.get(int(edge.get("article_id") or 0)) or {}
+        # 权威度沿用来源文章（图本身不创造权威度），并压到证据契约允许的 0..100
+        authority = int(min(100, max(1, int(article.get("authority_level") or 0) or 50)))
+        score = round(100.0 * weight * confidence + authority * 0.1, 3)
+        scored.append((score, kind, edge, article))
+    scored.sort(key=lambda item: (-item[0], -float(item[2].get("confidence") or 0)))
+
+    evidence = []
+    for score, kind, edge, article in scored[: max(0, int(limit))]:
+        src_label = str(edge.get("src_key") or "")
+        dst_label = str(edge.get("attr_value") or edge.get("dst_key") or "")
+        try:
+            labels = graph._fetch(
+                "SELECT node_key, label FROM kg_nodes WHERE node_key IN (?, ?)",
+                (edge.get("src_key"), edge.get("attr_value") or edge.get("dst_key")),
+            )
+            label_map = {row["node_key"]: row["label"] for row in labels}
+            src_label = label_map.get(str(edge.get("src_key")), src_label) or src_label
+            dst_label = label_map.get(str(edge.get("attr_value") or edge.get("dst_key")), dst_label) or dst_label
+        except Exception:
+            pass
+        fact = _graph_fact_text(edge, src_label, dst_label)
+        edge_key = str(edge.get("edge_key") or "")
+        article_id = int(edge.get("article_id") or 0)
+        evidence.append({
+            "evidence_ref": f"edge:{edge_key}"[:200],
+            "source_type": "graph",
+            "title": ("图谱属性：" if kind == "attribute" else "图谱事件：") + fact[:180],
+            "source_url": str(article.get("url") or ""),
+            # 注意：article_id 刻意留空——图事实与它的源文章是**两条**证据，
+            # 填了会被上游按 article_id 去重，反而把全文文章挤掉（可回溯性靠 metadata）。
+            "article_id": None,
+            "content_excerpt": fact[:5000],
+            "published_at": str(article.get("publish_date") or "") or None,
+            "fetched_at": None,
+            "ragflow_kb_id": None,
+            "document_id": None,
+            "chunk_id": None,
+            "score": score,
+            "authority_level": int(min(100, max(1, int(article.get("authority_level") or 0) or 50))),
+            "retrieval_method": "graph_%s" % kind,
+            "match_reason": "知识图谱%s边（%s）" % (
+                "属性" if kind == "attribute" else "事件",
+                "主体命中问题：" + str(edge.get("src_key") or "")),
+            "relationship": "supports",
+            "metadata": {
+                "graph_edge_key": edge_key,
+                "relation_kind": kind,
+                "src_key": str(edge.get("src_key") or ""),
+                "dst_key": str(edge.get("dst_key") or ""),
+                "attr_key": str(edge.get("attr_key") or ""),
+                "attr_value": str(edge.get("attr_value") or ""),
+                "value_type": str(edge.get("value_type") or ""),
+                "valid_from": str(edge.get("valid_from") or ""),
+                "valid_to": str(edge.get("valid_to") or ""),
+                "as_of": str(edge.get("as_of") or ""),
+                "event_time": str(edge.get("event_time") or ""),
+                "event_type": str(edge.get("event_type") or ""),
+                "state_before": str(edge.get("state_before") or ""),
+                "state_after": str(edge.get("state_after") or ""),
+                "evidence_quote": str(edge.get("evidence_quote") or ""),
+                "article_id": article_id or None,
+                "article_url": str(article.get("url") or ""),
+                "article_title": str(article.get("title") or ""),
+            },
+        })
+    stats["used"] = len(evidence)
+    stats["event"] = sum(1 for item in evidence if item["metadata"]["relation_kind"] == "event")
+    stats["attribute"] = sum(1 for item in evidence if item["metadata"]["relation_kind"] == "attribute")
+    stats["weights"] = weights
+    if not evidence:
+        stats["note"] = "图中没有命中该主体的可用边（图谱覆盖率还低）"
+    return {"evidence": evidence, "stats": stats}
+
+
+def _graph_node_key(value: str) -> str:
+    """与 kg_builder._node_key 同一口径（去空白/括号/标点、小写）。"""
+    text = str(value or "").lower()
+    text = re.sub(r"\s+", "", text)
+    text = re.sub(r"[（(].*?[)）]", "", text)
+    text = re.sub(r"[^一-鿿a-z0-9]", "", text)
+    return text[:120]
+
+
 # 时间精度 → 给人看的一句话（前端引用/证据卡直接展示；不写"未知"就等于骗人）
 _PRECISION_LABELS = {
     "exact": "精确到时分",
@@ -1047,6 +1271,20 @@ class ArticleRetriever:
             if article_id:
                 seen_articles.add(article_id)
 
+        # ── 知识图谱证据（阶段 8 扩展）──
+        # 图事实（事件边/属性边）在这里并入证据池，但**占用名额受限**：
+        # 它不能把文章证据挤光（文章有全文，图事实只有一句话 + 回链）。
+        cap_for_graph = max(1, min(_env_int("QA_GRAPH_MAX_ITEMS", 4, 0, 20),
+                                   max(1, int(limit or 12) // 3)))
+        graph_result = graph_evidence(
+            plan, industry_pack_id=str(industry_pack_id),
+            limit=cap_for_graph,
+        ) if cap_for_graph else {"evidence": [], "stats": {"enabled": False, "note": "名额为 0"}}
+        for item in graph_result.get("evidence") or []:
+            selected.append(item)
+        graph_stats = dict(graph_result.get("stats") or {})
+        graph_stats["slot_cap"] = cap_for_graph
+
         queries = [str(item) for item in plan.get("queries") or [] if str(item).strip()]
         _qsrc = queries or [str(plan.get("question") or "")]
 
@@ -1231,8 +1469,10 @@ class ArticleRetriever:
             "queries": queries,
             "evidence": selected,
             "excluded": {**excluded, "page_context": page_denied, "policy_exact": policy_exact_audit},
-            "stats": {"eligible": len(rows), "adopted": len(selected), "keyword_candidates": len(ranked)},
+            "stats": {"eligible": len(rows), "adopted": len(selected),
+                      "keyword_candidates": len(ranked), "graph_adopted": graph_stats.get("used", 0)},
             "time_window": _tw_out,
+            "graph": graph_stats,
         }
 
 

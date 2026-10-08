@@ -127,7 +127,9 @@ EVIDENCE_SCHEMA = _strict_object(
         "evidence_ref": {"type": "string", "minLength": 1, "maxLength": 200},
         "source_type": {
             "type": "string",
-            "enum": ["page_context", "article", "ragflow_chunk", "web", "official"],
+            # graph = 知识图谱派生事实（事件边/属性边）。它指向源文章但**不是**文章本身，
+            # 所以与文章证据并存（见 qa_retrieval._graph_evidence 的说明）。
+            "enum": ["page_context", "article", "ragflow_chunk", "web", "official", "graph"],
         },
         "title": {"type": "string", "minLength": 1, "maxLength": 1000},
         "source_url": {"type": "string", "maxLength": 4000},

@@ -273,24 +273,86 @@ def ensure_intel_subject_tables(cursor) -> None:
     )
 
 
+def ensure_intel_attribute_tables(cursor) -> None:
+    """文章属性/状态断言表（阶段 8 扩展）：主系表与数值类陈述。
+
+    为什么要单独一张表：事件回答"发生了什么"（有动作、有变化），而
+    「最近生产的模型是高精度的模型，2027 年发布的模型是低延迟模型」这类句子陈述的是
+    **主体的属性/定位**——它没有动作，按事件口径只会被丢弃（实测模型直接返回 {"events":[]}），
+    但它恰恰是可检索、可推理的事实。这里按"主体-属性-值 + 有效期"落库：
+
+      subject / attribute / value          例如 某模型 / 精度定位 / 高精度
+      value_type                           name | code | quantity | text
+      valid_from / valid_to                有效期（文中没写就留空，不猜）
+      as_of                                断言成立的时点（"现在/截至目前"这类）
+      evidence_quote                       原文片段（可回溯，避免"张冠李戴"）
+    """
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS intel_article_attributes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            article_id INTEGER NOT NULL,
+            attr_index INTEGER NOT NULL DEFAULT 0,
+            industry_pack_id TEXT NOT NULL DEFAULT '',
+            subject TEXT NOT NULL DEFAULT '',
+            attribute TEXT NOT NULL DEFAULT '',
+            value TEXT NOT NULL DEFAULT '',
+            value_type TEXT NOT NULL DEFAULT 'text'
+                CHECK (value_type IN ('name', 'code', 'quantity', 'text')),
+            valid_from TEXT NOT NULL DEFAULT '',
+            valid_to TEXT NOT NULL DEFAULT '',
+            as_of TEXT NOT NULL DEFAULT '',
+            evidence_quote TEXT NOT NULL DEFAULT '',
+            content_hash TEXT NOT NULL DEFAULT '',
+            llm_model_id TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+            UNIQUE(article_id, attr_index)
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_attr_article "
+        "ON intel_article_attributes(article_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_attr_subject "
+        "ON intel_article_attributes(industry_pack_id, subject)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_attr_valid "
+        "ON intel_article_attributes(valid_from, valid_to)"
+    )
+
+
 def ensure_intel_kg_tables(cursor) -> None:
     """知识图谱派生表（阶段 8）：kg_nodes / kg_edges。
 
-    图是**派生视图**，源表（intel_article_events / intel_subject_canonical / intel_topics）
-    才是准；所以这里只存"归并结果 + 幂等键 + 来源指纹"，随时可以删表重建。
+    图是**派生视图**，源表（intel_article_events / intel_article_attributes /
+    intel_subject_canonical / intel_topics）才是准；所以这里只存"归并结果 + 幂等键"，
+    随时可以删表重建。
     不引在线图数据库：PostgreSQL/SQLite 表 + 索引足够支撑邻域查询。
 
-      · 节点：实体（subject_key）与主题（topic_key）。
-      · 边：事件三元组（主体 → 客体），带 article_id / event_time / confidence / evidence_ref；
-        边身份 = (src, action, dst, article_id)，保证**同一篇文章重跑不产生重复边**。
+      · 节点：实体（subject_key）、主题（topic_key）、**属性值**（value）。
+      · 边按 `relation_kind` 分三类，**检索时必须按类型给不同权重**（否则会把
+        "是高精度的"当成"发生了一件事"）：
+          event        事件边（有动作/有变化），带 event_time + state_before/after
+          attribute    属性/定位边（主系表、数值），带 attr_key/attr_value + valid_from/valid_to
+          cooccurrence 共现边（同框出现）——目前**不生成**，只预留类型
+      · 边身份：事件边 = (src, action, dst, article_id)；属性边额外带 attr_key，
+        保证同一篇文章里"同一主体的同一条属性"重跑不重复。
     """
+    # node_type 的 CHECK 需要容纳 'value'：老表（只允许 entity/topic）在 SQLite 上无法改 CHECK，
+    # 而图是可重建的派生表，所以检测到旧约束就整表重建（数据由归并任务重新生成）。
+    _drop_kg_tables_if_schema_outdated(cursor)
     cursor.execute(
         f"""
         CREATE TABLE IF NOT EXISTS kg_nodes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             node_key TEXT NOT NULL,
             node_type TEXT NOT NULL DEFAULT 'entity'
-                CHECK (node_type IN ('entity', 'topic')),
+                CHECK (node_type IN ('entity', 'topic', 'value')),
             label TEXT NOT NULL DEFAULT '',
             industry_pack_id TEXT NOT NULL DEFAULT '',
             article_count INTEGER NOT NULL DEFAULT 0,
@@ -312,11 +374,22 @@ def ensure_intel_kg_tables(cursor) -> None:
             dst_key TEXT NOT NULL DEFAULT '',
             action TEXT NOT NULL DEFAULT '',
             event_type TEXT NOT NULL DEFAULT 'other',
+            -- 边类型（阶段 8 扩展）：检索/推理按它给不同权重，绝不混用
+            relation_kind TEXT NOT NULL DEFAULT 'event'
+                CHECK (relation_kind IN ('event', 'attribute', 'cooccurrence')),
+            -- 属性边专用：属性名/值 + 有效期（可检索；空 = 文中没说，不猜）
+            attr_key TEXT NOT NULL DEFAULT '',
+            attr_value TEXT NOT NULL DEFAULT '',
+            value_type TEXT NOT NULL DEFAULT 'text',
+            valid_from TEXT NOT NULL DEFAULT '',
+            valid_to TEXT NOT NULL DEFAULT '',
+            as_of TEXT NOT NULL DEFAULT '',
             industry_pack_id TEXT NOT NULL DEFAULT '',
             article_id INTEGER,
             event_time TEXT NOT NULL DEFAULT '',
             confidence REAL NOT NULL DEFAULT 0.5,
             evidence_ref TEXT NOT NULL DEFAULT '',
+            evidence_quote TEXT NOT NULL DEFAULT '',
             state_before TEXT NOT NULL DEFAULT '',
             state_after TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
@@ -337,6 +410,47 @@ def ensure_intel_kg_tables(cursor) -> None:
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_kg_edges_article ON kg_edges(article_id)"
     )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kg_edges_kind "
+        "ON kg_edges(industry_pack_id, relation_kind)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kg_edges_attr "
+        "ON kg_edges(industry_pack_id, attr_key, dst_key)"
+    )
+
+
+def _drop_kg_tables_if_schema_outdated(cursor) -> None:
+    """图表的 schema 升级：检测到旧结构就整表重建。
+
+    图是**纯派生**数据（由 tools/build_knowledge_graph.py 从源表重新归并），
+    所以为了给 `node_type` 的 CHECK 加 'value'、或给 kg_edges 加 relation_kind 等列，
+    直接重建表是最省事且安全的选择；代价只是需要重跑一次归并任务。
+    """
+    try:
+        # 只看 kg_edges 自己的列（写成 node_key 会永远失败 → 每次启动都误判旧结构、
+        # 把图清空；这是实测踩到的坑）
+        cursor.execute("SELECT relation_kind FROM kg_edges WHERE 1=0")
+        has_relation_kind = True
+    except Exception:
+        has_relation_kind = False
+    if has_relation_kind:
+        return
+    try:
+        cursor.execute("SELECT COUNT(*) AS n FROM kg_edges")
+        row = cursor.fetchone()
+        existing = int((row["n"] if hasattr(row, "keys") else row[0]) or 0)
+    except Exception:
+        existing = 0
+    # 只在确实存在旧表时重建，并明确打印（不静默丢数据）
+    if existing:
+        print("⚠️ kg 表是旧结构（缺 relation_kind），将整表重建；"
+              "旧数据 %d 条边可由 build_knowledge_graph.py 重新生成" % existing)
+    for table in ("kg_edges", "kg_nodes"):
+        try:
+            cursor.execute("DROP TABLE IF EXISTS %s" % table)
+        except Exception:
+            pass
 
 
 def ensure_intel_core_tables(cursor) -> None:
@@ -525,6 +639,7 @@ def ensure_intel_core_tables(cursor) -> None:
     ensure_intel_trend_tables(cursor)
     ensure_intel_event_tables(cursor)
     ensure_intel_subject_tables(cursor)
+    ensure_intel_attribute_tables(cursor)
     ensure_intel_kg_tables(cursor)
     ensure_intel_article_field_tables(cursor)
     ensure_intel_report_candidate_tables(cursor)

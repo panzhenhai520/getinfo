@@ -56,6 +56,10 @@ def main(argv=None) -> int:
     parser.add_argument("--depth", type=int, default=1, help="邻域跳数（1~2）")
     parser.add_argument("--since", default="", help="邻域时间过滤起点 YYYY-MM-DD")
     parser.add_argument("--until", default="", help="邻域时间过滤终点 YYYY-MM-DD")
+    parser.add_argument("--relation-kind", default="", choices=["", "event", "attribute"],
+                        help="只看某一类边（event / attribute）")
+    parser.add_argument("--as-of", default="",
+                        help="查询时点：属性边按有效期过滤（YYYY-MM-DD）")
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
@@ -72,10 +76,14 @@ def main(argv=None) -> int:
         result = builder.neighborhood(
             args.neighborhood, pack_id=args.pack, depth=args.depth,
             since=args.since, until=args.until, limit=args.limit,
+            relation_kind=str(args.relation_kind or ""), as_of=str(args.as_of or ""),
         )
         node = result.get("node") or {}
         print("=" * 88)
-        print("邻域查询：%s（%s，%d 跳）" % (args.neighborhood, args.pack or "全部包", result["stats"]["depth"]))
+        print("邻域查询：%s（%s，%d 跳%s%s）"
+              % (args.neighborhood, args.pack or "全部包", result["stats"]["depth"],
+                 "，只看" + args.relation_kind + "边" if args.relation_kind else "",
+                 "，时点 " + args.as_of if args.as_of else ""))
         print("=" * 88)
         print("中心节点：%s [%s] 文章 %s 篇 / 事件 %s 条 / 时间 %s ~ %s"
               % (node.get("label") or "（不在图中）", node.get("node_type") or "-",
@@ -85,9 +93,17 @@ def main(argv=None) -> int:
         for edge in result["edges"][:30]:
             arrow = "→" if edge["src_key"] == node.get("node_key") else "←"
             other = edge["dst_key"] if arrow == "→" else edge["src_key"]
-            print("   %s %s %s %s | %s | conf=%.2f | %s"
-                  % (edge["src_key"][:16], edge["action"][:12], arrow, other[:24],
-                     edge["event_time"] or "无时间", edge["confidence"], edge["evidence_ref"]))
+            kind = str(edge.get("relation_kind") or "event")
+            if kind == "attribute":
+                window = "%s~%s" % (edge.get("valid_from") or "-", edge.get("valid_to") or "-")
+                print("   [属性] %s --%s--> %s | 有效期 %s | conf=%.2f | %s"
+                      % (edge["src_key"][:16], str(edge.get("attr_key") or edge["action"])[:14],
+                         str(edge.get("attr_value") or other)[:24], window,
+                         edge["confidence"], edge["evidence_ref"]))
+            else:
+                print("   [事件] %s --%s--> %s | %s | conf=%.2f | %s"
+                      % (edge["src_key"][:16], edge["action"][:14], other[:24],
+                         edge["event_time"] or "无时间", edge["confidence"], edge["evidence_ref"]))
         print("\n邻居节点 %d 个" % len(result["neighbors"]))
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=1, default=str))
@@ -126,9 +142,12 @@ def main(argv=None) -> int:
         print("\n归并结果：")
 
     print("  源事件行: %d" % summary["events"])
+    print("  源属性行: %d" % summary.get("attributes", 0))
     print("  节点: %d（含主题 %d）" % (summary["nodes"], summary["topics"]))
-    print("  边: %d" % summary["edges"])
-    print("  边覆盖率（边/事件行）: %s"
+    print("  边: %d（事件 %d / 属性 %d）"
+          % (summary["edges"], summary.get("event_edges", summary["edges"]),
+             summary.get("attribute_edges", 0)))
+    print("  边覆盖率（事件边 / 事件行）: %s"
           % (("%.1f%%" % (summary["edge_coverage"] * 100)) if summary["edge_coverage"] is not None else "-"))
     print("  未映射到 canonical 的主体: %d 种，客体无法成键: %d 条"
           % (summary["unmapped_subjects"], summary["unmapped_objects"]))

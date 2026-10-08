@@ -1171,6 +1171,146 @@ class IntelRepository:
             finally:
                 cursor.close()
 
+    def replace_article_attributes(
+        self, *, article_id: int, content_hash: str, industry_pack_id: str,
+        attributes: List[Dict], llm_model_id: str = "",
+    ) -> int:
+        """幂等写入一篇文章的属性断言（DELETE+INSERT）。
+
+        0 条属性**不写占位行**：属性抽不到是常态（不是失败），不该污染表；
+        需要"是否已抽过"的判断走 intel_article_events 的占位行机制。
+        """
+        self._ensure()
+        now = utc_text()
+        pack = str(industry_pack_id or "")
+        chash = str(content_hash or "")
+        model = str(llm_model_id or "")
+        rows = []
+        seen = set()
+        for item in attributes or []:
+            subject = str(item.get("subject") or "").strip()
+            attribute = str(item.get("attribute") or "").strip()
+            value = str(item.get("value") or "").strip()
+            if not subject or not attribute or not value:
+                continue
+            key = (subject.casefold(), attribute.casefold(), value.casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append((
+                int(article_id), len(rows), pack,
+                subject[:120], attribute[:60], value[:160],
+                str(item.get("value_type") or "text"),
+                str(item.get("valid_from") or "")[:20],
+                str(item.get("valid_to") or "")[:20],
+                str(item.get("as_of") or "")[:20],
+                str(item.get("evidence_quote") or "")[:120],
+                chash, model, now, now,
+            ))
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                cursor.execute(
+                    "DELETE FROM intel_article_attributes WHERE article_id=?",
+                    (int(article_id),),
+                )
+                if rows:
+                    cursor.executemany(
+                        """
+                        INSERT INTO intel_article_attributes (
+                            article_id, attr_index, industry_pack_id, subject, attribute, value,
+                            value_type, valid_from, valid_to, as_of, evidence_quote,
+                            content_hash, llm_model_id, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        rows,
+                    )
+                self.db.connection.commit()
+                return len(rows)
+            finally:
+                cursor.close()
+
+    def list_articles_missing_attributes(
+        self, *, pack_id: str = "", limit: int = 20, max_chars: int = 8000,
+        require_events: bool = True,
+    ) -> List[Dict]:
+        """返回"抽过事件、但还没抽属性"的文章（用于给存量补属性）。
+
+        口径与 list_articles_missing_events 对齐（活跃 / 有包归属 / trend|event / 命中锚点），
+        多一个条件：该 content_hash 下还没有属性行。
+        """
+        self._ensure()
+        pack = str(pack_id or "").strip()
+        if pack:
+            pack_clause = "AND _c.industry_pack_id=?"
+            params: List = [int(max_chars), pack, int(limit)]
+        else:
+            pack_clause = ""
+            params = [int(max_chars), int(limit)]
+        event_clause = ""
+        if require_events:
+            event_clause = (
+                "AND EXISTS (SELECT 1 FROM intel_article_events e"
+                "            WHERE e.article_id=a.id"
+                "              AND e.content_hash = COALESCE(a.content_hash,'')"
+                "              AND e.subject NOT IN ('__error__'))"
+            )
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT a.id AS article_id, a.title,
+                           COALESCE(a.content_hash, '') AS content_hash,
+                           _c.industry_pack_id AS industry_pack_id,
+                           substr(COALESCE(a.content, ''), 1, ?) AS content
+                    FROM articles a
+                    JOIN article_intel_classifications _c ON _c.article_id=a.id
+                    WHERE a.status='active'
+                      AND COALESCE(a.content, '') != ''
+                      AND _c.final_category IN ('trend', 'event')
+                      {pack_clause}
+                      AND json_array_length(COALESCE(json_extract(_c.score_details_json, '$.hits.anchor'), '[]')) > 0
+                      {event_clause}
+                      AND NOT EXISTS (
+                          SELECT 1 FROM intel_article_attributes at
+                          WHERE at.article_id=a.id
+                            AND at.content_hash = COALESCE(a.content_hash, '')
+                      )
+                    ORDER BY a.id DESC
+                    LIMIT ?
+                    """,
+                    params,
+                )
+                return [dict(r) for r in cursor.fetchall()]
+            finally:
+                cursor.close()
+
+    def list_attribute_subjects(self, *, pack_id: str = "") -> List[Dict]:
+        """属性断言里的主体清单（供实体归一复用同一套 canonical 键）。"""
+        self._ensure()
+        pack = str(pack_id or "").strip()
+        pack_where = "AND at.industry_pack_id=?" if pack else ""
+        params: List = [pack] if pack else []
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT at.industry_pack_id AS industry_pack_id,
+                           at.subject AS subject, COUNT(*) AS freq
+                    FROM intel_article_attributes at
+                    JOIN articles a ON a.id=at.article_id AND a.status='active'
+                    WHERE at.subject != ''
+                    {pack_where}
+                    GROUP BY at.industry_pack_id, at.subject
+                    """,
+                    params,
+                )
+                return [dict(r) for r in cursor.fetchall()]
+            finally:
+                cursor.close()
+
     def aggregate_event_clusters(
         self, *, pack_id: str = "", days: int = 30,
         min_articles: int = 1, window: int = 7,

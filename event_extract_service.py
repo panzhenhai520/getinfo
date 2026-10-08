@@ -120,10 +120,12 @@ class EventExtractService:
         model_id = str(model_id or getattr(self.llm_client, "model_id", "") or "")
         article_pack_id = str(article.get("industry_pack_id") or pack_id)
         try:
-            events = self.llm_client.extract_events(
+            extracted = self.llm_client.extract_structured(
                 {"title": article.get("title") or "", "content": article.get("content") or ""},
                 self.pack_dict_for(article_pack_id, pack_dict),
             )
+            events = list((extracted or {}).get("events") or [])
+            attributes = list((extracted or {}).get("attributes") or [])
             self.repository.replace_article_events(
                 article_id=article["article_id"],
                 content_hash=str(article.get("content_hash") or ""),
@@ -131,6 +133,18 @@ class EventExtractService:
                 events=events,
                 llm_model_id=model_id,
             )
+            # 属性与事件同一次调用产出，一起落库（0 条也走 DELETE，保证幂等）
+            try:
+                self.repository.replace_article_attributes(
+                    article_id=article["article_id"],
+                    content_hash=str(article.get("content_hash") or ""),
+                    industry_pack_id=article_pack_id,
+                    attributes=attributes,
+                    llm_model_id=model_id,
+                )
+            except Exception as attr_exc:  # 属性写库失败绝不能影响事件
+                logger.warning("event_extract: 文章 %s 属性写库失败: %s",
+                               article.get("article_id"), attr_exc)
             return "ok", len(events)
         except Exception as exc:  # 单篇失败：记占位行，继续
             logger.warning("event_extract: 文章 %s 失败: %s", article.get("article_id"), exc)
