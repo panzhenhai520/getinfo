@@ -1,22 +1,41 @@
 # -*- coding: utf-8 -*-
 
-"""T4.3 反爬处理宪法：简单朴实、不绕开反爬。
+"""T4.3 反爬处理宪法（2026-10-08 按产品决策修订）。
 
 降级链（统一决策，任何新增抓取路径都必须走这里）：
   1. 常规解析（限速、退避、robots 尊重、条件请求）；
   2. 动态列表页 → VPN run(mode='list')；
   3. 详情页解析失败/403/验证码 → VPN OCR（截图→OCR→LLM，extraction_method='vpn_ocr'）；
   4. 仍失败 → 记录 last_error，停止硬攻，等下一轮。
-反爬状态码（403/406/412/429/503 等）自动对域名降频退避（指数退避窗口），
-绝不开发/启用隐身、指纹伪装、验证码破解、代理轮换等绕过手段。
-patchright 只作普通浏览器渲染（新代码不得加载对抗类插件）。
+反爬状态码（403/406/412/429/503 等）自动对域名降频退避（指数退避窗口）。
 
-2026-10-07 补充：新增 antibot_detector.py + config/antibot_rules.json，用来**识别
-是谁拦了我们**，并据此止损（跳过无效引擎、把一直抓不到的信源从轮询里摘出去、
-把爬取槽位还给能出正文的信源）。识别器本身不提供任何绕过能力：
-  · 验证码型（Turnstile/极验/reCAPTCHA/hCaptcha）判定为「需要人工」，直接停止重试；
-  · JS 传感器型（DataDome/Kasada/PerimeterX/瑞数…）只用于跳过无效的 curl_cffi 梯队；
-  · stealth_self_check() 只做指纹漏点自检，用于发现问题，不得用于增加伪装。
+【当前边界（产品负责人 2026-10-08 决策，取代原「绝不启用隐身/指纹伪装/验证码破解」表述）】
+原表述与代码现状早已不符（cloudflare_bypass 一直在轮换 curl_cffi 浏览器指纹；
+Scrapling 的隐身后端就是 patchright——一个专门去除自动化痕迹的 Chromium），
+按现状重新划界如下：
+
+  ✅ 允许：
+    · 隐身浏览器渲染（Scrapling/patchright，即现有本地第一梯队）；
+    · HTTP/TLS 指纹（curl_cffi impersonate）；
+    · Cloudflare 挑战自动通行（Scrapling solve_cloudflare）；
+    · 页面改版自愈（adaptive selector）。
+  ⛔ 仍不允许：
+    · 轮换 IP 绕过封禁（被封就降频等待，靠已有的指数退避 + 信源级放弃止损）；
+    · 加载第三方对抗类浏览器插件。
+  ⚠️ 人机验证（reCAPTCHA / hCaptcha / 极验 等）：
+    产品口径为「只要不违反 robots.txt，能破就破」。但技术上目前无实现路径——
+    这些需要真实人工行为或付费打码服务，项目内没有也不打算内置；
+    antibot_detector 仍把它们判为「需要人工」并停止重试（因为没有可用手段，
+    空跑只是浪费爬取槽位）。若将来引入付费打码服务，需单独评估成本与合规。
+
+  robots 说明：robots.txt 与验证码是两回事——robots 是爬虫礼貌约定，
+  验证码是技术访问控制。本项目现状是「第一层尊重 robots，被 robots 拒绝时
+  走 VPN+OCR 兜底（该路径不检查 robots）」，此处如实记录，不再声称"尊重 robots"。
+
+2026-10-07 补充：antibot_detector.py + config/antibot_rules.json 用来**识别是谁拦了我们**
+并据此止损（跳过无效引擎、把一直抓不到的信源从轮询里摘出去、把爬取槽位还给能出正文的信源）：
+  · JS 传感器型（DataDome/Kasada/PerimeterX/瑞数…）用于跳过无效的 curl_cffi 梯队；
+  · stealth_self_check() 只做指纹漏点自检，用于发现问题。
 """
 
 import time
