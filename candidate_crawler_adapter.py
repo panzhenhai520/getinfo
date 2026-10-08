@@ -324,6 +324,28 @@ def _close_all_scrapling_sessions() -> None:
         _close_scrapling_session(session)
 
 
+def _stealth_kwargs() -> Dict:
+    """Scrapling 隐身抓取的统一参数（会话与一次性实例必须完全一致）。
+
+    2026-10-08 实测结论（A 机，真实被 Cloudflare 拦的 step.org）：
+      solve_cloudflare 对 Cloudflare 的 **managed Turnstile** 成功率为 0，
+      耗时从 6.3 秒涨到 41.8 秒（Scrapling 内部 10 秒等待 × 3 次重试后放弃）——
+      每个信源每次白烧 40 秒爬取预算。因此由 config.CRAWL_SCRAPLING_SOLVE_CLOUDFLARE
+      控制，默认关闭；确认到属于"纯 JS 计算型 interstitial"的信源再逐个放开。
+
+    人机验证（reCAPTCHA/hCaptcha/极验/DataDome/Kasada）一律不做、也不接付费打码服务：
+    它们依赖真人行为特征，由 antibot_detector 判为「需要人工」并直接放弃派发，
+    把爬取槽位省下来。
+    """
+    kwargs: Dict = {
+        "headless": True,
+        "network_idle": False,
+    }
+    if bool(getattr(config, "CRAWL_SCRAPLING_SOLVE_CLOUDFLARE", False)):
+        kwargs["solve_cloudflare"] = True
+    return kwargs
+
+
 def _scrapling_session():
     """取当前线程的 Scrapling 会话（没有就建一个），建不起来返回 None 由调用方降级。
 
@@ -343,7 +365,7 @@ def _scrapling_session():
         from scrapling.fetchers import StealthySession
         # Scrapling 的 timeout 单位是毫秒；15s 起步，避免拖慢兜底链路
         timeout_ms = max(5000, int((config.INTEL_SCAN_READ_TIMEOUT_SECONDS or 15) * 1000))
-        session = StealthySession(headless=True, timeout=timeout_ms)
+        session = StealthySession(timeout=timeout_ms, **_stealth_kwargs())
         session.start()
     except Exception as exc:
         _SCRAPLING_SESSION_STATS["create_failed"] += 1
@@ -856,9 +878,8 @@ class CandidateCrawlerAdapter:
                 fetcher = StealthyFetcher()
                 page = fetcher.fetch(
                     url,
-                    headless=True,
-                    network_idle=False,
                     timeout=_timeout_ms,
+                    **_stealth_kwargs(),
                 )
             except Exception as exc:
                 error = f"Scrapling 抓取失败: {sanitize_external_error(exc) or str(exc)}"

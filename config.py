@@ -397,6 +397,20 @@ BUZZING_RADAR_CACHE_SECONDS = _env_int('BUZZING_RADAR_CACHE_SECONDS', 600, 0, 86
 BUZZING_RADAR_CONNECT_TIMEOUT_SECONDS = _env_int('BUZZING_RADAR_CONNECT_TIMEOUT_SECONDS', 10, 1, 60)
 BUZZING_RADAR_READ_TIMEOUT_SECONDS = _env_int('BUZZING_RADAR_READ_TIMEOUT_SECONDS', 60, 5, 300)
 
+# Scrapling 隐身抓取：Cloudflare 挑战自动通行（solve_cloudflare）开关。
+# 开关化是为了能随时回退（改 .env 重启即可，不必重新发版）。
+#
+# ⚠️ 默认关闭，原因是实测数据（2026-10-08，A 机，真实被拦信源 step.org）：
+#     不开：HTTP 403 / 28811 字符 / 6.3 秒（仍是 Cloudflare 拦截页）
+#     打开：HTTP 403 / 28811 字符 / 41.8 秒（Scrapling 日志：turnstile version
+#           "managed" → 10 秒等待 × 3 次 → Failed to solve the Cloudflare challenge）
+#   即：对 Cloudflare 的 **managed Turnstile** 成功率为 0，耗时涨 6.6 倍，
+#   每个信源每次白烧 40 秒爬取预算——与"节省产能"目标相反。
+#   它只对"纯 JS 计算型 interstitial 挑战"可能有效，而 managed 型需要真人行为特征
+#   （项目不接付费打码服务）。等确认到确实有信源属于 interstitial 型、且打开后
+#   成功率有提升，再按信源逐个放开；在那之前保持关闭。
+CRAWL_SCRAPLING_SOLVE_CLOUDFLARE = _env_bool('CRAWL_SCRAPLING_SOLVE_CLOUDFLARE', False)
+
 # 财经新闻刷新：默认关闭；即使开启也只提示"高级版本目前不支持"，不产生任何外部调用。
 FINANCIAL_NEWS_REFRESH_ENABLED = _env_bool('FINANCIAL_NEWS_REFRESH_ENABLED', False)
 
