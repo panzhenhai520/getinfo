@@ -45,6 +45,7 @@ def _coverage(db) -> dict:
             cur.execute(
                 "SELECT COUNT(DISTINCT e.article_id) AS n FROM intel_article_events e"
                 " JOIN articles a ON a.id=e.article_id WHERE a.status='active'"
+                "   AND e.subject NOT IN ('__no_event__', '__error__')"
             )
             covered = int(cur.fetchone()["n"] or 0)
             cur.execute(
@@ -136,7 +137,8 @@ def main(argv=None) -> int:
     print("=" * 88)
     print("事件抽取回填（阶段 7）")
     print("=" * 88)
-    print("活跃文章 %d 篇；已覆盖 %d 篇（%.1f%%）；占位行 %d；实体归一 %d 行；带状态字段的事件 %d 行"
+    print("活跃文章 %d 篇；**有事件**的 %d 篇（%.1f%%）；抽过但无事件（占位行）%d 篇；"
+          "实体归一 %d 行；带状态字段的事件 %d 行"
           % (state["active"], state["covered"],
              100.0 * state["covered"] / max(1, state["active"]),
              state["placeholders"], state["canonicals"], state["rows_with_state"]))
@@ -234,7 +236,7 @@ def main(argv=None) -> int:
     })
     print("\n本次：处理 %d 篇（成功 %d / 失败 %d），新增事件 %d 条，用时 %.1f 秒"
           % (processed, succeeded, failed, events_total, summary["elapsed_seconds"]))
-    print("活跃文章事件覆盖率：%d/%d = %.1f%%（回填前 %.1f%%）"
+    print("活跃文章**事件覆盖率**：%d/%d = %.1f%%（回填前 %.1f%%；口径不含占位行）"
           % (after["covered"], after["active"],
              100.0 * after["covered"] / max(1, after["active"]),
              100.0 * state["covered"] / max(1, state["active"])))
