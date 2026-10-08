@@ -1,0 +1,110 @@
+[
+ {
+  "id": "e1",
+  "question": "比亚迪最近有什么动态？",
+  "kind": "event",
+  "industry_pack_id": "automotive_industry",
+  "expect_terms": [
+   "比亚迪"
+  ]
+ },
+ {
+  "id": "e2",
+  "question": "蔚来最近有什么动态？",
+  "kind": "event",
+  "industry_pack_id": "automotive_industry",
+  "expect_terms": [
+   "蔚来"
+  ]
+ },
+ {
+  "id": "a3",
+  "question": "2027年发布的模型的模型定位是什么？",
+  "kind": "attribute",
+  "industry_pack_id": "ai_news",
+  "expect_terms": [
+   "2027年发布的模型"
+  ]
+ },
+ {
+  "id": "a4",
+  "question": "低延迟模型的应用场景是什么？",
+  "kind": "attribute",
+  "industry_pack_id": "ai_news",
+  "expect_terms": [
+   "低延迟模型"
+  ]
+ },
+ {
+  "id": "a5",
+  "question": "高精度模型的应用场景是什么？",
+  "kind": "attribute",
+  "industry_pack_id": "ai_news",
+  "expect_terms": [
+   "高精度模型"
+  ]
+ },
+ {
+  "id": "a6",
+  "question": "最近生产的模型的模型定位是什么？",
+  "kind": "attribute",
+  "industry_pack_id": "ai_news",
+  "expect_terms": [
+   "最近生产的模型"
+  ]
+ },
+ {
+  "id": "t7",
+  "question": "模型最近 90 天有什么新动态？",
+  "kind": "time_window",
+  "industry_pack_id": "education_news",
+  "expect_terms": [
+   "模型"
+  ]
+ },
+ {
+  "id": "t8",
+  "question": "智能驾驶最近 90 天有什么新动态？",
+  "kind": "time_window",
+  "industry_pack_id": "automotive_industry",
+  "expect_terms": [
+   "智能驾驶"
+  ]
+ },
+ {
+  "id": "t9",
+  "question": "家族办公室最近 90 天有什么新动态？",
+  "kind": "time_window",
+  "industry_pack_id": "family_office",
+  "expect_terms": [
+   "家族办公室"
+  ]
+ },
+ {
+  "id": "t10",
+  "question": "政策最近 90 天有什么新动态？",
+  "kind": "time_window",
+  "industry_pack_id": "family_office",
+  "expect_terms": [
+   "政策"
+  ]
+ },
+ {
+  "id": "t11",
+  "question": "报告最近 90 天有什么新动态？",
+  "kind": "time_window",
+  "industry_pack_id": "family_office",
+  "expect_terms": [
+   "报告"
+  ]
+ },
+ {
+  "id": "t12",
+  "question": "治理最近 90 天有什么新动态？",
+  "kind": "time_window",
+  "industry_pack_id": "family_office",
+  "expect_terms": [
+   "治理"
+  ]
+ }
+]

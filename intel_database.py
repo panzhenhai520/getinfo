@@ -1364,6 +1364,73 @@ class IntelRepository:
             "extra_if_widened": max(0, widened - base),
         }
 
+    def coverage_report(self, *, pack_id: str = "") -> Dict:
+        """覆盖率**双口径**（阶段 7 验收修正）。
+
+        旧口径：分母 = 全部活跃文章 —— 把"本来就没有事件的文章"（政策解读/科普/行情/
+        榜单/属性陈述）也算进分母，导致天花板只有 46%，60% 这条线永远够不到。
+        新口径：分母 = **趋势/事件类文章**（final_category in trend|event），
+        即"本来就该有事件的那类文章"；这才是"抽取有没有漏"的正确尺子。
+
+        分子给两个：只算事件（严格）与"有事件或有属性"（结构化）。
+        """
+        self._ensure()
+        pack = str(pack_id or "").strip()
+        pack_clause = "AND c.industry_pack_id=?" if pack else ""
+
+        def count(extra_sql: str, params: List) -> int:
+            with self.db.lock:
+                cursor = self.db.connection.cursor()
+                try:
+                    cursor.execute(extra_sql, tuple(params))
+                    row = cursor.fetchone()
+                    return int((row["n"] if hasattr(row, "keys") else row[0]) or 0)
+                finally:
+                    cursor.close()
+
+        has_events = (
+            "EXISTS (SELECT 1 FROM intel_article_events e WHERE e.article_id=a.id"
+            "        AND e.subject NOT IN ('__no_event__', '__error__'))"
+        )
+        has_attributes = (
+            "EXISTS (SELECT 1 FROM intel_article_attributes at WHERE at.article_id=a.id)"
+        )
+        base_from = (
+            "FROM articles a"
+            " LEFT JOIN article_intel_classifications c ON c.article_id=a.id"
+            " WHERE a.status='active' AND COALESCE(a.content, '') != ''"
+        )
+        params: List = [pack] if pack else []
+        scoped = f" AND c.final_category IN ('trend', 'event') {pack_clause}"
+
+        denom_all = count(f"SELECT COUNT(DISTINCT a.id) AS n {base_from}", params)
+        denom_scope = count(f"SELECT COUNT(DISTINCT a.id) AS n {base_from}{scoped}", params)
+        num_all = count(f"SELECT COUNT(DISTINCT a.id) AS n {base_from} AND {has_events}", params)
+        num_scope = count(f"SELECT COUNT(DISTINCT a.id) AS n {base_from}{scoped} AND {has_events}", params)
+        structured_all = count(
+            f"SELECT COUNT(DISTINCT a.id) AS n {base_from} AND ({has_events} OR {has_attributes})",
+            params)
+        structured_scope = count(
+            f"SELECT COUNT(DISTINCT a.id) AS n {base_from}{scoped}"
+            f" AND ({has_events} OR {has_attributes})", params)
+
+        def ratio(num: int, denom: int) -> float:
+            return round(num / float(denom), 4) if denom else 0.0
+
+        return {
+            "pack_id": pack or "*",
+            "denominator_all": denom_all,
+            "denominator_scope": denom_scope,
+            "events_all": num_all,
+            "events_scope": num_scope,
+            "structured_all": structured_all,
+            "structured_scope": structured_scope,
+            "rate_events_all": ratio(num_all, denom_all),
+            "rate_events_scope": ratio(num_scope, denom_scope),
+            "rate_structured_all": ratio(structured_all, denom_all),
+            "rate_structured_scope": ratio(structured_scope, denom_scope),
+        }
+
     def aggregate_event_clusters(
         self, *, pack_id: str = "", days: int = 30,
         min_articles: int = 1, window: int = 7,

@@ -181,25 +181,49 @@ def main(argv=None) -> int:
               % (state["structured"],
                  100.0 * state["structured"] / max(1, state["active"]),
                  state.get("attributes", 0), state.get("attributes_with_validity", 0)))
+
+    # 覆盖率双口径（阶段 7 验收修正）：旧口径把"本来就没有事件的文章"也算进分母，
+    # 天花板只有 46%，60% 永远够不到；新口径的分母是"本来该有事件的那类文章"。
+    try:
+        cover = intel_repository.coverage_report(pack_id=str(args.pack or ""))
+        print("\n覆盖率双口径（阶段 7 验收用**新口径**）：")
+        print("  旧口径（分母=全部活跃文章）      %d/%d = %.1f%%"
+              % (cover["events_all"], cover["denominator_all"],
+                 100.0 * cover["rate_events_all"]))
+        print("  新口径（分母=趋势/事件类文章）    %d/%d = %.1f%%   ← 验收看这一行"
+              % (cover["events_scope"], cover["denominator_scope"],
+                 100.0 * cover["rate_events_scope"]))
+        print("  新口径·结构化（含属性）          %d/%d = %.1f%%"
+              % (cover["structured_scope"], cover["denominator_scope"],
+                 100.0 * cover["rate_structured_scope"]))
+        summary["coverage"] = cover
+    except Exception as exc:
+        print("\n[提示] 覆盖率双口径统计失败（不影响回填）：%s" % str(exc)[:120])
     print("待抽取（活跃 / 有包归属 / trend|event / 命中锚点 / 未抽过）: %d 篇" % eligible)
 
     # 覆盖率天花板账：让"要不要放宽准入"变成可决策的数字（实测产出率约 59%）
+    # 分子分母**都用新口径**：分母=趋势/事件类文章，分子=已有事件 + 0.59×新准入。
     try:
         admission = intel_repository.admission_report(pack_id=str(args.pack or ""))
+        cover = summary.get("coverage") or intel_repository.coverage_report(
+            pack_id=str(args.pack or ""))
         YIELD = 0.59  # 实测：送抽文章里约 59% 能抽出至少一个事件
-        ceiling = lambda n: 100.0 * min(1.0, (state["covered"] + YIELD * n) / max(1, state["active"]))  # noqa: E731
-        print("\n覆盖率天花板（按实测产出率 %.0f%% 估算）：" % (YIELD * 100))
-        print("  当前口径      准入 %5d 篇 → 天花板约 %.0f%%   （阶段 7 验收线 60%%）"
-              % (admission["base"], ceiling(admission["base"])))
-        print("  放宽锚点要求  准入 %5d 篇（+%d）→ 天花板约 %.0f%%"
-              % (admission["no_anchor"], admission["extra_if_no_anchor"],
-                 ceiling(admission["no_anchor"])))
-        print("  纳入 other 类 准入 %5d 篇（+%d）→ 天花板约 %.0f%%"
-              % (admission["with_other"], admission["extra_if_with_other"],
-                 ceiling(admission["with_other"])))
-        print("  两者都放宽    准入 %5d 篇（+%d）→ 天花板约 %.0f%%"
-              % (admission["widened"], admission["extra_if_widened"],
-                 ceiling(admission["widened"])))
+
+        def ceiling(extra_count: int, extra_denominator: int, label: str) -> str:
+            numerator = cover["events_scope"] + YIELD * extra_count
+            denominator = cover["denominator_scope"] + extra_denominator
+            return "  %-14s 准入 %5d 篇（其中新加入分母 %4d）→ 天花板约 %.0f%%" % (
+                label, extra_count, extra_denominator,
+                100.0 * min(1.0, numerator / max(1.0, denominator)))
+
+        print("\n覆盖率天花板（新口径：趋势/事件类为分母；按实测产出率 %.0f%% 估算）：" % (YIELD * 100))
+        print(ceiling(admission["base"], 0, "当前口径"))
+        print(ceiling(admission["no_anchor"], 0, "放宽锚点"))
+        print(ceiling(admission["with_other"], admission["extra_if_with_other"], "纳入 other 类"))
+        print(ceiling(admission["widened"], admission["extra_if_widened"], "两者都放宽"))
+        print("  验收线 60%：能否达成看上面四行（当前口径那行）")
+        print("  提示：新口径下分母只算"本来该有事件的文章"，因此 60% 是可达的；")
+        print("        旧口径（全部文章为分母）天花板只有 46%，不建议再作为验收线。")
         summary["admission"] = admission
     except Exception as exc:
         print("\n[提示] 准入阶梯统计失败（不影响回填）：%s" % str(exc)[:120])
