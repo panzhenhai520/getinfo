@@ -94,6 +94,21 @@ def serpapi_preview_gate(item: Dict, pack: Dict, query_text: str) -> bool:
     )
 
 
+def _listing_publish_time(text: str, url: str = "") -> str:
+    """从链接附近的文本 / URL 里抽发布时间（采集那一刻就写，不等事后回填）。
+
+    过去列表页扫描把 published_at 一律写成 None，而绝大多数信源是列表页——
+    这就是候选表里发布时间只有 2% 有值的直接原因。这里统一走 publish_time.py：
+    列表页日期（2026-10-07 / 2026年10月7日 / 3天前）> URL 里的日期 > 拿不到就留空。
+    """
+    try:
+        from publish_time import extract
+
+        return str(extract(listing_text=text, url=url).get("published_at") or "")
+    except Exception:
+        return ""
+
+
 def _filter_items_to_window(items: Iterable[Dict], start: str = '', end: str = '') -> List[Dict]:
     """Keep dated candidates inside an initialization window.
 
@@ -236,7 +251,8 @@ def _direct_link_extract(content: bytes | str, base_url: str, pattern: str, limi
             "url": target,
             "title": title[:1000],
             "summary": "",
-            "published_at": None,
+            # 采集时就写发布时间：href 附近那段文本（链接列表里日期常与标题同行）
+            "published_at": _listing_publish_time(window, target),
         })
         if len(results) >= limit:
             break
@@ -295,7 +311,13 @@ class ListPageScanner:
         summary = str(description_tag.get("content") or "").strip() if description_tag else ""
         if not title:
             return items
-        page_item = {"url": base_url, "title": title[:1000], "summary": summary[:5000], "published_at": None}
+        page_item = {
+            "url": base_url,
+            "title": title[:1000],
+            "summary": summary[:5000],
+            # 采集时就写发布时间（列表页本身也常是文章页：能抽到就带上）
+            "published_at": _listing_publish_time(summary, base_url),
+        }
         canonical = base_url.split("#", 1)[0]
         remaining = [item for item in items if str(item.get("url") or "").split("#", 1)[0] != canonical]
         return [page_item, *remaining][:limit]
@@ -363,7 +385,8 @@ class ListPageScanner:
                     "url": target,
                     "title": title[:1000],
                     "summary": parent_text[:5000],
-                    "published_at": None,
+                    # 采集时就写发布时间：链接所在节点（article/li/div）的文本里几乎都带日期
+                    "published_at": _listing_publish_time(parent_text, target),
                 }
             )
             if len(results) >= limit:
