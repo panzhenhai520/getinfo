@@ -11031,8 +11031,10 @@
 .tl-badge{display:inline-block;font-size:10px;line-height:1.7;padding:0 6px;border-radius:9999px;font-weight:600;white-space:nowrap}
 .tl-badge.future{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
 .tl-badge.inferred{background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc}
+.tl-badge.precision{background:#eef2f7;color:#475569;border:1px solid #cbd5e1;font-weight:500}
 body.skin-darkblue .tl-badge.future{background:rgba(251,191,36,.18);color:#fcd34d;border-color:rgba(251,191,36,.45)}
 body.skin-darkblue .tl-badge.inferred{background:rgba(129,140,248,.18);color:#a5b4fc;border-color:rgba(129,140,248,.45)}
+body.skin-darkblue .tl-badge.precision{background:rgba(148,163,184,.16);color:#cbd5e1;border-color:rgba(148,163,184,.4)}
 body.skin-darkblue .tl-time{color:#5eead4}
 .tl-topic{font-size:11px;background:#e6f2ef;color:#0f766e;padding:1px 6px;border-radius:4px;white-space:nowrap}
 .tl-body{min-width:0}
@@ -11128,7 +11130,7 @@ body.skin-darkblue .merged-sec-body{color:#dbeafe}
         var n = Math.round(h / ITEM);
         return Math.max(MIN, Math.min(MAX, n));
       }
-      var body=ev.slice(0,timelineItemBudget()).map(function(e){var subs=[]; if(e.sub_items&&e.sub_items.length){subs=e.sub_items.map(function(s){return '<a class="tl-sub" data-id="'+s.id+'" href="javascript:void(0)">· '+esc(s.title)+'</a>';}).join('');} var merged=e.merged_ids&&e.merged_ids.length?(' data-merged="'+e.merged_ids.join(',')+'"'):''; return '<div class="tl-item" data-id="'+e.id+'"'+merged+'><span class="tl-dot"></span><div class="tl-body"><div class="tl-row"><span class="tl-time">'+esc(e.time||'')+'</span>'+(e.date_future?'<span class="tl-badge future" title="文章里预告的未来日期（晚于今天）；排序已按入库时间处理，顺序正常">预告日期</span>':'')+(e.topic?'<span class="tl-topic">'+esc(e.topic)+'</span>':'')+(e.merged_count?'<span class="tl-merged" title="查看合并正文">合并'+e.merged_count+'篇 ▾</span>':'')+'</div><div class="tl-title">'+esc(e.title)+'</div>'+((subs)?'<div class="tl-subs">'+subs+'</div>':'')+'<div class="tl-src">来源：'+esc(e.domain||'-')+((e.date_future||e.date_inferred)&&e.crawl_time?(' · 入库 '+esc(e.crawl_time)):'')+'</div></div></div>';}).join('');
+      var body=ev.slice(0,timelineItemBudget()).map(function(e){var subs=[]; if(e.sub_items&&e.sub_items.length){subs=e.sub_items.map(function(s){return '<a class="tl-sub" data-id="'+s.id+'" href="javascript:void(0)">· '+esc(s.title)+'</a>';}).join('');} var merged=e.merged_ids&&e.merged_ids.length?(' data-merged="'+e.merged_ids.join(',')+'"'):''; return '<div class="tl-item" data-id="'+e.id+'"'+merged+'><span class="tl-dot"></span><div class="tl-body"><div class="tl-row"><span class="tl-time">'+esc(e.time||'')+'</span>'+(e.date_future?'<span class="tl-badge future" title="文章里预告的未来日期（晚于今天）；排序已按入库时间处理，顺序正常">预告日期</span>':'')+(e.time_note?'<span class="tl-badge precision" title="'+esc(e.time_note)+'；引用该文时按此精度理解">'+esc(e.time_note)+'</span>':'')+(e.topic?'<span class="tl-topic">'+esc(e.topic)+'</span>':'')+(e.merged_count?'<span class="tl-merged" title="查看合并正文">合并'+e.merged_count+'篇 ▾</span>':'')+'</div><div class="tl-title">'+esc(e.title)+'</div>'+((subs)?'<div class="tl-subs">'+subs+'</div>':'')+'<div class="tl-src">来源：'+esc(e.domain||'-')+((e.date_future||e.date_inferred)&&e.crawl_time?(' · 入库 '+esc(e.crawl_time)):'')+'</div></div></div>';}).join('');
       tl.innerHTML=head+'<div class="tl-list">'+body+'</div>';
       tl.querySelectorAll('.tl-item').forEach(function(it){it.addEventListener('click',function(ev){var m=it.dataset.merged; if(m&&m.indexOf(',')>=0){ev.stopPropagation();openMergedArticles(m);} else {openArticle(it.dataset.id);}});});
       tl.querySelectorAll('.tl-sub').forEach(function(it){it.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();openArticle(it.dataset.id);});});

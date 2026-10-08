@@ -135,6 +135,43 @@ def _item_day(item):
     return item[5] if len(item) > 5 else None
 
 
+# 时间精度 → 给人看的一句话（前端引用/证据卡直接展示；不写"未知"就等于骗人）
+_PRECISION_LABELS = {
+    "exact": "精确到时分",
+    "date": "仅到日",
+    "url": "按链接日期推断",
+    "discovered": "时间未知（按首次抓取标记）",
+}
+
+
+def normalize_precision(value) -> str:
+    """精度归一：兼容历史写法（day/datetime）与空值。"""
+    try:
+        from publish_time import normalize_precision as _normalize
+
+        return _normalize(value)
+    except Exception:
+        text = str(value or "").strip().casefold()
+        return {"day": "date", "datetime": "exact"}.get(text, text)
+
+
+def describe_published_precision(precision: str, timezone_name: str = "") -> str:
+    """把精度说成一句人话（带源站时区时一并说明）。抽不到就是空串。
+
+    入参先归一化，这样调用方传历史写法（`day`/`datetime`）也不会静默变成空串。
+    """
+    text = normalize_precision(precision)
+    if not text:
+        return ""
+    label = _PRECISION_LABELS.get(text, "")
+    if not label:
+        return ""
+    zone = str(timezone_name or "").strip()
+    if zone and text in {"exact", "date", "url"}:
+        return f"{label}（源站时区 {zone}）"
+    return label
+
+
 def _window_from_adjustment(plan: Mapping):
     """用户在调整里明确给出的时间范围 → 检索窗口（阶段 5）；没有则返回 None。
 
@@ -706,6 +743,10 @@ def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, s
         authority_level = min(authority_level, 10)
     article_url = canonical_http_url(str(row.get("url") or ""))
     policy_url = canonical_http_url(str(row.get("policy_source_url") or policy_meta.get("source_url") or ""))
+    # 时间精度随证据一起交给前端与合成：只到"日"的时间、以及"只有抓取时间"的时间，
+    # 引用时必须让人看出可信度差别（阶段 4：published_precision 要贯通到展示）。
+    _precision = normalize_precision(str(row.get("published_precision") or ""))
+    _timezone = str(row.get("published_timezone") or "")
     return {
         "evidence_ref": f"page:{article_id}" if source_type == "page_context" else f"article:{article_id}",
         "source_type": source_type,
@@ -713,6 +754,10 @@ def _article_evidence(row: Mapping, *, score: float, method: str, reason: str, s
         "source_url": policy_url or article_url,
         "content_excerpt": content[:max(500, int(excerpt_chars or 5000))],
         "published_at": str(row.get("publish_date") or "") or None,
+        "published_at_utc": str(row.get("published_at_utc") or "") or None,
+        "published_precision": _precision,
+        "published_timezone": _timezone,
+        "published_time_note": describe_published_precision(_precision, _timezone),
         "fetched_at": str(row.get("first_crawled") or "") or None,
         "article_id": article_id,
         "ragflow_kb_id": None,

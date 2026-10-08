@@ -12,12 +12,18 @@
   原则：**只在本机改代码**。所有改动先落到 F:\CollectInfo，再执行本脚本推送到生产机；
   不要直接登生产机改文件。
 
+  地址约定（重要）：A 机**一律用固定公网 IP**，不要用 VPN 内网地址。
+  同一台机器有两个地址：公网 117.50.211.93 / VPN 内 10.88.0.3；
+  实测内网地址整体不可达（见 项目部署说明\worker抗卡死与队列治理-部署步骤-10-06.md），
+  而公网 8003 一直正常，所以默认值与示例都用公网。
+
 .EXAMPLE
   pwsh -File F:\CollectInfo\deploy-to-prod.ps1
 #>
 [CmdletBinding()]
 param(
-  [string]$ProdHost   = 'root@10.88.0.3',
+  # 固定公网 IP（不要改回 10.88.0.3：那是 VPN 内网地址，实测不可达）
+  [string]$ProdHost   = 'root@117.50.211.93',
   [string]$RemoteDir  = '/www/CollectInfo_latest_new',
   [string]$Image      = 'collectinfo-web:latest',
   [int]   $HealthWait = 180,
@@ -225,6 +231,7 @@ if [ "$LAYERS" -ge 118 ]; then
     echo 'CMD ["gunicorn","-w","2","--threads","4","--bind","0.0.0.0:8003","--timeout","300","firecrawl_app:app"]'
     echo 'COPY . /app/'
     echo 'RUN sed -i "s/\r$//" /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh'
+    echo 'RUN python -m playwright install chromium && python tools/check_browsers.py'
   } > /tmp/collectinfo-deploy/Dockerfile.flat
   if docker build -q -t "$IMG" -f /tmp/collectinfo-deploy/Dockerfile.flat "$CTX" | tail -1; then
     echo "    压平重建通过，层数已重置为 $(docker image inspect "$IMG" --format '{{len .RootFS.Layers}}')"
@@ -236,6 +243,13 @@ else
 FROM collectinfo-web:latest
 COPY . /app/
 RUN sed -i 's/\r$//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
+# 浏览器保证（2026-10-08 事故修复）：这条 overlay 才是 A 机实际使用的构建路径，
+# 仓库 Dockerfile 的浏览器安装步骤在这里从来不执行——所以镜像里长期缺
+# chromium-1091，267 个 website 信源一秒内失败、累计浪费 1588 次扫描记录。
+# 放在 COPY 之后（脚本来自源码）；幂等：已装好时 playwright install 只做校验不做下载，
+# 缺失才真正下载（A 机网络实测可下载）。check_browsers.py 是真的启动两个浏览器，
+# 启动不了就让本次构建失败，杜绝再次带病上线。
+RUN python -m playwright install chromium && python tools/check_browsers.py
 DOCKER
   if ! docker build -q -t "$IMG" -f /tmp/collectinfo-deploy/Dockerfile.deploy "$CTX" | tail -1; then
     echo "    overlay 构建失败 → 回退到仓库 Dockerfile 全量重建"

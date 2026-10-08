@@ -122,6 +122,48 @@ class TimeGateTests(unittest.TestCase):
         self.assertFalse(receipt["hard_filter"])
 
 
+class PrecisionDisplayTests(unittest.TestCase):
+    """精度贯通"展示"：证据与时间轴要能看出"仅到日""时间未知"的可信度差别。"""
+
+    def test_precision_labels_are_human_readable(self):
+        self.assertIn("精确", qr.describe_published_precision("exact"))
+        self.assertIn("仅到日", qr.describe_published_precision("date"))
+        self.assertIn("链接", qr.describe_published_precision("url"))
+        self.assertIn("未知", qr.describe_published_precision("discovered"))
+
+    def test_legacy_precision_vocabulary_is_accepted(self):
+        self.assertIn("仅到日", qr.describe_published_precision("day"))
+        self.assertIn("精确", qr.describe_published_precision("datetime"))
+        self.assertEqual(qr.normalize_precision("day"), "date")
+        self.assertEqual(qr.normalize_precision("datetime"), "exact")
+
+    def test_timezone_is_included_only_for_real_timestamps(self):
+        self.assertIn("Asia/Shanghai", qr.describe_published_precision("date", "Asia/Shanghai"))
+        # discovered 不是发布时间，带上时区反而像在暗示它有可信时间
+        self.assertNotIn("Asia/Shanghai", qr.describe_published_precision("discovered", "Asia/Shanghai"))
+
+    def test_unknown_precision_describes_nothing(self):
+        self.assertEqual(qr.describe_published_precision(""), "")
+        self.assertEqual(qr.describe_published_precision("weird"), "")
+
+    def test_evidence_carries_precision_fields(self):
+        evidence = qr._article_evidence(
+            {"id": 7, "title": "T", "content": "正文", "publish_date": "2026-10-07",
+             "published_at_utc": "2026-10-07T00:00:00Z", "published_timezone": "Asia/Shanghai",
+             "published_precision": "day"},
+            score=1.0, method="keyword", reason="命中")
+        self.assertEqual(evidence["published_precision"], "date")
+        self.assertEqual(evidence["published_timezone"], "Asia/Shanghai")
+        self.assertEqual(evidence["published_at_utc"], "2026-10-07T00:00:00Z")
+        self.assertIn("仅到日", evidence["published_time_note"])
+
+    def test_evidence_without_precision_stays_quiet(self):
+        evidence = qr._article_evidence(
+            {"id": 8, "title": "T", "content": "正文"}, score=1.0, method="keyword", reason="命中")
+        self.assertEqual(evidence["published_precision"], "")
+        self.assertEqual(evidence["published_time_note"], "")
+
+
 class LadderConfigTests(unittest.TestCase):
     def test_default_ladder_is_three_six_twelve_months(self):
         self.assertEqual(qr._time_ladder(), [90, 180, 365])

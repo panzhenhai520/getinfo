@@ -30,8 +30,8 @@
 ## 1. 发布前检查（在两台生产机上各做一次，只读）
 
 ```bash
-# A 机（VPN 不通时用公网 IP）
-ssh root@117.50.211.93     # 公网；VPN 内为 10.88.0.3（本轮实测该地址曾整体不可达）
+# A 机：**一律用固定公网 IP**（VPN 内网地址 10.88.0.3 实测整体不可达，不要再用它）
+ssh root@117.50.211.93
 # B 机
 ssh -p 8001 timebot@122.10.99.195
 
@@ -62,9 +62,9 @@ docker images | grep collectinfo-web | head -3   # 发布脚本会自动打 coll
 git status --short          # 应为空
 git log --oneline -3
 
-# 1) A 机（VPN 地址不通时用公网地址）
-pwsh -NoProfile -File F:\CollectInfo\deploy-to-prod.ps1 -ProdHost root@117.50.211.93
-#   VPN 正常时：pwsh -NoProfile -File F:\CollectInfo\deploy-to-prod.ps1
+# 1) A 机：固定公网 IP（脚本默认值已是公网；不要再传 10.88.0.3）
+pwsh -NoProfile -File F:\CollectInfo\deploy-to-prod.ps1
+#   如需显式指定：pwsh -NoProfile -File F:\CollectInfo\deploy-to-prod.ps1 -ProdHost root@117.50.211.93
 
 # 2) B 机
 python F:\CollectInfo\_b_deploy.py upload build up

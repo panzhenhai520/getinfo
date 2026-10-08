@@ -5292,6 +5292,7 @@ def intel_timeline():
             ).fetchone()["n"])
             rows = cursor.execute(
                 """SELECT a.id, a.title, a.url, a.domain, a.publish_date, a.published_at_utc, a.first_crawled, a.matched_keywords,
+                          a.published_precision, a.published_timezone,
                           (SELECT t.topic_name FROM intel_topic_articles ta
                            JOIN intel_topics t ON t.id=ta.topic_id
                            WHERE ta.article_id=a.id AND t.industry_pack_id=?
@@ -5312,6 +5313,10 @@ def intel_timeline():
                       + [per_page, offset]),
             ).fetchall()
         events = []
+        try:
+            from qa_retrieval import describe_published_precision, normalize_precision
+        except Exception:  # 精度只是展示信息，取不到不影响时间轴
+            describe_published_precision = normalize_precision = None
         for r in rows:
             # 显示时间必须与上面的排序键同源（发布日期优先），否则会出现"9.11 排在 9.13 上面"
             # 这种看似乱序的现象——排序按发布日期、标签却显示聚合时间。
@@ -5337,7 +5342,23 @@ def intel_timeline():
             # 该日期是"回落到聚合时间"的推断值，还是来自文章预告的未来日期，供前端标注
             # 「预告日期」= 发布日期在未来（文中预告的活动/会议日期）→ 显示它并打标记 ✓
             # 「按入库」不再显示（排序已正确，无需解释）
-            date_inferred = False
+            # 时间精度（阶段 4）：只有抓取时间的（discovered）必须标出来，
+            # 否则运营会把"我们什么时候抓到的"当成"文章什么时候发的"。
+            try:
+                _precision = normalize_precision(str(r["published_precision"] or "")) if normalize_precision else ""
+                _time_note = describe_published_precision(
+                    _precision, str(r["published_timezone"] or "")) if describe_published_precision else ""
+            except Exception:
+                _precision, _time_note = "", ""
+            if not _precision and str(r["published_at_utc"] or ""):
+                # 有瞬间但没有精度声明：按"只到日"理解（published_at_utc 里日期是源站本地日期）
+                _precision = "date"
+                try:
+                    _time_note = describe_published_precision(
+                        _precision, str(r["published_timezone"] or "")) if describe_published_precision else ""
+                except Exception:
+                    _time_note = ""
+            date_inferred = _precision == "discovered"
             date_future = bool(_publish_future)
             _is_event_date = _publish_future
             topic = str(r["topic"] or "").strip()
@@ -5348,7 +5369,8 @@ def intel_timeline():
                            "topic": topic, "time": disp_time,
                            "converted": bool(r["converted"]),
                            "crawl_time": crawl_time[5:16] if len(crawl_time) >= 16 else crawl_time[5:10],
-                           "date_inferred": date_inferred, "date_future": date_future})
+                           "date_inferred": date_inferred, "date_future": date_future,
+                           "date_precision": _precision, "time_note": _time_note})
         # 折叠近似重复（同源同质标题，只保留一条）
         events = _collapse_timeline_near_duplicates(events)
         return jsonify({"success": True, "request_id": request_id, "events": events,
