@@ -59,8 +59,34 @@ def _coverage(db) -> dict:
                 " WHERE COALESCE(state_before,'')<>'' OR COALESCE(state_after,'')<>''"
             )
             with_state = int(cur.fetchone()["n"] or 0)
+            # 结构化覆盖率：**有事件 或 有属性**就算已结构化。
+            # 主系表/数值类文章（例如"某模型是高精度的"）0 事件但已抽到属性，
+            # 只按"有事件"统计会把它们误判成没抽到东西。
+            try:
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM ("
+                    "  SELECT e.article_id AS aid FROM intel_article_events e"
+                    "   JOIN articles a ON a.id=e.article_id AND a.status='active'"
+                    "   WHERE e.subject NOT IN ('__no_event__', '__error__')"
+                    "  UNION"
+                    "  SELECT at.article_id FROM intel_article_attributes at"
+                    "   JOIN articles a ON a.id=at.article_id AND a.status='active'"
+                    ") t"
+                )
+                structured = int(cur.fetchone()["n"] or 0)
+                cur.execute("SELECT COUNT(*) AS n FROM intel_article_attributes")
+                attributes = int(cur.fetchone()["n"] or 0)
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM intel_article_attributes"
+                    " WHERE COALESCE(valid_from,'')<>'' OR COALESCE(valid_to,'')<>''"
+                )
+                attributes_with_validity = int(cur.fetchone()["n"] or 0)
+            except Exception:
+                structured, attributes, attributes_with_validity = covered, 0, 0
             return {"active": active, "covered": covered, "placeholders": placeholders,
-                    "canonicals": canonicals, "rows_with_state": with_state}
+                    "canonicals": canonicals, "rows_with_state": with_state,
+                    "structured": structured, "attributes": attributes,
+                    "attributes_with_validity": attributes_with_validity}
         finally:
             cur.close()
 
@@ -150,6 +176,11 @@ def main(argv=None) -> int:
           % (state["active"], state["covered"],
              100.0 * state["covered"] / max(1, state["active"]),
              state["placeholders"], state["canonicals"], state["rows_with_state"]))
+    if state.get("structured") is not None:
+        print("结构化覆盖（有事件**或**有属性）: %d 篇（%.1f%%）；属性 %d 行（带有效期 %d 行）"
+              % (state["structured"],
+                 100.0 * state["structured"] / max(1, state["active"]),
+                 state.get("attributes", 0), state.get("attributes_with_validity", 0)))
     print("待抽取（活跃 / 有包归属 / trend|event / 命中锚点 / 未抽过）: %d 篇" % eligible)
 
     # 覆盖率天花板账：让"要不要放宽准入"变成可决策的数字（实测产出率约 59%）
