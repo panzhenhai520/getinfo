@@ -30,6 +30,12 @@ RUN apt-get update \
 
 COPY . .
 
+# 构建期硬门槛：两个浏览器（playwright 的 chromium-1091 + patchright 的 chromium-1234）
+# 都必须真的能启动。2026-10-08 A 机事故：镜像里缺 chromium-1091，267 个 website 信源
+# 一秒内失败、累计浪费 1588 次扫描记录，而构建过程毫无报错——这里让"启动不了"
+# 直接变成构建失败，杜绝带病出厂。（必须放在 COPY 之后，否则找不到脚本）
+RUN python tools/check_browsers.py
+
 # --- Agent 信源：Agent-Reach + 上游工具（信源关键词抓取） ---
 # 说明：与爬虫无关的 playwright/CUDA 不涉及；这里只装信源抓取所需的 CLI 工具。
 #   gh/ffmpeg 走 apt；twitter-cli/rdt-cli/bili-cli 走 pipx（PIPX_BIN_DIR 放到 /usr/local/bin 以进入 PATH）。
