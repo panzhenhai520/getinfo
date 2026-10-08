@@ -68,6 +68,29 @@ class FeedParsingTests(unittest.TestCase):
         self.assertEqual(result["entries"], [])
         self.assertIn("boom", result["error"])
 
+    def test_fetch_feed_uses_its_own_generous_timeout(self):
+        """海外慢站实测要 26 秒：雷达必须传自己的超时预算，而不是扫描器默认的 20 秒读取。"""
+        br.clear_cache()
+        captured = {}
+
+        class FakeResponse:
+            status_code = 200
+            content = ATOM.encode("utf-8")
+            content_type = "application/atom+xml"
+
+        def fake_get(url, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+        with patch.object(br.config, "BUZZING_RADAR_CONNECT_TIMEOUT_SECONDS", 7), \
+                patch.object(br.config, "BUZZING_RADAR_READ_TIMEOUT_SECONDS", 88), \
+                patch("intel_http.SafeHTTPClient.get", side_effect=fake_get):
+            result = br.fetch_feed("https://finance.buzzing.cc/feed.xml")
+
+        self.assertEqual(result["error"], "")
+        self.assertEqual(len(result["entries"]), 2)
+        self.assertEqual(captured.get("timeout"), (7, 88))
+
 
 class TermExtractionTests(unittest.TestCase):
     def test_english_only_keeps_proper_nouns(self):

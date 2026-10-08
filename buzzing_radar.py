@@ -194,10 +194,17 @@ def fetch_feed(feed_url: str, *, timeout: Optional[int] = None) -> Dict[str, Any
         from intel_http import SafeHTTPClient
 
         client = SafeHTTPClient()
+        # 海外站可能很慢：实测 A 机拉 finance.buzzing.cc 要 26 秒（本地几秒），
+        # 用扫描器默认的 20 秒读取会直接超时，所以这里给雷达自己的更宽预算。
+        timeout = (
+            int(getattr(config, "BUZZING_RADAR_CONNECT_TIMEOUT_SECONDS", 10) or 10),
+            int(getattr(config, "BUZZING_RADAR_READ_TIMEOUT_SECONDS", 60) or 60),
+        )
         response = client.get(
             url,
             headers={"User-Agent": "MarketIntelRadar/1.0 (+headline-radar)",
                      "Accept": "application/atom+xml, application/xml, text/xml"},
+            timeout=timeout,
         )
         status = int(getattr(response, "status_code", 0) or 0)
         if not 200 <= status < 300:

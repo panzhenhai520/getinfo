@@ -120,7 +120,23 @@ class SafeHTTPClient:
         self.resolver = resolver
         self.allowlist = allowlist
 
-    def get(self, url: str, *, headers: Optional[dict] = None) -> HTTPFetchResult:
+    def get(
+        self,
+        url: str,
+        *,
+        headers: Optional[dict] = None,
+        timeout: Optional[tuple] = None,
+    ) -> HTTPFetchResult:
+        """抓取一个外部 URL。
+
+        timeout=(连接秒, 读取秒)，默认走扫描器口径（INTEL_SCAN_*_TIMEOUT_SECONDS）。
+        海外慢站（实测 A 机拉 finance.buzzing.cc 要 26 秒，默认 20 秒读取会直接超时）
+        可以传更宽的自有预算，而不必为个别来源放宽全局扫描超时。
+        """
+        connect_timeout, read_timeout = timeout or (
+            config.INTEL_SCAN_CONNECT_TIMEOUT_SECONDS,
+            config.INTEL_SCAN_READ_TIMEOUT_SECONDS,
+        )
         current = str(url or "").strip()
         max_redirects = config.INTEL_SCAN_MAX_REDIRECTS
         for redirect_index in range(max_redirects + 1):
@@ -132,10 +148,7 @@ class SafeHTTPClient:
             response = self.session.get(
                 current,
                 headers=headers or {},
-                timeout=(
-                    config.INTEL_SCAN_CONNECT_TIMEOUT_SECONDS,
-                    config.INTEL_SCAN_READ_TIMEOUT_SECONDS,
-                ),
+                timeout=(connect_timeout, read_timeout),
                 allow_redirects=False,
                 stream=True,
             )
