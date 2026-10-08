@@ -180,17 +180,19 @@ def rollback(db, path: str) -> int:
 
 
 def clear_implausible(db, *, statuses, apply: bool) -> int:
-    """清掉"不可采信的未来时间"（超过今天 + 90 天）。
+    """清掉"不可采信的未来日期"（超过今天 + 90 天）。
 
-    这类值多半是早期从正文里误抽出来的（实测 A 机有 2027-12-01），
-    清空后重跑回填即可按 URL/正文重新取值，而不是把脏日期留在排序与时间过滤里。
+    这类值多半是早期从正文里误抽出来的（实测 A 机有 2027-12-01 落在 published_at_utc，
+    源列 publish_date 里也还留着同一个假日期）。**两个列一起清**——口径与入库闸门一致
+    （sqlite_database 里对未来的 publish_date 就是"直接抹掉，宁可显示未知"）；
+    清空后重跑回填会按 URL/正文重新取值。
     """
     try:
         from article_identity import _is_implausible_future_date
     except Exception:
         return 0
     db._ensure_connection()
-    where = ["COALESCE(published_at_utc,'') <> ''"]
+    where = ["(COALESCE(published_at_utc,'') <> '' OR COALESCE(publish_date,'') <> '')"]
     params = []
     if statuses:
         where.append("status IN (%s)" % ",".join("?" for _ in statuses))
@@ -199,17 +201,24 @@ def clear_implausible(db, *, statuses, apply: bool) -> int:
         cur = db.connection.cursor()
         try:
             cur.execute(
-                "SELECT id, published_at_utc, title FROM articles WHERE " + " AND ".join(where),
+                "SELECT id, publish_date, published_at_utc, title FROM articles WHERE "
+                + " AND ".join(where),
                 tuple(params),
             )
-            victims = [dict(row) for row in cur.fetchall()]
+            rows = [dict(row) for row in cur.fetchall()]
         finally:
             cur.close()
-    victims = [row for row in victims if _is_implausible_future_date(row["published_at_utc"])]
-    print("\n不可采信的未来时间（> 今天 + 90 天）：%d 条" % len(victims))
+    victims = [
+        row for row in rows
+        if _is_implausible_future_date(row.get("publish_date"))
+        or _is_implausible_future_date(row.get("published_at_utc"))
+    ]
+    print("\n不可采信的未来日期（> 今天 + 90 天）：%d 条" % len(victims))
     for row in victims[:10]:
-        print("   id=%s %s  %s" % (row["id"], str(row["published_at_utc"])[:10],
-                                   str(row.get("title") or "")[:40]))
+        print("   id=%s publish_date=%s published_at_utc=%s  %s"
+              % (row["id"], str(row.get("publish_date") or "-")[:10],
+                 str(row.get("published_at_utc") or "-")[:10],
+                 str(row.get("title") or "")[:34]))
     if not victims or not apply:
         if victims:
             print("   [dry-run] 未清理；加 --apply 一起清掉（随后重跑回填会自动重新取值）")
@@ -222,14 +231,15 @@ def clear_implausible(db, *, statuses, apply: bool) -> int:
                 chunk = ids[chunk_start:chunk_start + 200]
                 marks = ",".join("?" for _ in chunk)
                 cur.execute(
-                    "UPDATE articles SET published_at_utc='', published_timezone='',"
-                    " published_precision='', published_time_source='' WHERE id IN (%s)" % marks,
+                    "UPDATE articles SET publish_date='', published_at_utc='',"
+                    " published_timezone='', published_precision='', published_time_source=''"
+                    " WHERE id IN (%s)" % marks,
                     tuple(chunk),
                 )
             db.connection.commit()
         finally:
             cur.close()
-    print("   已清空 %d 行（重跑回填会按 URL/正文重新取值）" % len(ids))
+    print("   已清空 %d 行（publish_date 与四个时间列；重跑回填会按 URL/正文重新取值）" % len(ids))
     return len(ids)
 
 
