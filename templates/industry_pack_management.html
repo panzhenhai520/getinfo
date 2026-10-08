@@ -331,6 +331,22 @@
     .antibot-note.info { color: #0f766e; background: #ecfdf5; border: 1px solid #a7f3d0; }
     .antibot-note.warn { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
 
+    /* ── RSS 订阅体检（来源管理页内嵌区块）──
+       同样复用反爬看板的 .antibot-board/.antibot-head/.antibot-card/.antibot-table/
+       .antibot-note/.antibot-empty（含深蓝皮肤覆盖），只补体检特有的东西：
+       汇总三列、地址截断、状态徽标、以及「原因 + 建议」的分行样式。 */
+    .rss-health-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .rss-health-meta { align-self: center; color: var(--admin-muted); font-size: 12px; white-space: nowrap; }
+    .rss-health-name { font-weight: 600; word-break: break-word; }
+    /* feed 地址很长：截断显示，鼠标悬停（title）看全，别把表格撑爆 */
+    .rss-health-url { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; color: var(--admin-muted); font-size: 11px; }
+    .rss-health-status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .rss-health-status.ok { color: #087067; background: #d9f5ed; }
+    .rss-health-status.bad { color: #b42318; background: #fee4e2; }
+    /* 失败原因（红）与建议（琥珀）分两行：建议是运营真正要照做的那一句，不能被原因挤掉 */
+    .rss-health-error { display: block; color: #b42318; font-size: 11px; line-height: 1.6; word-break: break-word; }
+    .rss-health-hint { display: block; margin-top: 3px; color: #92400e; font-size: 11px; line-height: 1.6; }
+
     /* ── 海外标题雷达（独立标签页）──
        刻意复用上面反爬看板的 .antibot-board/.antibot-card/.antibot-table/.antibot-note/
        .antibot-empty（含深蓝皮肤覆盖），保证两个看板视觉一致，皮肤规则也不用写两套；
@@ -536,6 +552,8 @@
       .radar-gap-head { display: block; }
       .radar-gap-meta { display: block; margin-top: 3px; }
       .radar-gap-item { padding: 12px 0; }
+      /* RSS 订阅体检：表格靠横向滚动看，地址列在窄屏再收窄一点，避免一行只放得下一个地址 */
+      .rss-health-url { max-width: 170px; }
     }
   </style>
   <style>
@@ -649,6 +667,12 @@
   body.skin-darkblue .antibot-empty,body.skin-darkblue .antibot-url{color:#8ea6c8}
   body.skin-darkblue .antibot-note.info{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.3);color:#6ee7b7}
   body.skin-darkblue .antibot-note.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.3);color:#fbbf24}
+  /* 深蓝：RSS 订阅体检（看板/卡片/表格/提示条已复用反爬看板的深蓝规则，这里只补体检特有部分） */
+  body.skin-darkblue .rss-health-meta,body.skin-darkblue .rss-health-url{color:#8ea6c8}
+  body.skin-darkblue .rss-health-status.ok{background:rgba(16,185,129,.18);color:#6ee7b7}
+  body.skin-darkblue .rss-health-status.bad{background:rgba(248,113,113,.18);color:#fca5a5}
+  body.skin-darkblue .rss-health-error{color:#fca5a5}
+  body.skin-darkblue .rss-health-hint{color:#fbbf24}
   /* 深蓝：海外标题雷达（看板/卡片/表格/提示条已复用反爬看板的深蓝规则，这里只补雷达特有部分） */
   body.skin-darkblue .radar-control select{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#e6f0ff}
   body.skin-darkblue .radar-meta,body.skin-darkblue .radar-who,body.skin-darkblue .radar-titles,body.skin-darkblue .radar-block-hint{color:#8ea6c8}
@@ -1049,6 +1073,40 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div class="antibot-empty" id="antibotSourceEmpty">暂无被拦截的信源。所有信源都处于健康状态，不需要额外处置。</div>
               </div>
+            </div>
+          </div>
+
+          <!-- RSS 订阅体检：真订阅一次，按生产入库同一套校验器判「能不能用」。
+               只读体检——不写库、不改任何信源配置。 -->
+          <div class="antibot-board" id="rssHealthBoard">
+            <div class="antibot-head">
+              <div>
+                <h3>RSS 订阅体检</h3>
+                <p>对本行业包的 RSS 源（<b>包内种子 + 生产库登记</b>）逐个真订阅一次，用<b>生产入库同一套校验器</b>判定：✅ 表示真的能订阅且符合入库标准，不是「看着像能跑」。失败行会给出原因与建议。<b>只读体检，不会改动任何信源配置。</b>要真的联网订阅，最多等 60 秒。</p>
+              </div>
+              <div class="antibot-head-actions">
+                <button class="action secondary" type="button" id="rssHealthBtn" onclick="runRssHealthCheck()">开始体检</button>
+                <span class="rss-health-meta" id="rssHealthAt">尚未体检</span>
+              </div>
+            </div>
+
+            <div class="antibot-note" id="rssHealthNote"></div>
+
+            <div class="source-metrics antibot-metrics rss-health-metrics">
+              <div class="metric healthy"><strong id="rssHealthTotal">0</strong><span>RSS 源（本行业包）</span></div>
+              <div class="metric healthy"><strong id="rssHealthOk">0</strong><span>可订阅</span></div>
+              <div class="metric blocked"><strong id="rssHealthBad">0</strong><span>不可用（需处置）</span></div>
+            </div>
+
+            <div class="antibot-card">
+              <h4>逐个 feed 体检结果</h4>
+              <div class="antibot-scroll">
+                <table class="antibot-table">
+                  <thead><tr><th>信源名</th><th>feed 地址</th><th>条数</th><th>带日期</th><th>状态</th><th>原因与建议</th></tr></thead>
+                  <tbody id="rssHealthRows"></tbody>
+                </table>
+              </div>
+              <div class="antibot-empty" id="rssHealthEmpty">还没有体检结果。点右上角「开始体检」，会对本包的每个 RSS 源真订阅一次再判定。</div>
             </div>
           </div>
         </section>
@@ -2015,6 +2073,102 @@ async function reloadAntibotRules() {
   } finally {
     if (button) { button.disabled = false; button.classList.remove('is-busy'); }
   }
+}
+
+// ── RSS 订阅体检：真订阅一次，按生产入库同一套校验器判「能不能用」 ──
+// 数据来自 /api/intel/rss-health（按行业包收口）。只读体检：不写库、不改任何信源配置。
+// 这是一个「慢接口」（要真的联网订阅每个 feed，最多 60 秒），所以只在点按钮时触发，
+// 刻意不挂进 setTab()/selectPack() 的自动刷新——否则切个标签页就发起一轮真实订阅。
+let rssHealthRan = false; // 是否已出过结果（用于判断「切包后结果作废需重跑」）
+
+// 属性值里的 URL 要额外转义引号，否则地址里带引号会截断 title 属性
+const rssHealthAttr = value => esc(value).replace(/"/g, '&quot;');
+
+function rssHealthNote(text, kind = 'info') {
+  const box = $('rssHealthNote');
+  if (!box) return;
+  box.textContent = text || '';
+  box.className = 'antibot-note ' + kind;
+  box.style.display = text ? 'block' : 'none';
+}
+
+function renderRssHealth(payload = {}) {
+  const summary = payload.summary || {};
+  const setText = (id, value) => { const node = $(id); if (node) node.textContent = Number(value || 0); };
+  setText('rssHealthTotal', summary.total);
+  setText('rssHealthOk', summary.ok);
+  setText('rssHealthBad', summary.bad);
+
+  const rows = payload.results || [];
+  $('rssHealthRows').innerHTML = rows.map(row => {
+    const ok = Boolean(row.ok);
+    const badge = ok
+      ? '<span class="rss-health-status ok">✅ 可订阅</span>'
+      : '<span class="rss-health-status bad">❌ 不可用</span>';
+    // 失败行必须把「原因 + 建议」都摆出来：建议（hint）才是运营真正要照做的那一句
+    const why = ok ? '' : `<span class="rss-health-error">${esc(row.error || '未知原因')}</span>` +
+      (row.hint ? `<span class="rss-health-hint">建议：${esc(row.hint)}</span>` : '');
+    const packs = (row.packs || []).join('、') || '—';
+    const origin = row.origin === 'db' ? '生产库' : '包内种子';
+    return `<tr>
+      <td><span class="rss-health-name">${esc(row.name || '未命名信源')}</span><span class="antibot-url">${esc(packs)} · ${esc(origin)}</span></td>
+      <td><span class="rss-health-url" title="${rssHealthAttr(row.url || '')}">${esc(row.url || '')}</span></td>
+      <td class="num">${ok ? Number(row.entries || 0) : '—'}</td>
+      <td class="num">${ok ? Number(row.dated || 0) : '—'}</td>
+      <td>${badge}</td>
+      <td>${why || '<span class="muted">—</span>'}</td>
+    </tr>`;
+  }).join('');
+  $('rssHealthEmpty').style.display = rows.length ? 'none' : 'block';
+  rssHealthRan = true;
+}
+
+async function runRssHealthCheck() {
+  const button = $('rssHealthBtn');
+  if (!$('rssHealthRows')) return;
+  if (!selected) {
+    rssHealthNote('请先在左侧选择一个行业包，再对它做 RSS 订阅体检。', 'warn');
+    return;
+  }
+  if (button) {
+    button.disabled = true;
+    button.classList.add('is-busy');
+    button.textContent = '正在逐个订阅…';
+  }
+  rssHealthNote('正在逐个订阅…（每个 feed 都要真的联网订阅一次，最多等 60 秒，请不要关页面）');
+  try {
+    const payload = await api('/api/intel/rss-health?industry_pack_id=' + encodeURIComponent(selected));
+    renderRssHealth(payload);
+    if ($('rssHealthAt')) $('rssHealthAt').textContent = '上次体检：' + (payload.checked_at || '—');
+    const summary = payload.summary || {};
+    if (!Number(summary.total || 0)) {
+      rssHealthNote('这个行业包目前没有登记任何 RSS 源：先在「添加信源」里加 RSS 类型的源，或在信源上挂 metadata.rss_url，再来体检。', 'warn');
+    } else if (Number(summary.bad || 0)) {
+      rssHealthNote(`体检完成：共 ${Number(summary.total)} 个，可订阅 ${Number(summary.ok)} 个，不可用 ${Number(summary.bad)} 个——红色行的「建议」就是处置办法。`, 'warn');
+    } else {
+      rssHealthNote(`体检完成：${Number(summary.total)} 个 RSS 源全部可订阅。`, 'info');
+    }
+  } catch (error) {
+    rssHealthNote('体检失败：' + (error.message || error) + '（服务或网络异常，可稍后重试）', 'warn');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('is-busy');
+      button.textContent = '开始体检';
+    }
+  }
+}
+
+// 切换行业包后上一轮结果就作废了：清空并提示重跑，避免把 A 包的结果当成 B 包的
+function resetRssHealthBoard() {
+  if (!$('rssHealthRows')) return;
+  const hadResult = rssHealthRan;
+  $('rssHealthRows').innerHTML = '';
+  ['rssHealthTotal', 'rssHealthOk', 'rssHealthBad'].forEach(id => { if ($(id)) $(id).textContent = '0'; });
+  if ($('rssHealthAt')) $('rssHealthAt').textContent = '尚未体检';
+  $('rssHealthEmpty').style.display = 'block';
+  rssHealthRan = false;
+  if (hadResult) rssHealthNote('已切换行业包，上一轮结果已清空，请重新体检。', 'warn');
 }
 
 // ── 海外标题雷达：海外今天在炒什么、我们漏了什么 ──
@@ -2992,6 +3146,8 @@ function renderDraft(payload) {
   filterSources();
   // 切包后同步刷新反爬看板（仅在来源管理页时请求，避免多余调用）
   if (currentTab === 'sources') loadAntibotBoard();
+  // RSS 订阅体检是慢接口，切包时只清空上一轮结果、不自动重跑（避免每次切包都发起真实订阅）
+  if (currentTab === 'sources') resetRssHealthBoard();
   // 海外标题雷达不在这里再挂一次钩子：下面 setTab(currentTab) 已按当前标签页触发，
   // 这里再调一次就会变成同一个接口发两次请求。
   $('diff').textContent = JSON.stringify(payload.diff, null, 2);

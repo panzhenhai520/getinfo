@@ -4172,6 +4172,127 @@ def _antibot_report_for_pack(pack_id: str, limit: int = 500) -> dict:
     }
 
 
+# RSS 订阅体检的并发数与总时长上限：这是同步接口，任何情况下都不能把请求挂死。
+_RSS_HEALTH_WORKERS = 6
+_RSS_HEALTH_DEADLINE_SECONDS = 60.0
+
+
+def _rss_health_targets_for_pack(pack_id: str) -> dict:
+    """收集某个行业包的 RSS 源（包内种子 + 生产库登记），同一 url 合并、packs 去重。
+
+    复用命令行体检工具 tools/check_rss_health.py 的收集逻辑，不重写一份：
+    · collect_from_seeds() 按行业包读 config/industry_packs/*.json；
+    · collect_from_db() 读生产库 intel_sources 里 source_type='rss' 的记录。
+    注意：collect_from_db(only_pack) 会放行「没标行业包」的库记录（它面向全库体检），
+    在按包体检的场景里这会把别的包/全局信源混进来，所以这里补一道按包收口。
+    """
+    from tools import check_rss_health as rss_health_tool
+
+    targets = rss_health_tool.collect_from_seeds(rss_health_tool._DEFAULT_PACK_DIR, pack_id)
+    for url, meta in (rss_health_tool.collect_from_db(pack_id) or {}).items():
+        if not pack_id or pack_id not in (meta.get("packs") or []):
+            continue
+        if url in targets:
+            for other in meta.get("packs") or []:
+                if other and other not in targets[url]["packs"]:
+                    targets[url]["packs"].append(other)
+        else:
+            targets[url] = meta
+    return targets
+
+
+def _rss_health_row(url: str, meta: dict, row: dict) -> dict:
+    """把 check_feed() 的结果补齐成接口返回的一行（名称/所属包/来源/建议）。"""
+    from tools import check_rss_health as rss_health_tool
+
+    error = str(row.get("error") or "")
+    hint = ""
+    if not row.get("ok"):
+        # 失败必须给出可执行建议：hint 是前端最实用的部分，绝不留空。
+        hint = rss_health_tool._reason_hint(error) or (
+            "原因未归类——请人工在浏览器打开该 feed 核对（地址写错、需要登录或不是 feed）"
+        )
+    return {
+        "url": str(url),
+        "name": str((meta or {}).get("name") or ""),
+        "packs": sorted({str(p) for p in ((meta or {}).get("packs") or []) if p}),
+        "origin": str((meta or {}).get("origin") or ""),
+        "ok": bool(row.get("ok")),
+        "entries": int(row.get("entries") or 0),
+        "dated": int(row.get("dated") or 0),
+        "error": error,
+        "hint": hint,
+    }
+
+
+def _rss_health_for_pack(pack_id: str, timeout: int = 10) -> dict:
+    """按行业包做一次 RSS 订阅体检（只读：真订阅一次，不写库、不改任何信源配置）。
+
+    判定标准与生产入库完全一致（工具内用 rss_feed_contract.validate_rss_feed_response），
+    所以 ok=True 表示「真的能订阅且符合入库标准」，不是「看着像能跑」。
+
+    总时长保护：as_completed(timeout=60) 到期后不再等待，未返回的 feed 直接标记为
+    「本地等待超时」照样返回，保证这个同步接口最大耗时约 60 秒而不是无限等待。
+    """
+    from concurrent.futures import (
+        ThreadPoolExecutor,
+        as_completed,
+        TimeoutError as FuturesTimeoutError,
+    )
+
+    from tools import check_rss_health as rss_health_tool
+    from utils import get_china_time  # 体检时间用中国时区，和页面其它时间一致
+
+    targets = _rss_health_targets_for_pack(pack_id)
+    urls = sorted(targets)
+    results: list = []
+    timed_out: list = []
+
+    if urls:
+        pool = ThreadPoolExecutor(max_workers=min(_RSS_HEALTH_WORKERS, len(urls)))
+        futures = {pool.submit(rss_health_tool.check_feed, url, timeout): url for url in urls}
+        try:
+            for future in as_completed(futures, timeout=_RSS_HEALTH_DEADLINE_SECONDS):
+                url = futures[future]
+                try:
+                    row = future.result()
+                except Exception as exc:
+                    # check_feed() 内部已把异常收敛成 ok=False，这里只防意外
+                    row = {"url": url, "ok": False, "entries": 0, "dated": 0,
+                           "error": f"{type(exc).__name__}: {str(exc)[:140]}"}
+                results.append(_rss_health_row(url, targets.get(url), row))
+        except FuturesTimeoutError:
+            pass
+        finally:
+            # 未开始的任务直接取消；已在跑的线程不等（wait=False），
+            # 否则 with 块退出时的 shutdown(wait=True) 又会把请求拖死。
+            for future in futures:
+                future.cancel()
+            pool.shutdown(wait=False)
+        done = {row["url"] for row in results}
+        timed_out = [url for url in urls if url not in done]
+
+    for url in timed_out:
+        row = {"url": url, "ok": False, "entries": 0, "dated": 0, "error": "本地等待超时"}
+        item = _rss_health_row(url, targets.get(url), row)
+        # 「本地等待超时」不是对端报的错，_reason_hint 不认识它，这里给专门的建议
+        item["hint"] = (
+            f"整体等待超过 {int(_RSS_HEALTH_DEADLINE_SECONDS)} 秒仍未返回——该 feed 太慢，"
+            "建议单独复检或先停用"
+        )
+        results.append(item)
+
+    # 失败项排前面：运营打开这块最先要看到的是「哪个不能订阅」
+    results.sort(key=lambda row: (row["ok"], row["name"] or row["url"], row["url"]))
+    ok_count = sum(1 for row in results if row["ok"])
+    return {
+        "summary": {"total": len(results), "ok": ok_count, "bad": len(results) - ok_count},
+        "results": results,
+        "timeout_seconds": int(timeout),
+        "checked_at": get_china_time().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
 @intel_bp.route("/buzzing-radar", methods=["GET"])
 @login_required
 def buzzing_headline_radar():
@@ -4229,6 +4350,42 @@ def antibot_health_report():
         return _error(str(exc), 400, request_id=request_id)
     except Exception:
         return _error("反爬健康报告查询失败", 500, request_id=request_id)
+
+
+@intel_bp.route("/rss-health", methods=["GET"])
+@login_required
+def rss_health_report():
+    """RSS 订阅体检（行业包管理页「来源管理 → RSS 订阅体检」）。
+
+    只查这一个行业包的 RSS 源（包内种子 + 生产库登记，同一个 url 合并、packs 去重），
+    并发 6 个 worker 真订阅一次，单 feed 超时默认 10 秒（timeout 参数可覆盖，范围 5~30），
+    总时长最多等 60 秒——超时的 feed 标记为「本地等待超时」照样返回，不会把请求挂死。
+
+    **只读体检**：不会写库、不会改动任何信源配置。
+
+    返回：{success, request_id, industry_pack_id, checked_at, timeout_seconds,
+          summary:{total,ok,bad},
+          results:[{url,name,packs,origin,ok,entries,dated,error,hint}]}
+    其中 ok=True 用的是生产入库同一套校验器（rss_feed_contract.validate_rss_feed_response），
+    即「真的能订阅且符合入库标准」；失败项带 hint（可执行的中文建议）。
+    """
+    request_id = _request_id()
+    try:
+        pack_id = _industry_pack_id(str(request.args.get("industry_pack_id") or ""))
+        timeout = coerce_int(request.args.get("timeout"), 10, 5, 30)
+        report = _rss_health_for_pack(pack_id, timeout)
+        return jsonify(
+            {
+                "success": True,
+                "request_id": request_id,
+                "industry_pack_id": pack_id,
+                **report,
+            }
+        )
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("RSS 订阅体检失败", 500, request_id=request_id)
 
 
 @intel_bp.route("/antibot/sources/<int:source_id>/recover", methods=["POST"])
