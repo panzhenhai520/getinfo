@@ -331,6 +331,51 @@
     .antibot-note.info { color: #0f766e; background: #ecfdf5; border: 1px solid #a7f3d0; }
     .antibot-note.warn { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
 
+    /* ── 海外标题雷达（独立标签页）──
+       刻意复用上面反爬看板的 .antibot-board/.antibot-card/.antibot-table/.antibot-note/
+       .antibot-empty（含深蓝皮肤覆盖），保证两个看板视觉一致，皮肤规则也不用写两套；
+       这里只补雷达特有的控件、状态徽标和「覆盖缺口」的强调样式。 */
+    .radar-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .radar-control { display: inline-flex; align-items: center; gap: 5px; color: var(--admin-muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .radar-control select { padding: 7px 8px; border: 1px solid #cbd8dc; border-radius: 9px; background: #fff; color: #3b4d57; font: inherit; font-size: 12px; }
+    .radar-meta { margin: 0 0 12px; color: var(--admin-muted); font-size: 12px; line-height: 1.65; }
+    /* 出处表只有两列短内容，窄卡片里不需要横向滚动 */
+    .radar-table-narrow { min-width: 300px; }
+    .radar-table-narrow th:last-child, .radar-table-narrow td:last-child { width: 96px; }
+    .radar-block { margin-top: 14px; }
+    .radar-block > h4 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 9px; font-size: 14px; }
+    .radar-block-hint { color: var(--admin-muted); font-size: 12px; font-weight: 400; }
+    .radar-term { font-weight: 700; word-break: break-word; }
+    .radar-who { display: block; margin-top: 3px; color: var(--admin-muted); font-size: 11px; line-height: 1.55; }
+    /* 示例标题默认折叠：热词榜一行不被长标题撑爆，手机上点开才展开 */
+    .radar-titles { margin-top: 5px; color: var(--admin-muted); font-size: 11px; line-height: 1.6; }
+    .radar-titles > summary { color: var(--admin-brand-dark); cursor: pointer; }
+    .radar-titles-item { margin: 4px 0 0 2px; padding-left: 9px; border-left: 2px solid var(--admin-line); }
+    /* 状态徽标：已覆盖=绿 / 缺口=红 / 词表外=灰 / 无法判定=黄 */
+    .radar-status { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .radar-status.covered { color: #087067; background: #d9f5ed; }
+    .radar-status.gap { color: #b42318; background: #fee4e2; }
+    .radar-status.out { color: #53636c; background: #edf1f2; }
+    .radar-status.unknown { color: #92400e; background: #fef3c7; }
+    /* 覆盖缺口：真正的行动项，整块用红底强调，位置在两张表下方单独一行 */
+    .radar-gap { padding: 13px 14px; border: 1px solid #fecdca; border-radius: 13px; background: #fff7f6; }
+    .radar-gap > h4 { color: #b42318; }
+    .radar-gap-item { padding: 10px 0; border-top: 1px solid #f7d9d6; }
+    .radar-gap-item:first-child { padding-top: 0; border-top: 0; }
+    .radar-gap-item:last-child { padding-bottom: 0; }
+    .radar-gap-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .radar-gap-head strong { color: #b42318; font-size: 15px; }
+    .radar-gap-meta { color: #8a5a56; font-size: 12px; }
+    .radar-gap-title { margin: 5px 0 0; color: #52616a; font-size: 12px; line-height: 1.65; }
+    .radar-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    /* chip 容器里的占位/空态要占满一行，否则会被挤成一根窄条 */
+    .radar-chips > .antibot-empty { flex: 1 1 100%; }
+    .radar-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border: 1px solid #dbe3e5; border-radius: 999px; background: #f6f8f9; font-size: 12px; }
+    .radar-chip em { color: var(--admin-muted); font-size: 11px; font-style: normal; }
+    /* 词表外但我们已经写过 → 绿；完全没写过 → 红（越红越该看） */
+    .radar-chip.hit { border-color: #a7f3d0; background: #ecfdf5; }
+    .radar-chip.miss { border-color: #fecdca; background: #fff5f4; }
+
     .release-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(290px, .75fr); gap: 16px; }
     .release-card { min-width: 0; border: 1px solid var(--admin-line); border-radius: 14px; background: #fff; overflow: hidden; }
     .release-card h3 { margin: 0; padding: 14px 16px; border-bottom: 1px solid var(--admin-line); font-size: 16px; }
@@ -475,7 +520,7 @@
       .source-metrics { grid-template-columns: 1fr 1fr; }
       .tab-panel { padding-top: 16px; }
     }
-    /* 手机竖屏（≤767px）：反爬看板改单列，表格横向滚动，不压缩到看不清 */
+    /* 手机竖屏（≤767px）：反爬看板 / 海外标题雷达改单列，表格横向滚动，不压缩到看不清 */
     @media (max-width: 767px) {
       .antibot-grid { grid-template-columns: 1fr; }
       .antibot-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -483,6 +528,14 @@
       .antibot-head-actions { margin-top: 10px; }
       .antibot-head-actions .action { flex: 1 1 44%; }
       .antibot-table { min-width: 560px; }
+      /* 雷达：天数/条数选择与刷新按钮各占满半行，指标区两列，缺口条目竖排 */
+      .tab-panel[data-panel="radar"] .section-head { display: block; }
+      .radar-controls { width: 100%; }
+      .radar-control { flex: 1 1 40%; }
+      .radar-control select { flex: 1 1 auto; min-width: 0; }
+      .radar-gap-head { display: block; }
+      .radar-gap-meta { display: block; margin-top: 3px; }
+      .radar-gap-item { padding: 12px 0; }
     }
   </style>
   <style>
@@ -596,6 +649,23 @@
   body.skin-darkblue .antibot-empty,body.skin-darkblue .antibot-url{color:#8ea6c8}
   body.skin-darkblue .antibot-note.info{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.3);color:#6ee7b7}
   body.skin-darkblue .antibot-note.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.3);color:#fbbf24}
+  /* 深蓝：海外标题雷达（看板/卡片/表格/提示条已复用反爬看板的深蓝规则，这里只补雷达特有部分） */
+  body.skin-darkblue .radar-control select{background:#0e1d3a;border-color:rgba(96,165,250,.28);color:#e6f0ff}
+  body.skin-darkblue .radar-meta,body.skin-darkblue .radar-who,body.skin-darkblue .radar-titles,body.skin-darkblue .radar-block-hint{color:#8ea6c8}
+  body.skin-darkblue .radar-titles > summary{color:#7dd3fc}
+  body.skin-darkblue .radar-titles-item{border-left-color:rgba(96,165,250,.3)}
+  body.skin-darkblue .radar-gap{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.32)}
+  body.skin-darkblue .radar-gap > h4,body.skin-darkblue .radar-gap-head strong{color:#fca5a5}
+  body.skin-darkblue .radar-gap-item{border-color:rgba(248,113,113,.24)}
+  body.skin-darkblue .radar-gap-meta{color:#e5a9a5}
+  body.skin-darkblue .radar-gap-title{color:#cbd5e1}
+  body.skin-darkblue .radar-chip{background:#12233f;border-color:rgba(96,165,250,.28);color:#dbeafe}
+  body.skin-darkblue .radar-chip.hit{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.3)}
+  body.skin-darkblue .radar-chip.miss{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3)}
+  body.skin-darkblue .radar-status.covered{background:rgba(16,185,129,.18);color:#6ee7b7}
+  body.skin-darkblue .radar-status.gap{background:rgba(248,113,113,.18);color:#fca5a5}
+  body.skin-darkblue .radar-status.out{background:rgba(148,163,184,.18);color:#cbd5e1}
+  body.skin-darkblue .radar-status.unknown{background:rgba(245,158,11,.18);color:#fbbf24}
   </style>
 </head>
 <body>
@@ -785,6 +855,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <button class="tab-button" type="button" role="tab" data-tab="topics" onclick="setTab('topics')">内部主题</button>
           <button class="tab-button" type="button" role="tab" data-tab="attention" onclick="setTab('attention')">注意力方向</button>
           <button class="tab-button" type="button" role="tab" data-tab="sources" onclick="setTab('sources')">来源管理</button>
+          <button class="tab-button" type="button" role="tab" data-tab="radar" onclick="setTab('radar')">海外标题雷达</button>
           <button class="tab-button" type="button" role="tab" data-tab="releases" onclick="setTab('releases')">版本与生命周期</button>
           <button class="tab-button" type="button" role="tab" data-tab="remote" onclick="setTab('remote')">分布式服务设置</button>
         </nav>
@@ -978,6 +1049,92 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div class="antibot-empty" id="antibotSourceEmpty">暂无被拦截的信源。所有信源都处于健康状态，不需要额外处置。</div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 海外标题雷达：独立标签页。只用标题做趋势信号与覆盖度审计——不抓正文、不产生候选、不占爬取槽 -->
+        <section class="tab-panel" data-panel="radar">
+          <div class="section-head">
+            <div>
+              <h3>海外标题雷达</h3>
+              <p>只用标题做信号，不抓正文、不占爬取槽。把 buzzing.cc 的海外财经头条标题当作「外面在炒什么」的探针，再对着本行业包的词表和我方已发布文章，回答一个问题：<b>海外今天在炒什么，我们漏了什么</b>。</p>
+            </div>
+            <div class="antibot-head-actions radar-controls">
+              <label class="radar-control" for="radarDays">天数
+                <select id="radarDays" onchange="loadBuzzingRadar()">
+                  <option value="1">1 天</option>
+                  <option value="2" selected>2 天</option>
+                  <option value="3">3 天</option>
+                  <option value="7">7 天</option>
+                </select>
+              </label>
+              <label class="radar-control" for="radarTop">条数
+                <select id="radarTop" onchange="loadBuzzingRadar()">
+                  <option value="10">10 条</option>
+                  <option value="15" selected>15 条</option>
+                  <option value="25">25 条</option>
+                  <option value="50">50 条</option>
+                </select>
+              </label>
+              <button class="action secondary" type="button" id="radarRefreshBtn" onclick="loadBuzzingRadar()">刷新</button>
+            </div>
+          </div>
+
+          <div class="antibot-board" id="radarBoard">
+            <div class="antibot-note" id="radarNote"></div>
+
+            <div class="source-metrics antibot-metrics">
+              <div class="metric healthy"><strong id="radarFeedCount">0</strong><span>feed 源</span></div>
+              <div class="metric healthy"><strong id="radarEntryCount">0</strong><span>抓到的标题条目</span></div>
+              <div class="metric"><strong id="radarVocabulary">0</strong><span>本包词表规模</span></div>
+              <div class="metric warn"><strong id="radarGapCount">0</strong><span>覆盖缺口（词表内 0 篇）</span></div>
+            </div>
+            <p class="radar-meta" id="radarGenerated">选择行业包后显示统计口径与生成时间。</p>
+            <p class="radar-meta" id="radarFeeds"></p>
+
+            <div class="antibot-grid">
+              <div class="antibot-card">
+                <h4>出处排行</h4>
+                <div class="antibot-scroll">
+                  <table class="antibot-table radar-table-narrow">
+                    <thead><tr><th>媒体 / 出处</th><th>标题条数</th></tr></thead>
+                    <tbody id="radarPublisherRows"></tbody>
+                  </table>
+                </div>
+                <div class="antibot-empty" id="radarPublisherEmpty">选择行业包后显示出处排行。</div>
+              </div>
+
+              <div class="antibot-card">
+                <h4>热词榜</h4>
+                <div class="antibot-scroll">
+                  <table class="antibot-table">
+                    <thead><tr><th>热词</th><th>海外条数</th><th>我方标题命中</th><th id="radarTrendHead">近 2 天趋势</th><th>状态</th></tr></thead>
+                    <tbody id="radarHotRows"></tbody>
+                  </table>
+                </div>
+                <div class="antibot-empty" id="radarHotEmpty">选择行业包后显示热词榜。</div>
+              </div>
+            </div>
+
+            <p class="radar-meta" style="margin:12px 0 0">
+              <b>三列怎么读</b>：「我方标题命中」= 我方历史文章<b>标题</b>含该词的篇数（<b>—</b> 表示查询不可用，不是 0）；
+              「近 N 天趋势」= 近 N 天趋势命中该词的篇数，<b>只对行业包词表内的词有值</b>，其余恒为 —；
+              状态徽标：<span class="radar-status covered">已覆盖</span>&nbsp;我方写过 ·
+              <span class="radar-status gap">缺口</span>&nbsp;词表内有、我方 0 篇 ·
+              <span class="radar-status out">词表外</span>&nbsp;本包词表里没有这个词 ·
+              <span class="radar-status unknown">无法判定</span>&nbsp;覆盖数据拿不到（<b>不等于缺口</b>）。
+            </p>
+
+            <!-- 覆盖缺口：真正的行动项，整块红底强调，放在两张表下方单独一行 -->
+            <div class="radar-block radar-gap">
+              <h4>覆盖缺口 <span class="radar-block-hint">词表里有、我方 0 篇——优先处理这些</span></h4>
+              <div id="radarGapList"><div class="antibot-empty">选择行业包后显示覆盖缺口。</div></div>
+            </div>
+
+            <div class="radar-block">
+              <h4>词表里没有的词 <span class="radar-block-hint">海外在炒、但不在本行业包词表里；确认有价值就加进「关键词门控」</span></h4>
+              <div class="radar-chips" id="radarNewChips"><div class="antibot-empty">选择行业包后显示词表外热词。</div></div>
             </div>
           </div>
         </section>
@@ -1271,6 +1428,7 @@ function setTab(name) {
   if (name === 'remote') loadRemoteConfig();
   if (name === 'attention') loadAttention();
   if (name === 'sources') loadAntibotBoard();
+  if (name === 'radar') loadBuzzingRadar();
 }
 
 // ── 注意力方向（周报「下周关注」→ 追踪关键词 → 动态主题）──
@@ -1854,6 +2012,171 @@ async function reloadAntibotRules() {
     await loadAntibotBoard();
   } catch (error) {
     antibotNote('反爬规则热加载失败：' + (error.message || error), 'warn');
+  } finally {
+    if (button) { button.disabled = false; button.classList.remove('is-busy'); }
+  }
+}
+
+// ── 海外标题雷达：海外今天在炒什么、我们漏了什么 ──
+// 数据来自 /api/intel/buzzing-radar（按行业包收口）。只用标题做信号，不抓正文、不产生候选。
+// 三个字段的语义必须在展示上体现准确，不能糊：
+//   our_title_hits    —— 我方历史文章「标题」含该词的篇数（null = 查询不可用，不是 0 篇）
+//   our_trend_articles—— 近 days 天「趋势命中」该词的篇数（只对词表内的词有值，其余恒为 null）
+//   covered           —— true=已覆盖 / false=缺口 / null=无法判定（不能显示成「缺口」）
+function radarNote(text, kind = 'info') {
+  const box = $('radarNote');
+  if (!box) return;
+  box.textContent = text || '';
+  box.className = 'antibot-note ' + kind;
+  box.style.display = text ? 'block' : 'none';
+}
+
+// 数字展示：null/undefined 一律显示「—」，绝不悄悄变成 0——否则「查不到」会被误读成「没覆盖」
+function radarNum(value, emptyText = '—') {
+  if (value === null || value === undefined || value === '') return emptyText;
+  const num = Number(value);
+  return Number.isFinite(num) ? String(num) : emptyText;
+}
+
+// 状态徽标：先判词表、再判覆盖，保证「缺口」严格等于后端 missing_terms 的口径
+// （词表内 + 我方 0 篇）；「无法判定」单独给黄色，绝不并进红色缺口里。
+function radarBadge(row = {}) {
+  if (row.in_vocabulary !== true) return '<span class="radar-status out">词表外</span>';
+  if (row.covered === true) return '<span class="radar-status covered">已覆盖</span>';
+  if (row.covered === false) return '<span class="radar-status gap">缺口</span>';
+  return '<span class="radar-status unknown">无法判定</span>';
+}
+
+// 示例标题：默认折叠，点开才展开（手机上不占屏，也不会把表格行撑成一大坨）
+function radarTitles(titles) {
+  const list = (titles || []).filter(Boolean);
+  if (!list.length) return '';
+  return `<details class="radar-titles"><summary>看 ${list.length} 条示例标题</summary>`
+    + list.map(text => `<div class="radar-titles-item">${esc(text)}</div>`).join('')
+    + '</details>';
+}
+
+// 空态 / 加载中 / 失败：四块内容一起清空并给同一句文案，避免出现「半张空表」
+function radarPlaceholder(message) {
+  [['radarPublisherRows', 'radarPublisherEmpty'], ['radarHotRows', 'radarHotEmpty']].forEach(pair => {
+    const rows = $(pair[0]);
+    const empty = $(pair[1]);
+    if (rows) rows.innerHTML = '';
+    if (empty) { empty.textContent = message; empty.style.display = 'block'; }
+  });
+  const gapList = $('radarGapList');
+  const chips = $('radarNewChips');
+  const box = `<div class="antibot-empty">${esc(message)}</div>`;
+  if (gapList) gapList.innerHTML = box;
+  if (chips) chips.innerHTML = box;
+}
+
+function renderBuzzingRadar(payload = {}, days = 2) {
+  const feeds = payload.feeds || [];
+  const publishers = payload.publishers || [];
+  const hotTerms = payload.hot_terms || [];
+  const missing = payload.missing_terms || [];
+  const newTerms = payload.new_terms || [];
+  const put = (id, text) => { const node = $(id); if (node) node.textContent = text; };
+
+  // 顶部状态：feed 数量与条目数、生成时间
+  put('radarFeedCount', radarNum(feeds.length, '0'));
+  put('radarEntryCount', radarNum(payload.entry_count, '0'));
+  put('radarVocabulary', radarNum(payload.vocabulary_size, '0'));
+  put('radarGapCount', radarNum(missing.length, '0'));
+  put('radarGenerated', '生成时间 ' + (payload.generated_at || '—')
+    + ' · 统计口径：最近 ' + radarNum(payload.days, days) + ' 天 · 行业包 '
+    + (payload.industry_pack_id || selected || '—'));
+  put('radarFeeds', feeds.length
+    ? 'feed：' + feeds.map(item => `${String(item.feed || '').replace(/^https?:\/\//, '')} ${radarNum(item.entry_count, '0')} 条`
+        + (item.error ? '（拉取失败）' : '')).join(' · ')
+    : '没有配置可用的 feed 源。');
+  const trendHead = $('radarTrendHead');
+  if (trendHead) trendHead.textContent = '近 ' + radarNum(payload.days, days) + ' 天趋势';
+
+  // feed 拉取失败：黄色提示条（部分失败也要报，否则数据会静默变少）
+  const failed = feeds.filter(item => item && item.error);
+  if (failed.length) {
+    const detail = String(failed[0].error || '').slice(0, 160);
+    radarNote(`有 ${failed.length} 个 feed 拉取失败，下面的统计只覆盖成功的部分：`
+      + `${failed[0].feed || '未知 feed'} —— ${detail}`, 'warn');
+  } else {
+    radarNote('');
+  }
+
+  // 出处排行
+  $('radarPublisherRows').innerHTML = publishers.map(item => `
+    <tr><td><span class="antibot-name">${esc(item.publisher || '未知出处')}</span></td>
+    <td class="num">${radarNum(item.count, '0')}</td></tr>`).join('');
+  $('radarPublisherEmpty').textContent = '这个时间窗内没有解析到出处：可能是 feed 为空，或全都拉取失败。';
+  $('radarPublisherEmpty').style.display = publishers.length ? 'none' : 'block';
+
+  // 热词榜
+  $('radarHotRows').innerHTML = hotTerms.map(item => {
+    const who = (item.publishers || []).filter(Boolean);
+    const whoText = who.length
+      ? `<span class="radar-who">${esc(who.slice(0, 3).join(' · '))}${who.length > 3 ? ' 等 ' + who.length + ' 家' : ''}</span>`
+      : '';
+    const tags = [item.in_lexicon ? '通用财经词库' : '', item.in_vocabulary ? '本包词表' : ''].filter(Boolean);
+    const tagText = tags.length ? `<span class="radar-who">${esc(tags.join(' · '))}</span>` : '';
+    return `<tr>
+      <td><span class="radar-term">${esc(item.term || '')}</span>${whoText}${tagText}${radarTitles(item.titles)}</td>
+      <td class="num">${radarNum(item.count, '0')}</td>
+      <td class="num">${radarNum(item.our_title_hits)}</td>
+      <td class="num">${radarNum(item.our_trend_articles)}</td>
+      <td>${radarBadge(item)}</td>
+    </tr>`;
+  }).join('');
+  $('radarHotEmpty').textContent = '这个时间窗内没有抽到热词：换更大的天数，或等下一轮 feed 更新。';
+  $('radarHotEmpty').style.display = hotTerms.length ? 'none' : 'block';
+
+  // 覆盖缺口（行动项）：词表内 + 我方 0 篇
+  $('radarGapList').innerHTML = missing.length
+    ? missing.map(item => {
+        const sample = (item.titles || []).filter(Boolean)[0] || '';
+        return `<div class="radar-gap-item">
+          <div class="radar-gap-head">
+            <strong>${esc(item.term || '')}</strong>
+            <span class="radar-gap-meta">海外 ${radarNum(item.count, '0')} 条 · 我方标题命中 ${radarNum(item.our_title_hits)}
+              · 近 ${radarNum(payload.days, days)} 天趋势 ${radarNum(item.our_trend_articles)}</span>
+          </div>
+          ${sample ? `<p class="radar-gap-title">示例标题：${esc(sample)}</p>` : '<p class="radar-gap-title">这个热词在当前条目里没有可用示例标题。</p>'}
+        </div>`;
+      }).join('')
+    : '<div class="antibot-empty">没有覆盖缺口：词表里的海外热词，我方都有文章覆盖。</div>';
+
+  // 词表里没有的词（chip）：海外在炒但本包词表没收
+  $('radarNewChips').innerHTML = newTerms.length
+    ? newTerms.map(item => {
+        const hits = Number(item.our_title_hits);
+        const kind = item.our_title_hits === null || item.our_title_hits === undefined
+          ? ''
+          : (hits > 0 ? ' hit' : ' miss');
+        return `<span class="radar-chip${kind}">${esc(item.term || '')}<em>海外 ${radarNum(item.count, '0')} · 我方标题 ${radarNum(item.our_title_hits)}</em></span>`;
+      }).join('')
+    : '<div class="antibot-empty">没有词表外的热词：海外在炒的词都已经在本包词表里了。</div>';
+}
+
+async function loadBuzzingRadar() {
+  if (!$('radarHotRows')) return;
+  const button = $('radarRefreshBtn');
+  const days = Number(($('radarDays') || {}).value) || 2;
+  const top = Number(($('radarTop') || {}).value) || 15;
+  if (!selected) {
+    radarPlaceholder('请先在左侧选择一个行业包，再看这个包漏掉了哪些海外热词。');
+    radarNote('未选择行业包：海外标题雷达的覆盖缺口是按行业包统计的。', 'warn');
+    return;
+  }
+  if (button) { button.disabled = true; button.classList.add('is-busy'); }
+  radarNote('正在抓取海外头条标题并做覆盖审计…（只读标题，不抓正文、不占用爬取）');
+  radarPlaceholder('加载中…');
+  try {
+    const payload = await api('/api/intel/buzzing-radar?industry_pack_id=' + encodeURIComponent(selected)
+      + '&top=' + encodeURIComponent(top) + '&days=' + encodeURIComponent(days));
+    renderBuzzingRadar(payload, days);
+  } catch (error) {
+    radarPlaceholder('加载失败，点右上角「刷新」重试。');
+    radarNote('海外标题雷达加载失败：' + (error.message || error), 'warn');
   } finally {
     if (button) { button.disabled = false; button.classList.remove('is-busy'); }
   }
@@ -2669,6 +2992,8 @@ function renderDraft(payload) {
   filterSources();
   // 切包后同步刷新反爬看板（仅在来源管理页时请求，避免多余调用）
   if (currentTab === 'sources') loadAntibotBoard();
+  // 海外标题雷达不在这里再挂一次钩子：下面 setTab(currentTab) 已按当前标签页触发，
+  // 这里再调一次就会变成同一个接口发两次请求。
   $('diff').textContent = JSON.stringify(payload.diff, null, 2);
   $('summary').textContent = `草稿修订 ${revision} · 配置版本 ${draft.pack_version} · schema v${draft.schema_version}`;
   $('editorMeta').innerHTML = [

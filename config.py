@@ -385,6 +385,14 @@ AGENT_REACH_MAX_ITEMS_PER_QUERY = _env_int('AGENT_REACH_MAX_ITEMS_PER_QUERY', 5,
 AGENT_REACH_TIMEOUT_SECONDS = _env_int('AGENT_REACH_TIMEOUT_SECONDS', 90, 10, 900)
 AGENT_REACH_MAX_CALLS_PER_RUN = _env_int('AGENT_REACH_MAX_CALLS_PER_RUN', 6, 1, 100)
 
+# buzzing.cc 海外财经标题雷达（2026-10-07）：只用标题做趋势信号与覆盖度审计，
+# 不抓正文、不产生候选、不占爬取槽——按需实时计算（页面/接口/命令行触发），常开无成本。
+# 可写子站别名（finance/stocks/bbg/ft/wsj/tech/crypto）或完整 feed URL，逗号分隔。
+BUZZING_RADAR_ENABLED = _env_bool('BUZZING_RADAR_ENABLED', True)
+BUZZING_RADAR_FEEDS = _env_str('BUZZING_RADAR_FEEDS', 'finance')
+BUZZING_RADAR_MAX_ENTRIES = _env_int('BUZZING_RADAR_MAX_ENTRIES', 200, 10, 2000)
+BUZZING_RADAR_CACHE_SECONDS = _env_int('BUZZING_RADAR_CACHE_SECONDS', 600, 0, 86400)
+
 # 财经新闻刷新：默认关闭；即使开启也只提示"高级版本目前不支持"，不产生任何外部调用。
 FINANCIAL_NEWS_REFRESH_ENABLED = _env_bool('FINANCIAL_NEWS_REFRESH_ENABLED', False)
 

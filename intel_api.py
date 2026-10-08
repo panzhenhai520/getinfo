@@ -4172,6 +4172,34 @@ def _antibot_report_for_pack(pack_id: str, limit: int = 500) -> dict:
     }
 
 
+@intel_bp.route("/buzzing-radar", methods=["GET"])
+@login_required
+def buzzing_headline_radar():
+    """buzzing.cc 海外财经标题雷达（行业包管理页「海外标题雷达」区块）。
+
+    只用标题做信号，**不抓正文、不产生候选、不占爬取槽**，所以可以放心常开。
+    返回 {entry_count, feeds:[{feed,entry_count,cached,error}],
+          publishers:[{publisher,count}],
+          hot_terms:[{term,count,publishers,titles,in_vocabulary,in_lexicon,
+                      our_title_hits,our_trend_articles,covered}],
+          missing_terms:[...]（词表内但我方 0 篇）, new_terms:[...]（我方词表里没有的词）,
+          vocabulary_size, generated_at, days}
+    """
+    request_id = _request_id()
+    try:
+        pack_id = _industry_pack_id(str(request.args.get("industry_pack_id") or ""))
+        top = coerce_int(request.args.get("top"), 15, 1, 50)
+        days = coerce_int(request.args.get("days"), 2, 1, 30)
+        import buzzing_radar
+
+        report = buzzing_radar.radar_report(pack_id, days=days, top=top)
+        return jsonify({"success": True, "request_id": request_id, **report})
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception:
+        return _error("海外标题雷达查询失败", 500, request_id=request_id)
+
+
 @intel_bp.route("/antibot/health-report", methods=["GET"])
 @login_required
 def antibot_health_report():

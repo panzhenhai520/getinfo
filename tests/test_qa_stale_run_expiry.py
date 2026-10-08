@@ -9,16 +9,25 @@
 这里钉住：超过阈值没推进的运行会被回收，不再占用配额；未超阈值的不受影响。
 """
 import os
+import shutil
 import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-_TEMP = tempfile.TemporaryDirectory()
+# 用 mkdtemp 而不是 TemporaryDirectory：后者会在解释器退出时做 rmtree，
+# 而这里的库文件可能已被 SQLite 关闭流程改动，rrmtree 在 Windows 上偶发
+# NotADirectoryError，把整个 pytest 收尾炸掉（连"共几个通过"都打不出来）。
+# 改成显式清理 + ignore_errors，目录泄漏交给系统临时目录策略处理。
+_TEMP_PATH = tempfile.mkdtemp(prefix="qa-stale-")
 os.environ["DATABASE_TYPE"] = "sqlite"
-os.environ["SQLITE_BACKUP_PATH"] = os.path.join(_TEMP.name, "qa-stale.sqlite3")
+os.environ["SQLITE_BACKUP_PATH"] = os.path.join(_TEMP_PATH, "qa-stale.sqlite3")
 os.environ["DATABASE_PATH"] = os.environ["SQLITE_BACKUP_PATH"]
+
+
+def tearDownModule():
+    shutil.rmtree(_TEMP_PATH, ignore_errors=True)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
