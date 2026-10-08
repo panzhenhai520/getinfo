@@ -65,26 +65,40 @@ def _rows_needing_backfill(db, *, statuses, limit: int = 0):
 
 
 def _derive(row, *, include_discovered: bool):
-    """给一篇文章定出 (published_at, precision, source)；拿不到返回 None。"""
+    """给一篇文章定出 (published_at, precision, source)；拿不到返回 None。
+
+    与入库闸门共用同一条"未来日期不可采信"规则（article_identity._is_implausible_future_date，
+    容忍 90 天内的预告日期）：A 机实测有 `published_at_utc=2027-12-01` 这种从正文里误抽出来的
+    未来日期——回填时若原样搬运，等于把脏日期灌进排序与时间过滤。遇到就**跳过该来源**，
+    继续尝试 URL/正文（而不是直接放弃）。
+    """
     from publish_time import (
-        PRECISION_DISCOVERED, article_time_fields, parse_text_date, parse_url_date,
+        PRECISION_DISCOVERED, parse_text_date, parse_url_date,
     )
 
+    try:
+        from article_identity import _is_implausible_future_date
+    except Exception:
+        def _is_implausible_future_date(value):
+            return False
+
     existing = str(row.get("publish_date") or "").strip()
-    if existing:
+    if existing and not _is_implausible_future_date(existing):
         precision = str(row.get("published_precision") or "").strip()
         source = str(row.get("published_time_source") or "").strip() or "publish_date"
         if source.startswith("crawl_watermark"):
             # 水位线只能证明"在采集窗口内"，不是发布时间本身
             precision = precision or PRECISION_DISCOVERED
         return existing, precision, source, "publish_date"
+    if existing:
+        print("   ⏭️ 跳过不可采信的未来发布日期 %s（id=%s）" % (existing[:10], row.get("id")))
 
     parsed = parse_url_date(str(row.get("url") or ""))
     if parsed[0]:
         return parsed[0], parsed[1], "url", "url"
     for key in ("head_text", "tail_text"):
         parsed = parse_text_date(str(row.get(key) or ""))
-        if parsed[0]:
+        if parsed[0] and not _is_implausible_future_date(parsed[0]):
             return parsed[0], parsed[1], "content_" + key.split("_")[0], "content"
 
     if include_discovered:
@@ -165,6 +179,60 @@ def rollback(db, path: str) -> int:
     return restored
 
 
+def clear_implausible(db, *, statuses, apply: bool) -> int:
+    """清掉"不可采信的未来时间"（超过今天 + 90 天）。
+
+    这类值多半是早期从正文里误抽出来的（实测 A 机有 2027-12-01），
+    清空后重跑回填即可按 URL/正文重新取值，而不是把脏日期留在排序与时间过滤里。
+    """
+    try:
+        from article_identity import _is_implausible_future_date
+    except Exception:
+        return 0
+    db._ensure_connection()
+    where = ["COALESCE(published_at_utc,'') <> ''"]
+    params = []
+    if statuses:
+        where.append("status IN (%s)" % ",".join("?" for _ in statuses))
+        params.extend(statuses)
+    with db.lock:
+        cur = db.connection.cursor()
+        try:
+            cur.execute(
+                "SELECT id, published_at_utc, title FROM articles WHERE " + " AND ".join(where),
+                tuple(params),
+            )
+            victims = [dict(row) for row in cur.fetchall()]
+        finally:
+            cur.close()
+    victims = [row for row in victims if _is_implausible_future_date(row["published_at_utc"])]
+    print("\n不可采信的未来时间（> 今天 + 90 天）：%d 条" % len(victims))
+    for row in victims[:10]:
+        print("   id=%s %s  %s" % (row["id"], str(row["published_at_utc"])[:10],
+                                   str(row.get("title") or "")[:40]))
+    if not victims or not apply:
+        if victims:
+            print("   [dry-run] 未清理；加 --apply 一起清掉（随后重跑回填会自动重新取值）")
+        return len(victims)
+    ids = [int(row["id"]) for row in victims]
+    with db.lock:
+        cur = db.connection.cursor()
+        try:
+            for chunk_start in range(0, len(ids), 200):
+                chunk = ids[chunk_start:chunk_start + 200]
+                marks = ",".join("?" for _ in chunk)
+                cur.execute(
+                    "UPDATE articles SET published_at_utc='', published_timezone='',"
+                    " published_precision='', published_time_source='' WHERE id IN (%s)" % marks,
+                    tuple(chunk),
+                )
+            db.connection.commit()
+        finally:
+            cur.close()
+    print("   已清空 %d 行（重跑回填会按 URL/正文重新取值）" % len(ids))
+    return len(ids)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="回填 articles.published_at_utc")
     parser.add_argument("--apply", action="store_true", help="真正写库（默认只读审计）")
@@ -173,6 +241,8 @@ def main(argv=None) -> int:
     parser.add_argument("--include-discovered", action="store_true",
                         help="允许用 first_crawled 兜底（标 precision=discovered）")
     parser.add_argument("--limit", type=int, default=0, help="只处理最新的 N 篇（0=全部）")
+    parser.add_argument("--fix-implausible", action="store_true",
+                        help="先清掉不可采信的未来时间（配合 --apply）")
     parser.add_argument("--rollback", default="", help="用备份文件回滚")
     args = parser.parse_args(argv)
 
@@ -185,6 +255,8 @@ def main(argv=None) -> int:
         return 0
 
     statuses = [] if args.all_status else ["active"]
+    if args.fix_implausible:
+        clear_implausible(sqlite_db, statuses=statuses, apply=bool(args.apply))
     total, filled, dated = _coverage(sqlite_db, statuses)
     label = "全部状态" if args.all_status else "status=active"
     print("=" * 84)

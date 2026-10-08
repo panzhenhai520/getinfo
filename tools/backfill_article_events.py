@@ -74,7 +74,9 @@ def _eligible(db, pack_id: str) -> int:
         pack_clause = "AND c.industry_pack_id=?"
         params.append(pack_id)
     sql = (
-        "SELECT COUNT(*) AS n FROM articles a"
+        # COUNT(DISTINCT a.id)：一篇文章可能被多个包归类，普通 COUNT 会把分母放大
+        # （实测 A 机被算成 6650，去重后是 4608）
+        "SELECT COUNT(DISTINCT a.id) AS n FROM articles a"
         " JOIN article_intel_classifications c ON c.article_id=a.id"
         " WHERE a.status='active' AND COALESCE(a.content,'')!=''"
         "   AND c.final_category IN ('trend','event')"
@@ -107,6 +109,9 @@ def main(argv=None) -> int:
                         help="并发线程数（受 INTEL_LLM_MAX_CONCURRENCY 上限约束，默认 2）")
     parser.add_argument("--max-consecutive-failures", type=int, default=3,
                         help="连续失败这么多批就停（默认 3）")
+    parser.add_argument("--max-minutes", type=float, default=0.0,
+                        help="最长运行多少分钟（0=不限）。生产上跑长任务要有边界："
+                             "到点就停并打印进度，下次重跑会自动接着跑（断点续跑）")
     parser.add_argument("--normalize-subjects", action="store_true",
                         help="抽完后跑实体归一（写 intel_subject_canonical）")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
@@ -172,6 +177,10 @@ def main(argv=None) -> int:
     failures = []
 
     while True:
+        if args.max_minutes and (time.monotonic() - started) >= float(args.max_minutes) * 60:
+            print("\n达到 --max-minutes 上限（%.0f 分钟），停止；重跑会自动接着抽。"
+                  % float(args.max_minutes))
+            break
         if args.batches and batches >= args.batches:
             print("\n达到 --batches 上限，停止。")
             break
