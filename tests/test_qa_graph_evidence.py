@@ -9,6 +9,7 @@
   4. 图事实与它的源文章是**两条**证据（图事实的 article_id 留空），
      既保留可回溯（metadata.article_id / article_url），又不会被按 article_id 去重挤掉全文。
 """
+import json
 import os
 import tempfile
 import unittest
@@ -256,6 +257,75 @@ class EvidenceContractTests(unittest.TestCase):
 
         schema = qa_contracts.EVIDENCE_SCHEMA["properties"]["source_type"]
         self.assertIn("graph", schema["enum"])
+
+
+class AdmissionReportTests(unittest.TestCase):
+    """覆盖率天花板账：四档准入口径的计数必须**按文章去重**（多包归属会重复计数）。"""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db = SQLiteDatabase(os.path.join(self.temp_dir.name, "admission.sqlite3"))
+        self.db.connect()
+        self.db.create_tables()
+        self.db.analyze_article_spacetime_profile = lambda _article_id: None
+        self.repo = IntelRepository(self.db)
+        self.repo._ensure()
+
+    def tearDown(self):
+        try:
+            self.db.connection.close()
+        except Exception:
+            pass
+        self.temp_dir.cleanup()
+
+    def _article(self, index, category, anchor, packs=("ai_news",)):
+        article_id = self.db.insert_article({
+            "url": "https://example.com/adm/%d" % index,
+            "title": "准入测试 %d" % index,
+            "content": "正文" * 30,
+            "publish_date": "2026-10-0%d" % (index % 9 + 1),
+            "matched_keywords": ["模型"],
+        })
+        details = json.dumps({"hits": {"anchor": ["模型"] if anchor else []}}, ensure_ascii=False)
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                for pack in packs:
+                    cursor.execute(
+                        "INSERT INTO article_intel_classifications(article_id, industry_pack_id,"
+                        " industry_pack_version, classifier_version, article_content_hash,"
+                        " rule_category, matched_keywords_json, topic_tags_json, final_category,"
+                        " score_details_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        (article_id, pack, "v1", "test", "h%d" % index, "other",
+                         "[]", "[]", category, details),
+                    )
+                self.db.connection.commit()
+            finally:
+                cursor.close()
+        return article_id
+
+    def test_counts_are_deduplicated_across_packs(self):
+        # 2 篇 trend/event + 锚点（当前口径）
+        self._article(1, "event", True)
+        self._article(2, "trend", True)
+        # 1 篇 trend 但没命中锚点；1 篇 other 类但有锚点
+        self._article(3, "trend", False)
+        self._article(4, "other", True)
+        # 1 篇同时归属两个包（同口径下只能算 1 篇）
+        self._article(5, "event", True, packs=("ai_news", "family_office"))
+
+        report = self.repo.admission_report(pack_id="")
+        self.assertEqual(report["base"], 3, "trend|event + 锚点：1、2、5 共 3 篇")
+        self.assertEqual(report["no_anchor"], 4, "放宽锚点：多出第 3 篇")
+        self.assertEqual(report["with_other"], 4, "纳入 other：多出第 4 篇")
+        self.assertEqual(report["widened"], 5)
+        self.assertEqual(report["extra_if_with_other"], 1)
+
+    def test_pack_filter(self):
+        self._article(11, "event", True, packs=("ai_news",))
+        self._article(12, "event", True, packs=("family_office",))
+        self.assertEqual(self.repo.admission_report(pack_id="ai_news")["base"], 1)
+        self.assertEqual(self.repo.admission_report(pack_id="family_office")["base"], 1)
 
 
 if __name__ == "__main__":

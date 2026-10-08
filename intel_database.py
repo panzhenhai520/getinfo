@@ -1311,6 +1311,59 @@ class IntelRepository:
             finally:
                 cursor.close()
 
+    def admission_report(self, *, pack_id: str = "") -> Dict:
+        """抽取准入的"阶梯账"：不同准入口径各有多少篇可抽（用于 60% 覆盖率决策）。
+
+        只读统计，不改任何口径。四档：
+          base      当前口径：活跃 / 有包归属 / trend|event / 命中锚点
+          no_anchor 放宽锚点要求（仍在 trend|event）
+          with_other 纳入 other 类（仍要求锚点）
+          widened   两者都放宽（上限参考）
+        """
+        self._ensure()
+        pack = str(pack_id or "").strip()
+        pack_clause = "AND _c.industry_pack_id=?" if pack else ""
+        anchor_clause = (
+            "AND json_array_length(COALESCE(json_extract(_c.score_details_json, '$.hits.anchor'), '[]')) > 0"
+        )
+        params: List = [pack] if pack else []
+
+        def count(extra: str) -> int:
+            with self.db.lock:
+                cursor = self.db.connection.cursor()
+                try:
+                    cursor.execute(
+                        f"""
+                        SELECT COUNT(DISTINCT a.id) AS n
+                        FROM articles a
+                        JOIN article_intel_classifications _c ON _c.article_id=a.id
+                        WHERE a.status='active'
+                          AND COALESCE(a.content, '') != ''
+                          {pack_clause}
+                          {extra}
+                        """,
+                        params,
+                    )
+                    row = cursor.fetchone()
+                    return int((row["n"] if hasattr(row, "keys") else row[0]) or 0)
+                finally:
+                    cursor.close()
+
+        base = count(f"AND _c.final_category IN ('trend', 'event') {anchor_clause}")
+        no_anchor = count("AND _c.final_category IN ('trend', 'event')")
+        with_other = count(f"{anchor_clause}")
+        widened = count("")
+        return {
+            "pack_id": pack or "*",
+            "base": base,
+            "no_anchor": no_anchor,
+            "with_other": with_other,
+            "widened": widened,
+            "extra_if_no_anchor": max(0, no_anchor - base),
+            "extra_if_with_other": max(0, with_other - base),
+            "extra_if_widened": max(0, widened - base),
+        }
+
     def aggregate_event_clusters(
         self, *, pack_id: str = "", days: int = 30,
         min_articles: int = 1, window: int = 7,

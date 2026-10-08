@@ -359,7 +359,10 @@ class KnowledgeGraphBuilder:
                 "article_count": len(node["article_ids"]), "event_count": node["event_count"],
                 "first_seen": node["first_seen"], "last_seen": node["last_seen"],
             })
-        edge_coverage = (len(edges) / float(len(events))) if events else None
+        # 边覆盖率只算**事件边 / 事件行**：属性边与事件行不是同一类东西，
+        # 混在一起会算出 >100% 的荒谬值（实测出现过 167.8%）。
+        event_edges = len(edges) - attribute_edges
+        edge_coverage = (event_edges / float(len(events))) if events else None
         summary = {
             "pack_id": pack_id or "*",
             "source_rows": len(events) + len(attributes),
@@ -367,7 +370,7 @@ class KnowledgeGraphBuilder:
             "attributes": len(attributes),
             "nodes": len(node_rows),
             "edges": len(edges),
-            "event_edges": len(edges) - attribute_edges,
+            "event_edges": event_edges,
             "attribute_edges": attribute_edges,
             # 兼容旧字段名：边覆盖率 = 边 / 事件行（属性行不算进分母）
             "edge_coverage": round(edge_coverage, 4) if edge_coverage is not None else None,

@@ -665,11 +665,29 @@ def build_qa_stage_handlers(
                 "time_window": _time_window,
                 "stats": stats,
             })
+        # 知识图谱证据回执（阶段 8 扩展）：图事实用了多少条、按什么权重、
+        # 有没有因为"有效期还没生效"被挡掉——必须让上层与用户看得见，否则无从判断答案依据。
+        _graph = dict(local.get("graph") or {})
+        if callable(emit_stage_event) and _graph.get("enabled") and _graph.get("used"):
+            _graph_message = "图谱事实 %s 条（事件 %s / 属性 %s）" % (
+                _graph.get("used"), _graph.get("event", 0), _graph.get("attribute", 0))
+            _weights = _graph.get("weights") or {}
+            if _weights:
+                _graph_message += "；权重 事件 %.2f / 属性 %.2f" % (
+                    float(_weights.get("event", 0)), float(_weights.get("attribute", 0)))
+            if _graph.get("filtered_by_validity"):
+                _graph_message += "；另有 %s 条属性因查询时点未生效被排除" % _graph.get("filtered_by_validity")
+            emit_stage_event("stage_progress", {
+                "message": _graph_message,
+                "graph": _graph,
+                "stats": stats,
+            })
         result = {
             "queries": list(retrieval_plan.get("queries") or []),
             "evidence": evidence,
             "excluded": {**dict(local.get("excluded") or {}), "policy": policy_audit, "material_cleaning": material_audit},
             "stats": stats,
+            "graph": _graph,
             "search_status": external.get("status"),
             "search_providers": external.get("providers") or [],
             "search_errors": external.get("errors") or [],

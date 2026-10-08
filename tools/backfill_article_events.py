@@ -152,6 +152,27 @@ def main(argv=None) -> int:
              state["placeholders"], state["canonicals"], state["rows_with_state"]))
     print("待抽取（活跃 / 有包归属 / trend|event / 命中锚点 / 未抽过）: %d 篇" % eligible)
 
+    # 覆盖率天花板账：让"要不要放宽准入"变成可决策的数字（实测产出率约 59%）
+    try:
+        admission = intel_repository.admission_report(pack_id=str(args.pack or ""))
+        YIELD = 0.59  # 实测：送抽文章里约 59% 能抽出至少一个事件
+        ceiling = lambda n: 100.0 * min(1.0, (state["covered"] + YIELD * n) / max(1, state["active"]))  # noqa: E731
+        print("\n覆盖率天花板（按实测产出率 %.0f%% 估算）：" % (YIELD * 100))
+        print("  当前口径      准入 %5d 篇 → 天花板约 %.0f%%   （阶段 7 验收线 60%%）"
+              % (admission["base"], ceiling(admission["base"])))
+        print("  放宽锚点要求  准入 %5d 篇（+%d）→ 天花板约 %.0f%%"
+              % (admission["no_anchor"], admission["extra_if_no_anchor"],
+                 ceiling(admission["no_anchor"])))
+        print("  纳入 other 类 准入 %5d 篇（+%d）→ 天花板约 %.0f%%"
+              % (admission["with_other"], admission["extra_if_with_other"],
+                 ceiling(admission["with_other"])))
+        print("  两者都放宽    准入 %5d 篇（+%d）→ 天花板约 %.0f%%"
+              % (admission["widened"], admission["extra_if_widened"],
+                 ceiling(admission["widened"])))
+        summary["admission"] = admission
+    except Exception as exc:
+        print("\n[提示] 准入阶梯统计失败（不影响回填）：%s" % str(exc)[:120])
+
     if not args.apply:
         print("\n[dry-run] 未调用 LLM。确认后加 --apply（断点续跑，可随时中断重跑）。")
         if args.json:
