@@ -1,0 +1,25 @@
+[Unit]
+Description=CollectInfo 采集回填值班（白天 1 并发让路机器人 / 夜间放开 / 每日验收留档）
+Documentation=file:///www/CollectInfo_latest_new/ops/crawl_supervisor.sh
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/www/CollectInfo_latest_new
+Environment=DAY_WORKERS=1
+Environment=NIGHT_WORKERS=2
+Environment=NIGHT_START=1
+Environment=NIGHT_END=7
+Environment=ACCEPT_HOUR=8
+ExecStart=/bin/bash /www/CollectInfo_latest_new/ops/crawl_supervisor.sh
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+# 值班本身很轻（每 10 分钟检查一次），真正的负载在容器里
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
