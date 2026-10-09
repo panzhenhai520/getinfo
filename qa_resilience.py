@@ -16,6 +16,9 @@ from qa_schema import ensure_qa_tables
 STAGE_BUDGET_SECONDS = {
     "plan": 3,
     "level1_retrieval": 10,
+    # 阶段 9：多跳按跳累加（受 QA_MULTI_HOP_BUDGET_SECONDS 二次约束）
+    "multi_hop": 25,
+    "logic_validation": 3,
     "level1_draft_first_token": 30,
     "level1_draft": 60,
     "level2_query": 12,

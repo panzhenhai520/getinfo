@@ -18,6 +18,7 @@ from qa_resilience import STAGE_BUDGET_SECONDS
 FULL_STAGES = (
     "plan",
     "level1_retrieval",
+    "logic_validation",
     "level1_draft",
     "level2_retrieval",
     "level2_research",
@@ -28,12 +29,15 @@ FULL_STAGES = (
 FAST_STAGES = (
     "plan",
     "level1_retrieval",
+    "logic_validation",
     "level1_draft",
     "synthesis",
     "citation_validation",
 )
 TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
-DEGRADABLE_STAGES = frozenset({"level2_retrieval", "level2_research"})
+# logic_validation 允许"降级通过"：多跳有缺口时必须继续出答案，
+# 但缺口要在阶段结果里显式标注（不能悄悄跳过）。
+DEGRADABLE_STAGES = frozenset({"level2_retrieval", "level2_research", "logic_validation"})
 
 
 def _digest(value) -> str:

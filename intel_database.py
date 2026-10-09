@@ -1311,6 +1311,81 @@ class IntelRepository:
             finally:
                 cursor.close()
 
+    def upsert_business_rules(self, *, pack_id: str, rules: List[Dict], version: str = "") -> int:
+        """幂等写入规则（同 (包, rule_key) 覆盖；人工加的规则不会被包配置同步删掉）。"""
+        self._ensure()
+        pack = str(pack_id or "").strip()
+        if not pack or not rules:
+            return 0
+        now = utc_text()
+        payload = []
+        for rule in rules:
+            rule_key = str(rule.get("rule_key") or "").strip()
+            if not rule_key:
+                continue
+            payload.append((
+                pack, rule_key, str(rule.get("rule_type") or "keyword"),
+                json.dumps(rule.get("condition") or {}, ensure_ascii=False),
+                json.dumps(rule.get("action") or {}, ensure_ascii=False),
+                str(rule.get("source") or "pack_config"),
+                int(rule.get("priority") or 0),
+                1 if rule.get("is_enabled", True) else 0,
+                str(version or ""), now, now,
+            ))
+        if not payload:
+            return 0
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                cursor.executemany(
+                    """
+                    INSERT INTO intel_business_rules (
+                        industry_pack_id, rule_key, rule_type, condition_json, action_json,
+                        source, priority, is_enabled, version, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(industry_pack_id, rule_key) DO UPDATE SET
+                        rule_type=excluded.rule_type,
+                        condition_json=excluded.condition_json,
+                        action_json=excluded.action_json,
+                        source=excluded.source,
+                        priority=excluded.priority,
+                        version=excluded.version,
+                        updated_at=excluded.updated_at
+                    """,
+                    payload,
+                )
+                self.db.connection.commit()
+                return len(payload)
+            finally:
+                cursor.close()
+
+    def list_business_rules(self, *, pack_id: str = "", enabled_only: bool = True) -> List[Dict]:
+        """按包取规则（优先级降序：追踪方向 > 固定主题 > 核心关键词）。"""
+        self._ensure()
+        where = []
+        params: List = []
+        if str(pack_id or "").strip():
+            where.append("industry_pack_id=?")
+            params.append(str(pack_id))
+        if enabled_only:
+            where.append("is_enabled=1")
+        clause = ("WHERE " + " AND ".join(where)) if where else ""
+        with self.db.lock:
+            cursor = self.db.connection.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    SELECT industry_pack_id, rule_key, rule_type, condition_json, action_json,
+                           source, priority, is_enabled
+                    FROM intel_business_rules {clause}
+                    ORDER BY priority DESC, rule_key ASC
+                    """,
+                    params,
+                )
+                return [dict(row) for row in cursor.fetchall()]
+            finally:
+                cursor.close()
+
     def admission_report(self, *, pack_id: str = "") -> Dict:
         """抽取准入的"阶梯账"：不同准入口径各有多少篇可抽（用于 60% 覆盖率决策）。
 

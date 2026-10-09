@@ -29,6 +29,7 @@ from qa_retrieval import ArticleRetriever, default_web_search_service
 from qa_storage import QaStore
 from qa_flags import QaFeatureFlags
 from qa_resilience import QaCircuitOpen, QaPersistentResilience
+import config
 
 _PREWARM_LOCK = threading.Lock()
 _PREWARM_LAST: dict[str, float] = {}
@@ -337,6 +338,229 @@ def _evidence_anchored_level1_fallback(message: str, evidence: list[dict], queri
     return validate_level1_result(result)
 
 
+def _hop_carry_terms(evidence, exclude, limit: int = 6):
+    """从上一跳证据里挑"可带到下一跳"的词：出现在标题里的短词优先，排除已用过的。"""
+    from collections import Counter
+
+    counter = Counter()
+    for item in evidence or []:
+        title = str(item.get("title") or "")
+        try:
+            from qa_retrieval import _terms
+
+            for term in _terms([title]):
+                text = str(term).strip()
+                if 2 <= len(text) <= 12:
+                    counter[text] += 1
+        except Exception:
+            continue
+    blocked = {str(item).casefold() for item in (exclude or [])}
+    picked = []
+    for term, _count in counter.most_common(40):
+        if term.casefold() in blocked or term in picked:
+            continue
+        picked.append(term)
+        if len(picked) >= limit:
+            break
+    return picked
+
+
+def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
+                   pack_id: str, limit: int, emit_stage_event=None):
+    """按 DAG 顺序执行多跳检索，返回 (合并后的 local, 每跳回执)。
+
+    预算与跳数是**双重硬约束**：跳数上限 `QA_MAX_HOPS`，墙钟上限
+    `QA_MULTI_HOP_BUDGET_SECONDS`；超了就停在做完的跳上，并在回执里写明 `degraded`
+    与原因，由 logic_validation 阶段对用户明说。
+    """
+    import time as _time
+
+    hops = list((retrieval_plan.get("decomposition") or {}).get("hops") or [])
+    if len(hops) <= 1:
+        return first_local, []
+
+    budget = float(getattr(config, "QA_MULTI_HOP_BUDGET_SECONDS", 25) or 25)
+    started = _time.monotonic()
+    merged_evidence = list(first_local.get("evidence") or [])
+    seen_refs = {str(item.get("evidence_ref") or "") for item in merged_evidence}
+    receipts = []
+    carry_terms = []
+    question = str(retrieval_plan.get("question") or "")
+
+    for index, hop in enumerate(hops):
+        hop_id = str(hop.get("id") or ("h%d" % (index + 1)))
+        hop_question = str(hop.get("question") or "").strip() or question
+        if index == 0:
+            # 第 1 跳就是主检索，直接复用，不再打一次
+            receipts.append({
+                "hop_id": hop_id, "question": hop_question,
+                "depends_on": list(hop.get("depends_on") or []),
+                "purpose": str(hop.get("purpose") or ""),
+                "evidence": len(merged_evidence), "status": "ok",
+                "carry_terms": carry_terms,
+            })
+            carry_terms = _hop_carry_terms(merged_evidence, [question])
+            continue
+
+        elapsed = _time.monotonic() - started
+        if elapsed >= budget:
+            receipts.append({
+                "hop_id": hop_id, "question": hop_question,
+                "depends_on": list(hop.get("depends_on") or []),
+                "purpose": str(hop.get("purpose") or ""),
+                "evidence": 0, "status": "skipped_budget",
+                "reason": "多跳预算 %.0f 秒已用尽（已用 %.1f 秒）" % (budget, elapsed),
+                "carry_terms": list(carry_terms),
+            })
+            if callable(emit_stage_event):
+                emit_stage_event("stage_progress", {
+                    "message": "多跳预算用尽，停在第 %d 跳，后续跳已跳过并会明确标注。" % index,
+                    "multi_hop": {"budget_seconds": budget, "used_seconds": round(elapsed, 1)},
+                })
+            break
+
+        hop_plan = dict(retrieval_plan)
+        hop_plan["question"] = hop_question
+        hop_plan["queries"] = list(dict.fromkeys([hop_question, *carry_terms[:4]]))
+        hop_plan["entities"] = list(dict.fromkeys(
+            [*(retrieval_plan.get("entities") or []), *carry_terms]))
+        # 分跳检索复用同一条检索链路（同一套闸门、时间窗、图证据），不另开旁路
+        try:
+            hop_local = article_retriever.retrieve(
+                hop_plan, industry_pack_id=pack_id,
+                page_context={}, limit=limit,
+            )
+        except Exception as exc:
+            receipts.append({
+                "hop_id": hop_id, "question": hop_question,
+                "depends_on": list(hop.get("depends_on") or []),
+                "purpose": str(hop.get("purpose") or ""),
+                "evidence": 0, "status": "error", "reason": str(exc)[:80],
+                "carry_terms": list(carry_terms),
+            })
+            continue
+
+        hop_evidence = list(hop_local.get("evidence") or [])
+        added = 0
+        for item in hop_evidence:
+            ref = str(item.get("evidence_ref") or "")
+            if ref and ref in seen_refs:
+                continue
+            seen_refs.add(ref)
+            merged_evidence.append(item)
+            added += 1
+        receipts.append({
+            "hop_id": hop_id, "question": hop_question,
+            "depends_on": list(hop.get("depends_on") or []),
+            "purpose": str(hop.get("purpose") or ""),
+            "evidence": len(hop_evidence), "added": added,
+            "status": "ok" if hop_evidence else "empty",
+            "carry_terms": list(carry_terms),
+        })
+        if callable(emit_stage_event):
+            emit_stage_event("stage_progress", {
+                "message": "第 %d 跳「%s」取得 %d 条证据（新增 %d 条）。"
+                           % (index + 1, hop_question[:40], len(hop_evidence), added),
+                "multi_hop": {"hop_id": hop_id, "evidence": len(hop_evidence), "added": added},
+            })
+        carry_terms = _hop_carry_terms(hop_evidence, [question, hop_question])
+
+    merged = dict(first_local)
+    merged["evidence"] = merged_evidence
+    merged["multi_hop"] = {
+        "enabled": True,
+        "hops": receipts,
+        # 空跳与超预算跳都算降级：某跳没证据却不说，等于把半截结论当完整结论
+        "degraded": any(item.get("status") in ("skipped_budget", "error", "empty")
+                        for item in receipts),
+        "budget_seconds": budget,
+        "used_seconds": round(_time.monotonic() - started, 2),
+        "pattern": str((retrieval_plan.get("decomposition") or {}).get("pattern") or ""),
+    }
+    return merged, receipts
+
+
+def _logic_validation(question: str, retrieval: Mapping, plan: Mapping) -> dict:
+    """阶段 9 · 逻辑校验：因果链、条件满足、缺失链接（纯规则，不调用 LLM）。
+
+    输出 {status, checks, missing_links, degraded, note}：
+      · `passed`     该类型要求的链条都找到了证据
+      · `degraded`   多跳有跳没取到证据 / 预算用尽 → 必须在答复里明说
+      · `insufficient` 一条都没有，属于证据不足
+    """
+    evidence = list(retrieval.get("evidence") or [])
+    category = str((plan.get("category") or {}).get("key") or "")
+    multi_hop = dict(retrieval.get("multi_hop") or {})
+    checks = []
+    missing = []
+
+    def _haystack():
+        return " ".join(
+            "%s %s" % (str(item.get("title") or ""), str(item.get("content_excerpt") or "")[:800])
+            for item in evidence)
+
+    text = _haystack()
+
+    if category == "causal":
+        markers = ("导致", "因为", "由于", "引起", "造成", "原因是", "推动", "带动", "驱动", "因此", "使得")
+        hit = [marker for marker in markers if marker in text]
+        checks.append({"check": "causal_chain", "passed": bool(hit),
+                       "detail": "命中因果标记：%s" % ("、".join(hit[:5]) if hit else "无")})
+        if not hit:
+            missing.append({"type": "causal_link", "detail": "证据里没有因果连接词，无法确证因果关系"})
+
+    if category == "conditional_constraint":
+        condition = str((plan.get("decomposition") or {}).get("hops", [{}])[0].get("question") or "")
+        terms = [term for term in (condition or "").replace("，", " ").split(" ") if len(term) >= 2][:4]
+        hit = [term for term in terms if term in text]
+        passed = bool(hit) if terms else bool(evidence)
+        checks.append({"check": "condition_coverage", "passed": passed,
+                       "detail": "条件词命中：%s" % ("、".join(hit) if hit else "无")})
+        if not passed:
+            missing.append({"type": "condition_gap", "detail": "条件本身的规定没有取到证据"})
+
+    if category == "temporal_relation":
+        # 容错空格写法（"2025 年 3 月" 与 "2025年3月" 都要认）
+        dates = re.findall(r"20\d{2}\s*[-年/]\s*\d{1,2}", text)
+        passed = len(set(dates)) >= 2
+        checks.append({"check": "temporal_order", "passed": passed,
+                       "detail": "证据中出现 %d 个不同时间点" % len(set(dates))})
+        if not passed:
+            missing.append({"type": "temporal_gap", "detail": "证据不足以判定先后顺序"})
+
+    for hop in multi_hop.get("hops") or []:
+        if hop.get("status") in ("empty", "error", "skipped_budget"):
+            missing.append({
+                "type": "hop_missing",
+                "detail": "第 %s 跳「%s」未取到证据（%s）"
+                          % (hop.get("hop_id"), str(hop.get("question") or "")[:30],
+                             hop.get("status")),
+            })
+
+    if multi_hop.get("degraded"):
+        reason = "；".join(item["detail"] for item in missing if item["type"] == "hop_missing")[:160]
+        note = "多跳检索未走完：%s。已用已完成的跳给出结论。" % (reason or "有跳未取到证据")
+        status = "degraded"
+    elif not evidence:
+        note = "没有取到任何证据，属于证据不足。"
+        status = "insufficient"
+    elif missing:
+        note = "；".join(item["detail"] for item in missing)[:200]
+        status = "degraded"
+    else:
+        note = ""
+        status = "passed"
+
+    return {
+        "status": status,
+        "checks": checks,
+        "missing_links": missing,
+        "degraded": status in ("degraded", "insufficient"),
+        "note": note,
+        "multi_hop": multi_hop,
+    }
+
+
 def _rag_retrieval_fallback(level1: Mapping, reason: str) -> dict:
     evidence = list(level1.get("evidence") or [])
     return {
@@ -547,6 +771,20 @@ def build_qa_stage_handlers(
             "调整回执": question_plan.get("adjustment_receipt"),
             "子问题": question_plan.get("subquestions"),
         }
+        # 阶段 9：多跳与逻辑校验的结论要进生成端 —— 有缺口必须明说，
+        # 不能让答案看起来"完全确证"。
+        logic = context["outputs"].get("logic_validation") or {}
+        if isinstance(logic, Mapping) and logic:
+            summary["逻辑校验"] = {
+                "结论": logic.get("status"),
+                "缺口": [item.get("detail") for item in (logic.get("missing_links") or [])][:5],
+                "说明": logic.get("note"),
+                "跳数回执": [
+                    {"跳": item.get("hop_id"), "问句": str(item.get("question") or "")[:40],
+                     "证据": item.get("evidence"), "状态": item.get("status")}
+                    for item in ((logic.get("multi_hop") or {}).get("hops") or [])
+                ][:5],
+            }
         return standalone + "\n\n问题拆解与回答计划：" + json.dumps(summary, ensure_ascii=False)
 
     def _local_version(pack_id: str) -> str:
@@ -616,6 +854,23 @@ def build_qa_stage_handlers(
             page_context=request_payload.get("page_context") or {},
             limit=24 if retrieval_plan.get("high_risk_policy") else (16 if request_payload.get("mode") == "deep" else 12),
         )
+        # ── 多跳执行（阶段 9）──
+        # 只对确有逻辑结构的问题生效（分解器给出的 DAG + 每跳 depends_on）；
+        # 上一跳定位到的实体作为下一跳的过滤条件；受预算与跳数双重约束，
+        # 超预算就停在做完的跳并明确标注降级（不静默给半截结论）。
+        hop_receipts = []
+        multi_hop_plan = retrieval_plan.get("decomposition") or {}
+        if bool(getattr(config, "QA_MULTI_HOP_ENABLED", True)) and multi_hop_plan.get("is_multi_hop"):
+            local, hop_receipts = _run_multi_hop(
+                article_retriever, retrieval_plan, local, context,
+                pack_id=pack_id, limit=12, emit_stage_event=emit_stage_event,
+            )
+        elif multi_hop_plan.get("hops"):
+            hop_receipts = [{
+                "hop_id": "h1", "question": _planned_question(context),
+                "depends_on": [], "evidence": len(local.get("evidence") or []),
+                "status": "single_hop", "carry_terms": [],
+            }]
         external = web_search.search(
             retrieval_plan.get("queries") or [],
             enabled=bool(retrieval_plan.get("needs_web")),
@@ -698,6 +953,21 @@ def build_qa_stage_handlers(
             cache_key, result, namespace="level1_retrieval", pack_id=pack_id,
             kb_version=kb_version, scope_hash=scope_hash, ttl_seconds=180,
         )
+        return result
+
+    def logic_validation(context):
+        """阶段 9：逻辑校验（因果链 / 条件满足 / 缺失链接），把降级与缺口明确回报。"""
+        result = _logic_validation(
+            _planned_question(context),
+            context["outputs"]["level1_retrieval"],
+            context["outputs"]["plan"],
+        )
+        if callable(emit_stage_event):
+            message = "逻辑校验：%s" % {"passed": "通过", "degraded": "有缺口（已标注）",
+                                        "insufficient": "证据不足"}.get(result["status"], result["status"])
+            if result.get("note"):
+                message += "——" + str(result["note"])
+            emit_stage_event("stage_progress", {"message": message, "logic": result})
         return result
 
     def level1_draft(context):
@@ -1177,6 +1447,7 @@ def build_qa_stage_handlers(
     return {
         "plan": plan,
         "level1_retrieval": level1_retrieval,
+        "logic_validation": logic_validation,
         "level1_draft": level1_draft,
         "level2_retrieval": level2_retrieval,
         "level2_research": level2_research,

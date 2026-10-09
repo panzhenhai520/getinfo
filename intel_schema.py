@@ -453,6 +453,41 @@ def _drop_kg_tables_if_schema_outdated(cursor) -> None:
             pass
 
 
+def ensure_intel_business_rule_tables(cursor) -> None:
+    """行业规则引擎表（阶段 9）：把"条件 → 动作"从散落的包配置提成可查、可禁用、可加权的规则。
+
+    迁移来源（`source` 字段留痕，便于追溯是包配置还是人工加的）：
+      · pack_config：`core_keywords`（关键词条件）、`fixed_topics`（主题条件）
+      · attention  ：`pack_attention_directions` 里 active 的追踪方向
+    动作（`action_json`）只做"检索侧增强"：补检索式 / 加权词 / 要求全文，
+    不改证据闸门、不改引用校验。
+    """
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS intel_business_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            industry_pack_id TEXT NOT NULL,
+            rule_key TEXT NOT NULL,
+            rule_type TEXT NOT NULL DEFAULT 'keyword'
+                CHECK (rule_type IN ('keyword', 'topic', 'attention', 'condition')),
+            condition_json TEXT NOT NULL DEFAULT '{{}}',
+            action_json TEXT NOT NULL DEFAULT '{{}}',
+            source TEXT NOT NULL DEFAULT 'pack_config',
+            priority INTEGER NOT NULL DEFAULT 0,
+            is_enabled INTEGER NOT NULL DEFAULT 1,
+            version TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            UNIQUE(industry_pack_id, rule_key)
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_business_rules_pack "
+        "ON intel_business_rules(industry_pack_id, is_enabled, priority)"
+    )
+
+
 def ensure_intel_core_tables(cursor) -> None:
     cursor.execute(
         f"""
@@ -640,6 +675,7 @@ def ensure_intel_core_tables(cursor) -> None:
     ensure_intel_event_tables(cursor)
     ensure_intel_subject_tables(cursor)
     ensure_intel_attribute_tables(cursor)
+    ensure_intel_business_rule_tables(cursor)
     ensure_intel_kg_tables(cursor)
     ensure_intel_article_field_tables(cursor)
     ensure_intel_report_candidate_tables(cursor)

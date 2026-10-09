@@ -13,6 +13,26 @@ from industry_packs import industry_pack_loader
 from qa_policy_evidence import detect_policy_anchors, policy_source_queries, source_profiles_from_pack
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    """环境开关（与其它模块同一口径：#0/false/off/no 视为关闭）。"""
+    import os
+
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return bool(default)
+    return str(raw).strip().lower() not in ("0", "false", "off", "no")
+
+
+def _env_int(name: str, default: int, low: int, high: int) -> int:
+    import os
+
+    try:
+        value = int(str(os.environ.get(name, "")).strip())
+    except (TypeError, ValueError):
+        return int(default)
+    return max(int(low), min(int(high), value))
+
+
 _POLICY_RE = re.compile(r"政策|法规|法例|条例|公告|税|监管|合规|征管|生效|适用主体|豁免|宽免", re.I)
 _COMPARE_RE = re.compile(r"比较|对比|区别|横向|不同|vs\.?|versus", re.I)
 _CONFLICT_RE = re.compile(r"冲突|矛盾|不一致|相反|口径|以谁为准|哪个为准|到底按|究竟按|裁决", re.I)
@@ -47,6 +67,23 @@ _RELATION_STRATEGIES = {
 }
 
 _CATEGORY_RULES = [
+    # ── 阶段 9 新增四类：逻辑驱动的问题类型，放在最前（越具体越优先）──
+    # 多跳传导：问的是"A 怎么影响到 B"，需要分跳检索
+    ("multi_hop", "多跳传导类", re.compile(
+        r"(对|向|给)[^。？！]{1,24}(有什么|有何|会有|带来|产生)[^。？！]{0,8}影响"
+        r"|传导(路径|链条|机制|效应)|上下游|供应链[^。？！]{0,8}(影响|传导)"
+        r"|间接影响|如何影响|会影响到|波及|连锁反应|外溢效应|传导到", re.I)),
+    # 因果：问"为什么"，需要先事实后原因
+    ("causal", "因果类", re.compile(
+        r"为什么|为何|导致|引起|造成|原因|成因|因为|由于|根源|驱动因素|背后(的)?(逻辑|原因)", re.I)),
+    # 时序关系：问先后/时间线（"先…再…" 与 "先…还是…" 两种问法都要认）
+    ("temporal_relation", "时序关系类", re.compile(
+        r"先后顺序|时间线|时间轴|早于|晚于|在此之前|在此之后|同期|随后|紧接着|"
+        r"先[^。？！]{1,24}(?:再|还是|或)", re.I)),
+    # 条件约束：问"在什么条件下成立/是否满足"
+    ("conditional_constraint", "条件约束类", re.compile(
+        r"在[^。？！]{1,24}(条件|前提|情形|情况)下|如果[^。？！]{1,24}(是否|能否|会)|除非|"
+        r"只有[^。？！]{1,16}才|是否满足|满足[^。？！]{1,12}条件|前提是|限于[^。？！]{1,12}(情形|情况)", re.I)),
     ("evidence_gap", "证据不足/待核验类", re.compile(r"有没有|是否明确|依据|核验|冲突|矛盾|不确定|待确认|以谁为准", re.I)),
     ("risk_response", "风险与应对类", re.compile(r"风险|应对|调整|合规|规避|方案|怎么做|如何处理|补救", re.I)),
     ("industry_impact", "行业影响类", re.compile(r"影响|行业|家族办公室|家族信托|业务|客户|市场|机构", re.I)),
@@ -55,6 +92,9 @@ _CATEGORY_RULES = [
     ("policy_content", "政策内容类", re.compile(r"内容|是什么|具体规定|条文|原文|公告|办法|条例|文件", re.I)),
     ("fact_check", "事实核验类", re.compile(r"已经|是否|有没有|了吗|运行|上线|发布|推出|开始|最新|目前|现在", re.I)),
 ]
+
+# 需要分跳检索的问题类型（阶段 9）：这些类别才会触发多跳分解
+_MULTI_HOP_CATEGORIES = {"multi_hop", "causal", "conditional_constraint", "temporal_relation"}
 
 
 def _needs_article_retrieval(question: str) -> bool:
@@ -730,7 +770,9 @@ def _cluster_subquestions(subquestions: list[str]) -> list[dict]:
             grouped[key] = {"key": key, "label": category["label"], "question_ids": [], "questions": []}
         grouped[key]["question_ids"].append(f"q{index}")
         grouped[key]["questions"].append(text)
-    order = ["policy_content", "subject_scope", "filing_collection", "industry_impact", "risk_response", "evidence_gap", "fact_check", "other"]
+    order = ["policy_content", "subject_scope", "filing_collection", "industry_impact",
+             "multi_hop", "causal", "conditional_constraint", "temporal_relation",
+             "risk_response", "evidence_gap", "fact_check", "other"]
     return [grouped[key] for key in order if key in grouped]
 
 
@@ -751,6 +793,11 @@ def _retrieval_strategy(relationship: str, categories: list[dict]) -> list[dict]
         steps.append({
             "source": "professional_commentary",
             "purpose": "只在官方依据之后引用专业材料，用于影响、风险和实务应对分析。",
+        })
+    if category_keys & _MULTI_HOP_CATEGORIES:
+        steps.append({
+            "source": "hop_chain",
+            "purpose": "按依赖顺序分跳检索：上一跳定位到的实体作为下一跳的过滤条件，每一跳都要有证据。",
         })
     if relationship == "conflict":
         steps.append({
@@ -874,6 +921,43 @@ class QaQueryPlanner:
                 if any(str(keyword).casefold() in planning_question.casefold() for keyword in keywords if keyword):
                     topics.append(str(topic.get("key") or name))
 
+        # 行业规则引擎（阶段 9）：条件 → 动作。命中才补检索式/加权词，没命中与旧行为逐字一致。
+        category = _question_category(planning_question)
+        rule_patch = {"matched": [], "retrieval_queries": [], "boost_terms": [],
+                      "require_fulltext": False, "note": ""}
+        if _env_flag("QA_BUSINESS_RULES_ENABLED", True):
+            try:
+                from business_rules import business_rule_engine
+
+                rule_patch = business_rule_engine.match(
+                    planning_question, pack_id=pack_id, category=str(category.get("key") or ""))
+            except Exception:
+                rule_patch = {"matched": [], "retrieval_queries": [], "boost_terms": [],
+                              "require_fulltext": False, "note": ""}
+        for term in rule_patch.get("boost_terms") or []:
+            text = str(term or "").strip()
+            if text and text not in entities:
+                entities.append(text)
+        if rule_patch.get("require_fulltext"):
+            question_plan["must_fetch_fulltext"] = True
+
+        # 子查询分解（阶段 9）：产出带 depends_on 的有向无环图；分不出来就保持单跳。
+        decomposition = {"is_multi_hop": False, "hops": [], "reason": "未分解"}
+        if _env_flag("QA_QUERY_DECOMPOSE_ENABLED", True):
+            try:
+                from qa_query_decompose import decompose
+
+                decomposition = decompose(
+                    planning_question,
+                    category=str(category.get("key") or ""),
+                    relationship=str(question_plan.get("relationship") or ""),
+                    pack_id=pack_id, entities=entities, topics=topics,
+                    max_hops=_env_int("QA_MAX_HOPS", 3, 1, 5),
+                )
+            except Exception as exc:
+                decomposition = {"is_multi_hop": False, "hops": [],
+                                 "reason": "分解器不可用：%s" % str(exc)[:60]}
+
         # 用户调整产生的专项检索式：插在最前，确保在 query_cap 截断前一定保留
         # （阶段 5：调整要真的改变检索，不能只换回答模板）。
         adjustment_queries = [
@@ -904,6 +988,11 @@ class QaQueryPlanner:
                 queries.extend(policy_source_queries(planning_question, policy_anchors))
             if comparison:
                 queries.append(f"{planning_question} 同类案例 横向比较")
+            # 规则动作补的检索式：紧跟用户调整之后、扩展器之前，确保在 query_cap 内保留
+            for item in rule_patch.get("retrieval_queries") or []:
+                text = _clean_query(str(item))
+                if text:
+                    queries.append(text)
             if self.query_expander is not None:
                 try:
                     expanded = self.query_expander({
@@ -974,6 +1063,15 @@ class QaQueryPlanner:
             "must_fetch_fulltext": bool(question_plan.get("must_fetch_fulltext")),
             "time_window_adjustment": dict(question_plan.get("time_window") or {}),
             "adjustment_receipt": dict(question_plan.get("adjustment_receipt") or {}),
+            "category": dict(category),
+            "business_rules": {
+                "matched": list(rule_patch.get("matched") or []),
+                "retrieval_queries": list(rule_patch.get("retrieval_queries") or []),
+                "boost_terms": list(rule_patch.get("boost_terms") or []),
+                "note": str(rule_patch.get("note") or ""),
+            },
+            "decomposition": dict(decomposition),
+            "needs_multi_hop": bool(decomposition.get("is_multi_hop")),
             "answer_language": "zh-CN",
         }
 
