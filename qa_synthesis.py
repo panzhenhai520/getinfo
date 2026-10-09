@@ -30,6 +30,19 @@ def _int_env(name: str, default: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
 
+def _synthesis_local_timeouts(profile) -> dict:
+    """阶段 6-5：按端点能力推导超时（探测失败退回空字典，由调用点兜底）。"""
+    try:
+        from qa_endpoint_profile import endpoint_profile
+
+        return endpoint_profile(
+            str(getattr(profile, "base_url", "") or ""),
+            str(getattr(profile, "model_id", "") or ""),
+        )
+    except Exception:
+        return {}
+
+
 class _JsonAnswerDeltaExtractor:
     """Extract incremental content from a streaming JSON object's answer field."""
 
@@ -1093,10 +1106,15 @@ class QaFinalSynthesizer:
             answer_delta = _JsonAnswerDeltaExtractor()
             streamed_buffer = []
             structured_answer_stream = False
-            stream_timeout = (
-                _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 8, 4, 300)
-                if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 90
-            )
+            # 阶段 6-5：流式读超时按端点能力推导（显式 env 优先，其次探测推导，最后兜底）
+            if str(getattr(profile, "provider_id", "") or "").casefold() == "local":
+                stream_timeout = (
+                    _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 0, 0, 600)
+                    or _synthesis_local_timeouts(profile).get("first_token_seconds")
+                    or 120
+                )
+            else:
+                stream_timeout = 90
             for content in _stream_openai_json_content(profile, messages, timeout=stream_timeout):
                 raw_parts.append(content)
                 delta = answer_delta.feed(content)
@@ -1117,10 +1135,14 @@ class QaFinalSynthesizer:
                     token_callback(tail)
             raw = "".join(raw_parts)
         else:
-            raw_timeout = (
-                _int_env("QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS", 12, 5, 300)
-                if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 90
-            )
+            if str(getattr(profile, "provider_id", "") or "").casefold() == "local":
+                raw_timeout = (
+                    _int_env("QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS", 0, 0, 600)
+                    or _synthesis_local_timeouts(profile).get("request_seconds")
+                    or 180
+                )
+            else:
+                raw_timeout = 90
             raw = self.model_client(profile, messages, timeout=raw_timeout)
         if _is_model_refusal(raw):
             item = {

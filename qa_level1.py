@@ -29,6 +29,26 @@ def _int_env(name: str, default: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
 
+def _local_timeouts(profile) -> dict:
+    """阶段 6-5：按端点能力推导超时（探测失败也不抛异常，退回保守默认）。"""
+    try:
+        from qa_endpoint_profile import endpoint_profile
+
+        return endpoint_profile(
+            str(getattr(profile, "base_url", "") or ""),
+            str(getattr(profile, "model_id", "") or ""),
+        )
+    except Exception:
+        return {}
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or str(raw).strip() == "":
+        return bool(default)
+    return str(raw).strip().lower() not in ("0", "false", "off", "no")
+
+
 def extract_json_object(value) -> dict:
     if isinstance(value, Mapping):
         return dict(value)
@@ -291,11 +311,47 @@ class QaLevel1Generator:
             }, ensure_ascii=False)
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-    def generate(self, *, question: str, plan: Mapping, evidence: list[dict], profile) -> dict:
+    def _stream_raw(self, profile, messages, timeout, first_token_callback):
+        """流式取一级草稿原文；首个 chunk 到达即回报耗时。失败返回 None（调用点退回非流式）。"""
+        import time as _time
+
+        try:
+            from qa_synthesis import _stream_openai_json_content
+
+            started = _time.monotonic()
+            parts = []
+            reported = False
+            for chunk in _stream_openai_json_content(profile, messages, timeout=timeout):
+                if not reported:
+                    reported = True
+                    try:
+                        first_token_callback(round(_time.monotonic() - started, 2))
+                    except Exception:
+                        pass
+                parts.append(str(chunk))
+            text = "".join(parts).strip()
+            return text or None
+        except Exception:
+            return None
+
+    def generate(self, *, question: str, plan: Mapping, evidence: list[dict], profile,
+                 first_token_callback=None) -> dict:
         is_local = str(getattr(profile, "provider_id", "") or "").casefold() == "local"
-        first_timeout = _int_env("QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", 8, 4, 300) if is_local else 90
-        repair_timeout = _int_env("QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS", 5, 3, 120) if is_local else 60
-        raw = self.model_client(profile, self._messages(question, plan, evidence), timeout=first_timeout)
+        # 阶段 6-5：本地端点不再写死 8 秒（那会让整条 run 必然降级，B 机事故即此）。
+        # 显式 QA_LEVEL1_LOCAL_TIMEOUT_SECONDS 仍然优先；没配才用端点能力推导出来的值。
+        endpoint_timeouts = _local_timeouts(profile) if is_local else {}
+        first_timeout = (_int_env("QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", 0, 0, 600)
+                         or endpoint_timeouts.get("request_seconds") or 180) if is_local else 90
+        repair_timeout = (_int_env("QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS", 0, 0, 600)
+                          or endpoint_timeouts.get("repair_seconds") or 90) if is_local else 60
+        messages = self._messages(question, plan, evidence)
+        # 阶段 6-6：流式首字节优先 —— 本地端点先流式拿，首个 chunk 到达即回报（用户能看到
+        # "模型已在生成"而不是干等 30 秒）；流式不可用/失败则原样退回非流式，行为不变。
+        raw = None
+        if first_token_callback is not None and is_local and _env_flag("QA_LEVEL1_STREAM_FIRST_BYTE", True):
+            raw = self._stream_raw(profile, messages, first_timeout, first_token_callback)
+        if raw is None:
+            raw = self.model_client(profile, messages, timeout=first_timeout)
         last_error = None
         for attempt in range(2):
             try:

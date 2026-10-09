@@ -117,9 +117,21 @@ class QaOrchestrator:
             pass
 
     @staticmethod
-    def stage_plan(mode: str, origin: str = "") -> tuple[str, ...]:
-        # origin is deliberately ignored: both products use the same graph.
-        return FAST_STAGES if str(mode or "standard").casefold() == "fast" else FULL_STAGES
+    def stage_plan(mode: str, origin: str = "", *, level2_enabled: bool | None = None) -> tuple[str, ...]:
+        """阶段链：fast 走精简链，standard 走全链。
+
+        阶段 6-4：`level2_enabled=False` 时把 `level2_retrieval` / `level2_research` /
+        `conflict_review` 从链上**直接摘掉**——它们的唯一输入是二级检索的产物，
+        二级关掉后这些阶段只会空转（每次 run 都白记一条 stage 记录、白推一次事件），
+        而且会让前端看到"跑了但没内容"的阶段。
+        origin 故意忽略：两个产品共用同一条链。
+        """
+        if str(mode or "standard").casefold() == "fast":
+            return FAST_STAGES
+        if level2_enabled is False:
+            return tuple(stage for stage in FULL_STAGES
+                         if stage not in ("level2_retrieval", "level2_research", "conflict_review"))
+        return FULL_STAGES
 
     def _emit(self, run_id: str, event_type: str, stage: str, payload=None) -> dict:
         event = qa_event(
@@ -164,7 +176,19 @@ class QaOrchestrator:
                 if isinstance(details.get("result"), Mapping):
                     completed_outputs[str(prior.get("stage") or "")] = dict(details["result"])
         context = {"run": run, "request": request_payload, "outputs": completed_outputs}
-        stages = self.stage_plan(run.get("mode"), run.get("origin"))
+        # 阶段 6-4：二级检索关掉时，别让依赖它的阶段空转
+        _level2_enabled: bool | None = None
+        try:
+            flags = getattr(self, "feature_flags", None)
+            if flags is not None:
+                snapshot = flags.snapshot() or {}
+                if "level2_enabled" in snapshot:
+                    _level2_enabled = bool(snapshot.get("level2_enabled"))
+            elif run.get("level2_enabled") is not None:
+                _level2_enabled = bool(run.get("level2_enabled"))
+        except Exception:
+            _level2_enabled = None
+        stages = self.stage_plan(run.get("mode"), run.get("origin"), level2_enabled=_level2_enabled)
         self.store.update_run(run_id, status="running", stage=stages[0])
         if not self.store.events_after(run_id):
             self._emit(run_id, "run_started", stages[0], {"mode": run.get("mode"), "stages": list(stages)})

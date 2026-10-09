@@ -126,18 +126,55 @@ class QaMetricsService:
         }
 
 
-def provider_allowed_hosts() -> set[str]:
-    """出站白名单：管理员在 .env / chat_config.json 里配置的模型端点都算可信。
+_ALLOWED_HOSTS_CACHE = None  # (环境指纹, monotonic 时间, 主机集合) —— 带 TTL 的进程内缓存
+_ALLOWED_HOSTS_TTL_SECONDS = 60.0
 
-    为什么要把这些环境变量也算进来：私网地址（如 B 机的 http://192.168.0.64:8106/v1）
-    只在"显式白名单"里才被 validate_outbound_url 放行。此前白名单只取 chat_api.MODEL_META
-    与 QA_ALLOWED_PROVIDER_HOSTS，于是**管理员自己配在 .env 里的 QA_LLM_BASE_URL_* /
-    INTEL_LLM_BASE_URL 反而被拦**，实测 B 机因此每次 level1_draft 都降级
-    （INTERNAL_ERROR「服务地址解析到本机、内网或保留地址，已阻止访问」），
-    等于这台机器上的 AI 回答从来没有真正调用过模型。
-    白名单的本意是防"用户可控 URL 造成的 SSRF"，管理员配置的端点是同一类可信来源，
-    所以这里按前缀把这些配置项的 host 一并纳入。
+
+def _allowlist_env_fingerprint() -> tuple:
+    """白名单相关的环境指纹：指纹一变就让缓存失效。
+
+    只读环境变量、不触发任何导入，所以既便宜又**不会读到过期白名单**
+    （单靠 TTL 会让"管理员刚改完 .env"的 60 秒内继续用旧值；测试也抓到了这一点）。
     """
+    prefixed = tuple(sorted(
+        (key, os.environ[key]) for key in os.environ
+        if key.startswith("QA_LLM_BASE_URL_") or key.startswith("QA_EMBEDDING_BASE_URL_")
+    ))
+    return (
+        os.getenv("INTEL_LLM_BASE_URL", ""),
+        os.getenv("INTEL_EMBEDDING_BASE_URL", ""),
+        os.getenv("RAGFLOW_BASE_URL", ""),
+        os.getenv("QA_RAGFLOW_BASE_URL", ""),
+        os.getenv("QA_LLM_BASE_URL", ""),
+        os.getenv("QA_ALLOWED_PROVIDER_HOSTS", ""),
+        prefixed,
+    )
+
+
+def provider_allowed_hosts(force: bool = False) -> set[str]:
+    """出站白名单（**带缓存 + 环境指纹失效**，阶段 6 提速）。
+
+    为什么必须缓存：这个函数在**每次** level1_draft / synthesis 的模型调用前都会被调用，
+    而它内部 `from chat_api import MODEL_META` 会拉起整个 Flask 应用配置——实测冷调用
+    三秒以上，热调用也要重新构建一遍集合。白名单只随配置变化，缓存 60 秒 + 指纹失效足够安全。
+
+    返回集合的**副本**，避免调用方就地修改污染缓存。
+    """
+    global _ALLOWED_HOSTS_CACHE
+
+    now = time.monotonic()
+    fingerprint = _allowlist_env_fingerprint()
+    cached = _ALLOWED_HOSTS_CACHE
+    if (not force and cached and cached[0] == fingerprint
+            and (now - cached[1]) < _ALLOWED_HOSTS_TTL_SECONDS):
+        return set(cached[2])
+    computed = _compute_provider_allowed_hosts()
+    _ALLOWED_HOSTS_CACHE = (fingerprint, now, set(computed))
+    return set(computed)
+
+
+def _compute_provider_allowed_hosts() -> set[str]:
+    """重建白名单（缓存未命中时才会走到这里）。"""
     result = set()
     try:
         from chat_api import MODEL_META

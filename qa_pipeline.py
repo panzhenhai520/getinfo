@@ -338,6 +338,50 @@ def _evidence_anchored_level1_fallback(message: str, evidence: list[dict], queri
     return validate_level1_result(result)
 
 
+def _env_int(name: str, default: int, low: int, high: int) -> int:
+    import os
+
+    try:
+        value = int(str(os.environ.get(name, "")).strip())
+    except (TypeError, ValueError):
+        return int(default)
+    return max(int(low), min(int(high), value))
+
+
+def _evidence_limit(retrieval_plan: Mapping, mode) -> int:
+    """阶段 6-3：证据条数**按问题类型收敛**（原先一律 12/16/24）。
+
+    口径：
+      · 高风险政策、deep 模式：保持原值（完整性优先，不收敛）；
+      · 事实核验类（fact_check / evidence_gap）：收到 3~5 条——这类问题只需"有/没有那个事实"，
+        条数堆多了只会拖长草稿与合成；默认 5，`QA_EVIDENCE_LIMIT_FACT_CHECK` 可调；
+      · 时序/条件类：8 条（够判先后与条件，但不必铺满）；
+      · 其它：原值 12（standard）。
+    """
+    base = 24 if retrieval_plan.get("high_risk_policy") else (
+        16 if str(mode or "standard").casefold() == "deep" else 12)
+    if retrieval_plan.get("high_risk_policy") or str(mode or "").casefold() == "deep":
+        return base
+    category = str((retrieval_plan.get("category") or {}).get("key") or "")
+    if category in ("fact_check", "evidence_gap"):
+        return min(base, _env_int("QA_EVIDENCE_LIMIT_FACT_CHECK", 5, 3, 12))
+    if category in ("temporal_relation", "conditional_constraint"):
+        return min(base, _env_int("QA_EVIDENCE_LIMIT_RELATION", 8, 4, 16))
+    return base
+
+
+def _evidence_cap(retrieval_plan: Mapping, mode, limit: int) -> int:
+    """证据池上限：与 limit 联动，避免"只要 5 条却收进 18 条"。
+
+    高风险政策走 `max(base, limit)`：它的 limit 本来就是 24（完整性优先），
+    池子不该反而缩到 18 把刚取到的证据丢掉（原实现 limit=24 / cap=18 是自相矛盾的）。
+    """
+    base = 24 if str(mode or "standard").casefold() == "deep" else 18
+    if retrieval_plan.get("high_risk_policy"):
+        return max(base, int(limit))
+    return max(limit + 3, min(base, limit + 3))
+
+
 def _hop_carry_terms(evidence, exclude, limit: int = 6):
     """从上一跳证据里挑"可带到下一跳"的词：出现在标题里的短词优先，排除已用过的。"""
     from collections import Counter
@@ -852,7 +896,7 @@ def build_qa_stage_handlers(
             {**dict(retrieval_plan), "question": _planned_question(context)},
             industry_pack_id=pack_id,
             page_context=request_payload.get("page_context") or {},
-            limit=24 if retrieval_plan.get("high_risk_policy") else (16 if request_payload.get("mode") == "deep" else 12),
+            limit=_evidence_limit(retrieval_plan, request_payload.get("mode")),
         )
         # ── 多跳执行（阶段 9）──
         # 只对确有逻辑结构的问题生效（分解器给出的 DAG + 每跳 depends_on）；
@@ -876,7 +920,8 @@ def build_qa_stage_handlers(
             enabled=bool(retrieval_plan.get("needs_web")),
             limit=8,
         )
-        cap = 24 if request_payload.get("mode") == "deep" else 18
+        cap = _evidence_cap(retrieval_plan, request_payload.get("mode"),
+                            _evidence_limit(retrieval_plan, request_payload.get("mode")))
         raw_evidence = _dedupe_evidence(
             list(local.get("evidence") or []) + list(external.get("evidence") or []), cap
         )
@@ -1018,6 +1063,14 @@ def build_qa_stage_handlers(
                 plan=retrieval_plan,
                 evidence=evidence,
                 profile=profile,
+                # 阶段 6-6：首 token 到达就回报，别让用户干等（草稿阶段没有可见输出）
+                first_token_callback=(
+                    (lambda seconds: emit_stage_event("stage_progress", {
+                        "message": "模型已开始生成初步结论（首字 %.1f 秒），完整草稿仍在生成中。" % seconds,
+                        "first_token_seconds": seconds,
+                        "stats": {"first_token_seconds": seconds},
+                    })) if callable(emit_stage_event) else None
+                ),
             )
             resilience.circuit_success(dependency)
         except QaContractError as exc:
