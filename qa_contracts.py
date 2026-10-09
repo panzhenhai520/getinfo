@@ -50,6 +50,32 @@ QA_EVENT_TYPES = (
     "error",
 )
 
+# 阶段 01（graph-rag-v2 通用包 F-9）：检索通道 / 失败策略 / 停止原因 / 审计事件类型
+# 统一从 `qa_graph_contracts` 取（单一事实源），这里只做再导出，**取值一字不改**，
+# 便于既有调用点从契约层 import，避免同一枚举在多处漂移。
+from qa_graph_contracts import (  # noqa: E402  （放在契约常量之后，避免循环导入）
+    GRAPH_CONTRACT_VERSION,
+    QA_AUDIT_EVENT_TYPES,
+    QA_FAILURE_POLICIES,
+    QA_RETRIEVAL_ROUTES,
+    QA_STOP_REASONS,
+)
+
+# 阶段的"四图角色"分组（阶段 01 F-9）：阶段名 ≠ 节点类型，但要让执行链能对上四图。
+# 取值只做归类，不影响任何执行顺序（顺序仍由 qa_orchestrator.FULL_STAGES 决定）。
+QA_STAGE_ROLES = {
+    "plan": "context",
+    "level1_retrieval": "evidence",
+    "logic_validation": "evidence",
+    "level1_draft": "execution",
+    "level2_retrieval": "evidence",
+    "level2_research": "execution",
+    "conflict_review": "evidence",
+    "synthesis": "execution",
+    "citation_validation": "evidence",
+    "completed": "execution",
+}
+
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$")
 _SAFE_PACK = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 _FORBIDDEN_CLIENT_FIELDS = {
