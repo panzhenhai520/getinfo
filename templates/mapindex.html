@@ -7381,6 +7381,12 @@
             node.dataset.planAwaitingAction = 'false';
             if (!options.silent && gate.bar) {
                 gate.bar.remove();
+                // 一键澄清 chip 条与计划条同生共死：计划条拿掉后它必须一起拿掉。
+                // 实测缺陷：只 remove 计划条时 chip 条会残留，此时再点 chip，
+                // beginPlanAdjustment 拿到的 bar 已脱离文档 → 「已暂停当前输出…」那行回执
+                // 写进不在文档里的节点，用户看不到（真浏览器验证发现）。
+                const staleChips = node.querySelector('[data-plan-clarify="true"]');
+                if (staleChips) staleChips.remove();
                 startInlineAnswerProgress(node, '正在按问题分析思路继续：检索证据、整理引用并生成正文', { stage: 'level1_retrieval' });
                 setStatus(options.manual ? '已按当前思路继续生成' : '5秒未调整，已按当前思路继续生成');
             }
