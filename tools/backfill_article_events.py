@@ -222,7 +222,7 @@ def main(argv=None) -> int:
         print(ceiling(admission["with_other"], admission["extra_if_with_other"], "纳入 other 类"))
         print(ceiling(admission["widened"], admission["extra_if_widened"], "两者都放宽"))
         print("  验收线 60%：能否达成看上面四行（当前口径那行）")
-        print("  提示：新口径下分母只算"本来该有事件的文章"，因此 60% 是可达的；")
+        print("  提示：新口径下分母只算「本来该有事件的文章」，因此 60% 是可达的；")
         print("        旧口径（全部文章为分母）天花板只有 46%，不建议再作为验收线。")
         summary["admission"] = admission
     except Exception as exc:
