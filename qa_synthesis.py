@@ -19,6 +19,7 @@ from qa_level1 import (
     _client_last_usage,
     _merge_token_usage,
     _normalize_token_usage,
+    _stream_include_usage,
     _with_token_usage,
     extract_json_object,
 )
@@ -113,8 +114,28 @@ class _JsonAnswerDeltaExtractor:
         return decoded
 
 
-def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int = 90, usage_sink=None):
-    """流式取模型 JSON 原文。usage_sink：传可变字典就顺带收集流式返回里的 token 用量。"""
+def _blames_stream_options(response) -> bool:
+    """400 响应体是否点名 stream_options / include_usage（不认这个参数的端点会这么说）。
+
+    只有点了名才回退：别的 400（模型名不对、参数非法……）必须照旧失败，不许扩大重试范围。
+    stream=True 时响应体要在这里读掉 —— 既用于判断，也顺带缓存给随后的 raise_for_status()
+    （连接关掉后再读就是空串）。
+    """
+    try:
+        text = str(response.text or "").casefold()
+    except Exception:
+        return False
+    return "stream_options" in text or "include_usage" in text
+
+
+def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int = 90, usage_sink=None,
+                                include_usage: bool | None = None):
+    """流式取模型 JSON 原文。usage_sink：传可变字典就顺带收集流式返回里的 token 用量。
+
+    include_usage：请求体是否带 stream_options.include_usage（端点才会在末块回传用量）。
+    None → 读 QA_STREAM_INCLUDE_USAGE（默认开）。端点不认该参数时，只要 400 报错点名了它，
+    就摘掉参数原样重发一次，仍然走这条流式解析路径（不退化、不改变其它错误的失败路径）。
+    """
     if profile.provider_id != "local" and not profile.api_key:
         from qa_errors import missing_api_key_error
         from qa_orchestrator import QaStageFailure
@@ -160,19 +181,32 @@ def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int =
     }
     if response_format:
         payload["response_format"] = response_format
+    if include_usage is None:
+        include_usage = _stream_include_usage()
+    if include_usage:
+        # 不带这个参数时 llama.cpp 的 SSE 全程没有 usage 块（实测 3 块 / 0 用量），
+        # 流式路径就永远采不到用量 → Cost 基线恒为 0。带上后末块回传 usage（4 块 / 1 用量）。
+        payload["stream_options"] = {"include_usage": True}
     is_local = str(profile.provider_id or "").casefold() == "local"
     read_timeout = (
         _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 8, 4, 300)
         if is_local else int(timeout or 90)
     )
-    response = requests.post(
-        f"{safe_base.rstrip('/')}/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=(5, read_timeout),
-        proxies=proxies,
-        stream=True,
-    )
+    request_url = f"{safe_base.rstrip('/')}/chat/completions"
+    request_kwargs = {
+        "headers": headers,
+        "json": payload,
+        "timeout": (5, read_timeout),
+        "proxies": proxies,
+        "stream": True,
+    }
+    response = requests.post(request_url, **request_kwargs)
+    if include_usage and response.status_code == 400 and _blames_stream_options(response):
+        # 端点不认 stream_options：摘掉它原样重发一次。仍是同一条流式解析路径 ——
+        # 不能退化成非流式，也不能改变其它错误的失败路径（只有点名的 400 才重试）。
+        response.close()
+        payload.pop("stream_options", None)
+        response = requests.post(request_url, **request_kwargs)
     response.raise_for_status()
     for raw_line in response.iter_lines():
         if not raw_line:
@@ -1142,7 +1176,8 @@ class QaFinalSynthesizer:
                 stream_timeout = 90
             stream_usage: dict = {}
             for content in _stream_openai_json_content(
-                profile, messages, timeout=stream_timeout, usage_sink=stream_usage
+                profile, messages, timeout=stream_timeout, usage_sink=stream_usage,
+                include_usage=_stream_include_usage(),
             ):
                 raw_parts.append(content)
                 delta = answer_delta.feed(content)

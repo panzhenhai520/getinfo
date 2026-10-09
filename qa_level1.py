@@ -49,6 +49,16 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return str(raw).strip().lower() not in ("0", "false", "off", "no")
 
 
+def _stream_include_usage() -> bool:
+    """流式请求是否带 stream_options.include_usage（默认**开启**）。
+
+    实测（本地 llama.cpp 端点）：不带该参数的 SSE 全程没有 usage 块，流式路径永远采不到
+    用量，Cost 基线恒为 0；带上后末块会回传 usage。所以默认开启，`QA_STREAM_INCLUDE_USAGE=0`
+    可一键回滚成旧请求体。每次调用现读环境变量（不缓存），方便运行期改。
+    """
+    return _env_flag("QA_STREAM_INCLUDE_USAGE", True)
+
+
 def extract_json_object(value) -> dict:
     if isinstance(value, Mapping):
         return dict(value)
@@ -436,6 +446,7 @@ class QaLevel1Generator:
         """流式取一级草稿原文；首个 chunk 到达即回报耗时。失败返回 None（调用点退回非流式）。
 
         usage_sink：传一个可变字典就顺带收集流式返回里的 token 用量（拿不到时保持空）。
+        请求体是否带 stream_options（让端点回传用量块）由 QA_STREAM_INCLUDE_USAGE 控制，默认开。
         """
         import time as _time
 
@@ -446,7 +457,8 @@ class QaLevel1Generator:
             parts = []
             reported = False
             for chunk in _stream_openai_json_content(
-                profile, messages, timeout=timeout, usage_sink=usage_sink
+                profile, messages, timeout=timeout, usage_sink=usage_sink,
+                include_usage=_stream_include_usage(),
             ):
                 if not reported:
                     reported = True
