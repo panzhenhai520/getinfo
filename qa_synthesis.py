@@ -14,7 +14,14 @@ from typing import Callable, Mapping
 import requests
 
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_final_answer
-from qa_level1 import OpenAIJsonModelClient, extract_json_object
+from qa_level1 import (
+    OpenAIJsonModelClient,
+    _client_last_usage,
+    _merge_token_usage,
+    _normalize_token_usage,
+    _with_token_usage,
+    extract_json_object,
+)
 
 _REFUSAL_RE = re.compile(r"(抱歉|无法|不能|拒绝|sorry|cannot|can't|unable).{0,20}(处理|回答|协助|comply|process|answer)", re.I)
 _RISK_RE = re.compile(r"(风险|冲击|影响|应对|调整|合规|家族办公室|家族信托|离岸信托|规避|反避税|申报|税务)", re.I)
@@ -106,7 +113,8 @@ class _JsonAnswerDeltaExtractor:
         return decoded
 
 
-def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int = 90):
+def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int = 90, usage_sink=None):
+    """流式取模型 JSON 原文。usage_sink：传可变字典就顺带收集流式返回里的 token 用量。"""
     if profile.provider_id != "local" and not profile.api_key:
         from qa_errors import missing_api_key_error
         from qa_orchestrator import QaStageFailure
@@ -179,6 +187,16 @@ def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int =
             body = json.loads(data)
         except Exception:
             continue
+        if usage_sink is not None:
+            # 流式里 usage 一般只在最后一块出现，且是**整段累计值** —— 取最后一块，不累加。
+            # 采集是旁路：解析出意外就当这块没带用量，绝不能打断流式读取。
+            try:
+                chunk_usage = _normalize_token_usage(body)
+            except Exception:
+                chunk_usage = {}
+            if chunk_usage:
+                usage_sink.clear()
+                usage_sink.update(chunk_usage)
         choice = (body.get("choices") or [{}])[0]
         delta = choice.get("delta") or {}
         content = delta.get("content")
@@ -1101,6 +1119,13 @@ class QaFinalSynthesizer:
         token_callback: Callable[[str], None] | None = None,
     ) -> dict:
         messages = self._messages(question=question, graph=graph, level1=level1, level2=level2, degradation=degradation)
+        # 本阶段的模型用量：首答 + 引用修复重试逐次收集，最后累加（拿不到就不挂该键）
+        usage_parts: list[dict] = []
+
+        def _finalize(payload: dict) -> dict:
+            """把本阶段（可能多次调用）的用量挂到阶段输出上；拿不到就不挂 token_usage 键。"""
+            return _with_token_usage(payload, _merge_token_usage(*usage_parts))
+
         if token_callback:
             raw_parts = []
             answer_delta = _JsonAnswerDeltaExtractor()
@@ -1115,7 +1140,10 @@ class QaFinalSynthesizer:
                 )
             else:
                 stream_timeout = 90
-            for content in _stream_openai_json_content(profile, messages, timeout=stream_timeout):
+            stream_usage: dict = {}
+            for content in _stream_openai_json_content(
+                profile, messages, timeout=stream_timeout, usage_sink=stream_usage
+            ):
                 raw_parts.append(content)
                 delta = answer_delta.feed(content)
                 if delta:
@@ -1134,6 +1162,7 @@ class QaFinalSynthesizer:
                 if not structured_answer_stream:
                     token_callback(tail)
             raw = "".join(raw_parts)
+            usage_parts.append(stream_usage)
         else:
             if str(getattr(profile, "provider_id", "") or "").casefold() == "local":
                 raw_timeout = (
@@ -1144,17 +1173,18 @@ class QaFinalSynthesizer:
             else:
                 raw_timeout = 90
             raw = self.model_client(profile, messages, timeout=raw_timeout)
+            usage_parts.append(_client_last_usage(self.model_client))
         if _is_model_refusal(raw):
             item = {
                 "stage": "synthesis",
                 "code": "SYNTHESIS_MODEL_REFUSED",
                 "message": "最终综合模型拒绝处理，已改用证据约束的结构化重组。",
             }
-            return fallback_final_answer(
+            return _finalize(fallback_final_answer(
                 graph=graph, level1=level1, level2=level2,
                 degradation=list(degradation or []) + [item], models=models,
                 reason=item["message"], question=question,
-            )
+            ))
         last_error = None
         for attempt in range(2):
             try:
@@ -1164,7 +1194,7 @@ class QaFinalSynthesizer:
                 unsupported = _unsupported_numbers(result["answer"], source_text)
                 if unsupported:
                     raise QaContractError("最终答案包含证据外数字: " + ", ".join(unsupported[:10]))
-                return validate_final_answer(result)
+                return _finalize(validate_final_answer(result))
             except (QaContractError, KeyError, TypeError, ValueError) as exc:
                 last_error = exc
                 if attempt:
@@ -1180,18 +1210,19 @@ class QaFinalSynthesizer:
                         if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 80
                     ),
                 )
+                usage_parts.append(_client_last_usage(self.model_client))
                 if _is_model_refusal(raw):
                     item = {
                         "stage": "synthesis",
                         "code": "SYNTHESIS_MODEL_REFUSED",
                         "message": "最终综合模型拒绝处理，已改用证据约束的结构化重组。",
                     }
-                    return fallback_final_answer(
+                    return _finalize(fallback_final_answer(
                         graph=graph, level1=level1, level2=level2,
                         degradation=list(degradation or []) + [item], models=models,
                         reason=item["message"], question=question,
-                    )
-        return fallback_final_answer(
+                    ))
+        return _finalize(fallback_final_answer(
             graph=graph,
             level1=level1,
             level2=level2,
@@ -1199,7 +1230,7 @@ class QaFinalSynthesizer:
             models=models,
             reason="",
             question=question,
-        )
+        ))
 
     @staticmethod
     def _lock_to_graph(parsed: Mapping, graph: Mapping, level1: Mapping, level2: Mapping, degradation: list, models: Mapping, *, question: str = "") -> dict:

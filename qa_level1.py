@@ -171,11 +171,127 @@ def _canonicalize_level1_result(parsed: Mapping, evidence: list[dict]) -> dict:
     }
 
 
+# ── 模型 token 用量采集（Phase 00 · P00-04「Cost 基线」前置）────────────────────
+# 只提取**计数**，绝不把 prompt/响应原文写进用量字典（避免敏感内容落库）；
+# 任何异常形状（缺字段、类型不对、负数、usage 不是对象）一律当"没拿到"，
+# 调用方据此**不写** token_usage 键，而不是写 0 冒充。
+_USAGE_IN_KEYS = ("tokens_in", "prompt_tokens", "input_tokens", "prompt_eval_count")
+_USAGE_OUT_KEYS = ("tokens_out", "completion_tokens", "output_tokens", "eval_count")
+_USAGE_TOTAL_KEYS = ("tokens_total", "total_tokens")
+
+
+def _usage_int(value):
+    """用量字段 → 非负整数；认不出来（布尔/非数字/负数/NaN/inf）返回 None。"""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            return None
+        number = int(value)
+    elif isinstance(value, str):
+        text = value.strip()
+        if not re.fullmatch(r"\d+", text or ""):
+            return None
+        number = int(text)
+    else:
+        return None
+    return number if number >= 0 else None
+
+
+def _pick_usage_int(source: Mapping, keys) -> int | None:
+    for key in keys:
+        value = _usage_int(source.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def _normalize_token_usage(payload) -> dict:
+    """从模型返回体里解析 token 用量，归一成 {"tokens_in","tokens_out","tokens_total"}。
+
+    兼容的形状（同一份归一逻辑给 qa_level1 / qa_synthesis 复用）：
+      · OpenAI 风格   usage.prompt_tokens / usage.completion_tokens / usage.total_tokens
+      · input/output  usage.input_tokens / usage.output_tokens
+      · llama.cpp 系  usage.prompt_eval_count / usage.eval_count
+      · 平铺形状      响应顶层直接给 prompt_tokens / completion_tokens
+    拿不到（缺字段、类型不对、负数、usage 不是对象）→ 返回 {}，调用方不写 token_usage 键。
+    """
+    if not isinstance(payload, Mapping):
+        return {}
+    if "usage" in payload:
+        # usage 存在就必须是对象：是字符串/列表/None 说明返回体本身不可信 —— 不猜、不误写
+        source = payload.get("usage")
+        if not isinstance(source, Mapping):
+            return {}
+    else:
+        source = payload
+    tokens_in = _pick_usage_int(source, _USAGE_IN_KEYS)
+    tokens_out = _pick_usage_int(source, _USAGE_OUT_KEYS)
+    if tokens_in is None and tokens_out is None:
+        return {}
+    total = _pick_usage_int(source, _USAGE_TOTAL_KEYS)
+    tokens_in, tokens_out = int(tokens_in or 0), int(tokens_out or 0)
+    # provider 给的 total 与明细矛盾时以明细为准（有的实现只统计其中一段）
+    return {
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "tokens_total": max(int(total or 0), tokens_in + tokens_out),
+    }
+
+
+def _merge_token_usage(*usages) -> dict:
+    """累加同一阶段的多次模型调用用量（草稿修复重试 / 合成引用修复）。
+
+    全部拿不到 → {}（依旧不写 0 冒充）。已归一的字典可再次传入（幂等）。
+    采集是旁路：任何意外一律吞掉当"没拿到"，绝不能影响问答主流程。
+    """
+    try:
+        parts = [item for item in (_normalize_token_usage(usage) for usage in usages) if item]
+    except Exception:
+        return {}
+    if not parts:
+        return {}
+    return {
+        "tokens_in": sum(item["tokens_in"] for item in parts),
+        "tokens_out": sum(item["tokens_out"] for item in parts),
+        "tokens_total": sum(item["tokens_total"] for item in parts),
+    }
+
+
+def _client_last_usage(client) -> dict:
+    """读模型客户端上记录的"最近一次调用用量"；自定义/打桩客户端没有该属性就是 {}。"""
+    try:
+        return _normalize_token_usage(getattr(client, "last_usage", None))
+    except Exception:
+        return {}
+
+
+def _with_token_usage(payload, usage) -> dict:
+    """把归一后的用量挂到阶段输出字典的 `token_usage` 键上；拿不到就**不挂**这个键。
+
+    旁路逻辑：解析出意外时只当"没拿到"（不挂键），绝不把异常抛进问答主流程。
+    """
+    result = dict(payload or {})
+    try:
+        merged = _normalize_token_usage(usage)
+    except Exception:
+        merged = {}
+    if merged:
+        result["token_usage"] = merged
+    return result
+
+
 class OpenAIJsonModelClient:
     def __init__(self, *, session=None):
         self.session = session or requests.Session()
+        # 最近一次调用的 token 用量（已归一）；拿不到就保持 {}，调用方据此不写 token_usage
+        self.last_usage: dict = {}
 
     def __call__(self, profile, messages: list[dict], *, timeout: int = 90) -> str:
+        # 先清空：本次调用失败/没给用量时，绝不能把上一次的用量重复计入
+        self.last_usage = {}
         if profile.provider_id != "local" and not profile.api_key:
             raise QaStageFailure(missing_api_key_error(profile.provider_id, stage="level1_draft"))
         headers = {"Content-Type": "application/json"}
@@ -245,6 +361,11 @@ class OpenAIJsonModelClient:
         )
         response.raise_for_status()
         body = response.json()
+        # 采集是旁路：解析出意外也只当"没拿到"，绝不能影响这次模型调用本身
+        try:
+            self.last_usage = _normalize_token_usage(body)
+        except Exception:
+            self.last_usage = {}
         choices = body.get("choices") if isinstance(body, dict) else None
         if not isinstance(choices, list) or not choices:
             raise QaContractError("一级模型没有返回答案")
@@ -311,8 +432,11 @@ class QaLevel1Generator:
             }, ensure_ascii=False)
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
-    def _stream_raw(self, profile, messages, timeout, first_token_callback):
-        """流式取一级草稿原文；首个 chunk 到达即回报耗时。失败返回 None（调用点退回非流式）。"""
+    def _stream_raw(self, profile, messages, timeout, first_token_callback, usage_sink=None):
+        """流式取一级草稿原文；首个 chunk 到达即回报耗时。失败返回 None（调用点退回非流式）。
+
+        usage_sink：传一个可变字典就顺带收集流式返回里的 token 用量（拿不到时保持空）。
+        """
         import time as _time
 
         try:
@@ -321,7 +445,9 @@ class QaLevel1Generator:
             started = _time.monotonic()
             parts = []
             reported = False
-            for chunk in _stream_openai_json_content(profile, messages, timeout=timeout):
+            for chunk in _stream_openai_json_content(
+                profile, messages, timeout=timeout, usage_sink=usage_sink
+            ):
                 if not reported:
                     reported = True
                     try:
@@ -345,18 +471,25 @@ class QaLevel1Generator:
         repair_timeout = (_int_env("QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS", 0, 0, 600)
                           or endpoint_timeouts.get("repair_seconds") or 90) if is_local else 60
         messages = self._messages(question, plan, evidence)
+        # 本阶段的模型用量：首答 + 修复重试逐次收集，最后累加（拿不到就不挂该键）
+        usage_parts: list[dict] = []
         # 阶段 6-6：流式首字节优先 —— 本地端点先流式拿，首个 chunk 到达即回报（用户能看到
         # "模型已在生成"而不是干等 30 秒）；流式不可用/失败则原样退回非流式，行为不变。
         raw = None
         if first_token_callback is not None and is_local and _env_flag("QA_LEVEL1_STREAM_FIRST_BYTE", True):
-            raw = self._stream_raw(profile, messages, first_timeout, first_token_callback)
+            stream_usage: dict = {}
+            raw = self._stream_raw(profile, messages, first_timeout, first_token_callback, stream_usage)
+            if raw is not None:
+                usage_parts.append(stream_usage)
         if raw is None:
             raw = self.model_client(profile, messages, timeout=first_timeout)
+            usage_parts.append(_client_last_usage(self.model_client))
         last_error = None
         for attempt in range(2):
             try:
                 parsed = _canonicalize_level1_result(extract_json_object(raw), evidence)
-                return validate_level1_result(parsed)
+                result = validate_level1_result(parsed)
+                return _with_token_usage(result, _merge_token_usage(*usage_parts))
             except (QaContractError, KeyError, TypeError, ValueError) as exc:
                 last_error = exc
                 if attempt:
@@ -366,6 +499,7 @@ class QaLevel1Generator:
                     self._messages(question, plan, evidence, repair_error=str(exc), prior=str(raw)),
                     timeout=repair_timeout,
                 )
+                usage_parts.append(_client_last_usage(self.model_client))
         raise QaContractError(f"一级结构化输出校验失败: {last_error}")
 
 

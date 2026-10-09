@@ -7,7 +7,13 @@ from __future__ import annotations
 import hashlib
 
 
-QA_SCHEMA_VERSION = "unified-qa-schema-v5"
+# v5 → v6（graph-rag-v2 通用包 Phase 01 · F-5/F-7/F-8）：
+#   · qa_runs 加版本四元组（corpus_version / model_version / prompt_version / config_hash）；
+#   · qa_reasoning_traces 补 SearchTrace 字段（gap_id / route / results /
+#     accepted / rejected / new_claims / resolved_gap）；
+#   · qa_stage_runs 补 node-run 载体（node_id / node_kind / parent_node_id）与 round_index。
+# 老库升级一律 ADD COLUMN + DEFAULT（见 QA_ADDED_COLUMNS_V6），既有列语义一个字不改。
+QA_SCHEMA_VERSION = "unified-qa-schema-v6"
 
 QA_TABLE_DDL = (
     """
@@ -25,6 +31,13 @@ QA_TABLE_DDL = (
         status TEXT NOT NULL DEFAULT '',
         round_index INTEGER NOT NULL DEFAULT 0,
         latency_ms INTEGER NOT NULL DEFAULT 0,
+        gap_id TEXT DEFAULT '',
+        route TEXT DEFAULT '',
+        results INTEGER DEFAULT 0,
+        accepted INTEGER DEFAULT 0,
+        rejected INTEGER DEFAULT 0,
+        new_claims INTEGER DEFAULT 0,
+        resolved_gap INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         UNIQUE(run_id, round_index, hop_index)
@@ -68,6 +81,10 @@ QA_TABLE_DDL = (
         degraded INTEGER NOT NULL DEFAULT 0,
         degradation_json TEXT NOT NULL DEFAULT '[]',
         final_answer_json TEXT NOT NULL DEFAULT '{}',
+        corpus_version TEXT DEFAULT '',
+        model_version TEXT DEFAULT '',
+        prompt_version TEXT DEFAULT '',
+        config_hash TEXT DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         completed_at TEXT,
@@ -89,6 +106,10 @@ QA_TABLE_DDL = (
         token_usage_json TEXT NOT NULL DEFAULT '{}',
         error_code TEXT NOT NULL DEFAULT '',
         details_json TEXT NOT NULL DEFAULT '{}',
+        node_id TEXT DEFAULT '',
+        node_kind TEXT DEFAULT '',
+        parent_node_id TEXT DEFAULT '',
+        round_index INTEGER DEFAULT 0,
         UNIQUE(run_id, stage, attempt)
     )
     """,
@@ -344,9 +365,11 @@ QA_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_qa_runs_job ON qa_runs(job_id)",
     "CREATE INDEX IF NOT EXISTS idx_qa_runs_session ON qa_runs(session_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_qa_reasoning_trace_run ON qa_reasoning_traces(run_id, hop_index)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_reasoning_trace_gap ON qa_reasoning_traces(run_id, gap_id)",
     "CREATE INDEX IF NOT EXISTS idx_qa_session_constraints_scope"
     " ON qa_session_constraints(owner_user_id, session_id)",
     "CREATE INDEX IF NOT EXISTS idx_qa_stage_run ON qa_stage_runs(run_id, stage, attempt)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_stage_runs_node ON qa_stage_runs(run_id, node_id)",
     "CREATE INDEX IF NOT EXISTS idx_qa_claim_run ON qa_claims(run_id, verification_status)",
     "CREATE INDEX IF NOT EXISTS idx_qa_evidence_run ON qa_evidence(run_id, source_type)",
     "CREATE INDEX IF NOT EXISTS idx_qa_events_resume ON qa_events(run_id, event_id)",
@@ -390,6 +413,88 @@ QA_REQUIRED_TABLES = frozenset(
 )
 
 
+QA_ADDED_COLUMNS_V6 = (
+    # 只允许 ADD COLUMN，且一律带 DEFAULT —— 老库（v5）升级不重写表、不改既有列语义，
+    # 回滚时把这些列留着不读即可（写入侧全部有默认值兜底）。
+    ("qa_runs", "corpus_version", "TEXT DEFAULT ''"),
+    ("qa_runs", "model_version", "TEXT DEFAULT ''"),
+    ("qa_runs", "prompt_version", "TEXT DEFAULT ''"),
+    ("qa_runs", "config_hash", "TEXT DEFAULT ''"),
+    ("qa_reasoning_traces", "gap_id", "TEXT DEFAULT ''"),
+    ("qa_reasoning_traces", "route", "TEXT DEFAULT ''"),
+    ("qa_reasoning_traces", "results", "INTEGER DEFAULT 0"),
+    ("qa_reasoning_traces", "accepted", "INTEGER DEFAULT 0"),
+    ("qa_reasoning_traces", "rejected", "INTEGER DEFAULT 0"),
+    ("qa_reasoning_traces", "new_claims", "INTEGER DEFAULT 0"),
+    ("qa_reasoning_traces", "resolved_gap", "INTEGER DEFAULT 0"),
+    ("qa_stage_runs", "node_id", "TEXT DEFAULT ''"),
+    ("qa_stage_runs", "node_kind", "TEXT DEFAULT ''"),
+    ("qa_stage_runs", "parent_node_id", "TEXT DEFAULT ''"),
+    # round 在 qa_stage_runs 里没有既有列（attempt 是重试次数，语义不同），
+    # 按 qa_reasoning_traces.round_index 的口径补一列，不重复加同义列。
+    ("qa_stage_runs", "round_index", "INTEGER DEFAULT 0"),
+)
+"""Phase 01（v5 → v6）新增列清单：(表名, 列名, 列定义)。
+
+与上面 `QA_TABLE_DDL` 的建表文本**必须一致**：清库建表走 DDL，老库升级走这里；
+`tests/test_qa_phase01_schema.py` 会同时校验两条路径产出的列完全相同。
+"""
+
+
+def _existing_columns(cursor, table_name: str) -> set:
+    """列出表已有列名：SQLite 用 PRAGMA、PostgreSQL 用 information_schema，两边都试。
+
+    与 `intel_schema._existing_columns` 同一套做法（这里不想跨模块 import 一个私有函数）：
+    PG 上 `PRAGMA table_info(x)` 不报错但返回空集，若据此认为"列都不存在"就会对已存在的列
+    ADD COLUMN → DuplicateColumn 打断整段建表；因此只在**确实拿到非空列集**时才决定加列。
+    """
+    names = set()
+    try:
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        for row in cursor.fetchall():
+            try:
+                names.add(str(row["name"]))
+            except Exception:
+                try:
+                    names.add(str(row[1]))
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    if not names:
+        try:
+            cursor.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name=?",
+                (table_name,),
+            )
+            for row in cursor.fetchall():
+                try:
+                    names.add(str(row["column_name"]))
+                except Exception:
+                    try:
+                        names.add(str(row[0]))
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+    return names
+
+
+def _ensure_qa_columns(cursor) -> None:
+    """老库升级：把 `QA_ADDED_COLUMNS_V6` 里缺的列 ADD 上去（已存在则跳过）。"""
+    seen: dict[str, set] = {}
+    for table_name, column_name, definition in QA_ADDED_COLUMNS_V6:
+        if table_name not in seen:
+            # 一张表只查一次列清单（ensure_schema 被每个 store 方法调用，别把它拖慢）
+            seen[table_name] = _existing_columns(cursor, table_name)
+        columns = seen[table_name]
+        if not columns:
+            # 拿不到列清单（表还没建/后端异常）时不盲加，避免 DuplicateColumn 打断建表
+            continue
+        if column_name not in columns:
+            cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+
 def qa_schema_checksum() -> str:
     payload = "\n".join(sql.strip() for sql in QA_TABLE_DDL + QA_INDEX_DDL)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
@@ -398,11 +503,14 @@ def qa_schema_checksum() -> str:
 def ensure_qa_tables(cursor) -> None:
     for statement in QA_TABLE_DDL:
         cursor.execute(statement)
+    # 建表后、建索引前补齐老库缺列：新加的索引可能引用这些新列，顺序不能颠倒。
+    _ensure_qa_columns(cursor)
     for statement in QA_INDEX_DDL:
         cursor.execute(statement)
 
 
 __all__ = [
+    "QA_ADDED_COLUMNS_V6",
     "QA_INDEX_DDL",
     "QA_REQUIRED_TABLES",
     "QA_SCHEMA_VERSION",

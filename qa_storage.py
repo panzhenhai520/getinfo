@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Mapping
@@ -55,6 +57,121 @@ def _decode_run(row) -> dict | None:
     return value
 
 
+# ── graph-rag-v2 通用包 Phase 01 · F-5：版本四元组 ────────────────────────────
+# 四元组（corpus_version / model_version / prompt_version / config_hash）用于回放判定：
+# 任一版本变化就说明"同样的问句不该按旧结论复用"。四个值都允许为空串（老数据、取不到），
+# 一律**只做尽力读取，绝不抛异常**——建 run 是请求的关键路径。
+_CONFIG_HASH_LENGTH = 16
+_CONFIG_HASH_KEYS = (
+    # 检索 / 多跳 / 重规划（config.py 里带默认值的开关与上限）
+    "QA_BUSINESS_RULES_ENABLED", "QA_QUERY_DECOMPOSE_ENABLED", "QA_MULTI_HOP_ENABLED",
+    "QA_MAX_HOPS", "QA_MULTI_HOP_BUDGET_SECONDS", "QA_RECURSION_MAX_ROUNDS",
+    # 检索通道与候选过滤（由各模块直接读环境变量，config 里没有默认值）
+    "QA_GRAPH_EVIDENCE_ENABLED", "QA_VECTOR_VARIANTS", "QA_VECTOR_PREFILTER",
+    "QA_TIME_EXPAND_LADDER", "QA_RANKING_PROFILE",
+    # 政策解析上限与生成侧选择
+    "QA_STANDARD_MAX_HOPS", "QA_DEEP_MAX_HOPS", "QA_MAX_QUERIES_PER_HOP", "QA_MAX_EVIDENCE",
+    "QA_SYNTHESIS_PROVIDER", "QA_RESEARCH_TIMEOUT_SECONDS", "QA_LLM_SELECTION",
+)
+"""纳入 config_hash 的配置键：全部是"改了就影响问答链路"的静态配置。"""
+
+
+def _config_value(key: str):
+    """取配置的有效值：优先 config 模块（带默认值），其次环境变量，都取不到为 None。"""
+    try:
+        import config as _config
+
+        if hasattr(_config, key):
+            return getattr(_config, key)
+    except Exception:
+        pass
+    return os.environ.get(key, None)
+
+
+def _config_hash() -> str:
+    """对"与本次问答相关的关键配置"算稳定 sha256 短哈希（16 位十六进制）。
+
+    纳入：排序权重表（含 QA_RANKING_PROFILE 选档与 QA_RANKING_WEIGHT_* 逐项覆盖）、
+    `_CONFIG_HASH_KEYS` 里的开关与上限、以及 `QA_CONTRACT_VERSION`（契约变了就不该按旧配置回放）。
+    不纳入：时间戳、run_id、用户/包标识、问题文本与 mode —— 这些是"数据"不是"配置"，
+    已经落在 request_json 里；纳入它们会让同一份配置算出不同哈希，回放判定直接失效。
+    同一份配置必须得到同一个值：payload 用 sort_keys 序列化后再哈希。
+    """
+    payload: dict = {"contract_version": QA_CONTRACT_VERSION}
+    try:
+        from qa_ranking_weights import ranking_weights
+
+        payload["ranking_weights"] = ranking_weights()
+    except Exception:
+        payload["ranking_weights"] = None
+    payload["qa_config"] = {key: _config_value(key) for key in _CONFIG_HASH_KEYS}
+    return hashlib.sha256(_json(payload).encode("utf-8")).hexdigest()[:_CONFIG_HASH_LENGTH]
+
+
+def _prompt_version() -> str:
+    """提示词/模板版本（F-5 的 prompt_version）：把现成的版本常量拼成稳定串。
+
+    来源都是模块级常量（延迟 import、只读、失败忽略）：
+      · `qa_research.RESEARCH_TEMPLATE_VERSION`：研究笔记模板；
+      · `qa_reasoning.ADJUDICATION_VERSION`：证据裁决规则。
+    一个都取不到就返回空串——宁可空着，也不编一个假版本号。
+    """
+    parts = []
+    for module_name, attr in (("qa_research", "RESEARCH_TEMPLATE_VERSION"),
+                              ("qa_reasoning", "ADJUDICATION_VERSION")):
+        try:
+            value = str(getattr(importlib.import_module(module_name), attr, "") or "").strip()
+        except Exception:
+            value = ""
+        if value:
+            parts.append(value)
+    return "+".join(parts)
+
+
+def _provider_model_version(database, provider_id: str) -> str:
+    """provider 的模型 id（F-5 的 model_version）；拿不到就空串。
+
+    只读、不联网、不动 provider 层：查 `qa_provider_profiles.model_id`（profile_id 精确匹配）。
+    **刻意**不调用 `QaProviderRegistry.resolve`：它对 local provider 会做端点探测（可能几秒），
+    建 run 在请求同步路径上，不能为一个版本号把它拖慢（拿不到就留空，回放时按"未知模型"看）。
+    """
+    profile_id = str(provider_id or "").strip().casefold() or "local"
+    try:
+        database._ensure_connection()
+        with database.lock:
+            row = database.connection.execute(
+                "SELECT model_id FROM qa_provider_profiles WHERE profile_id=?", (profile_id,),
+            ).fetchone()
+    except Exception:
+        return ""
+    if row is None:
+        return ""
+    try:
+        return str(row["model_id"] or "").strip()
+    except Exception:
+        try:
+            return str(row[0] or "").strip()
+        except Exception:
+            return ""
+
+
+def _corpus_version(database, pack_id: str) -> str:
+    """本地语料指纹（F-5 的 corpus_version）；拿不到就空串。
+
+    与检索缓存的 kb_version **同一个口径**：复用 `qa_pipeline._local_corpus_version`
+    （延迟 import + 兜底：qa_pipeline 反过来 import qa_storage，模块级 import 会成环；
+    真 import 不到就留空，绝不因此打断建 run）。
+    """
+    try:
+        from qa_pipeline import _local_corpus_version
+    except Exception:
+        return ""
+    try:
+        return str(_local_corpus_version(database, pack_id) or "")
+    except Exception:
+        return ""
+
+
 class QaStore:
     def __init__(self, database):
         self.database = database
@@ -80,12 +197,30 @@ class QaStore:
         idempotency_key: str,
         research_app_id: str = "",
         synthesis_provider_id: str = "local",
+        corpus_version: str = "",
+        model_version: str = "",
+        prompt_version: str = "",
+        config_hash: str = "",
     ) -> dict:
+        """建 run。
+
+        Phase 01（F-5）：四个版本参数都是**可选**的，默认值让老调用方行为不变——
+        不传就尽力推导（语料指纹 / provider 模型 id / 模板版本 / 配置哈希），
+        推导不出来就写空串（可回滚：列有默认值，读取侧不依赖非空）。
+        """
         self.ensure_schema()
         owner = str(owner_user_id or "")
         idem = str(idempotency_key or "").strip()
         if not idem:
             raise ValueError("idempotency_key is required")
+        pack_id = str(request_payload.get("industry_pack_id") or "")
+        provider_id = str(request_payload.get("draft_provider") or "local")
+        versions = (
+            str(corpus_version or "") or _corpus_version(self.database, pack_id),
+            str(model_version or "") or _provider_model_version(self.database, provider_id),
+            str(prompt_version or "") or _prompt_version(),
+            str(config_hash or "") or _config_hash(),
+        )
         with self.database.lock:
             run_id = uuid.uuid4().hex
             now = _now()
@@ -95,7 +230,7 @@ class QaStore:
                 QA_CONTRACT_VERSION,
                 str(request_payload.get("session_id") or ""),
                 owner,
-                str(request_payload.get("industry_pack_id") or ""),
+                pack_id,
                 str(request_payload.get("origin") or "api"),
                 str(request_payload.get("mode") or "standard"),
                 hashlib.sha256(question.encode("utf-8")).hexdigest(),
@@ -107,6 +242,7 @@ class QaStore:
                 str(research_app_id or ""),
                 str(synthesis_provider_id or "local"),
                 idem,
+                *versions,
                 now,
                 now,
             )
@@ -116,8 +252,9 @@ class QaStore:
                     id,contract_version,session_id,owner_user_id,industry_pack_id,
                     origin,mode,question_hash,question_text,request_json,status,current_stage,
                     draft_provider_id,research_app_id,synthesis_provider_id,
-                    idempotency_key,created_at,updated_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    idempotency_key,corpus_version,model_version,prompt_version,config_hash,
+                    created_at,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(owner_user_id,idempotency_key) DO NOTHING
                 """,
                 values,
@@ -531,8 +668,15 @@ class QaStore:
                                sub_query: str = "", depends_on=None, partial_answer: str = "",
                                used_evidence_refs=None, missing_links=None, next_queries=None,
                                status: str = "", round_index: int = 0,
-                               latency_ms: int = 0) -> None:
+                               latency_ms: int = 0, gap_id: str = "", route: str = "",
+                               results: int = 0, accepted: int = 0, rejected: int = 0,
+                               new_claims: int = 0, resolved_gap: int = 0) -> None:
         """阶段 10：记录一跳的推理留痕（幂等：同 run + 轮次 + 跳序号覆盖）。
+
+        Phase 01（F-7）：补齐 SearchTrace 字段（gap_id / route / results / accepted /
+        rejected / new_claims / resolved_gap），全部是**可选关键字参数**，默认值与原行为
+        逐字等价（老调用方一行都不用改）。`round_index` 即 SearchTrace 的 `round`。
+        `gap_id` / `new_claims` / `resolved_gap` 属阶段 07 的缺口闭环，现阶段默认 0/空串。
 
         刻意**不抛异常**：留痕是观测能力，写库失败绝不能影响问答主流程（边界要求）。
         """
@@ -547,8 +691,9 @@ class QaStore:
                         INSERT INTO qa_reasoning_traces(
                             run_id,hop_index,sub_query_id,sub_query,depends_on_json,partial_answer,
                             used_evidence_refs_json,missing_links_json,next_queries_json,status,
-                            round_index,latency_ms,created_at,updated_at
-                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            round_index,latency_ms,gap_id,route,results,accepted,rejected,
+                            new_claims,resolved_gap,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                         ON CONFLICT(run_id,round_index,hop_index) DO UPDATE SET
                             sub_query_id=excluded.sub_query_id,sub_query=excluded.sub_query,
                             depends_on_json=excluded.depends_on_json,
@@ -557,6 +702,10 @@ class QaStore:
                             missing_links_json=excluded.missing_links_json,
                             next_queries_json=excluded.next_queries_json,
                             status=excluded.status,latency_ms=excluded.latency_ms,
+                            gap_id=excluded.gap_id,route=excluded.route,
+                            results=excluded.results,accepted=excluded.accepted,
+                            rejected=excluded.rejected,new_claims=excluded.new_claims,
+                            resolved_gap=excluded.resolved_gap,
                             updated_at=excluded.updated_at
                         """,
                         (
@@ -564,7 +713,10 @@ class QaStore:
                             str(sub_query or "")[:1000], _json(list(depends_on or [])),
                             str(partial_answer or "")[:4000], _json(list(used_evidence_refs or [])),
                             _json(list(missing_links or [])), _json(list(next_queries or [])),
-                            str(status or ""), int(round_index), int(latency_ms), now, now,
+                            str(status or ""), int(round_index), int(latency_ms),
+                            str(gap_id or ""), str(route or ""), int(results or 0),
+                            int(accepted or 0), int(rejected or 0), int(new_claims or 0),
+                            int(resolved_gap or 0), now, now,
                         ),
                     )
                     self.database.connection.commit()
@@ -782,9 +934,25 @@ class QaStore:
         output_hash: str = "",
         error_code: str = "",
         details: Mapping | None = None,
+        node_id: str = "",
+        node_kind: str = "",
+        parent_node_id: str = "",
+        round_index: int = 0,
     ) -> None:
+        """记录一个阶段的执行（幂等：同 run+stage+attempt 覆盖）。
+
+        Phase 01（F-8）：补 node-run 载体。三个 node 参数都是可选的——
+        不传时 `node_id` 默认等于 `stage`、`node_kind` 默认 `"execution"`、
+        `parent_node_id` 默认空串，因此**现有调用点零改动**即可产出 node-run 行；
+        阶段 05 真建执行 DAG 时，谁有真 node_id 谁显式传。
+        `round_index` 即 SearchTrace 的 `round`（qa_stage_runs 里没有同义列，attempt 是重试次数）。
+        """
         self.ensure_schema()
         now = _now()
+        node_id = str(node_id or stage)
+        node_kind = str(node_kind or "execution")
+        parent_node_id = str(parent_node_id or "")
+        round_index = int(round_index or 0)
         completed = now if status in {"completed", "failed", "cancelled", "degraded"} else None
         with self.database.lock:
             prior = self.database.connection.execute(
@@ -804,8 +972,9 @@ class QaStore:
                 """
                 INSERT INTO qa_stage_runs(
                     run_id,stage,attempt,status,started_at,completed_at,
-                    latency_ms,input_hash,output_hash,token_usage_json,error_code,details_json
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    latency_ms,input_hash,output_hash,token_usage_json,error_code,details_json,
+                    node_id,node_kind,parent_node_id,round_index
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(run_id,stage,attempt) DO UPDATE SET
                     status=excluded.status,
                     completed_at=excluded.completed_at,
@@ -814,7 +983,19 @@ class QaStore:
                     output_hash=excluded.output_hash,
                     token_usage_json=excluded.token_usage_json,
                     error_code=excluded.error_code,
-                    details_json=excluded.details_json
+                    details_json=excluded.details_json,
+                    -- node 字段只在"调用方显式传了非默认值"时才覆盖：
+                    -- 否则阶段 05 传过真 node_id 后，后续只更新状态的调用会把它打回 stage。
+                    node_id=CASE WHEN excluded.node_id<>excluded.stage
+                                 THEN excluded.node_id ELSE qa_stage_runs.node_id END,
+                    node_kind=CASE WHEN excluded.node_kind<>'execution'
+                                   THEN excluded.node_kind ELSE qa_stage_runs.node_kind END,
+                    parent_node_id=CASE WHEN excluded.parent_node_id<>''
+                                        THEN excluded.parent_node_id
+                                        ELSE qa_stage_runs.parent_node_id END,
+                    round_index=CASE WHEN excluded.round_index>qa_stage_runs.round_index
+                                     THEN excluded.round_index
+                                     ELSE qa_stage_runs.round_index END
                 """,
                 (
                     str(run_id),
@@ -829,6 +1010,10 @@ class QaStore:
                     _json(token_usage),
                     str(error_code or ""),
                     _json(details or {}),
+                    node_id,
+                    node_kind,
+                    parent_node_id,
+                    round_index,
                 ),
             )
             self.database.connection.commit()

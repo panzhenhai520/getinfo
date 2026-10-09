@@ -4,14 +4,14 @@
 
 |ID|任务|状态|证据|最后更新|
 |---|---|---|---|---|
-|P00-01|环境/目录/依赖探查| IN_PROGRESS | 部分：运行拓扑/工作树/依赖/配置/DB/镜像锁 6 份 manifest 已在（tools/capture_*.py + tests/test_*baseline*.py）；缺 QA/V2 模块与依赖清单（按 D-005 补） | 2026-10-09 |
-|P00-02|冻结原 API contract| IN_PROGRESS | 部分：版本锚点在（qa_contracts.py:19 unified-qa-v1、qa_schema.py:10 unified-qa-schema-v5、7 个 schema + 守门用例）；缺冻结快照与变更流程 | 2026-10-09 |
-|P00-03|建立固定 benchmark| IN_PROGRESS | 部分：config/qa_acceptance_questions.json(12 题) + tools/qa_retrieval_acceptance.py + 历史 1 条；缺 benchmark_version、语料快照绑定、golden 答案 | 2026-10-09 |
-|P00-04|记录 Recall/Citation/Quality/Latency/Cost baseline| IN_PROGRESS | 部分：Latency 完整（baseline/performance-baseline.json + tools/benchmark_stage1.py）；检索侧 hit/grounded/graph_rate 有；缺 Recall@K、citation precision/recall、Quality、Cost | 2026-10-09 |
-|P01-01|Node/Edge contract| IN_PROGRESS | 部分：两套事实上的 node/edge（qa_reasoning.py:206 Claim–Evidence 图；kg_builder.py:51-53 事件/属性/共现）都不在契约层；缺 Execution Graph Node 契约 | 2026-10-09 |
-|P01-02|ResearchSession/SearchTrace| IN_PROGRESS | 部分：qa_runs / qa_reasoning_traces / qa_stage_runs / qa_events / qa_audit_events 在；缺 gap_id/route/results/accepted/rejected/new_claims/resolved_gap，且 trace_id 当前 == run_id（qa_orchestrator.py:112） | 2026-10-09 |
-|P01-03|版本字段 corpus/retrieval/prompt/model| IN_PROGRESS | 部分：检索侧 qa_retrieval_cache.kb_version 在（qa_schema.py:243）；qa_runs/qa_contracts 缺 corpus_version/model_version/prompt_version/config_hash | 2026-10-09 |
-|P01-04|idempotency/trace/round/node-run| IN_PROGRESS | 部分：idempotency 已达标（qa_schema.py:66/74 + qa_storage.py:121 ON CONFLICT）；round/hop 有；node-run 完全缺失（无 node_id/node_kind/parent_node_id） | 2026-10-09 |
+|P00-01|环境/目录/依赖探查| PASS | tools/qa_baseline_inventory.py + tests/test_qa_baseline_inventory.py(8 例)；产物 baseline/qa-baseline-inventory.json（captured_at_utc=2026-10-09T15:58:47Z）：模块 20/20 存在、依赖边 129 条无自环、验收 acceptance.passed=true | 2026-10-09 |
+|P00-02|冻结原 API contract| PASS | 七个契约 schema 指纹已冻结并落盘（EVIDENCE 370301331c02c738 / CLAIM 06fcdb02441248b2 / CONFLICT aabd3259b07f9a3e / LEVEL1 7e864764429db111 / LEVEL2 a0484f894e7bc9d6 / FINAL_ANSWER 4d1efa54ca1cbc1a / QA_EVENT 59358bfa88a6c6af）；版本锚点 unified-qa-v1 / qa-sse-v1 / unified-qa-schema-v6 / graph-contract-v1；守门用例断言指纹稳定；变更流程见 DECISION_LOG | 2026-10-09 |
+|P00-03|建立固定 benchmark| PASS | config/qa_acceptance_questions.json 冻结为信封形态（benchmark_version=qa-acceptance-v1、corpus_snapshot_id=pending:first-run+真实快照写入历史、generated_at）；题目内容与 git HEAD 逐题相等（12 题 id 序列不变）；tools/qa_retrieval_acceptance.py 支持两形态解析；tests/test_qa_acceptance_benchmark_version.py 13 例 | 2026-10-09 |
+|P00-04|记录 Recall/Citation/Quality/Latency/Cost baseline| PARTIAL | Latency 已有（baseline/performance-baseline.json）；本轮补上 Recall@K=0.8333（k=12，词级 micro）/citation_precision=0.7719 / citation_recall=0.8333 / cost 聚合（cost 值的真实性依赖 token 采集，见 P00-04b）；**Quality（unsupported claim rate / entailment）按通用包规划属阶段 03**，此处只登记缺口 | 2026-10-09 |
+|P01-01|Node/Edge contract| PASS | qa_graph_contracts.py（节点类型/边关系/Claim–Evidence 关系/检索通道/失败策略五值/停止原因五值/五个可校验 schema + validate()）；tests/test_qa_graph_contracts.py 12 例（含与 kg_builder 常量逐字相等的等价断言） | 2026-10-09 |
+|P01-02|ResearchSession/SearchTrace| PASS | qa_reasoning_traces 补齐 gap_id/route/results/accepted/rejected/new_claims/resolved_gap；qa_storage.record_reasoning_trace 新增 7 个可选 kwarg（旧签名兼容）；qa_pipeline._record 回填 route/计数（回执与返回结构一字未变）；trace_id==run_id 的语义已在 qa_orchestrator 注释写明；tests/test_qa_phase01_schema.py 覆盖 | 2026-10-09 |
+|P01-03|版本字段 corpus/retrieval/prompt/model| PASS | qa_runs 新增 corpus_version/model_version/prompt_version/config_hash（TEXT DEFAULT ''，ADD COLUMN 可回滚）；create_run 写入四元组；真跑值 corpus_version=ba768b331fd86cec803be04e、prompt_version=qa-research-notes-v3+qa-adjudication-v1、config_hash=c75da38ad7bbfa98；model_version 已由 qa_gateway 传入草稿角色 model_id（此前恒空的缺口已补） | 2026-10-09 |
+|P01-04|idempotency/trace/round/node-run| PASS | 幂等保持（qa_storage.py:121 ON CONFLICT 回读既有 run）；node-run 载体落地：qa_stage_runs 新增 node_id/node_kind/parent_node_id + round_index，node_id 不传时自动等于 stage（现有调用点零改动）、显式 node_id 不会被状态更新打回；新建索引 idx_qa_stage_runs_node；tests/test_qa_phase01_schema.py 12 例 | 2026-10-09 |
 |P02-01|Claim/Entity/Evidence/Source/Span schema|NOT_STARTED|||
 |P02-02|provenance|NOT_STARTED|||
 |P02-03|seen 与 confirmed|NOT_STARTED|||

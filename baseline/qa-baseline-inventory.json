@@ -1,0 +1,1440 @@
+{
+  "manifest_version": "qa-baseline-inventory-v1",
+  "captured_at_utc": "2026-10-09T15:58:47Z",
+  "scope": "只读基线：不连数据库、不调 LLM、不发网络请求；除本 JSON 产物外不写仓库任何文件。",
+  "host": {
+    "python_version": "3.11.5",
+    "python_full_version": "3.11.5 | packaged by Anaconda, Inc. | (main, Sep 11 2023, 13:26:23) [MSC v.1916 64 bit (AMD64)]",
+    "python_implementation": "CPython",
+    "python_executable": "C:\\Anaconda\\python.exe",
+    "platform": "Windows-10-10.0.22000-SP0",
+    "system": "Windows",
+    "release": "10",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 126 Stepping 5, GenuineIntel",
+    "repo_root": "F:\\CollectInfo",
+    "cwd": "F:\\CollectInfo",
+    "packages": {
+      "flask": "2.2.2",
+      "jsonschema": "4.26.0",
+      "psycopg2": "2.9.12",
+      "requests": "2.34.2",
+      "redis": "8.1.0",
+      "playwright": "1.63.0",
+      "pydantic": "2.12.5"
+    },
+    "packages_unavailable": {},
+    "package_notes": {
+      "psycopg2": "无发行版元数据，退回模块 __version__（原值：2.9.12 (dt dec pq3 ext lo64)）"
+    }
+  },
+  "modules": {
+    "required": [
+      "qa_contracts.py",
+      "qa_schema.py",
+      "qa_storage.py",
+      "qa_orchestrator.py",
+      "qa_pipeline.py",
+      "qa_planner.py",
+      "qa_query_decompose.py",
+      "qa_retrieval.py",
+      "qa_ranking_weights.py",
+      "qa_level1.py",
+      "qa_synthesis.py",
+      "qa_attribution.py",
+      "qa_observability.py",
+      "qa_reasoning.py",
+      "qa_graph_contracts.py",
+      "kg_builder.py",
+      "business_rules.py",
+      "intel_schema.py",
+      "intel_worker.py",
+      "intel_database.py"
+    ],
+    "count": 20,
+    "present_count": 20,
+    "missing": [],
+    "files": [
+      {
+        "name": "qa_contracts.py",
+        "path": "qa_contracts.py",
+        "exists": true,
+        "bytes": 21031,
+        "sha256": "31506807f9ce685a7c7df524c3355477489c8463b94886daa6a0d40dd960bf98",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "qa_graph_contracts.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "copy",
+          "re",
+          "typing"
+        ],
+        "third_party_imports": [
+          "jsonschema"
+        ]
+      },
+      {
+        "name": "qa_schema.py",
+        "path": "qa_schema.py",
+        "exists": true,
+        "bytes": 19604,
+        "sha256": "2f9b5e75b6c01552fee86fedd79fd7d557526d25ca3aaf966a13f7c68446acde",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [],
+        "stdlib_imports": [
+          "__future__",
+          "hashlib"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_storage.py",
+        "path": "qa_storage.py",
+        "exists": true,
+        "bytes": 51195,
+        "sha256": "24fdbbdf8f42ec6a2d60719003c1023f55eed8532f665471148a97756b35e0a7",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "config.py",
+          "qa_contracts.py",
+          "qa_pipeline.py",
+          "qa_ranking_weights.py",
+          "qa_schema.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "hashlib",
+          "importlib",
+          "json",
+          "os",
+          "typing",
+          "uuid"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_orchestrator.py",
+        "path": "qa_orchestrator.py",
+        "exists": true,
+        "bytes": 15883,
+        "sha256": "408808b244aaf8eacb48951d15345137e7d2f93b77d7a88e18ab92c1615530b2",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "qa_errors.py",
+          "qa_observability.py",
+          "qa_question_templates.py",
+          "qa_resilience.py",
+          "qa_sse.py",
+          "qa_ui_adapter.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "dataclasses",
+          "hashlib",
+          "json",
+          "time",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_pipeline.py",
+        "path": "qa_pipeline.py",
+        "exists": true,
+        "bytes": 90764,
+        "sha256": "e7f8b7c5d8e1a3cc609d82286746790143c77c82ebcbd0b7c33c00c81e34d9fb",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "chat_api.py",
+          "config.py",
+          "qa_contracts.py",
+          "qa_errors.py",
+          "qa_flags.py",
+          "qa_graph_contracts.py",
+          "qa_level1.py",
+          "qa_orchestrator.py",
+          "qa_planner.py",
+          "qa_policy.py",
+          "qa_policy_evidence.py",
+          "qa_provider_registry.py",
+          "qa_question_templates.py",
+          "qa_ragflow_client.py",
+          "qa_reasoning.py",
+          "qa_relevance.py",
+          "qa_research.py",
+          "qa_resilience.py",
+          "qa_retrieval.py",
+          "qa_storage.py",
+          "qa_synthesis.py",
+          "sqlite_database.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "collections",
+          "hashlib",
+          "json",
+          "os",
+          "re",
+          "threading",
+          "time",
+          "typing"
+        ],
+        "third_party_imports": [
+          "requests"
+        ]
+      },
+      {
+        "name": "qa_planner.py",
+        "path": "qa_planner.py",
+        "exists": true,
+        "bytes": 57991,
+        "sha256": "1871af8d51decaf620529f8dd6051a907abea8636d08286980f618c59a48f7bc",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "business_rules.py",
+          "industry_packs.py",
+          "qa_policy_evidence.py",
+          "qa_query_decompose.py",
+          "qa_query_normalize.py",
+          "qa_task_templates.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "json",
+          "os",
+          "re",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_query_decompose.py",
+        "path": "qa_query_decompose.py",
+        "exists": true,
+        "bytes": 11383,
+        "sha256": "b6f924e8394352896f11dcd57c72c9921b1f686053cd306a69d4f2ea0e89db48",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [],
+        "stdlib_imports": [
+          "__future__",
+          "re",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_retrieval.py",
+        "path": "qa_retrieval.py",
+        "exists": true,
+        "bytes": 79380,
+        "sha256": "6e95c5182cec5712cc7df16543f807b6f556df27586ab7c9c9c3d437ecd940cb",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "config.py",
+          "financial_evidence.py",
+          "intel_topics.py",
+          "kg_builder.py",
+          "publish_time.py",
+          "qa_policy_evidence.py",
+          "qa_query_normalize.py",
+          "qa_ranking_weights.py",
+          "serpapi_client.py",
+          "tavily_client.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "hashlib",
+          "html",
+          "ipaddress",
+          "json",
+          "os",
+          "re",
+          "typing",
+          "urllib",
+          "zoneinfo"
+        ],
+        "third_party_imports": [
+          "jieba"
+        ]
+      },
+      {
+        "name": "qa_ranking_weights.py",
+        "path": "qa_ranking_weights.py",
+        "exists": true,
+        "bytes": 4060,
+        "sha256": "8448e443ae599e6171364e74bc6daf0b5ccc4e71ca1fa7d985f1e83e31586138",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [],
+        "stdlib_imports": [
+          "__future__",
+          "os",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_level1.py",
+        "path": "qa_level1.py",
+        "exists": true,
+        "bytes": 17583,
+        "sha256": "537b20e64e98fad66b3e65c00d54d83eaae75273f7b40f2d23c2396256e07445",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "config.py",
+          "qa_contracts.py",
+          "qa_endpoint_profile.py",
+          "qa_errors.py",
+          "qa_observability.py",
+          "qa_orchestrator.py",
+          "qa_security.py",
+          "qa_synthesis.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "json",
+          "os",
+          "re",
+          "time",
+          "typing"
+        ],
+        "third_party_imports": [
+          "requests"
+        ]
+      },
+      {
+        "name": "qa_synthesis.py",
+        "path": "qa_synthesis.py",
+        "exists": true,
+        "bytes": 64092,
+        "sha256": "61917f62ba990f363f17fcaa444f4a2e595ac1ba5a35a5d7f06977215fd942b4",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "config.py",
+          "qa_contracts.py",
+          "qa_endpoint_profile.py",
+          "qa_errors.py",
+          "qa_level1.py",
+          "qa_observability.py",
+          "qa_orchestrator.py",
+          "qa_security.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "ast",
+          "datetime",
+          "json",
+          "os",
+          "re",
+          "typing"
+        ],
+        "third_party_imports": [
+          "requests"
+        ]
+      },
+      {
+        "name": "qa_attribution.py",
+        "path": "qa_attribution.py",
+        "exists": true,
+        "bytes": 50258,
+        "sha256": "011692a7a0991317a9259e06846b56bad65df990d63f38e068880a77fe46bd90",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "qa_level1.py",
+          "qa_provider_registry.py",
+          "qa_storage.py",
+          "sqlite_database.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "json",
+          "math",
+          "os",
+          "re",
+          "threading",
+          "typing",
+          "urllib"
+        ],
+        "third_party_imports": [
+          "torch",
+          "transformers"
+        ]
+      },
+      {
+        "name": "qa_observability.py",
+        "path": "qa_observability.py",
+        "exists": true,
+        "bytes": 14503,
+        "sha256": "657f2e5d336e8dec783d405c13efbc6deaf2b655852b25f923a6bfc4404353ba",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "chat_api.py",
+          "config.py",
+          "qa_policy.py",
+          "qa_provider_registry.py",
+          "qa_ragflow_client.py",
+          "qa_schema.py",
+          "qa_security.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "json",
+          "math",
+          "os",
+          "socket",
+          "time",
+          "typing",
+          "urllib"
+        ],
+        "third_party_imports": [
+          "requests"
+        ]
+      },
+      {
+        "name": "qa_reasoning.py",
+        "path": "qa_reasoning.py",
+        "exists": true,
+        "bytes": 13764,
+        "sha256": "b13a4892bceb6d3ca4d8b9c80e34c90ebf4536ebd54a7cf263df69f883fa41c9",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "hashlib",
+          "re",
+          "typing",
+          "urllib"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "qa_graph_contracts.py",
+        "path": "qa_graph_contracts.py",
+        "exists": true,
+        "bytes": 10135,
+        "sha256": "ea3f3ac32ece523913c59654bf83adb03b807f25c33f0aaedca4e32484c11a8a",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [],
+        "stdlib_imports": [
+          "__future__",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "kg_builder.py",
+        "path": "kg_builder.py",
+        "exists": true,
+        "bytes": 29798,
+        "sha256": "7b2745a0c6858ae62b28cb1039da1cb98556874982ef402c91fd5be1728004c9",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "intel_database.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "hashlib",
+          "json",
+          "logging",
+          "re",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "business_rules.py",
+        "path": "business_rules.py",
+        "exists": true,
+        "bytes": 7379,
+        "sha256": "90a2c60aefff7c927a990fb9540bb157ef2a1806e43bb570f4b345824d5b60b6",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "intel_database.py",
+          "pack_attention.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "json",
+          "typing"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "intel_schema.py",
+        "path": "intel_schema.py",
+        "exists": true,
+        "bytes": 75594,
+        "sha256": "1ad80ed5c5cd15ba45835cf2ada180f32856209d19afe27f5ca9b8f2a6fe2303",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [],
+        "stdlib_imports": [
+          "__future__"
+        ],
+        "third_party_imports": []
+      },
+      {
+        "name": "intel_worker.py",
+        "path": "intel_worker.py",
+        "exists": true,
+        "bytes": 109370,
+        "sha256": "1e79bc846f803440ec23a8c32d50a458972f21f3d5713213170800bbd10c0f44",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "bertopic_topic_service.py",
+          "candidate_crawler_adapter.py",
+          "candidate_dispatcher.py",
+          "config.py",
+          "content_handlers.py",
+          "dynamic_link_converter.py",
+          "embed_articles_service.py",
+          "event_extract_service.py",
+          "financial_market_scheduler.py",
+          "financial_paper_trading.py",
+          "financial_worker_jobs.py",
+          "industry_collection_runtime.py",
+          "industry_pack_runtime.py",
+          "industry_packs.py",
+          "industry_ragflow.py",
+          "intel_candidates.py",
+          "intel_classifier.py",
+          "intel_content_quality_gate.py",
+          "intel_contracts.py",
+          "intel_database.py",
+          "intel_evidence.py",
+          "intel_light_scanner.py",
+          "intel_llm_client.py",
+          "intel_reports.py",
+          "intel_schema.py",
+          "intel_sources.py",
+          "intel_topics.py",
+          "pack_report.py",
+          "pack_tenant.py",
+          "qa_runtime.py",
+          "ragflow_client.py",
+          "remote_pipeline_client.py",
+          "remote_result_ingestor.py",
+          "subject_normalize_service.py",
+          "task_retention.py",
+          "trend_aggregate_service.py",
+          "utils.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "argparse",
+          "concurrent",
+          "datetime",
+          "gc",
+          "hashlib",
+          "json",
+          "logging",
+          "os",
+          "re",
+          "signal",
+          "socket",
+          "threading",
+          "time",
+          "typing",
+          "uuid"
+        ],
+        "third_party_imports": [
+          "psutil",
+          "redis"
+        ]
+      },
+      {
+        "name": "intel_database.py",
+        "path": "intel_database.py",
+        "exists": true,
+        "bytes": 179495,
+        "sha256": "5b470b6c8bdb3d9fd8568bb3523bac7eae45b8119d0939b1be7f42d8831fa424",
+        "ast_parsed": true,
+        "parse_error": null,
+        "internal_imports": [
+          "config.py",
+          "industry_pack_runtime.py",
+          "industry_packs.py",
+          "intel_contracts.py",
+          "intel_evidence.py",
+          "intel_schema.py",
+          "pack_user_gate.py",
+          "project_keyword_gate.py",
+          "remote_result_ingestor.py",
+          "sqlite_database.py",
+          "trend_detect.py",
+          "utils.py"
+        ],
+        "stdlib_imports": [
+          "__future__",
+          "datetime",
+          "hashlib",
+          "json",
+          "re",
+          "sqlite3",
+          "threading",
+          "typing"
+        ],
+        "third_party_imports": [
+          "numpy"
+        ]
+      }
+    ],
+    "parse_errors": {},
+    "dependency_edge_count": 129,
+    "dependency_targets_outside_manifest": [
+      "bertopic_topic_service.py",
+      "candidate_crawler_adapter.py",
+      "candidate_dispatcher.py",
+      "chat_api.py",
+      "config.py",
+      "content_handlers.py",
+      "dynamic_link_converter.py",
+      "embed_articles_service.py",
+      "event_extract_service.py",
+      "financial_evidence.py",
+      "financial_market_scheduler.py",
+      "financial_paper_trading.py",
+      "financial_worker_jobs.py",
+      "industry_collection_runtime.py",
+      "industry_pack_runtime.py",
+      "industry_packs.py",
+      "industry_ragflow.py",
+      "intel_candidates.py",
+      "intel_classifier.py",
+      "intel_content_quality_gate.py",
+      "intel_contracts.py",
+      "intel_evidence.py",
+      "intel_light_scanner.py",
+      "intel_llm_client.py",
+      "intel_reports.py",
+      "intel_sources.py",
+      "intel_topics.py",
+      "pack_attention.py",
+      "pack_report.py",
+      "pack_tenant.py",
+      "pack_user_gate.py",
+      "project_keyword_gate.py",
+      "publish_time.py",
+      "qa_endpoint_profile.py",
+      "qa_errors.py",
+      "qa_flags.py",
+      "qa_policy.py",
+      "qa_policy_evidence.py",
+      "qa_provider_registry.py",
+      "qa_query_normalize.py",
+      "qa_question_templates.py",
+      "qa_ragflow_client.py",
+      "qa_relevance.py",
+      "qa_research.py",
+      "qa_resilience.py",
+      "qa_runtime.py",
+      "qa_security.py",
+      "qa_sse.py",
+      "qa_task_templates.py",
+      "qa_ui_adapter.py",
+      "ragflow_client.py",
+      "remote_pipeline_client.py",
+      "remote_result_ingestor.py",
+      "serpapi_client.py",
+      "sqlite_database.py",
+      "subject_normalize_service.py",
+      "task_retention.py",
+      "tavily_client.py",
+      "trend_aggregate_service.py",
+      "trend_detect.py",
+      "utils.py"
+    ]
+  },
+  "dependencies": [
+    {
+      "from": "business_rules.py",
+      "to": "intel_database.py"
+    },
+    {
+      "from": "business_rules.py",
+      "to": "pack_attention.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "config.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "industry_pack_runtime.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "industry_packs.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "intel_contracts.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "intel_evidence.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "intel_schema.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "pack_user_gate.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "project_keyword_gate.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "remote_result_ingestor.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "sqlite_database.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "trend_detect.py"
+    },
+    {
+      "from": "intel_database.py",
+      "to": "utils.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "bertopic_topic_service.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "candidate_crawler_adapter.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "candidate_dispatcher.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "config.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "content_handlers.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "dynamic_link_converter.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "embed_articles_service.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "event_extract_service.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "financial_market_scheduler.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "financial_paper_trading.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "financial_worker_jobs.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "industry_collection_runtime.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "industry_pack_runtime.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "industry_packs.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "industry_ragflow.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_candidates.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_classifier.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_content_quality_gate.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_contracts.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_database.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_evidence.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_light_scanner.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_llm_client.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_reports.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_schema.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_sources.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "intel_topics.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "pack_report.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "pack_tenant.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "qa_runtime.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "ragflow_client.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "remote_pipeline_client.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "remote_result_ingestor.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "subject_normalize_service.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "task_retention.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "trend_aggregate_service.py"
+    },
+    {
+      "from": "intel_worker.py",
+      "to": "utils.py"
+    },
+    {
+      "from": "kg_builder.py",
+      "to": "intel_database.py"
+    },
+    {
+      "from": "qa_attribution.py",
+      "to": "qa_level1.py"
+    },
+    {
+      "from": "qa_attribution.py",
+      "to": "qa_provider_registry.py"
+    },
+    {
+      "from": "qa_attribution.py",
+      "to": "qa_storage.py"
+    },
+    {
+      "from": "qa_attribution.py",
+      "to": "sqlite_database.py"
+    },
+    {
+      "from": "qa_contracts.py",
+      "to": "qa_graph_contracts.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "config.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_contracts.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_endpoint_profile.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_errors.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_observability.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_orchestrator.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_security.py"
+    },
+    {
+      "from": "qa_level1.py",
+      "to": "qa_synthesis.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "chat_api.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "config.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "qa_policy.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "qa_provider_registry.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "qa_ragflow_client.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "qa_schema.py"
+    },
+    {
+      "from": "qa_observability.py",
+      "to": "qa_security.py"
+    },
+    {
+      "from": "qa_orchestrator.py",
+      "to": "qa_errors.py"
+    },
+    {
+      "from": "qa_orchestrator.py",
+      "to": "qa_observability.py"
+    },
+    {
+      "from": "qa_orchestrator.py",
+      "to": "qa_question_templates.py"
+    },
+    {
+      "from": "qa_orchestrator.py",
+      "to": "qa_resilience.py"
+    },
+    {
+      "from": "qa_orchestrator.py",
+      "to": "qa_sse.py"
+    },
+    {
+      "from": "qa_orchestrator.py",
+      "to": "qa_ui_adapter.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "chat_api.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "config.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_contracts.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_errors.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_flags.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_graph_contracts.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_level1.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_orchestrator.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_planner.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_policy.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_policy_evidence.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_provider_registry.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_question_templates.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_ragflow_client.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_reasoning.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_relevance.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_research.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_resilience.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_retrieval.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_storage.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "qa_synthesis.py"
+    },
+    {
+      "from": "qa_pipeline.py",
+      "to": "sqlite_database.py"
+    },
+    {
+      "from": "qa_planner.py",
+      "to": "business_rules.py"
+    },
+    {
+      "from": "qa_planner.py",
+      "to": "industry_packs.py"
+    },
+    {
+      "from": "qa_planner.py",
+      "to": "qa_policy_evidence.py"
+    },
+    {
+      "from": "qa_planner.py",
+      "to": "qa_query_decompose.py"
+    },
+    {
+      "from": "qa_planner.py",
+      "to": "qa_query_normalize.py"
+    },
+    {
+      "from": "qa_planner.py",
+      "to": "qa_task_templates.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "config.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "financial_evidence.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "intel_topics.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "kg_builder.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "publish_time.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "qa_policy_evidence.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "qa_query_normalize.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "qa_ranking_weights.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "serpapi_client.py"
+    },
+    {
+      "from": "qa_retrieval.py",
+      "to": "tavily_client.py"
+    },
+    {
+      "from": "qa_storage.py",
+      "to": "config.py"
+    },
+    {
+      "from": "qa_storage.py",
+      "to": "qa_contracts.py"
+    },
+    {
+      "from": "qa_storage.py",
+      "to": "qa_pipeline.py"
+    },
+    {
+      "from": "qa_storage.py",
+      "to": "qa_ranking_weights.py"
+    },
+    {
+      "from": "qa_storage.py",
+      "to": "qa_schema.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "config.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_contracts.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_endpoint_profile.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_errors.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_level1.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_observability.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_orchestrator.py"
+    },
+    {
+      "from": "qa_synthesis.py",
+      "to": "qa_security.py"
+    }
+  ],
+  "contracts": {
+    "source_module": "qa_contracts.py",
+    "versions": {
+      "QA_CONTRACT_VERSION": "unified-qa-v1",
+      "QA_SSE_PROTOCOL_VERSION": "qa-sse-v1",
+      "QA_SCHEMA_VERSION": "unified-qa-schema-v6",
+      "GRAPH_CONTRACT_VERSION": "graph-contract-v1"
+    },
+    "schemas": {
+      "EVIDENCE_SCHEMA": {
+        "fingerprint": "370301331c02c738",
+        "required": [
+          "evidence_ref",
+          "source_type",
+          "title",
+          "source_url",
+          "content_excerpt",
+          "metadata"
+        ],
+        "property_count": 22,
+        "top_level_type": "object",
+        "additional_properties": false
+      },
+      "CLAIM_SCHEMA": {
+        "fingerprint": "06fcdb02441248b2",
+        "required": [
+          "claim_id",
+          "text",
+          "claim_type",
+          "confidence",
+          "valid_from",
+          "valid_to",
+          "scope",
+          "evidence_refs",
+          "needs_verification",
+          "verification_status"
+        ],
+        "property_count": 10,
+        "top_level_type": "object",
+        "additional_properties": false
+      },
+      "CONFLICT_SCHEMA": {
+        "fingerprint": "aabd3259b07f9a3e",
+        "required": [
+          "conflict_id",
+          "subject",
+          "conflict_type",
+          "claim_ids",
+          "evidence_refs",
+          "resolution",
+          "rationale"
+        ],
+        "property_count": 8,
+        "top_level_type": "object",
+        "additional_properties": false
+      },
+      "LEVEL1_RESULT_SCHEMA": {
+        "fingerprint": "7e864764429db111",
+        "required": [
+          "contract_version",
+          "draft_answer",
+          "claims",
+          "entities",
+          "timeline_hints",
+          "gaps",
+          "followup_queries",
+          "evidence",
+          "citations"
+        ],
+        "property_count": 9,
+        "top_level_type": "object",
+        "additional_properties": false
+      },
+      "LEVEL2_RESULT_SCHEMA": {
+        "fingerprint": "a0484f894e7bc9d6",
+        "required": [
+          "contract_version",
+          "confirmed_claims",
+          "corrected_claims",
+          "new_findings",
+          "timeline",
+          "horizontal_comparisons",
+          "conflicts",
+          "multi_hop_findings",
+          "evidence_gaps",
+          "evidence",
+          "citations"
+        ],
+        "property_count": 12,
+        "top_level_type": "object",
+        "additional_properties": false
+      },
+      "FINAL_ANSWER_SCHEMA": {
+        "fingerprint": "4d1efa54ca1cbc1a",
+        "required": [
+          "contract_version",
+          "status",
+          "answer",
+          "sections",
+          "claims",
+          "conflicts",
+          "evidence",
+          "citations",
+          "cutoff_at",
+          "degraded",
+          "degradation_reasons",
+          "models"
+        ],
+        "property_count": 13,
+        "top_level_type": "object",
+        "additional_properties": false
+      },
+      "QA_EVENT_SCHEMA": {
+        "fingerprint": "59358bfa88a6c6af",
+        "required": [
+          "protocol_version",
+          "type",
+          "run_id",
+          "event_id",
+          "stage",
+          "timestamp",
+          "payload"
+        ],
+        "property_count": 7,
+        "top_level_type": "object",
+        "additional_properties": false
+      }
+    },
+    "import_error": null,
+    "schema_errors": {},
+    "version_errors": {}
+  },
+  "benchmark": {
+    "path": "config/qa_acceptance_questions.json",
+    "exists": true,
+    "file_sha256": "b1b8e4ba7912359382813c2b5e0d21b3488db83ab1d290ead0bb8e3d3797d59a",
+    "container": "dict",
+    "metadata": {
+      "keys": [
+        "benchmark_version",
+        "corpus_snapshot_id",
+        "corpus_snapshot_id_note",
+        "generated_at",
+        "questions"
+      ],
+      "benchmark_version": "qa-acceptance-v1",
+      "corpus_snapshot_id": "pending:first-run",
+      "generated_at": "2026-10-08T23:48:58Z"
+    },
+    "question_count": 12,
+    "questions_fingerprint": "71f2d919ac04a9f2",
+    "question_fingerprints": [
+      {
+        "id": "e1",
+        "fingerprint": "115b178395ca4101"
+      },
+      {
+        "id": "e2",
+        "fingerprint": "6e5eb591ca228167"
+      },
+      {
+        "id": "a3",
+        "fingerprint": "3e77176d28e9aa58"
+      },
+      {
+        "id": "a4",
+        "fingerprint": "389ada67a73ce6ea"
+      },
+      {
+        "id": "a5",
+        "fingerprint": "b308bfa952a1c2ac"
+      },
+      {
+        "id": "a6",
+        "fingerprint": "112560d7be368046"
+      },
+      {
+        "id": "t7",
+        "fingerprint": "2fdfb7cc04758163"
+      },
+      {
+        "id": "t8",
+        "fingerprint": "5e64c4e8c63ca2d5"
+      },
+      {
+        "id": "t9",
+        "fingerprint": "0c1fff64c8546e96"
+      },
+      {
+        "id": "t10",
+        "fingerprint": "826708b1c59a85c9"
+      },
+      {
+        "id": "t11",
+        "fingerprint": "59342548c60fe29a"
+      },
+      {
+        "id": "t12",
+        "fingerprint": "5b06dca4a884c7e3"
+      }
+    ],
+    "parse_error": null
+  },
+  "acceptance": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "required_modules_present",
+        "ok": true,
+        "detail": "20 个必需模块全部存在"
+      },
+      {
+        "name": "module_fingerprints_complete",
+        "ok": true,
+        "detail": "所有存在的模块都拿到 sha256"
+      },
+      {
+        "name": "modules_ast_parsed",
+        "ok": true,
+        "detail": "全部模块 ast 解析成功"
+      },
+      {
+        "name": "seven_schema_fingerprints_present",
+        "ok": true,
+        "detail": "七个契约 schema 指纹齐备"
+      },
+      {
+        "name": "seven_schema_fingerprints_distinct",
+        "ok": true,
+        "detail": "七个指纹两两不同（7 个）"
+      },
+      {
+        "name": "dependency_edges_nonempty",
+        "ok": true,
+        "detail": "仓库内依赖边 129 条"
+      },
+      {
+        "name": "dependency_edges_no_self_loop",
+        "ok": true,
+        "detail": "无自环边"
+      },
+      {
+        "name": "acceptance_questions_parsable",
+        "ok": true,
+        "detail": "问题集可解析（顶层为 dict），题数 12"
+      }
+    ]
+  }
+}

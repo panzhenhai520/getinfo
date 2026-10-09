@@ -13,6 +13,10 @@ from typing import Mapping
 
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_level1_result, validate_level2_result
 from qa_errors import QaAction, QaPublicError, classify_qa_error
+from qa_graph_contracts import (
+    QA_ROUTE_GRAPH, QA_ROUTE_GRAPH_ATTRIBUTE, QA_ROUTE_KEYWORD, QA_ROUTE_PAGE_CONTEXT,
+    QA_ROUTE_POLICY_EXACT, QA_ROUTE_SEMANTIC, QA_ROUTE_WEB,
+)
 from qa_level1 import QaLevel1Generator, empty_level1_result
 from qa_orchestrator import QaStageFailure
 from qa_planner import QaQueryPlanner
@@ -429,6 +433,76 @@ def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping)
         return 0
 
 
+# ── 阶段 01（F-7）：SearchTrace 的 route / results / accepted / rejected ──────
+# route 的取值域是 `qa_graph_contracts.QA_RETRIEVAL_ROUTES`（单一事实源，别在这儿另造字符串）。
+_ROUTE_BY_METHOD = {
+    "keyword": QA_ROUTE_KEYWORD,
+    # hybrid = 关键词召回 + 向量重排命中：按"更强的通道"归到 semantic，
+    # 否则 semantic 通道在统计里永远为 0（候选本来就都来自同一条关键词 SQL）。
+    "hybrid": QA_ROUTE_SEMANTIC,
+    "page_context": QA_ROUTE_PAGE_CONTEXT,
+    "policy_metadata_exact": QA_ROUTE_POLICY_EXACT,
+    "graph_event": QA_ROUTE_GRAPH,
+    "graph_cooccurrence": QA_ROUTE_GRAPH,
+    "graph_attribute": QA_ROUTE_GRAPH_ATTRIBUTE,
+}
+
+
+def _as_int(value, default: int = 0) -> int:
+    """宽松取整：None/坏值一律退回 default（留痕字段宁可写默认值也不许抛）。"""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _route_of_evidence(item: Mapping) -> str:
+    """单条证据走的是哪条检索通道。"""
+    if str(item.get("source_type") or "") == "web":
+        return QA_ROUTE_WEB
+    method = str(item.get("retrieval_method") or "").strip().casefold()
+    if method in _ROUTE_BY_METHOD:
+        return _ROUTE_BY_METHOD[method]
+    if method.startswith("graph"):
+        return QA_ROUTE_GRAPH
+    if method.startswith("policy"):
+        return QA_ROUTE_POLICY_EXACT
+    return QA_ROUTE_KEYWORD
+
+
+def _hop_route(evidence, stats=None) -> str:
+    """本跳的主检索通道（SearchTrace 的 `route`）。
+
+    取本跳证据里出现次数最多的通道；同票按首次出现顺序取胜出者（dict 保序），
+    保证同样的输入永远给同一个 route。没有可用证据时：有候选就算跑过检索（记基础通道
+    keyword），一条候选都没有才留空串（"没搜"与"搜了没中"是两件事）。
+    """
+    counts: dict[str, int] = {}
+    for item in evidence or []:
+        if not isinstance(item, Mapping):
+            continue
+        token = _route_of_evidence(item)
+        counts[token] = counts.get(token, 0) + 1
+    if not counts:
+        metrics = stats if isinstance(stats, Mapping) else {}
+        return QA_ROUTE_KEYWORD if _as_int(metrics.get("eligible"), 0) > 0 else ""
+    return max(counts.items(), key=lambda item: item[1])[0]
+
+
+def _hop_counts(stats, evidence) -> tuple[int, int]:
+    """本跳的候选/采纳口径（SearchTrace 的 `results` / `accepted`）。
+
+    results = 进入打分前过滤的候选数（检索 stats 的 eligible），accepted = 实际采纳条数
+    （stats 的 adopted）。拿不到 stats 的分支（第 1 跳复用、异常/超预算跳）退回"证据条数"，
+    并保证 results >= accepted >= 0——rejected 由调用点按 results - accepted 得出。
+    """
+    metrics = stats if isinstance(stats, Mapping) else {}
+    evidence_count = len([item for item in (evidence or []) if isinstance(item, Mapping)])
+    accepted = max(0, _as_int(metrics["adopted"], evidence_count)) if "adopted" in metrics else evidence_count
+    results = _as_int(metrics["eligible"], evidence_count) if "eligible" in metrics else evidence_count
+    return max(results, accepted), accepted
+
+
 def _hop_carry_terms(evidence, exclude, limit: int = 6):
     """从上一跳证据里挑"可带到下一跳"的词：出现在标题里的短词优先，排除已用过的。"""
     from collections import Counter
@@ -483,11 +557,17 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
     carry_terms = []
     question = str(retrieval_plan.get("question") or "")
 
-    def _record(receipt, evidence_list):
-        """写一条推理留痕（缺省不写；回调内部异常一律吞掉）。"""
+    def _record(receipt, evidence_list, stats=None):
+        """写一条推理留痕（缺省不写；回调内部异常一律吞掉）。
+
+        阶段 01（F-7）：带上检索通道与候选/采纳口径（SearchTrace 的
+        route / results / accepted / rejected）。`new_claims` / `resolved_gap` 属
+        阶段 07 的缺口闭环，这里不编——由 record_reasoning_trace 的默认值留 0。
+        """
         if not callable(trace_recorder):
             return
         refs = [str(item.get("evidence_ref") or "") for item in (evidence_list or [])][:40]
+        results, accepted = _hop_counts(stats, evidence_list)
         try:
             trace_recorder({
                 "hop_index": int(receipt.get("hop_index") or 0),
@@ -498,6 +578,10 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                 "status": str(receipt.get("status") or ""),
                 "latency_ms": int(receipt.get("latency_ms") or 0),
                 "round_index": int(round_index),
+                "route": _hop_route(evidence_list, stats),
+                "results": results,
+                "accepted": accepted,
+                "rejected": max(0, results - accepted),
             })
         except Exception:
             return
@@ -514,7 +598,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                 "evidence": len(merged_evidence), "status": "ok",
                 "carry_terms": carry_terms, "latency_ms": 0,
             })
-            _record(receipts[-1], merged_evidence)
+            _record(receipts[-1], merged_evidence, first_local.get("stats"))
             carry_terms = _hop_carry_terms(merged_evidence, [question])
             continue
 
@@ -577,7 +661,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             "carry_terms": list(carry_terms),
             "latency_ms": int((_time.monotonic() - hop_started) * 1000),
         })
-        _record(receipts[-1], hop_evidence)
+        _record(receipts[-1], hop_evidence, hop_local.get("stats"))
         if callable(emit_stage_event):
             emit_stage_event("stage_progress", {
                 "message": "第 %d 跳「%s」取得 %d 条证据（新增 %d 条）。"
@@ -641,7 +725,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                     "carry_terms": list(carry_terms),
                     "latency_ms": int((_time.monotonic() - repair_started) * 1000),
                 })
-                _record(receipts[-1], repair_local.get("evidence") or [])
+                _record(receipts[-1], repair_local.get("evidence") or [], repair_local.get("stats"))
                 if callable(emit_stage_event):
                     emit_stage_event("stage_progress", {
                         "message": "补检一轮取得 %d 条新证据。" % added,
@@ -823,6 +907,28 @@ def _pg_layered_research_result(level1: Mapping, retrieval: Mapping, reason: str
     return validate_level2_result(report)
 
 
+def _local_corpus_version(database, pack_id: str) -> str:
+    """本地语料指纹：本包 active 文章的条数 + 最新入库时间 → sha256 前 24 位。
+
+    阶段 01（F-5）从 `build_qa_stage_handlers` 里提成模块级函数（SQL 与口径一字未改），
+    让 `qa_storage.create_run` 能把**与检索缓存 kb_version 同源**的语料版本写进
+    `qa_runs.corpus_version`。取不到（库不可用/无该表）时返回 "unknown"——
+    与检索缓存侧的老行为完全一致，不抛异常、不阻塞建 run。
+    """
+    try:
+        database._ensure_connection()
+        with database.lock:
+            row = database.connection.execute(
+                """SELECT COUNT(*),COALESCE(MAX(COALESCE(a.first_crawled,a.created_at,'')),'')
+                FROM articles a JOIN article_intel_classifications c ON c.article_id=a.id
+                WHERE c.industry_pack_id=? AND a.status='active'""",
+                (str(pack_id),),
+            ).fetchone()
+        return hashlib.sha256(f"{row[0]}:{row[1]}".encode("utf-8")).hexdigest()[:24]
+    except Exception:
+        return "unknown"
+
+
 def build_qa_stage_handlers(
     *,
     database=None,
@@ -991,18 +1097,9 @@ def build_qa_stage_handlers(
         return standalone + "\n\n问题拆解与回答计划：" + json.dumps(summary, ensure_ascii=False)
 
     def _local_version(pack_id: str) -> str:
-        try:
-            database._ensure_connection()
-            with database.lock:
-                row = database.connection.execute(
-                    """SELECT COUNT(*),COALESCE(MAX(COALESCE(a.first_crawled,a.created_at,'')),'')
-                    FROM articles a JOIN article_intel_classifications c ON c.article_id=a.id
-                    WHERE c.industry_pack_id=? AND a.status='active'""",
-                    (str(pack_id),),
-                ).fetchone()
-            return hashlib.sha256(f"{row[0]}:{row[1]}".encode("utf-8")).hexdigest()[:24]
-        except Exception:
-            return "unknown"
+        # 阶段 01（F-5）：实现提到模块级 `_local_corpus_version`（口径一字不改），
+        # 这样 qa_storage.create_run 才能复用同一个语料指纹写 qa_runs.corpus_version。
+        return _local_corpus_version(database, pack_id)
 
     def _scope_hash(context) -> str:
         page = (context["request"].get("page_context") or {})
@@ -1065,7 +1162,13 @@ def build_qa_stage_handlers(
         multi_hop_plan = retrieval_plan.get("decomposition") or {}
         if bool(getattr(config, "QA_MULTI_HOP_ENABLED", True)) and multi_hop_plan.get("is_multi_hop"):
             def _trace_recorder(entry):
-                """阶段 10：每跳写一条推理留痕（store 内部已吞异常，绝不拖累主流程）。"""
+                """阶段 10 + 阶段 01（F-7）：每跳写一条推理留痕（store 内部已吞异常）。
+
+                `entry` 里的 route/results/accepted/rejected 由 `_run_multi_hop._record`
+                填；老的 recorder 调用点不传这些键也不影响（`.get` + 默认值兜底）。
+                """
+                results = int(entry.get("results") or 0)
+                accepted = int(entry.get("accepted") or 0)
                 store.record_reasoning_trace(
                     run["id"],
                     hop_index=int(entry.get("hop_index") or 0),
@@ -1081,6 +1184,11 @@ def build_qa_stage_handlers(
                     status=str(entry.get("status") or ""),
                     round_index=int(entry.get("round_index") or 0),
                     latency_ms=int(entry.get("latency_ms") or 0),
+                    route=str(entry.get("route") or ""),
+                    results=results,
+                    accepted=accepted,
+                    rejected=int(entry.get("rejected") or 0) if entry.get("rejected") is not None
+                    else max(0, results - accepted),
                 )
 
             local, hop_receipts = _run_multi_hop(

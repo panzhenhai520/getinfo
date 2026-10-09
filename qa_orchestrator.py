@@ -108,6 +108,12 @@ class QaOrchestrator:
         if self.audit_logger is None:
             return
         try:
+            # 阶段 01（F-5，仅注释、不改逻辑）：**当前 trace_id == run_id** ——
+            # 一次 run 就是一条研究轨迹，`qa_audit_events` / `qa_reasoning_traces` 都用
+            # run_id 关联（见 qa_schema 里两张表都有 run_id/trace_id 列）。
+            # 两者暂时取同一个值（`str(run.get("id"))`），是因为到 Phase 16 之前没有
+            # 独立于 run 的跨轮 trace（多轮追问会各起一个 run）。等引入真正的 trace 载体时，
+            # 这里改成 run["trace_id"]（取不到再退回 run_id），下游按列读的代码不用动。
             self.audit_logger.record(
                 event_type, trace_id=str(run.get("id") or ""), run_id=str(run.get("id") or ""),
                 actor_id=str(run.get("owner_user_id") or ""), origin=str(run.get("origin") or ""),
@@ -219,7 +225,33 @@ class QaOrchestrator:
                 if not isinstance(output, Mapping):
                     raise TypeError(f"stage {stage} must return an object")
                 output = dict(output)
+                # Phase 00 · P00-04（Cost 基线前置）：把阶段输出里的模型 token 用量**取出**，
+                # 交给 record_stage 写进 qa_stage_runs.token_usage_json。
+                # 必须从 output 里摘掉：level1_draft / synthesis 的输出会原样进入后续阶段的
+                # **严格 schema 校验**（如 citation_validation 会对 synthesis 输出跑
+                # validate_final_answer，additionalProperties=False），多带一个键就会把整条 run
+                # 判失败；而 details["result"] 还要作为"已完成阶段输出"回放（见上面 completed_outputs），
+                # 留着同样会把回放的 run 判失败。拿到的用量只进 details，不影响既有结果结构。
+                token_usage = output.pop("token_usage", None)
                 context["outputs"][stage] = output
+                details = {
+                    "result": output,
+                    "performance": {
+                        "elapsed_ms": elapsed_ms,
+                        "budget_ms": int(STAGE_BUDGET_SECONDS.get(stage, 0) * 1000),
+                        "over_budget": bool(STAGE_BUDGET_SECONDS.get(stage) and elapsed_ms > STAGE_BUDGET_SECONDS[stage] * 1000),
+                    },
+                }
+                # 存在且非空才传；只认非负整数计数（拿不到/脏值一律不写，绝不用 0 冒充，
+                # 也不让 NaN、嵌套对象这类内容进 record_stage 的严格 JSON 序列化）
+                if isinstance(token_usage, Mapping) and token_usage:
+                    clean_usage = {
+                        str(key): int(value)
+                        for key, value in token_usage.items()
+                        if isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                    }
+                    if clean_usage:
+                        details["token_usage"] = clean_usage
                 self.store.record_stage(
                     run_id,
                     stage,
@@ -227,14 +259,7 @@ class QaOrchestrator:
                     attempt=attempt,
                     input_hash=input_hash,
                     output_hash=_digest(output),
-                    details={
-                        "result": output,
-                        "performance": {
-                            "elapsed_ms": elapsed_ms,
-                            "budget_ms": int(STAGE_BUDGET_SECONDS.get(stage, 0) * 1000),
-                            "over_budget": bool(STAGE_BUDGET_SECONDS.get(stage) and elapsed_ms > STAGE_BUDGET_SECONDS[stage] * 1000),
-                        },
-                    },
+                    details=details,
                 )
                 self._audit("stage_completed", run, {
                     "stage": stage, "elapsed_ms": elapsed_ms,

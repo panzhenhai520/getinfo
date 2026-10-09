@@ -158,6 +158,10 @@ class QaGatewayService:
             idempotency_key=idem,
             research_app_id=policy.ragflow_app_id,
             synthesis_provider_id=providers["synthesis"].provider_id,
+            # 阶段 01（graph-rag-v2 通用包 F-5）：版本四元组里的模型版本。
+            # 网关此刻手上就有草稿角色的真实 model_id，直接传进去，
+            # 免得 qa_storage 去查尚无写入点的端点画像表而永远留空。
+            model_version=str(getattr(providers.get("draft"), "model_id", "") or ""),
         )
         created = bool(run.pop("_created", False))
         if created and research_degradation:
