@@ -11,6 +11,42 @@ QA_SCHEMA_VERSION = "unified-qa-schema-v5"
 
 QA_TABLE_DDL = (
     """
+    CREATE TABLE IF NOT EXISTS qa_reasoning_traces (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        hop_index INTEGER NOT NULL DEFAULT 0,
+        sub_query_id TEXT NOT NULL DEFAULT '',
+        sub_query TEXT NOT NULL DEFAULT '',
+        depends_on_json TEXT NOT NULL DEFAULT '[]',
+        partial_answer TEXT NOT NULL DEFAULT '',
+        used_evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+        missing_links_json TEXT NOT NULL DEFAULT '[]',
+        next_queries_json TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL DEFAULT '',
+        round_index INTEGER NOT NULL DEFAULT 0,
+        latency_ms INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(run_id, round_index, hop_index)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS qa_session_constraints (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_user_id TEXT NOT NULL DEFAULT '',
+        session_id TEXT NOT NULL DEFAULT '',
+        industry_pack_id TEXT NOT NULL DEFAULT '',
+        constraint_key TEXT NOT NULL,
+        constraint_value_json TEXT NOT NULL DEFAULT '{}',
+        source TEXT NOT NULL DEFAULT 'plan',
+        confirmed INTEGER NOT NULL DEFAULT 1,
+        run_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(owner_user_id, session_id, industry_pack_id, constraint_key)
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS qa_runs (
         id TEXT PRIMARY KEY,
         contract_version TEXT NOT NULL,
@@ -306,6 +342,10 @@ QA_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_qa_runs_owner_created ON qa_runs(owner_user_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_qa_runs_pack_status ON qa_runs(industry_pack_id, status, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_qa_runs_job ON qa_runs(job_id)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_runs_session ON qa_runs(session_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_reasoning_trace_run ON qa_reasoning_traces(run_id, hop_index)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_session_constraints_scope"
+    " ON qa_session_constraints(owner_user_id, session_id)",
     "CREATE INDEX IF NOT EXISTS idx_qa_stage_run ON qa_stage_runs(run_id, stage, attempt)",
     "CREATE INDEX IF NOT EXISTS idx_qa_claim_run ON qa_claims(run_id, verification_status)",
     "CREATE INDEX IF NOT EXISTS idx_qa_evidence_run ON qa_evidence(run_id, source_type)",
@@ -344,6 +384,8 @@ QA_REQUIRED_TABLES = frozenset(
         "qa_attribution_links",
         "qa_token_influence",
         "qa_attribution_runs",
+        "qa_reasoning_traces",
+        "qa_session_constraints",
     }
 )
 

@@ -382,6 +382,53 @@ def _evidence_cap(retrieval_plan: Mapping, mode, limit: int) -> int:
     return max(limit + 3, min(base, limit + 3))
 
 
+def _session_scope(run_meta: Mapping) -> tuple:
+    """会话约束的作用域键：(用户, 会话, 行业包)。会话为空时不固化/不读取。"""
+    return (str(run_meta.get("owner_user_id") or ""),
+            str(run_meta.get("session_id") or ""),
+            str(run_meta.get("industry_pack_id") or ""))
+
+
+def _load_session_constraints(store, run_meta: Mapping) -> dict:
+    """读会话约束（阶段 10-3）；任何异常都返回空，绝不影响规划。"""
+    owner, session_id, pack_id = _session_scope(run_meta)
+    if not session_id:
+        return {}
+    try:
+        return dict(store.session_constraints(
+            owner_user_id=owner, session_id=session_id, industry_pack_id=pack_id) or {})
+    except Exception:
+        return {}
+
+
+def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping) -> int:
+    """把本轮已确认的约束固化（时间窗/输出形式/实体/全文要求）。
+
+    只落"用户确实表达过"的东西：来自用户调整（adjustment_receipt）或计划里明确的值。
+    失败一律吞掉（留痕/固化绝不能拖累问答）。
+    """
+    owner, session_id, pack_id = _session_scope(run_meta)
+    if not session_id:
+        return 0
+    question_plan = plan_result.get("question_plan") if isinstance(
+        plan_result.get("question_plan"), Mapping) else {}
+    try:
+        constraints = {
+            "time_window": plan_result.get("time_window_adjustment")
+            or question_plan.get("time_window") or {},
+            "output_form": plan_result.get("output_form") or question_plan.get("output_form") or "",
+            "must_fetch_fulltext": bool(plan_result.get("must_fetch_fulltext")),
+            "entities": (plan_result.get("entities") or [])[:10],
+            "topics": (plan_result.get("topics") or [])[:10],
+        }
+        return store.save_session_constraints(
+            owner_user_id=owner, session_id=session_id, industry_pack_id=pack_id,
+            constraints=constraints, run_id=str(run_meta.get("id") or ""),
+        )
+    except Exception:
+        return 0
+
+
 def _hop_carry_terms(evidence, exclude, limit: int = 6):
     """从上一跳证据里挑"可带到下一跳"的词：出现在标题里的短词优先，排除已用过的。"""
     from collections import Counter
@@ -410,12 +457,17 @@ def _hop_carry_terms(evidence, exclude, limit: int = 6):
 
 
 def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
-                   pack_id: str, limit: int, emit_stage_event=None):
+                   pack_id: str, limit: int, emit_stage_event=None,
+                   trace_recorder=None, round_index: int = 0):
     """按 DAG 顺序执行多跳检索，返回 (合并后的 local, 每跳回执)。
 
     预算与跳数是**双重硬约束**：跳数上限 `QA_MAX_HOPS`，墙钟上限
     `QA_MULTI_HOP_BUDGET_SECONDS`；超了就停在做完的跳上，并在回执里写明 `degraded`
     与原因，由 logic_validation 阶段对用户明说。
+
+    阶段 10 增补：
+      · `trace_recorder`：每跳完成后回调一次（写 `qa_reasoning_traces`，**失败不影响主流程**）；
+      · `round_index`：递归重规划的轮次（0 = 首轮，1 = 依据缺失链接补检那一轮）。
     """
     import time as _time
 
@@ -431,31 +483,52 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
     carry_terms = []
     question = str(retrieval_plan.get("question") or "")
 
+    def _record(receipt, evidence_list):
+        """写一条推理留痕（缺省不写；回调内部异常一律吞掉）。"""
+        if not callable(trace_recorder):
+            return
+        refs = [str(item.get("evidence_ref") or "") for item in (evidence_list or [])][:40]
+        try:
+            trace_recorder({
+                "hop_index": int(receipt.get("hop_index") or 0),
+                "sub_query_id": str(receipt.get("hop_id") or ""),
+                "sub_query": str(receipt.get("question") or ""),
+                "depends_on": list(receipt.get("depends_on") or []),
+                "used_evidence_refs": refs,
+                "status": str(receipt.get("status") or ""),
+                "latency_ms": int(receipt.get("latency_ms") or 0),
+                "round_index": int(round_index),
+            })
+        except Exception:
+            return
+
     for index, hop in enumerate(hops):
         hop_id = str(hop.get("id") or ("h%d" % (index + 1)))
         hop_question = str(hop.get("question") or "").strip() or question
         if index == 0:
             # 第 1 跳就是主检索，直接复用，不再打一次
             receipts.append({
-                "hop_id": hop_id, "question": hop_question,
+                "hop_id": hop_id, "hop_index": index, "question": hop_question,
                 "depends_on": list(hop.get("depends_on") or []),
                 "purpose": str(hop.get("purpose") or ""),
                 "evidence": len(merged_evidence), "status": "ok",
-                "carry_terms": carry_terms,
+                "carry_terms": carry_terms, "latency_ms": 0,
             })
+            _record(receipts[-1], merged_evidence)
             carry_terms = _hop_carry_terms(merged_evidence, [question])
             continue
 
         elapsed = _time.monotonic() - started
         if elapsed >= budget:
             receipts.append({
-                "hop_id": hop_id, "question": hop_question,
+                "hop_id": hop_id, "hop_index": index, "question": hop_question,
                 "depends_on": list(hop.get("depends_on") or []),
                 "purpose": str(hop.get("purpose") or ""),
                 "evidence": 0, "status": "skipped_budget",
                 "reason": "多跳预算 %.0f 秒已用尽（已用 %.1f 秒）" % (budget, elapsed),
-                "carry_terms": list(carry_terms),
+                "carry_terms": list(carry_terms), "latency_ms": 0,
             })
+            _record(receipts[-1], [])
             if callable(emit_stage_event):
                 emit_stage_event("stage_progress", {
                     "message": "多跳预算用尽，停在第 %d 跳，后续跳已跳过并会明确标注。" % index,
@@ -469,6 +542,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
         hop_plan["entities"] = list(dict.fromkeys(
             [*(retrieval_plan.get("entities") or []), *carry_terms]))
         # 分跳检索复用同一条检索链路（同一套闸门、时间窗、图证据），不另开旁路
+        hop_started = _time.monotonic()
         try:
             hop_local = article_retriever.retrieve(
                 hop_plan, industry_pack_id=pack_id,
@@ -476,12 +550,13 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             )
         except Exception as exc:
             receipts.append({
-                "hop_id": hop_id, "question": hop_question,
+                "hop_id": hop_id, "hop_index": index, "question": hop_question,
                 "depends_on": list(hop.get("depends_on") or []),
                 "purpose": str(hop.get("purpose") or ""),
                 "evidence": 0, "status": "error", "reason": str(exc)[:80],
-                "carry_terms": list(carry_terms),
+                "carry_terms": list(carry_terms), "latency_ms": 0,
             })
+            _record(receipts[-1], [])
             continue
 
         hop_evidence = list(hop_local.get("evidence") or [])
@@ -494,13 +569,15 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             merged_evidence.append(item)
             added += 1
         receipts.append({
-            "hop_id": hop_id, "question": hop_question,
+            "hop_id": hop_id, "hop_index": index, "question": hop_question,
             "depends_on": list(hop.get("depends_on") or []),
             "purpose": str(hop.get("purpose") or ""),
             "evidence": len(hop_evidence), "added": added,
             "status": "ok" if hop_evidence else "empty",
             "carry_terms": list(carry_terms),
+            "latency_ms": int((_time.monotonic() - hop_started) * 1000),
         })
+        _record(receipts[-1], hop_evidence)
         if callable(emit_stage_event):
             emit_stage_event("stage_progress", {
                 "message": "第 %d 跳「%s」取得 %d 条证据（新增 %d 条）。"
@@ -508,6 +585,73 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                 "multi_hop": {"hop_id": hop_id, "evidence": len(hop_evidence), "added": added},
             })
         carry_terms = _hop_carry_terms(hop_evidence, [question, hop_question])
+
+    # ── 阶段 10：依据缺失链接的**递归重规划**（一轮，且必须还有预算）──
+    max_rounds = max(0, min(2, int(getattr(config, "QA_RECURSION_MAX_ROUNDS", 1) or 0)))
+    if max_rounds > round_index and not any(
+            str(item.get("hop_id")) == "r1" for item in receipts):
+        missing = [item for item in receipts
+                   if item.get("status") in ("empty", "error", "skipped_budget")]
+        elapsed = _time.monotonic() - started
+        remaining = budget - elapsed
+        if missing and remaining > 2.0:
+            repair_queries = []
+            for item in missing:
+                base = str(item.get("question") or "").strip()
+                if base and base not in repair_queries:
+                    repair_queries.append(base)
+                for term in item.get("carry_terms") or []:
+                    text = str(term).strip()
+                    if text and text not in repair_queries:
+                        repair_queries.append(text)
+            repair_queries = repair_queries[:3]
+            if repair_queries:
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "有 %d 跳未取到证据，按缺失链接补检一轮：%s"
+                                   % (len(missing), "；".join(repair_queries[:2])),
+                        "recursion": {"round": round_index + 1, "queries": repair_queries},
+                    })
+                repair_plan = dict(retrieval_plan)
+                repair_plan["question"] = " ".join(repair_queries)[:200]
+                repair_plan["queries"] = list(repair_queries)
+                repair_plan["entities"] = list(dict.fromkeys(
+                    [*(retrieval_plan.get("entities") or []), *carry_terms]))
+                repair_started = _time.monotonic()
+                try:
+                    repair_local = article_retriever.retrieve(
+                        repair_plan, industry_pack_id=pack_id, page_context={}, limit=limit)
+                except Exception:
+                    repair_local = {"evidence": []}
+                added = 0
+                for item in (repair_local.get("evidence") or []):
+                    ref = str(item.get("evidence_ref") or "")
+                    if ref and ref in seen_refs:
+                        continue
+                    seen_refs.add(ref)
+                    merged_evidence.append(item)
+                    added += 1
+                receipts.append({
+                    "hop_id": "r1", "hop_index": len(receipts),
+                    "question": repair_plan["question"],
+                    "depends_on": [item.get("hop_id") for item in missing],
+                    "purpose": "依据缺失链接补检（递归第 %d 轮）" % (round_index + 1),
+                    "evidence": len(repair_local.get("evidence") or []), "added": added,
+                    "status": "ok" if added else "empty",
+                    "carry_terms": list(carry_terms),
+                    "latency_ms": int((_time.monotonic() - repair_started) * 1000),
+                })
+                _record(receipts[-1], repair_local.get("evidence") or [])
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "补检一轮取得 %d 条新证据。" % added,
+                        "recursion": {"round": round_index + 1, "added": added},
+                    })
+        elif missing and callable(emit_stage_event):
+            emit_stage_event("stage_progress", {
+                "message": "有 %d 跳未取到证据，但多跳预算已用尽，停止递归并如实标注缺口。" % len(missing),
+                "recursion": {"round": round_index + 1, "stopped": "budget_exhausted"},
+            })
 
     merged = dict(first_local)
     merged["evidence"] = merged_evidence
@@ -520,6 +664,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
         "budget_seconds": budget,
         "used_seconds": round(_time.monotonic() - started, 2),
         "pattern": str((retrieval_plan.get("decomposition") or {}).get("pattern") or ""),
+        "recursion_rounds": max_rounds,
     }
     return merged, receipts
 
@@ -765,7 +910,21 @@ def build_qa_stage_handlers(
         threading.Thread(target=_worker, name=f"qa-prewarm-{reason}", daemon=True).start()
 
     def plan(context):
-        result = planner.plan(context["request"])
+        # 阶段 10-3：会话级约束固化 —— 上一轮已确认的时间/实体/输出形式/排除项，
+        # 作为本轮规划的**前置默认**（只补空缺，绝不覆盖用户本轮明确说的话）。
+        run_meta = context.get("run") or {}
+        request_payload = dict(context["request"])
+        saved_constraints = _load_session_constraints(store, run_meta)
+        if saved_constraints:
+            request_payload["session_constraints"] = saved_constraints
+            if callable(context.get("_emit_stage_event")):
+                context["_emit_stage_event"]("stage_progress", {
+                    "message": "沿用本会话已确认的约束：%s"
+                               % "、".join("%s=%s" % (k, v) for k, v in list(saved_constraints.items())[:3]),
+                    "session_constraints": saved_constraints,
+                })
+        result = planner.plan(request_payload)
+        _persist_session_constraints(store, run_meta, result)
         question_plan = result.get("question_plan") if isinstance(result.get("question_plan"), Mapping) else {}
         emit_stage_event = context.get("_emit_stage_event")
         if callable(emit_stage_event) and question_plan:
@@ -905,9 +1064,29 @@ def build_qa_stage_handlers(
         hop_receipts = []
         multi_hop_plan = retrieval_plan.get("decomposition") or {}
         if bool(getattr(config, "QA_MULTI_HOP_ENABLED", True)) and multi_hop_plan.get("is_multi_hop"):
+            def _trace_recorder(entry):
+                """阶段 10：每跳写一条推理留痕（store 内部已吞异常，绝不拖累主流程）。"""
+                store.record_reasoning_trace(
+                    run["id"],
+                    hop_index=int(entry.get("hop_index") or 0),
+                    sub_query_id=str(entry.get("sub_query_id") or ""),
+                    sub_query=str(entry.get("sub_query") or ""),
+                    depends_on=entry.get("depends_on") or [],
+                    partial_answer="已取到 %d 条证据" % len(entry.get("used_evidence_refs") or []),
+                    used_evidence_refs=entry.get("used_evidence_refs") or [],
+                    missing_links=[] if entry.get("status") == "ok" else [
+                        {"type": "hop_missing", "detail": "第 %s 跳状态=%s"
+                         % (entry.get("sub_query_id"), entry.get("status"))}],
+                    next_queries=[str(entry.get("sub_query") or "")] if entry.get("status") != "ok" else [],
+                    status=str(entry.get("status") or ""),
+                    round_index=int(entry.get("round_index") or 0),
+                    latency_ms=int(entry.get("latency_ms") or 0),
+                )
+
             local, hop_receipts = _run_multi_hop(
                 article_retriever, retrieval_plan, local, context,
                 pack_id=pack_id, limit=12, emit_stage_event=emit_stage_event,
+                trace_recorder=_trace_recorder,
             )
         elif multi_hop_plan.get("hops"):
             hop_receipts = [{

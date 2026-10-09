@@ -527,6 +527,142 @@ class QaStore:
             finally:
                 cursor.close()
 
+    def record_reasoning_trace(self, run_id: str, *, hop_index: int, sub_query_id: str = "",
+                               sub_query: str = "", depends_on=None, partial_answer: str = "",
+                               used_evidence_refs=None, missing_links=None, next_queries=None,
+                               status: str = "", round_index: int = 0,
+                               latency_ms: int = 0) -> None:
+        """阶段 10：记录一跳的推理留痕（幂等：同 run + 轮次 + 跳序号覆盖）。
+
+        刻意**不抛异常**：留痕是观测能力，写库失败绝不能影响问答主流程（边界要求）。
+        """
+        try:
+            self.ensure_schema()
+            now = _now()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO qa_reasoning_traces(
+                            run_id,hop_index,sub_query_id,sub_query,depends_on_json,partial_answer,
+                            used_evidence_refs_json,missing_links_json,next_queries_json,status,
+                            round_index,latency_ms,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(run_id,round_index,hop_index) DO UPDATE SET
+                            sub_query_id=excluded.sub_query_id,sub_query=excluded.sub_query,
+                            depends_on_json=excluded.depends_on_json,
+                            partial_answer=excluded.partial_answer,
+                            used_evidence_refs_json=excluded.used_evidence_refs_json,
+                            missing_links_json=excluded.missing_links_json,
+                            next_queries_json=excluded.next_queries_json,
+                            status=excluded.status,latency_ms=excluded.latency_ms,
+                            updated_at=excluded.updated_at
+                        """,
+                        (
+                            str(run_id), int(hop_index), str(sub_query_id or ""),
+                            str(sub_query or "")[:1000], _json(list(depends_on or [])),
+                            str(partial_answer or "")[:4000], _json(list(used_evidence_refs or [])),
+                            _json(list(missing_links or [])), _json(list(next_queries or [])),
+                            str(status or ""), int(round_index), int(latency_ms), now, now,
+                        ),
+                    )
+                    self.database.connection.commit()
+                finally:
+                    cursor.close()
+        except Exception:
+            return
+
+    def reasoning_traces(self, run_id: str) -> list[dict]:
+        """取某个 run 的全部推理留痕（按轮次、跳序号排序）。"""
+        self.ensure_schema()
+        with self.database.lock:
+            cursor = self.database.connection.cursor()
+            try:
+                cursor.execute(
+                    "SELECT * FROM qa_reasoning_traces WHERE run_id=?"
+                    " ORDER BY round_index, hop_index", (str(run_id),),
+                )
+                return [dict(row) for row in cursor.fetchall()]
+            finally:
+                cursor.close()
+
+    def save_session_constraints(self, *, owner_user_id: str, session_id: str,
+                                 industry_pack_id: str, constraints: Mapping,
+                                 run_id: str = "", source: str = "plan") -> int:
+        """阶段 10：把已确认的会话约束固化下来（时间/实体/输出形式/排除项）。
+
+        只落"非空"的约束；同 (用户, 会话, 包, 键) 覆盖。异常一律吞掉（不影响主流程）。
+        """
+        if not session_id:
+            return 0
+        try:
+            self.ensure_schema()
+            now = _now()
+            rows = []
+            for key, value in (constraints or {}).items():
+                # 空值不固化；显式 False 也不固化（False 就是默认，没有信息量）
+                if value is False or value in (None, "", [], {}, ()):
+                    continue
+                rows.append((
+                    str(owner_user_id or ""), str(session_id), str(industry_pack_id or ""),
+                    str(key)[:64], _json(value), str(source or "plan"), 1, str(run_id or ""),
+                    now, now,
+                ))
+            if not rows:
+                return 0
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    cursor.executemany(
+                        """
+                        INSERT INTO qa_session_constraints(
+                            owner_user_id,session_id,industry_pack_id,constraint_key,
+                            constraint_value_json,source,confirmed,run_id,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(owner_user_id,session_id,industry_pack_id,constraint_key)
+                        DO UPDATE SET constraint_value_json=excluded.constraint_value_json,
+                            source=excluded.source,confirmed=excluded.confirmed,
+                            run_id=excluded.run_id,updated_at=excluded.updated_at
+                        """,
+                        rows,
+                    )
+                    self.database.connection.commit()
+                    return len(rows)
+                finally:
+                    cursor.close()
+        except Exception:
+            return 0
+
+    def session_constraints(self, *, owner_user_id: str, session_id: str,
+                            industry_pack_id: str = "") -> dict:
+        """取会话约束（键 → 值）；没有就返回空字典。"""
+        if not session_id:
+            return {}
+        self.ensure_schema()
+        where = ["owner_user_id=?", "session_id=?"]
+        params = [str(owner_user_id or ""), str(session_id)]
+        if industry_pack_id:
+            where.append("industry_pack_id=?")
+            params.append(str(industry_pack_id))
+        with self.database.lock:
+            cursor = self.database.connection.cursor()
+            try:
+                cursor.execute(
+                    "SELECT constraint_key, constraint_value_json FROM qa_session_constraints"
+                    " WHERE " + " AND ".join(where), tuple(params),
+                )
+                result = {}
+                for row in cursor.fetchall():
+                    try:
+                        result[str(row["constraint_key"])] = json.loads(
+                            str(row["constraint_value_json"]) or "null")
+                    except Exception:
+                        continue
+                return result
+            finally:
+                cursor.close()
+
     def persist_reasoning_graph(self, run_id: str, graph: Mapping) -> None:
         self.ensure_schema()
         now = _now()

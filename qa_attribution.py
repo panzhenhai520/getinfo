@@ -152,8 +152,44 @@ class QaAttributionService:
                 [dict(item) for item in tokens],
             ),
             "stats": payload.get("stats") or {},
+            # 阶段 10-5：把推理留痕喂给【证据解析】——每一跳的依据 + 缺失链接 + 下一轮补检式
+            "reasoning_hops": self._public_hops(run_id),
             "cached": True,
         }
+
+    def _public_hops(self, run_id: str) -> list:
+        """读推理留痕（阶段 10），整理成前端可直接展开的形状；失败返回空列表。"""
+        try:
+            traces = self.store.reasoning_traces(run_id) if getattr(self, "store", None) else []
+        except Exception:
+            traces = []
+        hops = []
+        for item in traces or []:
+            try:
+                refs = json.loads(str(item.get("used_evidence_refs_json") or "[]"))
+            except Exception:
+                refs = []
+            try:
+                missing = json.loads(str(item.get("missing_links_json") or "[]"))
+            except Exception:
+                missing = []
+            try:
+                next_queries = json.loads(str(item.get("next_queries_json") or "[]"))
+            except Exception:
+                next_queries = []
+            hops.append({
+                "hop_index": int(item.get("hop_index") or 0),
+                "round_index": int(item.get("round_index") or 0),
+                "hop_id": str(item.get("sub_query_id") or ""),
+                "question": str(item.get("sub_query") or ""),
+                "partial_answer": str(item.get("partial_answer") or ""),
+                "status": str(item.get("status") or ""),
+                "latency_ms": int(item.get("latency_ms") or 0),
+                "evidence_refs": refs,
+                "missing_links": missing,
+                "next_queries": next_queries,
+            })
+        return hops
 
     def token_influence(self, run_id: str, *, unit_ids=None, top_sentences: int = 3,
                         force: bool = False) -> dict:

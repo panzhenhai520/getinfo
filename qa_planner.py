@@ -898,6 +898,22 @@ class QaQueryPlanner:
             elif planning_meta.get("user_confirmation"):
                 question_plan["answer_strategy"] = "用户确认沿用此前问题分析思路，继续按原计划检索和回答。"
         pack_id = str(request_payload.get("industry_pack_id") or "")
+        # 阶段 10-3：会话级约束作为规划**前置默认**（只填空缺，绝不覆盖本轮明确表达）
+        session_constraints = request_payload.get("session_constraints")
+        if isinstance(session_constraints, Mapping) and session_constraints:
+            applied = {}
+            if not question_plan.get("output_form") and session_constraints.get("output_form"):
+                question_plan["output_form"] = str(session_constraints["output_form"])
+                applied["输出形式"] = question_plan["output_form"]
+            if not (question_plan.get("time_window") or {}) and isinstance(
+                    session_constraints.get("time_window"), Mapping) and session_constraints["time_window"]:
+                question_plan["time_window"] = dict(session_constraints["time_window"])
+                applied["时间范围"] = session_constraints["time_window"].get("label") or "沿用会话"
+            if session_constraints.get("must_fetch_fulltext"):
+                question_plan["must_fetch_fulltext"] = True
+                applied["原文全文"] = True
+            if applied:
+                question_plan["session_constraints_applied"] = applied
         pack = self.pack_loader.load(pack_id)
         ragflow_policy = dict(pack.get("ragflow_policy") or {})
         ragflow_qa_enabled = bool(ragflow_policy.get("qa_retrieval_enabled"))

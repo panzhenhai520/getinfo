@@ -148,6 +148,24 @@ _GRAPH_EVENT_INTENT = (
 )
 
 
+def _ranking_weights() -> dict:
+    """阶段 10-4：取当前排序权重（档位由 QA_RANKING_PROFILE 决定；异常退回默认档）。
+
+    默认档与原硬编码系数逐项相等，所以不开档位时检索结果与历史完全一致。
+    """
+    try:
+        from qa_ranking_weights import ranking_weights
+
+        return ranking_weights()
+    except Exception:
+        return {
+            "title_phrase": 32.0, "title_amount": 36.0, "title": 8.0, "keyword": 5.0,
+            "body_phrase": 10.0, "body_amount": 16.0, "body": 1.5,
+            "anchor_coverage": 12.0, "semantic": 10.0, "in_window_bonus": 8.0,
+            "freshness": 1.0, "authority": 1.0, "coverage": 1.0,
+        }
+
+
 def graph_intent(question: str) -> dict:
     """问题意图 → 两类边的权重（event / attribute）。
 
@@ -938,7 +956,8 @@ def _policy_match_score(row: Mapping, spec: Mapping) -> tuple[float, list[str]]:
     if title_hits:
         score += 35 * min(4, len(title_hits))
         reasons.append("标题命中：" + "、".join(title_hits[:4]))
-    score += min(100, int(row.get("authority_level") or 1))
+    score += min(100, int(row.get("authority_level") or 1)) * float(
+        _ranking_weights().get("authority", 1.0))
     return score, list(dict.fromkeys(reasons))
 
 
@@ -1383,22 +1402,25 @@ class ArticleRetriever:
                 continue
             semantic = semantic_scores.get(article_id, 0.0)
             anchor_coverage = (len(anchor_hits) / max(1, len(anchor_terms))) if anchor_terms else 0.0
+            # 阶段 10-4：排序权重从硬编码提成可配（balanced 档与原系数逐项相等）
+            weights_cfg = _ranking_weights()
+            coverage_multiplier = float(weights_cfg.get("coverage", 1.0))
             score = (
-                len(title_phrase_hits) * 32
-                + len(title_amount_hits) * 36
-                + len(title_hits) * 8
-                + len(keyword_hits) * 5
-                + min(5, len(body_phrase_hits)) * 10
-                + min(4, len(body_amount_hits)) * 16
-                + min(5, len(body_hits)) * 1.5
-                + anchor_coverage * 12
-                + semantic * 10
+                len(title_phrase_hits) * weights_cfg["title_phrase"]
+                + len(title_amount_hits) * weights_cfg["title_amount"]
+                + len(title_hits) * weights_cfg["title"]
+                + len(keyword_hits) * weights_cfg["keyword"]
+                + min(5, len(body_phrase_hits)) * weights_cfg["body_phrase"]
+                + min(4, len(body_amount_hits)) * weights_cfg["body_amount"]
+                + min(5, len(body_hits)) * weights_cfg["body"]
+                + anchor_coverage * weights_cfg["anchor_coverage"] * coverage_multiplier
+                + semantic * weights_cfg["semantic"]
             )
             if score <= 0:
                 continue
             in_window = _in_window(row)
             if in_window:
-                score += 8          # 时效加权：区间内优先，但不排除区间外（配合扩窗）
+                score += weights_cfg["in_window_bonus"] * float(weights_cfg.get("freshness", 1.0))
                 window_ids.add(article_id)
             reasons = []
             if title_phrase_hits:
