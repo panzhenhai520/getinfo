@@ -1986,14 +1986,26 @@ class IntelWorker:
         schedule_periodic: bool = True,
     ) -> None:
         interval = max(1, int(poll_seconds or config.INTEL_WORKER_POLL_SECONDS))
+        # 槽位占满时的让出时间：**必须让出 GIL**，否则主循环的忙转会拖慢在跑的作业线程。
+        # A 机实测（2026-10-09）：intel-worker CPU 长期 100%、3 个 core worker 都显示空闲、
+        # 而库里积着 6494 条可领作业、吞吐只有 157/h —— 就是"领不到又不等"的忙转造成的。
+        in_flight_sleep = 0.2
         self._start_heartbeat_thread()
         try:
             while not self.stop_requested:
                 stats = self._pump_once(job_types=job_types, schedule_periodic=schedule_periodic)
-                if stats["claimed"] == 0 and stats["in_flight"] == 0:
-                    time.sleep(interval)
-                elif stats.get("cooldown"):
+                if stats["claimed"] > 0:
+                    # 领到活了：立刻再领一轮，把剩余空槽填满（不等整批完成）
+                    continue
+                if stats["in_flight"] > 0:
+                    # 槽位满 / 只是这轮没领到：短暂让出，别空转烧 CPU、抢在跑作业的 GIL
+                    time.sleep(in_flight_sleep)
+                    continue
+                if stats.get("cooldown"):
                     time.sleep(2)
+                    continue
+                # 真的没活了，才按轮询间隔睡
+                time.sleep(interval)
         finally:
             self._record_lane_heartbeat(status="stopped", note="worker 退出")
             if self._job_pool is not None:
