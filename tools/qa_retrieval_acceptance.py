@@ -290,6 +290,64 @@ def generate_questions(count: int = 24, *, limit_packs: int = 6) -> list:
     return questions[: max(1, int(count))]
 
 
+def _corpus_snapshot() -> dict:
+    """留档用的语料/图谱快照：覆盖率双口径 + 图规模（每次验收都记一份，便于看趋势）。"""
+    snapshot = {}
+    try:
+        from intel_database import intel_repository
+
+        intel_repository._ensure()
+        snapshot["coverage"] = intel_repository.coverage_report()
+        with sqlite_db.lock:
+            cursor = sqlite_db.connection.cursor()
+            try:
+                for label, sql in (
+                    ("nodes", "SELECT COUNT(*) AS n FROM kg_nodes"),
+                    ("edges", "SELECT COUNT(*) AS n FROM kg_edges"),
+                    ("event_edges",
+                     "SELECT COUNT(*) AS n FROM kg_edges WHERE relation_kind='event'"),
+                    ("attribute_edges",
+                     "SELECT COUNT(*) AS n FROM kg_edges WHERE relation_kind='attribute'"),
+                    ("attributes",
+                     "SELECT COUNT(*) AS n FROM intel_article_attributes"),
+                    ("attributes_with_validity",
+                     "SELECT COUNT(*) AS n FROM intel_article_attributes"
+                     " WHERE COALESCE(valid_from,'')<>'' OR COALESCE(valid_to,'')<>''"),
+                    ("event_rows",
+                     "SELECT COUNT(*) AS n FROM intel_article_events"
+                     " WHERE subject NOT IN ('__no_event__','__error__')"),
+                    ("placeholders",
+                     "SELECT COUNT(*) AS n FROM intel_article_events WHERE subject='__no_event__'"),
+                ):
+                    try:
+                        cursor.execute(sql)
+                        row = cursor.fetchone()
+                        snapshot[label] = int((row["n"] if hasattr(row, "keys") else row[0]) or 0)
+                    except Exception:
+                        snapshot[label] = None
+            finally:
+                cursor.close()
+    except Exception as exc:
+        snapshot["error"] = str(exc)[:160]
+    return snapshot
+
+
+def _append_history(path: str, outcome: dict) -> None:
+    """把一次验收结果追加到 JSONL（一行一次，便于按天对比与出趋势报告）。"""
+    import datetime as _dt
+
+    record = {
+        "recorded_at": _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "summary": outcome.get("summary") or {},
+        "corpus": _corpus_snapshot(),
+    }
+    directory = os.path.dirname(os.path.abspath(path))
+    if directory and not os.path.isdir(directory):
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="阶段 7/8 使用侧检索验收（不调用 LLM）")
     parser.add_argument("--questions", default="", help="问题 JSON 文件（默认用内置生成）")
@@ -298,6 +356,8 @@ def main(argv=None) -> int:
     parser.add_argument("--out", default="", help="生成的问题写到哪（默认打印）")
     parser.add_argument("--limit", type=int, default=12, help="每题最多取多少条证据")
     parser.add_argument("--pack", default="", help="只看某个行业包的问题")
+    parser.add_argument("--save-history", default="",
+                        help="把本次结果追加到 JSONL（含覆盖率与图规模快照）")
     parser.add_argument("--json", action="store_true", help="输出完整 JSON")
     args = parser.parse_args(argv)
 
@@ -339,6 +399,9 @@ def main(argv=None) -> int:
         print("    %-12s 题 %2d | 命中 %2d | 可回溯 %2d | 接地 %2d | 用图 %2d"
               % (kind, bucket["questions"], bucket["hit"], bucket["traceable"],
                  bucket["grounded"], bucket["graph"]))
+    if args.save_history:
+        _append_history(args.save_history, outcome)
+        print("\n  已留档 → %s" % args.save_history)
     if args.json:
         print("\n" + json.dumps(outcome, ensure_ascii=False, indent=1))
     return 0
