@@ -24,6 +24,7 @@ QA_MODES = ("standard", "deep", "fast")
 QA_STAGES = (
     "plan",
     "level1_retrieval",
+    "logic_validation",
     "level1_draft",
     "level2_retrieval",
     "level2_research",
@@ -142,6 +143,14 @@ EVIDENCE_SCHEMA = _strict_object(
         "chunk_id": {"type": ["string", "null"], "maxLength": 200},
         "score": {"type": ["number", "null"], "minimum": 0},
         "authority_level": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+        # 发布时间精度（阶段 4 起证据条目自带）：契约必须放行，否则一级草稿校验会因
+        # "Additional properties are not allowed" 整条失败降级——实测踩到，且只在
+        # **证据来自文章**（article:<id>）时才触发。
+        "published_at_utc": {"type": ["string", "null"], "maxLength": 80},
+        "published_precision": {"type": ["string", "null"], "maxLength": 20},
+        "published_timezone": {"type": ["string", "null"], "maxLength": 60},
+        "published_time_note": {"type": ["string", "null"], "maxLength": 200},
+        "excerpt_chars": {"type": ["integer", "null"], "minimum": 0},
         "retrieval_method": {"type": ["string", "null"], "maxLength": 80},
         "match_reason": {"type": ["string", "null"], "maxLength": 1000},
         "relationship": {

@@ -1002,6 +1002,10 @@ def build_qa_stage_handlers(
 
     def logic_validation(context):
         """阶段 9：逻辑校验（因果链 / 条件满足 / 缺失链接），把降级与缺口明确回报。"""
+        # 注意：emit_stage_event 由编排器通过 context 注入，必须显式取出
+        # （漏了这行会 NameError → 每个 run 到这一阶段直接 INTERNAL_ERROR；
+        #  tests/test_qa_stage_contract.py 里有守门用例钉死这一点）
+        emit_stage_event = context.get("_emit_stage_event")
         result = _logic_validation(
             _planned_question(context),
             context["outputs"]["level1_retrieval"],
