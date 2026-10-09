@@ -51,7 +51,7 @@ from financial_paper_trading import FinancialPaperTradingJobService
 LOGGER = logging.getLogger(__name__)
 
 
-def _enrich_failure_is_permanent(result: Dict, content: str) -> bool:
+def _enrich_failure_is_permanent(result: Dict, content: str, *, has_industry_signal: bool = True) -> bool:
     """VPN 精炼返回空内容时，判断这次失败是"该放弃"还是"该重试"。
 
     实测背景：55 个 enrich 作业累计 220 次尝试全部以「VPN 返回空精炼内容」告终，
@@ -59,7 +59,11 @@ def _enrich_failure_is_permanent(result: Dict, content: str) -> bool:
     重试 4 次只是白烧 lane 容量。判据：
       - VPN 明确标成无相关内容（relevance=none）；
       - VPN 判定的内容类型不是文章（列表/聚合/导航/索引页）；
-      - 原文本身短到不可能提炼出摘要。
+      - 原文本身短到不可能提炼出摘要；
+      - **文章零行业信号**（任何包下都没被分到 trend/event）——2026-10-09 A 机实测：
+        331 个 enrich 失败里 330 个（99.7%）都属于这一类，但旧判据只认下 7 个（2.1%），
+        多烧了 972 次尝试（占全部尝试 74.6%）。这类内容精炼出来也进不了证据池，
+        属于"产品口径上就不该做"的作业。
     以上任一成立 → 永久失败；否则按瞬时故障（模型抖动/超时）继续重试。
     """
     try:
@@ -71,6 +75,8 @@ def _enrich_failure_is_permanent(result: Dict, content: str) -> bool:
     if relevance in {"none", "irrelevant", "unrelated"}:
         return True
     if content_type in {"list", "aggregation", "navigation", "index", "listing"}:
+        return True
+    if not has_industry_signal:
         return True
     return len(str(content or "").strip()) < 120
 
@@ -296,6 +302,32 @@ class IntelWorker:
         with self._active_job_lock:
             self._active_cancel_events.pop(int(job_id), None)
 
+    def _article_has_industry_signal(self, article_id: int) -> bool:
+        """文章是否有行业信号（任一包下被分到 trend/event）。
+
+        为什么用它做 enrich 的永久失败判据：**零行业信号的文章按产品口径不得进 AI 证据池**
+        （见 tests/test_retrieval_evidence_policy.py 的闸门），精炼它纯属浪费；
+        A 机实测 331 个 enrich 失败里 330 个是这一类。
+
+        查不到（DB 异常）一律返回 True —— 宁可多试一次，也不要把可救的作业判成永久失败。
+        """
+        try:
+            with self.repository.db.lock:
+                cursor = self.repository.db.connection.cursor()
+                try:
+                    cursor.execute(
+                        "SELECT COUNT(*) AS n FROM article_intel_classifications"
+                        " WHERE article_id=? AND final_category IN ('trend','event')",
+                        (int(article_id),),
+                    )
+                    row = cursor.fetchone()
+                    value = row["n"] if hasattr(row, "keys") else row[0]
+                    return int(value or 0) > 0
+                finally:
+                    cursor.close()
+        except Exception:
+            return True
+
     def _handle_enrich(self, payload: Dict) -> Dict:
         """异步处理 VPN 精炼/翻译/预生成音频（submit+wait 在独立 worker 槽，不阻塞聚合）。
 
@@ -391,10 +423,14 @@ class IntelWorker:
             # 判据：VPN 明确把它标成无相关内容（relevance=none / content_type 为非正文类型），
             # 或原文本身短到不可能提炼 → 永久失败，不再重试；否则按瞬时故障重试。
             if not _refined:
-                if _enrich_failure_is_permanent(result, content):
+                # 零行业信号的文章：产品口径上就不该精炼（精炼出来也进不了证据池）。
+                # 查不到就按"有信号"处理——宁可多试一次，也不要误判成永久失败。
+                if _enrich_failure_is_permanent(
+                        result, content,
+                        has_industry_signal=self._article_has_industry_signal(article_id)):
                     return {
                         "success": False,
-                        "error": "VPN 返回空精炼内容（无实质正文，判定为永久失败，不再重试）",
+                        "error": "VPN 返回空精炼内容（无实质正文/无行业信号，判定为永久失败，不再重试）",
                         "retryable": False,
                     }
                 return {"success": False, "error": "VPN 返回空精炼内容"}
