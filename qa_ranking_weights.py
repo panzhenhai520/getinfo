@@ -31,6 +31,8 @@ _BALANCED = {
     "freshness": 1.0,          # 时效
     "authority": 1.0,          # 权威性（用于政策路径的 authority_level 加分）
     "coverage": 1.0,           # 覆盖面（用于核心词覆盖率）
+    # 阶段 11：硬约束命中直接置顶的加分（0 = 与历史行为一致，不置顶）
+    "hard_constraint_pin": 0.0,
 }
 
 PROFILES: Dict[str, Dict[str, float]] = {
@@ -44,6 +46,8 @@ PROFILES: Dict[str, Dict[str, float]] = {
     # 覆盖面优先：行业扫描类问题，覆盖更多核心词的证据更靠前
     "coverage": {**_BALANCED, "coverage": 1.5, "anchor_coverage": 16.0,
                  "title_phrase": 38.0, "freshness": 0.9},
+    # 阶段 11：硬约束（法规号/数值）命中直接置顶
+    "hard_pinned": {**_BALANCED, "hard_constraint_pin": 5000.0},
 }
 
 DEFAULT_PROFILE = "balanced"

@@ -148,6 +148,57 @@ _GRAPH_EVENT_INTENT = (
 )
 
 
+def prefilter_candidates(rows, *, in_window, hard_filter: bool, time_window: Mapping,
+                         min_in_window: int, enabled: bool = True) -> tuple:
+    """阶段 11：候选集**前置过滤**决策（纯函数，便于单测）。
+
+    只在"问题确实带时间窗 + 硬过滤开着 + 窗口内候选够多"时才收窄候选集；
+    否则**原样返回** —— 窗口内不够时收窄，等于把阶梯扩窗的退路堵死。
+
+    返回 (待打分的候选, 回执 stats)。
+    """
+    stats = {"enabled": False, "candidates": len(rows)}
+    if not enabled or not hard_filter or not rows:
+        return rows, stats
+    window = time_window or {}
+    if not window.get("has_time") or window.get("start") is None:
+        return rows, stats
+    in_window_rows = []
+    for row in rows:
+        try:
+            if in_window(row) is True:
+                in_window_rows.append(row)
+        except Exception:
+            continue
+    if len(in_window_rows) >= max(1, int(min_in_window or 1)) and len(in_window_rows) < len(rows):
+        stats = {"enabled": True, "candidates": len(rows), "in_window": len(in_window_rows)}
+        return in_window_rows, stats
+    return rows, stats
+
+
+def _vector_variants(queries, question: str, limit: int = 3) -> list:
+    """阶段 11：多向量召回的查询变体（原文 + 简繁/英文别名扩展）。
+
+    `QA_VECTOR_VARIANTS=1` 时只返回原文一条 → 与旧实现逐条一致（可做等价对照）。
+    """
+    base = " ".join(str(item) for item in (queries or []) if str(item).strip()) or str(question or "")
+    count = _env_int("QA_VECTOR_VARIANTS", 3, 1, 5)
+    variants = [base]
+    if count > 1 and base:
+        try:
+            from qa_query_normalize import expand_terms
+
+            terms = _terms([base]) or [base]
+            expanded = [str(term) for term in expand_terms(list(terms))]
+            extra = [term for term in expanded
+                     if term and term.casefold() not in base.casefold()]
+            if extra:
+                variants.append((base + " " + " ".join(extra[:10]))[:400])
+        except Exception:
+            pass
+    return variants[:count]
+
+
 def _ranking_weights() -> dict:
     """阶段 10-4：取当前排序权重（档位由 QA_RANKING_PROFILE 决定；异常退回默认档）。
 
@@ -941,6 +992,11 @@ def _policy_match_score(row: Mapping, spec: Mapping) -> tuple[float, list[str]]:
         if exact_doc_no and any(variant == exact_doc_no for variant in variants):
             score += 900
             reasons.append(f"法规号精确命中：{exact_doc_no}")
+            # 阶段 11：硬约束命中直接置顶（默认 0 = 不置顶，与旧行为一致）
+            pin = float(_ranking_weights().get("hard_constraint_pin", 0.0) or 0.0)
+            if pin:
+                score += pin
+                reasons.append("硬约束置顶（法规号精确命中）")
         elif any(variant.casefold() in blob for variant in variants):
             score += 520
             reasons.append("法规号命中")
@@ -1367,17 +1423,28 @@ class ArticleRetriever:
                 if not any((round(float(existing.get("value_yi") or 0), 6), bool(existing.get("approximate"))) == key for existing in amount_constraints):
                     amount_constraints.append(item)
         amount_context_terms = _amount_context_terms(queries or [str(plan.get("question") or "")])
+        # 阶段 11：候选集**前置过滤**（先过滤再算相似度），判定逻辑抽成纯函数便于单测
+        rows, prefilter_stats = prefilter_candidates(
+            rows, in_window=_in_window, hard_filter=_hard_filter,
+            time_window=_time_window, min_in_window=_min_in_window,
+            enabled=_env_flag("QA_VECTOR_PREFILTER", True),
+        )
         semantic_scores = {}
         if self.semantic_search and rows:
-            try:
-                raw_semantic = self.semantic_search(" ".join(queries), allowed_ids=set(by_id), limit=limit)
-                for item in raw_semantic or []:
-                    if isinstance(item, (tuple, list)) and len(item) >= 2:
-                        semantic_scores[int(item[0])] = max(0.0, float(item[1]))
-                    else:
-                        semantic_scores[int(item)] = 0.1
-            except Exception:
-                excluded["semantic_error"] = excluded.get("semantic_error", 0) + 1
+            # 阶段 11：多向量召回 —— 问题原文 + 简繁/英文别名扩展各算一次，按文章取最高分。
+            # `QA_VECTOR_VARIANTS=1` 时只有原文一条，与旧实现逐条一致（可回退对比）。
+            for variant in _vector_variants(queries or [str(plan.get("question") or "")],
+                                            str(plan.get("question") or "")):
+                try:
+                    raw_semantic = self.semantic_search(variant, allowed_ids=set(by_id), limit=limit)
+                    for item in raw_semantic or []:
+                        if isinstance(item, (tuple, list)) and len(item) >= 2:
+                            article_key, value = int(item[0]), max(0.0, float(item[1]))
+                        else:
+                            article_key, value = int(item), 0.1
+                        semantic_scores[article_key] = max(semantic_scores.get(article_key, 0.0), value)
+                except Exception:
+                    excluded["semantic_error"] = excluded.get("semantic_error", 0) + 1
 
         ranked = []
         for row in rows:
@@ -1418,6 +1485,11 @@ class ArticleRetriever:
             )
             if score <= 0:
                 continue
+            # 阶段 11：数值硬约束命中也可以直接置顶（默认 0 = 不置顶）
+            _pin = float(weights_cfg.get("hard_constraint_pin", 0.0) or 0.0)
+            if _pin and (title_amount_hits or body_amount_hits):
+                score += _pin
+                reasons.append("硬约束置顶（数值命中）")
             in_window = _in_window(row)
             if in_window:
                 score += weights_cfg["in_window_bonus"] * float(weights_cfg.get("freshness", 1.0))
@@ -1492,7 +1564,11 @@ class ArticleRetriever:
             "evidence": selected,
             "excluded": {**excluded, "page_context": page_denied, "policy_exact": policy_exact_audit},
             "stats": {"eligible": len(rows), "adopted": len(selected),
-                      "keyword_candidates": len(ranked), "graph_adopted": graph_stats.get("used", 0)},
+                      "keyword_candidates": len(ranked), "graph_adopted": graph_stats.get("used", 0),
+            # 阶段 11：把"多向量召回"与"候选集前置过滤"的效果回报出来（可审计）
+            "vector_variants": len(_vector_variants(queries or [str(plan.get("question") or "")],
+                                                    str(plan.get("question") or ""))),
+            "vector_prefilter": prefilter_stats},
             "time_window": _tw_out,
             "graph": graph_stats,
         }
