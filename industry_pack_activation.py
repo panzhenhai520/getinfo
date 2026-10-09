@@ -665,6 +665,18 @@ class IndustryPackActivationService:
                 raise
             finally:
                 cursor.close()
+        # 行业包激活成功后**同步业务规则**（阶段 9）：规则来自本包的
+        # core_keywords / fixed_topics / 本周追踪方向。放在锁外、失败只记录，
+        # 绝不回滚激活结果（规则是检索增强项，不能拖累行业切换这条主流程）。
+        rule_sync: dict
+        try:
+            from business_rules import business_rule_engine
+            from industry_packs import industry_pack_loader
+
+            pack = industry_pack_loader.load(preview["target_pack_id"]) or {}
+            rule_sync = business_rule_engine.sync_from_pack(preview["target_pack_id"], pack)
+        except Exception as exc:
+            rule_sync = {"error": str(exc)[:120]}
         return {
             "activation_id": activation_id,
             "previous_pack_id": preview["previous_pack_id"],
@@ -680,6 +692,7 @@ class IndustryPackActivationService:
             "article_status_unchanged": True,
             "content_preservation": preservation_result,
             "initialization_window": preview.get('initialization_window'),
+            "business_rules": rule_sync,
         }
 
     def _current_activation(self, activation_id: str) -> dict:
