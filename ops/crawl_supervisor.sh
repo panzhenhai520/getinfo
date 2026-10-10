@@ -1,16 +1,22 @@
 #!/bin/bash
 # 采集回填值班（A 机常驻）
-#   1) 白天 1 并发 —— 给机器人留一个模型槽位（两台共用同一台 GPU 机的 llama.cpp，-np 2）
-#   2) 夜间 01:00-07:00 放开到 2 并发 —— 机器人空闲时段把 20 小时压缩到约 15 小时
+#   1) 白天 **0 并发**（完全不跑）—— **机器人优先**：两台共用同一台 GPU 机的 llama.cpp（-np 2），
+#      2026-10-09 实测：回填占着槽位时机器人语音链「用户说完→LLM 首句」13~44 秒、整轮 45~78 秒；
+#      把回填停掉后同一台 27B 的裸时延只要 首 token 0.9~1.7 秒（短 prompt）/ 3.3 秒（2000 字 prompt）。
+#      结论：连"白天 1 并发"都会让机器人明显卡顿，所以白天直接不跑。
+#   2) 深夜 03:00-06:00 放开到 **1 并发** —— 该时段基本不会有人跟机器人对话；
+#      覆盖率是长跑指标，慢一点可以接受，机器人体验不能牺牲。
+#      （Ollama 那条"给爬虫单独一个实例"的路已实测走不通：同款 27B 因 8081 已占显存而 OOM，
+#        gemma431b-32k 只有 6.3 tok/s，比 27B 还慢。）
 #   3) 回填进程挂了自动拉起（断点续跑，不会重复烧 LLM）
 #   4) 每天 08:00 自动跑一次检索验收并留档（含覆盖率与图规模快照）
 # 全部参数可用环境变量覆盖；要停就 `pkill -f crawl_supervisor.sh`，回填进程不受影响。
 set -u
 
-DAY_WORKERS=${DAY_WORKERS:-1}
-NIGHT_WORKERS=${NIGHT_WORKERS:-2}
-NIGHT_START=${NIGHT_START:-1}
-NIGHT_END=${NIGHT_END:-7}
+DAY_WORKERS=${DAY_WORKERS:-0}
+NIGHT_WORKERS=${NIGHT_WORKERS:-1}
+NIGHT_START=${NIGHT_START:-3}
+NIGHT_END=${NIGHT_END:-6}
 ACCEPT_HOUR=${ACCEPT_HOUR:-8}
 QUESTIONS=/app/data/qa_acceptance_questions.json
 HISTORY=/app/data/qa_acceptance_history.jsonl
