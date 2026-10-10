@@ -107,8 +107,10 @@ QA_STOP_REASONS: Tuple[str, ...] = (
     QA_STOP_NO_GAIN, QA_STOP_UNRESOLVABLE_CONTRADICTION,
 )
 """多跳循环的停止原因。本仓库现状：预算耗尽会写 `status='skipped_budget'`，
-"无缺失链接"会自然收束——对应 `BUDGET_EXHAUSTED` 与 `ANSWERABLE`；
-`MAX_DEPTH`/`NO_GAIN`/`UNRESOLVABLE_CONTRADICTION` 待阶段 07 补齐。"""
+"无缺失链接"会自然收束——对应 `BUDGET_EXHAUSTED` 与 `ANSWERABLE`；`MAX_DEPTH` 由
+执行图的跳数上限给出；**Phase 07 补齐 `NO_GAIN` 与 `UNRESOLVABLE_CONTRADICTION`**
+（`qa_gap_analyzer.GapLoopState`：连续若干轮无新增有效证据/无新增 claim → NO_GAIN；
+Phase 06 矛盾裁决 unresolved 且已无可用下一跳 → UNRESOLVABLE_CONTRADICTION）。"""
 
 # ── 研究规划与执行图（Phase 05 · P05-01…P05-05）────────────────────────────
 # 通用包 01_V2_ARCHITECTURE §6（Query Interpreter）/ §7（Research Planner）/
@@ -459,8 +461,11 @@ EXECUTION_GRAPH_SCHEMA = {    "type": "object",
     "required": ["contract_version", "path", "nodes", "edges", "parallel_groups", "budget"],
     "additionalProperties": True,
 }
-"""执行图（§3.1）。`stop_reason` 取既有五值枚举（Phase 01 冻结），
-本阶段只可能产出 {ANSWERABLE, BUDGET_EXHAUSTED, MAX_DEPTH}——另两值属 Phase 07 的缺口闭环。"""
+"""执行图（§3.1）。`stop_reason` 取既有五值枚举（Phase 01 冻结）。
+**规划期**（建图那一刻）只可能产出 {ANSWERABLE, BUDGET_EXHAUSTED, MAX_DEPTH}——NO_GAIN 与
+UNRESOLVABLE_CONTRADICTION 是**运行期**结论（要等检索/核验/裁决跑完才知道），
+由 Phase 07 的缺口循环（`qa_gap_analyzer`）在 `_run_multi_hop` 与 conflict_review 里给出，
+落在 `qa_pipeline._run_multi_hop` 的 `gap_loop` 回执与执行图 `gap_loop` 节点的账本记录里。"""
 
 
 # ── 证据层 schema（Phase 02 · P02-01）────────────────────────────────────────
@@ -886,19 +891,179 @@ EVIDENCE_GRAPH_SCHEMA = {
 """证据图整体契约（P06-01 的仓储/API 返回体）。"""
 
 
+# ── 缺口分析与动态多跳（Phase 07 · P07-01…P07-06）──────────────────────────
+# 通用包 01_V2_ARCHITECTURE 依据：
+#   · §12 Gap Analyzer："每一轮 fan-in 后不问'还要不要再检索一次'，而问'为了可靠回答原问题，
+#     哪些必要 Claim 仍缺少什么类型的证据？'"——gap 形状（gap_id/claim_id/missing/priority/
+#     suggested_queries/suggested_routes/reason）与**十种** Gap 类型逐字取自这一节；
+#   · §13 Dynamic Next-hop Planner："下一跳不是 hop+1，而是 Gap → Best Retrieval Action"
+#     （G1→BM25 Hunter / G4→Two independent Hunters）；完整循环 PLAN→FAN OUT→VERIFY→MERGE→
+#     GAP ANALYSIS→（gaps→GENERATE NEXT HOPS→FAN OUT | sufficient→ANSWER）；
+#   · §14 收敛与停止：连续两轮 `new_verified_claims == 0 AND resolved_high_priority_gaps == 0`
+#     → STOP_NO_GAIN；五个停止原因（Phase 01 已冻结在 `QA_STOP_REASONS`，本阶段不再新增取值）；
+#   · §21 Safety-Critical Gap → Priority Override；
+#   · §24 Query Fingerprint = normalized_query + constraints + corpus_version + retrieval_config；
+#   · §23 Search Trace：每跳必须能回答"为什么搜/为什么走这个 route/解决了哪个 Gap/为什么停"。
+#
+# 三条口径（写死在这里，避免后续阶段各算一套）：
+#   1. `missing` 取 `QA_GAP_TYPES` 的十个值（**逐字**取自 §12，不新造、不改名）；
+#   2. `suggested_routes` 只吃 `QA_RETRIEVAL_ROUTES` 的既有 7 个通道值 —— §12 示例里的
+#      `bm25`/`graph` 在本仓库的对应物是 Hunter 身份（`QA_HUNTER_IDS`）与检索通道
+#      （`QA_RETRIEVAL_ROUTES`）两层，Phase 04（D-017）已经把它们分开；缺口建议只写通道，
+#      否则 SearchTrace 的 route 会开始接受冻结枚举外的取值（跨阶段契约漂移）；
+#   3. 停止原因**不新增取值**：NO_GAIN / UNRESOLVABLE_CONTRADICTION 就是 Phase 01 冻结五值里
+#      那两个"待阶段 07 补齐"的值（本阶段补齐，见 qa_gap_analyzer）。
+GAP_ANALYZER_VERSION = "qa-gap-analyzer-v1"
+"""缺口分析版本（换规则=换版本）：gap 分类/优先级/证据要求都可复算到这个版本号。"""
+
+NEXT_HOP_PLANNER_VERSION = "qa-next-hop-planner-v1"
+"""下一跳规划器版本（§13）。默认实现是规则；注册后端走 `qa_gap_analyzer.register_next_hop_planner`。"""
+
+QA_GAP_NO_EVIDENCE = "NO_EVIDENCE"
+QA_GAP_LOW_RELEVANCE = "LOW_RELEVANCE"
+QA_GAP_LOW_AUTHORITY = "LOW_AUTHORITY"
+QA_GAP_SINGLE_SOURCE = "SINGLE_SOURCE"
+QA_GAP_MISSING_ENTITY_LINK = "MISSING_ENTITY_LINK"
+QA_GAP_MISSING_TIME_LINK = "MISSING_TIME_LINK"
+QA_GAP_CONTRADICTION = "CONTRADICTION"
+QA_GAP_AMBIGUOUS_ENTITY = "AMBIGUOUS_ENTITY"
+QA_GAP_MISSING_CAUSAL_BRIDGE = "MISSING_CAUSAL_BRIDGE"
+QA_GAP_MISSING_COUNTEREVIDENCE = "MISSING_COUNTEREVIDENCE"
+QA_GAP_TYPES: Tuple[str, ...] = (
+    QA_GAP_NO_EVIDENCE, QA_GAP_LOW_RELEVANCE, QA_GAP_LOW_AUTHORITY, QA_GAP_SINGLE_SOURCE,
+    QA_GAP_MISSING_ENTITY_LINK, QA_GAP_MISSING_TIME_LINK, QA_GAP_CONTRADICTION,
+    QA_GAP_AMBIGUOUS_ENTITY, QA_GAP_MISSING_CAUSAL_BRIDGE, QA_GAP_MISSING_COUNTEREVIDENCE,
+)
+"""Gap 类型十值（§12 逐字）。含义与判定规则见 `qa_gap_analyzer.detect_gaps` 的文档字符串。"""
+
+GAP_PRIORITY_BANDS: Tuple[str, ...] = ("critical", "high", "medium", "low")
+"""优先级分档：由 `priority` 单一数字派生（阈值可配置），保证"同一个数字永远同一档"。"""
+
+GAP_STATUSES: Tuple[str, ...] = ("open", "resolved", "unactionable")
+"""缺口生命周期：`open` = 还没被证据满足；`resolved` = 后续跳已满足其证据要求；
+`unactionable` = 规则判定"再检索也拿不到"（例如已见且被拒的来源），必须显式记账而不是消失。"""
+
+GAP_PRIORITY_WEIGHTS = {"severity": 0.55, "claim_importance": 0.25, "evidence_deficit": 0.20}
+"""优先级三个分量的权重（和为 1）。§21 的安全关键覆盖是**覆盖**（override）而非加权项。"""
+
+SAFETY_OVERRIDE_PRIORITY = 0.95
+"""§21 Priority Override：`safety_critical=true` 的缺口优先级**抬高到至少**这个值。"""
+
+NEXT_HOP_PLANNERS: Tuple[str, ...] = ("rule",)
+"""内置下一跳规划器身份。注册后端用 `register_next_hop_planner(name, fn)`（名字不在这里）。"""
+
+GAP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "gap_id": {"type": "string"},
+        "claim_id": {"type": "string"},
+        "missing": {"type": "string", "enum": list(QA_GAP_TYPES)},
+        "priority": {"type": "number", "minimum": 0, "maximum": 1},
+        "band": {"type": "string", "enum": list(GAP_PRIORITY_BANDS)},
+        "status": {"type": "string", "enum": list(GAP_STATUSES)},
+        "suggested_queries": {"type": "array", "items": {"type": "string"}},
+        "suggested_routes": {"type": "array", "items": {"type": "string",
+                                                        "enum": list(QA_RETRIEVAL_ROUTES)}},
+        "reason": {"type": "string"},
+        # P07-02：这条缺口到底缺哪类证据、缺到什么程度（§7 的 Evidence Requirement 口径）
+        "evidence_requirement": EVIDENCE_REQUIREMENT_SCHEMA,
+        # 可复算的优先级分解（每个分量都写出来，便于"为什么它排第一"）
+        "priority_factors": {"type": "object"},
+        "safety_critical": {"type": "boolean"},
+        "priority_override": {"type": "boolean"},
+        "origin": {"type": "string"},
+    },
+    "required": ["gap_id", "missing", "priority", "suggested_routes", "reason"],
+    "additionalProperties": True,
+}
+"""Evidence Gap 契约（§12 的字段 + P07-02 的证据要求 + 可复算的优先级分解）。
+
+`claim_id` 不在 required 里：`MISSING_ENTITY_LINK` 这类缺口可能挂在计划 claim 上
+（`plan_only=true`，是"要证实什么"而不是已下结论），也可能是全局缺口（无 claim）。"""
+
+NEXT_HOP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "hop_id": {"type": "string"},
+        "gap_id": {"type": "string"},
+        "round_index": {"type": "integer", "minimum": 0},
+        "question": {"type": "string"},
+        "queries": {"type": "array", "items": {"type": "string"}},
+        "route": {"type": "string", "enum": list(QA_RETRIEVAL_ROUTES) + [""]},
+        "routes": {"type": "array", "items": {"type": "string",
+                                              "enum": list(QA_RETRIEVAL_ROUTES)}},
+        "priority": {"type": "number", "minimum": 0, "maximum": 1},
+        "reason": {"type": "string"},
+        "query_fingerprint": {"type": "string"},
+        "evidence_requirement": EVIDENCE_REQUIREMENT_SCHEMA,
+        # route → 真实的检索计划覆盖（三通道各自的落点：queries / entities / terms）
+        "plan_overrides": {"type": "object"},
+        "hunters": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["hop_id", "gap_id", "question", "queries", "route", "reason"],
+    "additionalProperties": True,
+}
+"""下一跳契约（§13）：一跳 = 一个缺口 + 一条最优检索动作（route）+ 它的可复算指纹。"""
+
+GAP_LOOP_ROUND_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "round_index": {"type": "integer", "minimum": 0},
+        "open_gaps": {"type": "integer", "minimum": 0},
+        "high_priority_gaps": {"type": "integer", "minimum": 0},
+        "new_evidence": {"type": "integer", "minimum": 0},
+        "new_verified_claims": {"type": "integer", "minimum": 0},
+        "resolved_high_priority_gaps": {"type": "integer", "minimum": 0},
+        "planned_hops": {"type": "integer", "minimum": 0},
+        "skipped_hops": {"type": "integer", "minimum": 0},
+        "dedupe_hits": {"type": "integer", "minimum": 0},
+        "no_gain": {"type": "boolean"},
+        "no_gain_streak": {"type": "integer", "minimum": 0},
+        "stop_reason": {"type": "string", "enum": list(QA_STOP_REASONS) + [""]},
+        "detail": {"type": "string"},
+    },
+    "required": ["round_index", "no_gain", "no_gain_streak"],
+    "additionalProperties": True,
+}
+"""缺口循环单轮回执：每一轮都记"新增多少有效证据/解决了多少高优缺口/丢了几个重复跳"。"""
+
+GAP_LOOP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "analyzer_version": {"type": "string"},
+        "planner_version": {"type": "string"},
+        "enabled": {"type": "boolean"},
+        "stop_reason": {"type": "string", "enum": list(QA_STOP_REASONS) + [""]},
+        "stop_detail": {"type": "string"},
+        "no_gain_rounds": {"type": "integer", "minimum": 0},
+        "rounds": {"type": "array", "items": GAP_LOOP_ROUND_SCHEMA},
+        "gaps": {"type": "array", "items": GAP_SCHEMA},
+        "hops": {"type": "array", "items": NEXT_HOP_SCHEMA},
+        "seen_dedupe": {"type": "object"},
+        "stats": {"type": "object"},
+    },
+    "required": ["analyzer_version", "enabled", "stop_reason", "rounds"],
+    "additionalProperties": True,
+}
+"""缺口循环整体回执（P07-05/P07-06）：停止原因 + 每轮回执 + 缺口清单 + 下一跳清单。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
-    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s：节点类型 %d / 边关系 %d / "
+    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s："
+            "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
-            "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d"
+            "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
+            "缺口类型 %d / 优先级分档 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
-               EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION,
+               EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
                len(QUERY_INTENTS), len(EXECUTION_NODE_KINDS),
                len(EVIDENCE_GRAPH_NODE_TYPES), len(EVIDENCE_GRAPH_RELATIONSHIPS),
-               len(CONTRADICTION_RESOLUTION_CODES)))
+               len(CONTRADICTION_RESOLUTION_CODES),
+               len(QA_GAP_TYPES), len(GAP_PRIORITY_BANDS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -925,6 +1090,12 @@ def _check_node(schema: dict, payload: Mapping, path: str) -> str:
                         failure = _check_node(item_schema, item, "%s%s[%d]." % (path, key, index))
                         if failure:
                             return failure
+                        continue
+                    # 标量元素同样要守枚举：字符串数组的取值域也是契约的一部分
+                    # （Phase 07 的 `suggested_routes` / `routes` 就靠这一条拦住冻结枚举外的通道值）
+                    item_enum = item_schema.get("enum")
+                    if item_enum and item not in item_enum:
+                        return "字段 %s%s[%d] 取值 %r 不在枚举内" % (path, key, index, item)
     return ""
 
 
@@ -959,6 +1130,11 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "evidence_graph_edge": EVIDENCE_GRAPH_EDGE_SCHEMA,
         "claim_coverage": CLAIM_COVERAGE_SCHEMA,
         "contradiction_decision": CONTRADICTION_DECISION_SCHEMA,
+        # Phase 07（P07-01…P07-06）
+        "gap": GAP_SCHEMA,
+        "next_hop": NEXT_HOP_SCHEMA,
+        "gap_loop_round": GAP_LOOP_ROUND_SCHEMA,
+        "gap_loop": GAP_LOOP_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

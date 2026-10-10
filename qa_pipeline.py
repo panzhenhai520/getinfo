@@ -42,6 +42,10 @@ from qa_evidence_graph import (
     EVIDENCE_GRAPH_VERSION as EVIDENCE_GRAPH_LAYER_VERSION,
     evidence_graph_enabled, layer_from_graph,
 )
+from qa_gap_analyzer import (
+    GAP_ANALYZER_VERSION, GapLoopState, gap_analyzer_enabled, gap_summary,
+    plan_next_hops, review_graph as review_gap_graph,
+)
 from qa_verifier import (
     VERIFIER_VERSION, verification_cache, verification_of, verifier_enabled,
     verify_claim_graph, verify_evidence_batch,
@@ -733,6 +737,34 @@ def _build_evidence_graph_layer(graph: dict, *, plan: Mapping | None, run_meta: 
                 "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
+def _attach_gap_review(graph: Mapping, layer: dict, *, plan: Mapping | None,
+                       previous_stop_reason: str = "") -> dict:
+    """阶段 07（P07-06）：在证据图上做一次缺口复核，结果挂 `layer["gap_review"]`。
+
+    这是 `UNRESOLVABLE_CONTRADICTION` 的**权威出口**：Phase 06 的规则裁决已经比过 §15 的
+    八项比较，落 `unresolved` 就说明"再检索也裁不动"（要裁得换更强的裁决器，本轮硬约束禁止）。
+    只加不改：evidence_graph 契约 `additionalProperties=True`，复核是新键；
+    复核失败只记账（`error`），绝不影响建图与答案。
+    """
+    try:
+        review = review_gap_graph(layer, graph=graph, plan=plan,
+                                  previous_stop_reason=previous_stop_reason)
+    except Exception as exc:      # noqa: BLE001 —— 复核绝不能拖累主流程
+        review = {"analyzer_version": GAP_ANALYZER_VERSION, "stage": "evidence_graph_review",
+                  "stop_reason": "", "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+    layer["gap_review"] = review
+    return review
+
+
+def _gap_stop_reason_from_level1(context: Mapping) -> str:
+    """多跳缺口循环给出的停止原因（`stats["gap_loop"]["stop_reason"]`；没有就是空串）。"""
+    outputs = context.get("outputs") or {}
+    level1 = outputs.get("level1_retrieval") if isinstance(outputs, Mapping) else {}
+    stats = level1.get("stats") if isinstance(level1, Mapping) else {}
+    receipt = stats.get("gap_loop") if isinstance(stats, Mapping) else {}
+    return str((receipt or {}).get("stop_reason") or "") if isinstance(receipt, Mapping) else ""
+
+
 def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping) -> int:
     """把本轮已确认的约束固化（时间窗/输出形式/实体/全文要求）。
 
@@ -858,12 +890,52 @@ def _hop_carry_terms(evidence, exclude, limit: int = 6):
     return picked
 
 
+def _gap_plan_claims(retrieval_plan, *, question: str, mode: str = "") -> tuple:
+    """阶段 07（P07-01）：缺口分析要的"必要 Claim"（§12 的原话：哪些**必要 Claim** 缺什么证据）。
+
+    复用 Phase 05 `qa_execution_graph.build_research_plan()`（**不重写分解器**）：它把
+    `plan["decomposition"]` 的 hops 一对一映射成 sub_question 与 plan claim（role=answer/link）；
+    这里只做一件事——把它的陈述前缀"需要证实或证伪："去掉，让缺口生成的查询读起来像人话。
+
+    算不出来就退化成"问题本身就是唯一必要 claim"：宁可少一层分析，也不许因为计划不可用
+    就整段跳过缺口分析（那样 NO_GAIN/UNRESOLVABLE_CONTRADICTION 永远产不出来）。
+    """
+    text = str(question or retrieval_plan.get("question") or "")
+    prefix = "需要证实或证伪："
+    try:
+        from qa_execution_graph import build_research_plan
+
+        plan = build_research_plan(text, plan=retrieval_plan, mode=str(mode or "standard"))
+        claims = []
+        for row in plan.get("claims") or []:
+            if not isinstance(row, Mapping):
+                continue
+            item = dict(row)
+            item["statement"] = str(item.get("statement") or "").replace(prefix, "", 1).strip()
+            claims.append(item)
+        if claims:
+            return plan, claims
+    except Exception:          # noqa: BLE001 —— 计划不可用只降级，不影响多跳
+        pass
+    return ({}, [{"claim_id": "q1", "statement": text, "role": "answer",
+                  "plan_node_kind": "claim"}])
+
+
+def _gap_loop_category(retrieval_plan: Mapping | None) -> str:
+    """缺口分析要的问题类别（复用既有 plan["category"]，口径在 qa_gap_analyzer 里）。"""
+    from qa_gap_analyzer import category_of
+
+    return category_of(retrieval_plan)
+
+
 def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                    pack_id: str, limit: int, emit_stage_event=None,
                    trace_recorder=None, round_index: int = 0, store=None,
                    run_meta: Mapping | None = None, question: str = "",
                    corpus_version: str = "", hop_audit: dict | None = None,
-                   budget_seconds: float | None = None):
+                   budget_seconds: float | None = None,
+                   plan_claims: Sequence[Mapping] | None = None, mode: str = "",
+                   retrieval_config_version: str = ""):
     """按 DAG 顺序执行多跳检索，返回 (合并后的 local, 每跳回执)。
 
     预算与跳数是**双重硬约束**：跳数上限 `QA_MAX_HOPS`，墙钟上限
@@ -877,11 +949,23 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
     阶段 02 缺口 1 增补：每一跳取回的证据都过一遍证据层（标注 + seen 登记 + 跨轮去重），
     回执累加进调用方传入的 `hop_audit`，最终并入既有 `stats["evidence_layer"]`（不新增返回键）。
     `store` / `run_meta` 缺省为 None：拿不到作用域时只记 `skipped_scope`，绝不报错。
+
+    阶段 07（P07-01…P07-06）增补（`QA_GAP_ANALYZER` **默认关**时逐字回到上面这套行为）：
+      · 每跳之后跑一次缺口分析（`GapLoopState.observe`），逐轮记
+        `new_verified_claims` / `resolved_high_priority_gaps` / `new_evidence`；
+      · DAG 与补检跑完后，按缺口规划**补充跳**（§13 的 Gap → Best Retrieval Action），
+        上限 `QA_GAP_MAX_NEXT_HOPS`、且受同一份墙钟预算与跳数硬上限约束；
+      · 收尾时按 §14 给出**停止原因**（`merged["gap_loop"]["stop_reason"]`），
+        并把 `gap_id`/`new_claims`/`resolved_gap` 通过 `trace_recorder` 真正落库
+        （Phase 01 埋的 `qa_reasoning_traces` 三列，本阶段填上）。
     """
     import time as _time
 
     hops = list((retrieval_plan.get("decomposition") or {}).get("hops") or [])
-    if len(hops) <= 1:
+    if len(hops) <= 1 and not gap_analyzer_enabled():
+        # 既有行为（开关关着时逐字不变）：没有 DAG 就没有多跳可跑。
+        # 开关打开时**单跳问题也进缺口循环**——§13 的 "Gap → Next Hop" 对单跳问题最有用
+        # （首跳没解掉的缺口只能靠补充跳），只在开关打开时生效。
         return first_local, []
 
     budget = float(getattr(config, "QA_MULTI_HOP_BUDGET_SECONDS", 25) or 25)
@@ -895,12 +979,58 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
     carry_terms = []
     question = str(retrieval_plan.get("question") or "")
 
+    # ── 阶段 07：缺口循环状态（开关关着时 gap_state 为 None，下面每一处都是空操作）──
+    gap_state = None
+    gap_claims: list = []
+    if gap_analyzer_enabled():
+        gap_claims = [dict(row) for row in (plan_claims or []) if isinstance(row, Mapping)]
+        if not gap_claims:
+            _, gap_claims = _gap_plan_claims(retrieval_plan, question=question, mode=mode)
+        gap_state = GapLoopState(
+            rounds_limit=max(2, len(hops) + 1 + max(1, int(getattr(config, "QA_MAX_HOPS", 3) or 3))),
+            budget_seconds=budget, started=started,
+            category=_gap_loop_category(retrieval_plan), plan=retrieval_plan,
+            corpus_version=corpus_version, retrieval_config=retrieval_config_version)
+
+    def _observe_gap_round(round_no: int, *, new_refs=()) -> dict:
+        """跑一轮缺口分析（**异常一律吞掉**：缺口分析绝不能把检索阶段打断）。"""
+        if gap_state is None:
+            return {}
+        try:
+            return gap_state.observe(round_index=round_no, claims=gap_claims,
+                                     evidence=merged_evidence, new_refs=new_refs)
+        except Exception as exc:      # noqa: BLE001
+            gap_state.record_error("observe", "%s: %s" % (type(exc).__name__, str(exc)[:120]))
+            return {}
+
+    def _attribute_gap(receipt: dict, round_receipt: Mapping) -> None:
+        """把这一跳的缺口留痕写进回执（P07 的三列：gap_id / resolved_gap / new_claims）。
+
+        口径（可复算）：
+          · `resolved_gap` = 本跳解决了几个**高优**缺口（"上轮有、本轮没了"才算，见 observe）；
+          · `gap_id` = 解决了就写被解决的那个；没解决就写当前最高优的 open 缺口
+            （说明"这一跳之后还欠什么"）；
+          · `new_claims` = 本跳新增了多少"拿到已核验支持"的 claim（§14 的 new_verified_claims）。
+        """
+        if gap_state is None or not isinstance(round_receipt, Mapping):
+            return
+        try:
+            resolved = [str(item) for item in (round_receipt.get("resolved_gap_ids") or [])]
+            open_ids = [str(gap.get("gap_id") or "") for gap in gap_state.high_priority_open()]
+            receipt["resolved_gap"] = len(resolved)
+            receipt["new_claims"] = int(round_receipt.get("new_verified_claims") or 0)
+            receipt["gap_id"] = (resolved[0] if resolved
+                                 else (open_ids[0] if open_ids else ""))
+        except Exception:             # noqa: BLE001 —— 留痕不许影响检索
+            return
+
     def _record(receipt, evidence_list, stats=None):
         """写一条推理留痕（缺省不写；回调内部异常一律吞掉）。
 
         阶段 01（F-7）：带上检索通道与候选/采纳口径（SearchTrace 的
-        route / results / accepted / rejected）。`new_claims` / `resolved_gap` 属
-        阶段 07 的缺口闭环，这里不编——由 record_reasoning_trace 的默认值留 0。
+        route / results / accepted / rejected）。
+        阶段 07：带上缺口闭环三列（gap_id / new_claims / resolved_gap）——
+        它们来自缺口循环的逐轮回执，**不是编的**；开关关着时是空串/0（与既有默认值一致）。
         """
         if not callable(trace_recorder):
             return
@@ -915,11 +1045,14 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                 "used_evidence_refs": refs,
                 "status": str(receipt.get("status") or ""),
                 "latency_ms": int(receipt.get("latency_ms") or 0),
-                "round_index": int(round_index),
-                "route": _hop_route(evidence_list, stats),
+                "round_index": int(receipt.get("round_index", round_index)),
+                "route": str(receipt.get("route") or _hop_route(evidence_list, stats)),
                 "results": results,
                 "accepted": accepted,
                 "rejected": max(0, results - accepted),
+                "gap_id": str(receipt.get("gap_id") or ""),
+                "new_claims": int(receipt.get("new_claims") or 0),
+                "resolved_gap": int(receipt.get("resolved_gap") or 0),
             })
         except Exception:
             return
@@ -929,15 +1062,17 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
         hop_question = str(hop.get("question") or "").strip() or question
         if index == 0:
             # 第 1 跳就是主检索，直接复用，不再打一次
-            receipts.append({
+            receipt = {
                 "hop_id": hop_id, "hop_index": index, "question": hop_question,
                 "depends_on": list(hop.get("depends_on") or []),
                 "purpose": str(hop.get("purpose") or ""),
                 "evidence": len(merged_evidence), "status": "ok",
                 "carry_terms": carry_terms, "latency_ms": 0,
-            })
-            _record(receipts[-1], merged_evidence, first_local.get("stats"))
+            }
             carry_terms = _hop_carry_terms(merged_evidence, [question])
+            _attribute_gap(receipt, _observe_gap_round(0, new_refs=seen_refs))
+            receipts.append(receipt)
+            _record(receipt, merged_evidence, first_local.get("stats"))
             continue
 
         elapsed = _time.monotonic() - started
@@ -989,6 +1124,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             store=store, round_index=round_index, corpus_version=corpus_version,
             route=_hop_route(hop_evidence, hop_local.get("stats")), audit=hop_audit)
         added = 0
+        added_refs = []
         for item in hop_evidence:
             ref = str(item.get("evidence_ref") or "")
             if ref and ref in seen_refs:
@@ -996,7 +1132,8 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             seen_refs.add(ref)
             merged_evidence.append(item)
             added += 1
-        receipts.append({
+            added_refs.append(ref)
+        receipt = {
             "hop_id": hop_id, "hop_index": index, "question": hop_question,
             "depends_on": list(hop.get("depends_on") or []),
             "purpose": str(hop.get("purpose") or ""),
@@ -1004,15 +1141,17 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             "status": "ok" if hop_evidence else "empty",
             "carry_terms": list(carry_terms),
             "latency_ms": int((_time.monotonic() - hop_started) * 1000),
-        })
-        _record(receipts[-1], hop_evidence, hop_local.get("stats"))
+        }
+        carry_terms = _hop_carry_terms(hop_evidence, [question, hop_question])
+        _attribute_gap(receipt, _observe_gap_round(index, new_refs=added_refs or [hop_id]))
+        receipts.append(receipt)
+        _record(receipt, hop_evidence, hop_local.get("stats"))
         if callable(emit_stage_event):
             emit_stage_event("stage_progress", {
                 "message": "第 %d 跳「%s」取得 %d 条证据（新增 %d 条）。"
                            % (index + 1, hop_question[:40], len(hop_evidence), added),
                 "multi_hop": {"hop_id": hop_id, "evidence": len(hop_evidence), "added": added},
             })
-        carry_terms = _hop_carry_terms(hop_evidence, [question, hop_question])
 
     # ── 阶段 10：依据缺失链接的**递归重规划**（一轮，且必须还有预算）──
     max_rounds = max(0, min(2, int(getattr(config, "QA_RECURSION_MAX_ROUNDS", 1) or 0)))
@@ -1059,6 +1198,7 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                     route=_hop_route(repair_local.get("evidence") or [], repair_local.get("stats")),
                     audit=hop_audit)
                 added = 0
+                added_refs = []
                 for item in repair_evidence:
                     ref = str(item.get("evidence_ref") or "")
                     if ref and ref in seen_refs:
@@ -1066,7 +1206,8 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                     seen_refs.add(ref)
                     merged_evidence.append(item)
                     added += 1
-                receipts.append({
+                    added_refs.append(ref)
+                receipt = {
                     "hop_id": "r1", "hop_index": len(receipts),
                     "question": repair_plan["question"],
                     "depends_on": [item.get("hop_id") for item in missing],
@@ -1075,8 +1216,11 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                     "status": "ok" if added else "empty",
                     "carry_terms": list(carry_terms),
                     "latency_ms": int((_time.monotonic() - repair_started) * 1000),
-                })
-                _record(receipts[-1], repair_local.get("evidence") or [], repair_local.get("stats"))
+                }
+                _attribute_gap(receipt, _observe_gap_round(len(receipts),
+                                                           new_refs=added_refs or ["r1"]))
+                receipts.append(receipt)
+                _record(receipt, repair_local.get("evidence") or [], repair_local.get("stats"))
                 if callable(emit_stage_event):
                     emit_stage_event("stage_progress", {
                         "message": "补检一轮取得 %d 条新证据。" % added,
@@ -1088,6 +1232,125 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                 "recursion": {"round": round_index + 1, "stopped": "budget_exhausted"},
             })
 
+    # ── 阶段 07（P07-03）：缺口驱动的**补充跳**（§13 Gap → Best Retrieval Action）──
+    gap_next_used = 0
+    if gap_state is not None:
+        from qa_gap_analyzer import max_next_hops as _gap_max_next_hops
+
+        gap_cap = max(0, int(_gap_max_next_hops()))
+        from qa_query_decompose import MAX_HOPS_HARD as _MAX_HOPS_HARD
+
+        # 缺口驱动的补充跳**不受 QA_MAX_HOPS 约束**：那个旋钮是**规划期分解上限**
+        # （qa_query_decompose 用它决定 DAG 有几跳）。若拿它当运行期总跳数上限，
+        # 任何已经用满 3 跳的计划都不可能再有补充跳，§13 的 "Gap → Next Hop" 就落不了地。
+        # 运行期的双重硬约束仍然是：墙钟预算（同一份 budget）+ 跳数硬上限 MAX_HOPS_HARD=5。
+        hard_cap = max(1, int(_MAX_HOPS_HARD))
+        while gap_next_used < gap_cap:
+            if gap_state.budget_exhausted():
+                break
+            if gap_state.no_gain_confirmed():
+                # §14：连续若干轮无新增有效证据/无新增 claim → 收敛（不再发补充跳）
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "缺口闭环已收敛（连续 %d 轮无增益），不再发补充跳。"
+                                   % int(gap_state.last_round.get("no_gain_streak") or 0),
+                        "gap_loop": {"no_gain_streak": int(
+                            gap_state.last_round.get("no_gain_streak") or 0)},
+                    })
+                break
+            if len([item for item in receipts if str(item.get("status")) != "skipped_budget"]) >= hard_cap:
+                break
+            try:
+                planned = gap_state.next_hops(plan=retrieval_plan, limit=1)
+            except Exception as exc:      # noqa: BLE001 —— 规划器坏掉不许把检索打断
+                gap_state.record_error("next_hops", "%s: %s" % (type(exc).__name__,
+                                                                str(exc)[:120]))
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "缺口下一跳规划失败（%s），停止补充跳。" % type(exc).__name__,
+                        "gap_loop": {"planner_error": "%s: %s" % (type(exc).__name__,
+                                                                  str(exc)[:120])},
+                    })
+                break
+            hop_tasks = list(planned.get("hops") or [])
+            if planned.get("dedupe", {}).get("dropped_count"):
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "缺口驱动的下一跳被 seen 去重拦下 %d 条（不重复搜同一句话）。"
+                                   % int(planned["dedupe"]["dropped_count"]),
+                        "gap_dedupe": planned.get("dedupe") or {},
+                    })
+            if not hop_tasks:
+                break
+            task = hop_tasks[0]
+            overrides = task.get("plan_overrides") if isinstance(
+                task.get("plan_overrides"), Mapping) else {}
+            hop_question = str(task.get("question") or "")
+            hop_plan = dict(retrieval_plan)
+            hop_plan["question"] = hop_question
+            hop_plan["queries"] = list(dict.fromkeys(
+                [str(q) for q in (overrides.get("queries") or [])]
+                + [str(q) for q in (task.get("queries") or [])] + carry_terms[:2]))
+            hop_plan["entities"] = list(dict.fromkeys(
+                [*(retrieval_plan.get("entities") or [])]
+                + [str(e) for e in (overrides.get("entities") or [])] + carry_terms))
+            if overrides.get("terms"):
+                hop_plan["queries"] = list(dict.fromkeys(
+                    [*hop_plan["queries"], *[str(t) for t in overrides["terms"]]]))
+            hop_started = _time.monotonic()
+            try:
+                gap_local = article_retriever.retrieve(
+                    hop_plan, industry_pack_id=pack_id, page_context={}, limit=limit)
+                gap_error = ""
+            except Exception as exc:      # noqa: BLE001 —— 补充跳失败只记缺口，不影响主流程
+                gap_local, gap_error = {"evidence": []}, str(exc)[:80]
+            gap_evidence = _wire_hop_evidence_layer(
+                list(gap_local.get("evidence") or []), question=question, plan=hop_plan,
+                run_meta=run_meta, store=store, round_index=round_index + 1,
+                corpus_version=corpus_version,
+                route=str(task.get("route") or "") or _hop_route(
+                    gap_local.get("evidence") or [], gap_local.get("stats")),
+                audit=hop_audit)
+            added = 0
+            added_refs = []
+            for item in gap_evidence:
+                ref = str(item.get("evidence_ref") or "")
+                if ref and ref in seen_refs:
+                    continue
+                seen_refs.add(ref)
+                merged_evidence.append(item)
+                added += 1
+                added_refs.append(ref)
+            gap_next_used += 1
+            round_no = len(receipts)
+            receipts.append({
+                "hop_id": str(task.get("hop_id") or "g%d" % gap_next_used),
+                "hop_index": round_no, "question": hop_question,
+                "depends_on": [hop_id], "purpose": "缺口驱动补充跳（%s）：%s"
+                                                   % (str(task.get("gap_id") or ""),
+                                                      str(task.get("reason") or "")[:120]),
+                "evidence": len(gap_evidence), "added": added,
+                "status": ("error" if gap_error else "ok" if gap_evidence else "empty"),
+                "reason": gap_error,
+                "gap_id": str(task.get("gap_id") or ""),
+                "route": str(task.get("route") or ""),
+                "priority": float(task.get("priority") or 0),
+                "carry_terms": list(carry_terms),
+                "latency_ms": int((_time.monotonic() - hop_started) * 1000),
+            })
+            _record(receipts[-1], gap_local.get("evidence") or [], gap_local.get("stats"))
+            if callable(emit_stage_event):
+                emit_stage_event("stage_progress", {
+                    "message": "按缺口 %s 补一跳（route=%s）取得 %d 条证据（新增 %d 条）。"
+                               % (str(task.get("gap_id") or ""), str(task.get("route") or ""),
+                                  len(gap_evidence), added),
+                    "gap_hop": {"gap_id": str(task.get("gap_id") or ""),
+                                "route": str(task.get("route") or ""), "added": added},
+                })
+            carry_terms = _hop_carry_terms(gap_evidence, [question, hop_question]) or carry_terms
+            # 本轮观察 → 缺口是否被解决/是否连续无增益，就看这一下
+            gap_state.observe(round_index=round_no, claims=gap_claims,
+                              evidence=merged_evidence, new_refs=added_refs)
     merged = dict(first_local)
     merged["evidence"] = merged_evidence
     merged["multi_hop"] = {
@@ -1101,7 +1364,35 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
         "pattern": str((retrieval_plan.get("decomposition") or {}).get("pattern") or ""),
         "recursion_rounds": max_rounds,
     }
+    if gap_state is not None:
+        # ── P07-05/P07-06：收尾算停止原因（缺口驱动的补充跳已经用掉，这里如实判深度）──
+        depth_exhausted = bool(gap_state.high_priority_open()) and (
+            gap_next_used >= int(_gap_current_max_next_hops()) or gap_state.budget_exhausted())
+        decision = gap_state.finalize(budget_exhausted=gap_state.budget_exhausted(),
+                                      depth_exhausted=depth_exhausted, actionable_hops=0)
+        receipt = gap_state.receipt()
+        receipt["stage"] = "multi_hop"
+        receipt["next_hops_used"] = gap_next_used
+        merged["gap_loop"] = receipt
+        merged["multi_hop"]["gap_stop_reason"] = str(decision.get("stop_reason") or "")
+        merged["multi_hop"]["gap_loop_version"] = GAP_ANALYZER_VERSION
+        if callable(emit_stage_event):
+            emit_stage_event("stage_progress", {
+                "message": "缺口闭环：停止原因 %s——%s"
+                           % (str(decision.get("stop_reason") or ""),
+                              str(decision.get("detail") or "")),
+                "gap_loop": {key: receipt[key] for key in
+                             ("analyzer_version", "stop_reason", "stop_detail", "stats")
+                             if key in receipt},
+            })
     return merged, receipts
+
+
+def _gap_current_max_next_hops() -> int:
+    """`QA_GAP_MAX_NEXT_HOPS` 的现读（独立函数便于用例打桩，避免 import 期取快照）。"""
+    from qa_gap_analyzer import max_next_hops
+
+    return int(max_next_hops())
 
 
 def _verification_prompt_blocks(context: Mapping) -> dict:
@@ -1794,8 +2085,18 @@ def build_qa_stage_handlers(
         hop_receipts = []
         # 阶段 02（缺口 1）：多跳每一跳的证据层回执累加到这里，最后并入 stats["evidence_layer"]
         hop_evidence_audit: dict = {}
+        # 阶段 07（P07-01）：缺口分析要的"必要 Claim"（复用 Phase 05 的研究计划；见 _gap_plan_claims）
+        gap_plan: dict = {}
+        gap_plan_claims: list = []
+        if gap_analyzer_enabled():
+            gap_plan, gap_plan_claims = _gap_plan_claims(
+                retrieval_plan, question=_planned_question(context),
+                mode=str(request_payload.get("mode") or "standard"))
         multi_hop_plan = retrieval_plan.get("decomposition") or {}
-        if bool(getattr(config, "QA_MULTI_HOP_ENABLED", True)) and multi_hop_plan.get("is_multi_hop"):
+        # 阶段 07：缺口循环打开时，**没有多跳 DAG 的问题也进循环**（单跳问题同样可能带缺口，
+        # 而 §13 的补充跳正是为它们准备的）；开关关着时条件与原来逐字一致。
+        if bool(getattr(config, "QA_MULTI_HOP_ENABLED", True)) and (
+                multi_hop_plan.get("is_multi_hop") or gap_analyzer_enabled()):
             def _trace_recorder(entry):
                 """阶段 10 + 阶段 01（F-7）：每跳写一条推理留痕（store 内部已吞异常）。
 
@@ -1829,6 +2130,10 @@ def build_qa_stage_handlers(
                     accepted=accepted,
                     rejected=int(entry.get("rejected") or 0) if entry.get("rejected") is not None
                     else max(0, results - accepted),
+                    # ── 阶段 07：缺口闭环三列（Phase 01 埋的列，这里真正落库）──
+                    gap_id=str(entry.get("gap_id") or ""),
+                    new_claims=int(entry.get("new_claims") or 0),
+                    resolved_gap=int(entry.get("resolved_gap") or 0),
                 )
 
             local, hop_receipts = _run_multi_hop(
@@ -1840,6 +2145,10 @@ def build_qa_stage_handlers(
                 # 阶段 05：图打开时用图给出的多跳预算（缺省 None → 既有 config 值，零变化）
                 budget_seconds=(float((execution_graph.get("budget") or {}).get("hop_budget_seconds"))
                                 if execution_graph else None),
+                # 阶段 07：缺口分析的"必要 Claim"与研究计划（开关关着时是空，整段空操作）
+                plan_claims=gap_plan_claims,
+                mode=str(request_payload.get("mode") or "standard"),
+                retrieval_config_version="qa-retrieval-v3-policy-exact",
             )
         elif multi_hop_plan.get("hops"):
             hop_receipts = [{
@@ -1963,6 +2272,25 @@ def build_qa_stage_handlers(
                 "graph": _graph,
                 "stats": stats,
             })
+        # 阶段 07（P07-05/P07-06）：缺口闭环回执放**兄弟键**（Phase 02/03/05/06 同样手法）：
+        # 停止原因、逐轮增益、缺口清单与补充跳都在里面，运维/验收据此出报表。
+        _gap_receipt = local.get("gap_loop")
+        if isinstance(_gap_receipt, Mapping):
+            stats["gap_loop"] = dict(_gap_receipt)
+            stats["gap_loop_summary"] = gap_summary([_gap_receipt])
+            if graph_ledger is not None and execution_graph is not None:
+                # 运行账本：P07 的 gap_loop 节点按真实结局记账（不再只是"未实现"）
+                try:
+                    graph_ledger.record(_graph_node_id(execution_graph, "gap_loop"),
+                                        status=("ok" if _gap_receipt.get("stop_reason")
+                                                else "skipped"),
+                                        detail="停止原因 %s：%s" % (
+                                            _gap_receipt.get("stop_reason") or "无",
+                                            str(_gap_receipt.get("stop_detail") or "")[:160]),
+                                        evidence=int((_gap_receipt.get("stats") or {}).get(
+                                            "open_gaps") or 0))
+                except Exception:
+                    pass
         result = {
             "queries": list(retrieval_plan.get("queries") or []),
             "evidence": evidence,
@@ -2401,10 +2729,17 @@ def build_qa_stage_handlers(
             graph, store=store, question=question, run_meta=context["run"])
         # 阶段 06（P06-01…P06-04）：显式证据图 + 矛盾裁决（默认关；开启后结果挂兄弟键）
         evidence_graph = {}
+        gap_review: dict = {}
         if evidence_graph_enabled():
             evidence_graph = _build_evidence_graph_layer(
                 graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
                 run_meta=context["run"])
+            # 阶段 07（P07-06）：证据图上的缺口复核（默认关；UNRESOLVABLE_CONTRADICTION 的出口）
+            if gap_analyzer_enabled() and not evidence_graph.get("error"):
+                gap_review = _attach_gap_review(
+                    graph, evidence_graph,
+                    plan=(plan_output if isinstance(plan_output, Mapping) else {}),
+                    previous_stop_reason=_gap_stop_reason_from_level1(context))
             graph["evidence_graph"] = evidence_graph
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
@@ -2422,6 +2757,10 @@ def build_qa_stage_handlers(
                 # 阶段 06：证据图回执（关系分布/coverage/矛盾裁决）——只在开关打开时出现
                 "evidence_graph": (evidence_graph.get("stats") or {}) if evidence_graph else {},
                 "claim_coverage": (evidence_graph.get("coverage") or {}) if evidence_graph else {},
+                # 阶段 07：缺口复核（停止原因 + 未消解矛盾）——只在两个开关都开时出现
+                "gap_review": ({key: gap_review[key] for key in
+                                ("stop_reason", "stop_detail", "stop_source", "stats")
+                                if key in gap_review} if gap_review else {}),
             })
         return graph
 
@@ -2441,6 +2780,12 @@ def build_qa_stage_handlers(
                 # fast 路径同样补 P06 层（口径与 standard/deep 一致，只是没有 level2 计划）
                 graph["evidence_graph"] = _build_evidence_graph_layer(
                     graph, plan=(context["outputs"].get("plan") or {}), run_meta=run)
+                if gap_analyzer_enabled() and not graph["evidence_graph"].get("error"):
+                    # fast 路径同样做 P07 缺口复核（否则两个停止原因只在 standard/deep 可见）
+                    _attach_gap_review(
+                        graph, graph["evidence_graph"],
+                        plan=(context["outputs"].get("plan") or {}),
+                        previous_stop_reason=_gap_stop_reason_from_level1(context))
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])

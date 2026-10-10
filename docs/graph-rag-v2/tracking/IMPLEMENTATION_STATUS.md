@@ -37,12 +37,12 @@
 |P06-02|SUPPORTS/REFUTES/DEPENDS/CONTRADICTS| PASS | 新增图级五值枚举 EVIDENCE_GRAPH_RELATIONSHIPS（四 Must + MENTIONS，后者给冻结证据契约的 context 与未判定证据落脚，否则只能错记 SUPPORTS 或丢边）+ 端点乘关系矩阵；不动 CLAIM_EVIDENCE_RELATIONSHIPS（它是冻结证据契约的镜像，守门用例断言二者机器对齐）；关系由 Phase 03 verdict 派生（claim pairs 优先于 evidence_layer.verification 优先于 UNVERIFIED），claim_status_from_edges 与 qa_verifier._claim_status 等价、真机 43 claim 复算 0 不一致；31 例 | 2026-10-10 |
 |P06-03|claim coverage| PASS | 口径写死 COVERAGE_DEFINITION：主口径为有已核验 SUPPORTS 边的非计划 claim 占比，带权口径为已核验支持强度饱和求和比，另有 claimed 对照口径与 evidence_coverage、refuted_claim_rate、支持数直方图、覆盖分桶、逐 claim 明细；空图比率写 null；真机 13 run 主口径 0.6977、带权 0.1531、证据覆盖 1.0；关掉核验复放则主口径 0.0（没有核验就没有已验证证据）；18 例 | 2026-10-10 |
 |P06-04|Contradiction detector/resolver| PASS | 两族检测（同一结论既有已核验支持又有已核验反驳；结论互斥）+ 九理由码规则裁决（范围、时间、权威、证据质量、独立性、关系强度 + 三种保留不确定性），每条记 winner 与 inputs、同输入同输出；零模型，默认规则裁决器加注入点，未注册或抛错或非法载荷或非法理由码四条失败路径全回落并记账；单调性守例（接线前 resolved 接线后仍 resolved）；回写只动冻结 CONFLICT_SCHEMA 的三个字段且 validate_final_answer 端到端通过；27 例 + 管线 9 例；真机 qa_conflicts 全库 0 行，故真机无对象可检、能力证据来自构造用例 | 2026-10-10 |
-|P07-01|Gap taxonomy/priority|NOT_STARTED|||
-|P07-02|suggested route/evidence requirement|NOT_STARTED|||
-|P07-03|Next-hop Planner|NOT_STARTED|||
-|P07-04|seen dedupe|NOT_STARTED|||
-|P07-05|no-gain convergence|NOT_STARTED|||
-|P07-06|stop reasons|NOT_STARTED|||
+|P07-01|Gap taxonomy/priority| PASS | 新模块 qa_gap_analyzer.py（纯规则零模型）：§12 十种 Gap 类型逐字入契约（五件套齐全，缺一个就有守例挂）；类型与严重度**由 Phase 03 核验理由码派生**（映射表可追溯 derived_from_reasons），两处口径不可能打架；优先级 = clamp(0.55×严重度 + 0.25×claim 重要性 + 0.20×证据亏空)，三分量与权重全进 priority_factors **可复算**；§21 安全关键缺口走 Priority Override（抬到 ≥0.95）；gap_id 内容寻址、同条件恒定；25 例 | 2026-10-11 |
+|P07-02|suggested route/evidence requirement| PASS | 缺口到建议通道只吃 Phase 01 冻结的 7 个通道值（bm25 落 Phase 04 的 Hunter 身份层，不新增通道取值）；通道到 Hunter 复用 QA_HUNTER_IDS；证据要求走既有契约且 satisfied_by 恒空（满足度由下一轮缺口重算证明、不自证）；建议查询是 claim 实词加模板的确定性拼装（LLM 重写只留注入点）；真机 13 run 复算 126 条缺口 / 7 种类型 / 79 高优 / 15 安全关键 | 2026-10-11 |
+|P07-03|Next-hop Planner| PASS | 缺口到一跳：route 取建议第一条且 plan_overrides 让 route **真的改变检索计划**（结构化与图通道带实体、语义通道带词表扩展），逐字复用同一条 ArticleRetriever 链路；四条失败路径全有用例（未注册或抛错或非法载荷保守回落并记账，后端合法返回空列表则尊重它并据此走向 NO_GAIN）；管线里补充跳真的发出且留进 SearchTrace；21 例 | 2026-10-11 |
+|P07-04|seen dedupe| PASS | 复用 Phase 02 既有 seen 机制：Query Fingerprint = 归一查询 + route + 约束 + 语料版本 + 检索配置；三种去重全留痕（同批重复 / 已搜指纹 / 已见且被拒来源，MASTER_RULES 第 14 条）；dropped_by_basis 把命中已搜查询与同一缺口重复规划分开记账；真机 13 次命中全部是 already_planned（already_searched=0，边界已记） | 2026-10-11 |
+|P07-05|no-gain convergence| PASS | §14 逐字：连续 QA_GAP_NO_GAIN_ROUNDS（默认 2）轮 new_verified_claims==0 且 resolved_high_priority_gaps==0 才收敛；第 0 轮是基线不计入连续数；resolved 口径严格（gap_id 内容哈希，上轮有本轮没了才算）；收敛后不再发补充跳；20 例；端到端同证据 retriever 得 NO_GAIN，真机复算 13/13 | 2026-10-11 |
+|P07-06|stop reasons| PASS | 五值**真的都能被产出**（Phase 05 留的账本阶段结清）：decide_stop_reason 唯一决策点（UNRESOLVABLE_CONTRADICTION 优先于 ANSWERABLE 优先于 BUDGET_EXHAUSTED 优先于 NO_GAIN 优先于 MAX_DEPTH，每条带 factors）；UNRESOLVABLE_CONTRADICTION 唯一权威出口是证据图缺口复核（引 Phase 06 的 unresolved 与理由码）；真机 0 条矛盾故用真机素材构造用例复现；MAX_DEPTH 只在高优缺口仍在且补充跳上限用完时给；五值齐备有专门用例 | 2026-10-11 |
 |P08-01|ContextItem/Graph|NOT_STARTED|||
 |P08-02|ContextUtility/token budget|NOT_STARTED|||
 |P08-03|Context Pack Builder|NOT_STARTED|||

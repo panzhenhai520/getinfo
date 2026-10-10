@@ -1,0 +1,5584 @@
+{
+ "report_version": "qa-gap-acceptance-v1",
+ "generated_at_utc": "2026-10-10T20:07:56Z",
+ "analyzer_version": "qa-gap-analyzer-v1",
+ "planner_version": "qa-next-hop-planner-v1",
+ "verify_replay": true,
+ "with_plan": true,
+ "simulated_rounds": 3,
+ "snapshot": {
+  "captured_at_utc": "2026-10-10T20:06:58Z",
+  "source": {
+   "host": "117.50.211.93",
+   "container": "collectinfo-postgres",
+   "database": "collectinfo",
+   "access": "readonly (BEGIN READ ONLY + statement_timeout=20s + LIMIT)",
+   "query": "qa_runs/qa_claims/qa_claim_evidence/qa_conflicts/qa_evidence/qa_reasoning_traces/qa_evidence_seen（各一条 SELECT，带 LIMIT）",
+   "snapshot_version": "qa-gap-real-sample-v1"
+  },
+  "catalog": {
+   "qa_runs": 15,
+   "qa_claims": 129,
+   "qa_claim_evidence": 57,
+   "qa_conflicts": 0,
+   "qa_evidence": 93,
+   "qa_reasoning_traces": 0,
+   "qa_stage_runs": 118
+  }
+ },
+ "totals": {
+  "runs": 13,
+  "before_claims": 43,
+  "before_edges": 47,
+  "before_conflicts": 0,
+  "before_relationship_distribution": {
+   "supports": 47
+  },
+  "before_gaps": null,
+  "after_gaps": 126,
+  "after_high_priority_gaps": 79,
+  "after_safety_critical_gaps": 15,
+  "after_next_hops": 13,
+  "after_seen_dedupe_hits": 13,
+  "after_seen_dedupe_by_basis": {
+   "already_planned": 13
+  },
+  "after_searched_queries": 17,
+  "after_traces": 0,
+  "after_trace_gap_ids": 0,
+  "after_trace_new_claims": 0,
+  "after_trace_resolved_gap": 0,
+  "after_trace_latency_ms": 0,
+  "after_loop_rounds": 39,
+  "after_plan_hops": 17,
+  "after_stage_latency_ms": 95777,
+  "after_stage_rows": 13,
+  "gap_types": {
+   "LOW_AUTHORITY": 49,
+   "SINGLE_SOURCE": 31,
+   "LOW_RELEVANCE": 23,
+   "NO_EVIDENCE": 20,
+   "MISSING_CAUSAL_BRIDGE": 1,
+   "MISSING_ENTITY_LINK": 1,
+   "MISSING_TIME_LINK": 1
+  },
+  "gap_bands": {
+   "medium": 47,
+   "critical": 45,
+   "high": 34
+  },
+  "stop_reasons": {
+   "NO_GAIN": 13
+  },
+  "review_stop_reasons": {
+   "MAX_DEPTH": 13
+  },
+  "routes": {
+   "keyword": 13
+  },
+  "before_gap_concept": null,
+  "after_gaps_per_run": 9.692,
+  "stop_reasons_produced": [
+   "NO_GAIN"
+  ],
+  "stop_reasons_all_five": false
+ },
+ "runs": [
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 2137,
+    "stage_latency_max_ms": 2137,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 1,
+    "evidence": 3,
+    "edges": 3,
+    "relationship_distribution": {
+     "supports": 3
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 3,
+    "plan_claims": 2,
+    "gap_types": {
+     "NO_EVIDENCE": 2,
+     "LOW_AUTHORITY": 1,
+     "LOW_RELEVANCE": 1
+    },
+    "gap_bands": {
+     "critical": 3,
+     "high": 1
+    },
+    "gaps": 4,
+    "high_priority_gaps": 4,
+    "safety_critical_gaps": 0,
+    "top_priority": 1.0,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 1.0,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 1.0,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G726a5a702c",
+      "claim_id": "l1-c1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gfe59b6cae1",
+      "claim_id": "l1-c1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 3,
+      "high_priority_gaps": 3,
+      "new_evidence": 3,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 3,
+      "high_priority_gaps": 3,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 3,
+      "high_priority_gaps": 3,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gf663819f",
+      "gap_id": "G5038ee9d3b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "b72e4a577a6f87e3",
+      "question": "需要证实或证伪：最近融资近3亿元的公司是哪个公司"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 7938,
+    "stage_latency_max_ms": 7938,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 4,
+    "evidence": 6,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 8,
+    "plan_claims": 4,
+    "gap_types": {
+     "LOW_AUTHORITY": 5,
+     "SINGLE_SOURCE": 4,
+     "LOW_RELEVANCE": 2,
+     "NO_EVIDENCE": 2
+    },
+    "gap_bands": {
+     "critical": 5,
+     "high": 4,
+     "medium": 4
+    },
+    "gaps": 13,
+    "high_priority_gaps": 9,
+    "safety_critical_gaps": 3,
+    "top_priority": 0.95,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G682e1ab52b",
+      "claim_id": "l1-evidence-4",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.1902,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2439,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2439,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9375,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G92aeeba8ed",
+      "claim_id": "c:h2",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.8275,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge055e7b481",
+      "claim_id": "c:h3",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.8275,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ga767810f9d",
+      "claim_id": "c:h2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gf5bcba8c47",
+      "claim_id": "c:h3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc0ff4b3504",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6907,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2658,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6867,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2461,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G1b49db62e0",
+      "claim_id": "l1-evidence-3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6357,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2658,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6317,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2461,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 14,
+      "high_priority_gaps": 9,
+      "new_evidence": 6,
+      "new_verified_claims": 4,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 14,
+      "high_priority_gaps": 9,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 14,
+      "high_priority_gaps": 9,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 4,
+     "searched_baseline": 3,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 3,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "g9d576a01",
+      "gap_id": "G682e1ab52b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "19a5304c3f495391",
+      "question": "已检索到参考资料《常学常新——简评私募基金备案第二批公示案例》，其内容载明：2022年4月，中国证券投资基金业协会发布《私募基金备案案例公示（2022年第1期 总第2期）》，针对私募基金备案中的六大热点问题提供监管指引，旨在提升备案效率与透"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 3,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "question": "最近一周最重要的技术进展是什么",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 3460,
+    "stage_latency_max_ms": 3460,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 2,
+    "evidence": 2,
+    "edges": 2,
+    "relationship_distribution": {
+     "supports": 2
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 4,
+    "plan_claims": 2,
+    "gap_types": {
+     "NO_EVIDENCE": 2,
+     "SINGLE_SOURCE": 2,
+     "LOW_AUTHORITY": 1
+    },
+    "gap_bands": {
+     "medium": 3,
+     "critical": 2
+    },
+    "gaps": 5,
+    "high_priority_gaps": 2,
+    "safety_critical_gaps": 0,
+    "top_priority": 1.0,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 1.0,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 1.0,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6898,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6348,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6339,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2571,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 6,
+      "high_priority_gaps": 2,
+      "new_evidence": 2,
+      "new_verified_claims": 2,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 6,
+      "high_priority_gaps": 2,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 6,
+      "high_priority_gaps": 2,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gf663819f",
+      "gap_id": "G5038ee9d3b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "3968df34342e8aa4",
+      "question": "需要证实或证伪：最近一周最重要的技术进展是什么"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "question": "帮我总结一下当前行业的主要风险",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 1656,
+    "stage_latency_max_ms": 1656,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 3,
+    "evidence": 3,
+    "edges": 3,
+    "relationship_distribution": {
+     "supports": 3
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 5,
+    "plan_claims": 2,
+    "gap_types": {
+     "SINGLE_SOURCE": 3,
+     "LOW_AUTHORITY": 2,
+     "NO_EVIDENCE": 2
+    },
+    "gap_bands": {
+     "critical": 3,
+     "medium": 3,
+     "high": 1
+    },
+    "gaps": 7,
+    "high_priority_gaps": 4,
+    "safety_critical_gaps": 1,
+    "top_priority": 1.0,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 1.0,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 1.0,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G1b49db62e0",
+      "claim_id": "l1-evidence-3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.1902,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7033,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.3292,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6898,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6483,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.3292,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6348,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 8,
+      "high_priority_gaps": 5,
+      "new_evidence": 3,
+      "new_verified_claims": 3,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 8,
+      "high_priority_gaps": 5,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 8,
+      "high_priority_gaps": 5,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gf663819f",
+      "gap_id": "G5038ee9d3b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "95e74fb2e3faea8c",
+      "question": "需要证实或证伪：帮我总结一下当前行业的主要风险"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "question": "出货量超1.9万台，占全球约77.9%的是什么",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 9347,
+    "stage_latency_max_ms": 9347,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 4,
+    "evidence": 12,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 6,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 5,
+     "LOW_RELEVANCE": 3,
+     "SINGLE_SOURCE": 2,
+     "NO_EVIDENCE": 1
+    },
+    "gap_bands": {
+     "high": 4,
+     "medium": 4,
+     "critical": 3
+    },
+    "gaps": 11,
+    "high_priority_gaps": 7,
+    "safety_critical_gaps": 0,
+    "top_priority": 0.9125,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G4d9264ed5d",
+      "claim_id": "l1-evidence-4",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G509e4cecc5",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G963bbc708f",
+      "claim_id": "l1-evidence-4",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gbdf66343fa",
+      "claim_id": "c:h1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.736,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.2298,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "Gcde06b7e72",
+      "claim_id": "c:h1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7085,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.2298,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6881,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2528,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc0ff4b3504",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6863,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2439,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6331,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2528,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G1b49db62e0",
+      "claim_id": "l1-evidence-3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6313,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2439,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 10,
+      "high_priority_gaps": 5,
+      "new_evidence": 12,
+      "new_verified_claims": 2,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 10,
+      "high_priority_gaps": 5,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 10,
+      "high_priority_gaps": 5,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "g072fc519",
+      "gap_id": "G879e9f1dd8",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "5b7d31e712520bd6",
+      "question": "已检索到参考资料《重庆造车新势力再递表港交所！今年前5月卖车2万辆，三年烧掉112亿》，其内容载明：车东西（公众号：chedongxi） 作者 ｜ 张睿 编辑 ｜ 志豪 重庆新势力车企更新招股书。 车东西7月1日消息，昨日，阿维塔科技（重庆"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+   "mode": "standard",
+   "industry_pack_id": "healthcare_news",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 1963,
+    "stage_latency_max_ms": 1963,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 4,
+    "evidence": 12,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 8,
+    "plan_claims": 4,
+    "gap_types": {
+     "LOW_AUTHORITY": 7,
+     "SINGLE_SOURCE": 4,
+     "LOW_RELEVANCE": 3,
+     "NO_EVIDENCE": 1
+    },
+    "gap_bands": {
+     "critical": 9,
+     "high": 4,
+     "medium": 2
+    },
+    "gaps": 15,
+    "high_priority_gaps": 13,
+    "safety_critical_gaps": 8,
+    "top_priority": 0.95,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G1b49db62e0",
+      "claim_id": "l1-evidence-3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2487,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G682e1ab52b",
+      "claim_id": "l1-evidence-4",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2705,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2287,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2287,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G963bbc708f",
+      "claim_id": "l1-evidence-4",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2705,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc0ff4b3504",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2487,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2696,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2696,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G92aeeba8ed",
+      "claim_id": "c:h2",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.8275,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge055e7b481",
+      "claim_id": "c:h3",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.8275,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ga767810f9d",
+      "claim_id": "c:h2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gf5bcba8c47",
+      "claim_id": "c:h3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.75,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gbdf66343fa",
+      "claim_id": "c:h1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.6683,
+      "band": "medium",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.75,
+       "evidence_deficit": 0.2042,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "Gcde06b7e72",
+      "claim_id": "c:h1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6408,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.75,
+       "evidence_deficit": 0.2042,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 15,
+      "high_priority_gaps": 10,
+      "new_evidence": 12,
+      "new_verified_claims": 4,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 15,
+      "high_priority_gaps": 10,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 15,
+      "high_priority_gaps": 10,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 4,
+     "searched_baseline": 3,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 3,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gc18a953f",
+      "gap_id": "G1b49db62e0",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "a3ef0a6da8240b25",
+      "question": "已检索到参考资料《AI时代下智慧医院系统的颠覆性架构设计》，其内容载明：<p> &nbsp; &nbsp; &nbsp; &nbsp;深圳课蜜科技发布了基于CDSS系统设计和微调的27B大语言模型，目前处于内测阶段，据悉，该公司原为人海科技"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 3,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "question": "这个行业最近最大的一笔融资是多少",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 4430,
+    "stage_latency_max_ms": 4430,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 2,
+    "evidence": 2,
+    "edges": 2,
+    "relationship_distribution": {
+     "supports": 2
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 4,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 2,
+     "NO_EVIDENCE": 2,
+     "SINGLE_SOURCE": 2
+    },
+    "gap_bands": {
+     "medium": 3,
+     "critical": 2,
+     "high": 1
+    },
+    "gaps": 6,
+    "high_priority_gaps": 3,
+    "safety_critical_gaps": 0,
+    "top_priority": 1.0,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 1.0,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 1.0,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7033,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.3292,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6898,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6483,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.3292,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6348,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 6,
+      "high_priority_gaps": 3,
+      "new_evidence": 2,
+      "new_verified_claims": 2,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 6,
+      "high_priority_gaps": 3,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 6,
+      "high_priority_gaps": 3,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gf663819f",
+      "gap_id": "G5038ee9d3b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "4937078fdbfb98e6",
+      "question": "需要证实或证伪：这个行业最近最大的一笔融资是多少"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "question": "特斯拉无人驾驶出租车已经在运行了吗",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 7387,
+    "stage_latency_max_ms": 7387,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 2,
+    "evidence": 1,
+    "edges": 2,
+    "relationship_distribution": {
+     "supports": 2
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 4,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 2,
+     "NO_EVIDENCE": 2,
+     "LOW_RELEVANCE": 1,
+     "SINGLE_SOURCE": 1
+    },
+    "gap_bands": {
+     "critical": 3,
+     "high": 2,
+     "medium": 1
+    },
+    "gaps": 6,
+    "high_priority_gaps": 5,
+    "safety_critical_gaps": 0,
+    "top_priority": 1.0,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 1.0,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 1.0,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "Gcb4d518ae1",
+      "claim_id": "l1-c2",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "insufficient_overlap"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G72f760c364",
+      "claim_id": "l1-c2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gfe59b6cae1",
+      "claim_id": "l1-c1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.736,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.4925,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gf7086923c8",
+      "claim_id": "l1-c1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.681,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.4925,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 5,
+      "high_priority_gaps": 4,
+      "new_evidence": 1,
+      "new_verified_claims": 1,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 5,
+      "high_priority_gaps": 4,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 5,
+      "high_priority_gaps": 4,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gf663819f",
+      "gap_id": "G5038ee9d3b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "d0456c947a653f71",
+      "question": "需要证实或证伪：特斯拉无人驾驶出租车已经在运行了吗"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "question": "行业里排名靠前的公司最近有什么动作",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 2902,
+    "stage_latency_max_ms": 2902,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 3,
+    "evidence": 3,
+    "edges": 3,
+    "relationship_distribution": {
+     "supports": 3
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 5,
+    "plan_claims": 2,
+    "gap_types": {
+     "SINGLE_SOURCE": 3,
+     "LOW_AUTHORITY": 2,
+     "NO_EVIDENCE": 2
+    },
+    "gap_bands": {
+     "medium": 4,
+     "critical": 2,
+     "high": 1
+    },
+    "gaps": 7,
+    "high_priority_gaps": 3,
+    "safety_critical_gaps": 0,
+    "top_priority": 1.0,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G5038ee9d3b",
+      "claim_id": "c:h1",
+      "missing": "NO_EVIDENCE",
+      "priority": 1.0,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 1.0,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "Gc0ff4b3504",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7033,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.3292,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6898,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G1b49db62e0",
+      "claim_id": "l1-evidence-3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6483,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.3292,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8a33ee6e43",
+      "claim_id": "l1-evidence-2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6348,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2615,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6339,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2571,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 8,
+      "high_priority_gaps": 3,
+      "new_evidence": 3,
+      "new_verified_claims": 3,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 8,
+      "high_priority_gaps": 3,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 8,
+      "high_priority_gaps": 3,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gf663819f",
+      "gap_id": "G5038ee9d3b",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "8de6874d09837154",
+      "question": "需要证实或证伪：行业里排名靠前的公司最近有什么动作"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 13308,
+    "stage_latency_max_ms": 13308,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 4,
+    "evidence": 7,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 6,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 5,
+     "LOW_RELEVANCE": 3,
+     "SINGLE_SOURCE": 2,
+     "NO_EVIDENCE": 1
+    },
+    "gap_bands": {
+     "high": 4,
+     "medium": 4,
+     "critical": 3
+    },
+    "gaps": 11,
+    "high_priority_gaps": 7,
+    "safety_critical_gaps": 0,
+    "top_priority": 0.9125,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G7685b5be96",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G8d0b0b2c41",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc0ff4b3504",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gbdf66343fa",
+      "claim_id": "c:h1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.7614,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.3569,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "Gcde06b7e72",
+      "claim_id": "c:h1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7339,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.3569,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "G963bbc708f",
+      "claim_id": "l1-evidence-4",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6913,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2692,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6873,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2492,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G682e1ab52b",
+      "claim_id": "l1-evidence-4",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6363,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2692,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6323,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2492,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 9,
+      "high_priority_gaps": 5,
+      "new_evidence": 7,
+      "new_verified_claims": 2,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 9,
+      "high_priority_gaps": 5,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 9,
+      "high_priority_gaps": 5,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "gc188aa51",
+      "gap_id": "Gc07661e53d",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "1a42835676f97995",
+      "question": "已检索到参考资料《Seeds | 做海面具身智能的欧卡智舶，C轮融了近3亿》，其内容载明：海面具身智能企业欧卡智舶于7月完成C轮融资，由西高投领投，元禾璞华、三元资本跟投，本年度累计融资近3亿元。公司成立于2017年，专注船舶智能驾驶与水面"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 20306,
+    "stage_latency_max_ms": 20306,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 5,
+    "evidence": 15,
+    "edges": 6,
+    "relationship_distribution": {
+     "supports": 6
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 7,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 6,
+     "SINGLE_SOURCE": 4,
+     "LOW_RELEVANCE": 3,
+     "MISSING_TIME_LINK": 1,
+     "NO_EVIDENCE": 1
+    },
+    "gap_bands": {
+     "medium": 8,
+     "critical": 4,
+     "high": 3
+    },
+    "gaps": 15,
+    "high_priority_gaps": 7,
+    "safety_critical_gaps": 3,
+    "top_priority": 0.95,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G1f2d0bc061",
+      "claim_id": "l1-c4",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G950a110604",
+      "claim_id": "l1-c4",
+      "missing": "MISSING_TIME_LINK",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "policy_exact",
+       "keyword"
+      ],
+      "evidence_type": "time_link",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.55,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "evidence_after_window"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gaa2cc7af1e",
+      "claim_id": "l1-c4",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.95,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": true,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": true,
+       "priority_override": true,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def) → max(…, 0.95)（§21 安全关键覆盖）"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "Gbdf66343fa",
+      "claim_id": "c:h1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.7519,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.3093,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "Gcde06b7e72",
+      "claim_id": "c:h1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7244,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.3093,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "G1e57076e3d",
+      "claim_id": "l1-c5",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.7106,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2282,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G905c945416",
+      "claim_id": "l1-c3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6838,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2314,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G839e5fddbc",
+      "claim_id": "l1-c5",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6831,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2282,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gfe59b6cae1",
+      "claim_id": "l1-c1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.683,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2274,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G72f760c364",
+      "claim_id": "l1-c2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6823,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.224,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G43f45b8cff",
+      "claim_id": "l1-c3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6288,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2314,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G0725da5b86",
+      "claim_id": "l1-c5",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6281,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2282,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gf7086923c8",
+      "claim_id": "l1-c1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.628,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2274,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G329d1872de",
+      "claim_id": "l1-c2",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6273,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.224,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 15,
+      "high_priority_gaps": 4,
+      "new_evidence": 15,
+      "new_verified_claims": 4,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 15,
+      "high_priority_gaps": 4,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 15,
+      "high_priority_gaps": 4,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "g8a4034c0",
+      "gap_id": "Gb14cd71d83",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "9524a9c918962c2f",
+      "question": "2025年并购退出成为一级市场重要亮点，8月单月退出数量创年内新高，回收资金133.47亿元，涉及电子信息、医疗健康等领域。"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 11526,
+    "stage_latency_max_ms": 11526,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 5,
+    "evidence": 15,
+    "edges": 6,
+    "relationship_distribution": {
+     "supports": 6
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 7,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 6,
+     "LOW_RELEVANCE": 5,
+     "MISSING_CAUSAL_BRIDGE": 1,
+     "MISSING_ENTITY_LINK": 1,
+     "NO_EVIDENCE": 1,
+     "SINGLE_SOURCE": 1
+    },
+    "gap_bands": {
+     "high": 8,
+     "critical": 4,
+     "medium": 3
+    },
+    "gaps": 15,
+    "high_priority_gaps": 12,
+    "safety_critical_gaps": 0,
+    "top_priority": 0.9125,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G726a5a702c",
+      "claim_id": "l1-c1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gcb4d518ae1",
+      "claim_id": "l1-c2",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gdd2944791d",
+      "claim_id": "l1-c3",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "keyword_only_similarity"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G72f760c364",
+      "claim_id": "l1-c2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G905c945416",
+      "claim_id": "l1-c3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gfe59b6cae1",
+      "claim_id": "l1-c1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gbdf66343fa",
+      "claim_id": "c:h1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.7564,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.3321,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "Gb880adbf0b",
+      "claim_id": "l1-c2",
+      "missing": "MISSING_ENTITY_LINK",
+      "priority": 0.755,
+      "band": "high",
+      "suggested_routes": [
+       "graph",
+       "graph_attribute"
+      ],
+      "evidence_type": "entity_link",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.6,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "entity_not_in_evidence"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gcde06b7e72",
+      "claim_id": "c:h1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7289,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.3321,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "G839e5fddbc",
+      "claim_id": "l1-c5",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.7235,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.4299,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gaa2cc7af1e",
+      "claim_id": "l1-c4",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.7019,
+      "band": "high",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.1846,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "partially_supported"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge88db9b366",
+      "claim_id": "l1-c5",
+      "missing": "MISSING_CAUSAL_BRIDGE",
+      "priority": 0.696,
+      "band": "medium",
+      "suggested_routes": [
+       "graph",
+       "semantic",
+       "keyword"
+      ],
+      "evidence_type": "causal_bridge",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.7,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.4299,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G1f2d0bc061",
+      "claim_id": "l1-c4",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6744,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.1846,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G0725da5b86",
+      "claim_id": "l1-c5",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6685,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.4299,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 10,
+      "high_priority_gaps": 7,
+      "new_evidence": 15,
+      "new_verified_claims": 2,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 10,
+      "high_priority_gaps": 7,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 10,
+      "high_priority_gaps": 7,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "g4ce15d55",
+      "gap_id": "G6c8a140ecc",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "5147c2ad253a8ce5",
+      "question": "SNE Research数据显示，2026年前七个月宁德时代全球动力电池使用量同比增长26.6%，市场份额由38%升至39.9%。"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "question": "最近工信部在人形机器人领域有什么动态",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "stage": {
+    "stage_rows": 1,
+    "stage_latency_ms": 9417,
+    "stage_latency_max_ms": 9417,
+    "stage_statuses": {
+     "completed": 1
+    }
+   },
+   "before": {
+    "claims": 4,
+    "evidence": 12,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflicts": 0,
+    "trace_rows": 0,
+    "gaps": null,
+    "gap_types": {},
+    "high_priority_gaps": null,
+    "stop_reason": null,
+    "next_hops": 0,
+    "seen_dedupe_hits": 0,
+    "note": "接线前没有 Gap 分析：qa_reasoning_traces 的 gap_id/new_claims/resolved_gap 三列恒为空/0，停止原因只能由执行图在规划期给出"
+   },
+   "after": {
+    "analyzer_version": "qa-gap-analyzer-v1",
+    "planner_version": "qa-next-hop-planner-v1",
+    "claims_analyzed": 6,
+    "plan_claims": 2,
+    "gap_types": {
+     "LOW_AUTHORITY": 5,
+     "SINGLE_SOURCE": 3,
+     "LOW_RELEVANCE": 2,
+     "NO_EVIDENCE": 1
+    },
+    "gap_bands": {
+     "medium": 8,
+     "critical": 2,
+     "high": 1
+    },
+    "gaps": 11,
+    "high_priority_gaps": 3,
+    "safety_critical_gaps": 0,
+    "top_priority": 0.9125,
+    "priority_threshold": 0.7,
+    "gaps_detail": [
+     {
+      "gap_id": "G0aa8fd471f",
+      "claim_id": "c:counter",
+      "missing": "NO_EVIDENCE",
+      "priority": 0.9125,
+      "band": "critical",
+      "suggested_routes": [
+       "keyword",
+       "semantic",
+       "web"
+      ],
+      "evidence_type": "any_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 1.0,
+       "claim_importance": 0.65,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "none"
+     },
+     {
+      "gap_id": "G7685b5be96",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.865,
+      "band": "critical",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G71d7bd78d1",
+      "claim_id": "l1-evidence-2",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.8375,
+      "band": "high",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 1.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc0ff4b3504",
+      "claim_id": "l1-evidence-3",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6915,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2698,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gbdf66343fa",
+      "claim_id": "c:h1",
+      "missing": "LOW_RELEVANCE",
+      "priority": 0.69,
+      "band": "medium",
+      "suggested_routes": [
+       "semantic",
+       "keyword",
+       "page_context"
+      ],
+      "evidence_type": "relevant_evidence",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.8,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "G963bbc708f",
+      "claim_id": "l1-evidence-4",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6888,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2566,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Ge2edcf90dd",
+      "claim_id": "l1-evidence-1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6881,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2528,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [
+       "low_authority_source"
+      ],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gcde06b7e72",
+      "claim_id": "c:h1",
+      "missing": "LOW_AUTHORITY",
+      "priority": 0.6625,
+      "band": "medium",
+      "suggested_routes": [
+       "policy_exact",
+       "graph_attribute",
+       "web"
+      ],
+      "evidence_type": "official_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.75,
+       "claim_importance": 1.0,
+       "evidence_deficit": 0.0,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "lexical_pool"
+     },
+     {
+      "gap_id": "G1b49db62e0",
+      "claim_id": "l1-evidence-3",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6365,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2698,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "G682e1ab52b",
+      "claim_id": "l1-evidence-4",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6338,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2566,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     },
+     {
+      "gap_id": "Gc69d6cea68",
+      "claim_id": "l1-evidence-1",
+      "missing": "SINGLE_SOURCE",
+      "priority": 0.6331,
+      "band": "medium",
+      "suggested_routes": [
+       "keyword",
+       "semantic"
+      ],
+      "evidence_type": "independent_source",
+      "safety_critical": false,
+      "priority_factors": {
+       "severity": 0.65,
+       "claim_importance": 0.9,
+       "evidence_deficit": 0.2528,
+       "weights": {
+        "severity": 0.55,
+        "claim_importance": 0.25,
+        "evidence_deficit": 0.2
+       },
+       "safety_critical": false,
+       "priority_override": false,
+       "formula": "clamp(severity*w_sev + claim_importance*w_imp + evidence_deficit*w_def)"
+      },
+      "derived_from_reasons": [],
+      "origin": "evidence_graph_edges"
+     }
+    ],
+    "review_stop_reason": "MAX_DEPTH",
+    "review_stop_source": "evidence_graph_review（离线复核，无循环状态）",
+    "review_unresolved_contradictions": 0,
+    "loop_stop_reason": "NO_GAIN",
+    "loop_stop_detail": "连续 2 轮 new_verified_claims=0 且 resolved_high_priority_gaps=0（§14 的 STOP_NO_GAIN 条件）",
+    "loop_rounds": [
+     {
+      "round_index": 0,
+      "open_gaps": 13,
+      "high_priority_gaps": 4,
+      "new_evidence": 12,
+      "new_verified_claims": 3,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": false,
+      "no_gain_streak": 0,
+      "baseline": true
+     },
+     {
+      "round_index": 1,
+      "open_gaps": 13,
+      "high_priority_gaps": 4,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 1,
+      "baseline": false
+     },
+     {
+      "round_index": 2,
+      "open_gaps": 13,
+      "high_priority_gaps": 4,
+      "new_evidence": 0,
+      "new_verified_claims": 0,
+      "resolved_high_priority_gaps": 0,
+      "no_gain": true,
+      "no_gain_streak": 2,
+      "baseline": false
+     }
+    ],
+    "loop_planned_hops": 1,
+    "loop_dedupe": {
+     "seen_queries": 2,
+     "searched_baseline": 1,
+     "planned_fingerprints": 1,
+     "rejected_sources": 0,
+     "dedupe_hits": 1,
+     "dropped_by_basis": {
+      "already_planned": 1
+     }
+    },
+    "searched_queries": 1,
+    "searched_basis": "plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）",
+    "next_hops": [
+     {
+      "hop_id": "g6b55ab39",
+      "gap_id": "G0aa8fd471f",
+      "route": "keyword",
+      "hunters": [
+       "bm25"
+      ],
+      "query_fingerprint": "4e81fea9364d13b3",
+      "question": "是否存在反证或替代解释"
+     }
+    ],
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）",
+    "plan_hops": 1,
+    "traces": 0,
+    "trace_gap_ids": 0,
+    "trace_new_claims": 0,
+    "trace_resolved_gap": 0,
+    "trace_latency_ms": 0
+   }
+  }
+ ],
+ "skipped_runs": [
+  {
+   "run_id": "239ba38b18ee456f8a0d2304ec6ac342",
+   "claims": 0,
+   "edges": 3,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "2af7dd7fed684803ad0572f82d8ce042",
+   "claims": 0,
+   "edges": 2,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "4d89571a535142fcbb2249c654592323",
+   "claims": 0,
+   "edges": 2,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+   "claims": 0,
+   "edges": 0,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "claims": 0,
+   "edges": 0,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "d83ab463596747b6971ccebff3661d63",
+   "claims": 0,
+   "edges": 3,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  }
+ ],
+ "seen": {
+  "rows": 0,
+  "by_status": {},
+  "scopes": 0
+ },
+ "constructed_case": {
+  "constructed": true,
+  "note": "真机没有矛盾可检（`qa_conflicts` 0 行；真实 claim 两两之间也检不出冲突），所以 UNRESOLVABLE_CONTRADICTION 的能力证据用**构造用例**给出：claim 文本与证据**都取自真机快照**（同一 run 的真实 claim 文本 + 两条权威度相同、发布时间相同的真实证据），只把第二条结论改写成它的否定式（`并非` + 原文）——这是「两句同等分量的相反说法」的最小构造。裁决链与停止原因全部由既有代码算出，本工具不写死结论。",
+  "run_id": "162612f141e84ead98c36047f4dfd64b",
+  "claim_text": "已检索到参考资料《常学常新——简评私募基金备案第二批公示案例》，其内容载明：2022年4月，中国证券投资基金业协会发布《私募基金备案案例公示（2022年第1期 总第2期）》，针对私募基金备案中的六大热点问题提供监管指引，旨在提升备案效率与透明度。文章重点解析了四个典型案例及其合规要求： 首先，针对“抽页”备案材料造假问题，监管强调备案材料需真实、准确、完整。若基金管理人未获投资者同意擅自修改合伙协",
+  "negated_text": "并非已检索到参考资料《常学常新——简评私募基金备案第二批公示案例》，其内容载明：2022年4月，中国证券投资基金业协会发布《私募基金备案案例公示（2022年第1期 总第2期）》，针对私募基金备案中的六大热点问题提供监管指引，旨在提升备案效率与透明度。文章重点解析了四个典型案例及其合规要求： 首先，针对“抽页”备案材料造假问题，监管强调备案材料需真实、准确、完整。若基金管理人未获投资者同意擅自修改合",
+  "evidence_refs": [
+   "article:1",
+   "article:2"
+  ],
+  "authorities": [
+   1,
+   1
+  ],
+  "published_at": "2026-10-04",
+  "contradictions": [
+   {
+    "kind": "claim_conflict",
+    "resolution": "unresolved",
+    "reason_code": "NO_DECISIVE_RULE",
+    "rationale": "现有规则（时间/权威/质量/独立性/强度）都不足以判定，保留为未解决冲突，回答必须明确呈现不确定性。"
+   }
+  ],
+  "stop_reason": "UNRESOLVABLE_CONTRADICTION",
+  "stop_detail": "1 条矛盾无法消解（Phase 06 裁决 unresolved）且已无可用下一跳：规则裁决能比的八项都比过了，再检索改变不了结论——按 §15 保留不确定性",
+  "unresolved_contradictions": 1,
+  "reason_codes": [
+   "NO_DECISIVE_RULE"
+  ]
+ },
+ "acceptance": {
+  "passed": true,
+  "checks": {
+   "gap_types_are_legal": {
+    "ok": true,
+    "detail": "非法类型：[]"
+   },
+   "routes_are_legal": {
+    "ok": true,
+    "detail": "枚举外通道：[]"
+   },
+   "priority_is_recomputable": {
+    "ok": true,
+    "detail": "异常缺口：[]"
+   },
+   "stop_reasons_are_legal": {
+    "ok": true,
+    "detail": "枚举外停止原因：[]"
+   },
+   "no_gain_needs_consecutive_barren_rounds": {
+    "ok": true,
+    "detail": "缺逐轮依据的 run：[]"
+   },
+   "unresolvable_contradiction_quotes_phase06": {
+    "ok": true,
+    "detail": "没有 Phase 06 unresolved 依据的 run：[]"
+   },
+   "next_hops_carry_query_fingerprints": {
+    "ok": true,
+    "detail": "缺指纹的 run：[]"
+   },
+   "seen_dedupe_has_a_real_basis": {
+    "ok": true,
+    "detail": "规划了下一跳却没有可比对的已搜查询：[]（口径来源：{'plan_sub_questions（真机留痕 0 行，退到 Phase 05 现算的 hop 问题）': 13}）"
+   },
+   "gap_columns_observable_on_the_real_host": {
+    "ok": true,
+    "detail": "真机 0 条跳留痕，其中带缺口 id 的 0 条（A 机 qa_reasoning_traces 为空，缺口三列要等部署后才可观测）"
+   },
+   "unresolvable_contradiction_is_reproducible": {
+    "ok": true,
+    "detail": "停止原因 UNRESOLVABLE_CONTRADICTION；未消解 1；理由码 ['NO_DECISIVE_RULE']（合法=True）"
+   }
+  }
+ }
+}

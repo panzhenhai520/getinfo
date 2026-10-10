@@ -212,3 +212,9 @@
 |P06-04|矛盾检测与裁决|`python -m pytest tests/test_qa_phase06_contradiction.py -q`|两族检测 + 九理由码规则裁决、零模型、同输入同输出|**27 passed + 管线 9 例**；单调性守例通过；**真机 qa_conflicts 全库 0 行 ⇒ 真机无可检对象**，能力证据来自构造用例|PASS|同上|
 |P06-R1|Phase 05 占位升级|`python -m pytest tests -q -k phase05`|deep 的 evidence_graph 由占位改已实现且不回归|节点 `implemented=True`、stage=conflict_review、model_tier=rule；开关关时标 skipped；Phase 05 六份 **107 passed**；全量 2203 passed / 1 skipped / 0 failed|PASS|`qa_execution_graph.py`|
 |P06-R2|冻结契约不动|`python -m pytest tests/test_qa_phase06_contracts.py -q`|七指纹复算不变、枚举不扩|**18 passed**；七指纹与 P00-02 逐字相同；EVIDENCE_SCHEMA 仍 additionalProperties=False；CONFLICT_SCHEMA 字段集与取值域未动；仍 v7、无新表|PASS|同上|
+|P07-01|Gap 分类与优先级|`python -m pytest tests/test_qa_phase07_taxonomy.py -q`|十种类型逐字、判定由核验理由码派生、优先级可复算|**25 passed**；五件套齐全；优先级三分量按权重重算逐条相等；gap_id 内容寻址|PASS|`qa_gap_analyzer.py`|
+|P07-02|建议通道与证据要求|`python -m pytest tests/test_qa_phase07_taxonomy.py tests/test_qa_phase07_next_hop.py -q`|通道只在冻结枚举内、证据要求可校验不自证|**46 passed**；`satisfied_by` 恒空；真机 13 run 复算 126 条缺口 / 7 类 / 79 高优|PASS|`baseline/qa-gap-acceptance.json`|
+|P07-03|下一跳规划与去重|`python -m pytest tests/test_qa_phase07_next_hop.py -q`|缺口到一跳、route 真改计划、失败回落、去重留痕|**21 passed**；四条失败路径；管线里补充跳真的发出并留 SearchTrace|PASS|`qa_gap_analyzer.py`|
+|P07-04|无增益收敛与五停止原因|`python -m pytest tests/test_qa_phase07_convergence.py tests/test_qa_phase07_pipeline.py -q`|连续两轮无增益得 NO_GAIN；unresolved 得 UNRESOLVABLE_CONTRADICTION；五值可产出|**20 + 16 passed**；五值齐备用例；真机复算 NO_GAIN 13/13、构造用例复现 UNRESOLVABLE|PASS|`baseline/qa-gap-acceptance.json`|
+|P07-R1|执行图占位升级（P07）|`python -m pytest tests -q -k phase05`|gap_loop 由 deferred 改已实现、三路径都有、开关关标 skipped|节点 `implemented=True`、stage=level1_retrieval、model_tier=rule；开关关时 skipped 且不进关键路径估算；Phase 05 用例同步通过|PASS|`qa_execution_graph.py`|
+|P07-R2|冻结契约与零迁移|`python -m pytest tests/test_qa_phase07_contracts.py -q`|七指纹不变、枚举不扩、仍 v7、无网络与模型痕迹|**15 passed**；七指纹与 P00-02 逐字相同；QA_STOP_REASONS 仍 5 值（只补产出路径）；无新表新列；AST 守门通过|PASS|同上|

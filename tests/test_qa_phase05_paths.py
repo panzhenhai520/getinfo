@@ -11,9 +11,8 @@
      失败策略只用五值枚举，并且与 `qa_orchestrator.DEGRADABLE_STAGES` 对齐；
   4. 舰队打开时首跳是**并行扇出 + fan-in barrier**（§2.4/§2.5），Hunter 节点的超时/重试
      直接取舰队的既有旋钮；
-  5. deep 链里属于**后续** Phase 的两段（gap_loop=P07 / final_verify=P13）是 `deferred`
-     占位节点（`implemented=False`），不参与预算、也不假装跑过；
-     `evidence_graph`（P06）自 Phase 06 起已实现，跑在既有 `conflict_review` 阶段内部。
+  5. 执行图里**未实现**的占位节点只剩 P13 的 `final_verify`（`deferred`、不参与预算）；
+     `evidence_graph`（P06）与 `gap_loop`（P07）自各自 Phase 起都是真节点（开关关着时标 skipped）。
 """
 import os
 import sys
@@ -158,16 +157,17 @@ class NodeContractTests(unittest.TestCase):
             self.assertEqual(edge["schema"], by_id[edge["src"]]["output_schema"]["name"])
 
     def test_deep_path_defers_later_phase_nodes(self):
-        """Phase 06 起 `evidence_graph` 已实现（不再是占位）；仍占位的是 P07/P13 两段。"""
+        """Phase 06 起 `evidence_graph` 已实现；Phase 07 起 `gap_loop` 也**不再是占位**。
+        仍占位的只剩 P13 的 `final_verify`（deep 链独有）。"""
         graph = _graph(mode="deep")
         deferred = [node for node in graph["nodes"] if node["status"] == "deferred"]
         self.assertEqual({node["node_id"].split(".")[-1] for node in deferred},
-                         {"gap_loop", "final_verify"})
+                         {"final_verify"})
         for node in deferred:
             self.assertFalse(node["implemented"])
             self.assertTrue(node["deferred_to"].startswith("P"))
             self.assertEqual(node["timeout"], 0.0, "占位节点不占预算")
-        self.assertEqual(graph["node_counts"]["deferred"], 2)
+        self.assertEqual(graph["node_counts"]["deferred"], 1)
         # P06 的 evidence_graph 现在是**真节点**：implementation 打开、有预算、阶段在链上
         evidence_graph = [node for node in graph["nodes"]
                           if node["node_id"] == "deep.evidence_graph"][0]
@@ -188,7 +188,44 @@ class NodeContractTests(unittest.TestCase):
             os.environ.pop("QA_EVIDENCE_GRAPH", None)
             if saved is not None:
                 os.environ["QA_EVIDENCE_GRAPH"] = saved
-        # 三条路径里只有 deep 有占位节点
+
+    def test_gap_loop_is_implemented_on_every_path(self):
+        """P07 的 gap_loop 跑在既有 `level1_retrieval` 的检索循环里 → 三条路径都有这个真节点。"""
+        for mode in ("fast", "standard", "deep"):
+            graph = _graph(mode=mode)
+            node = [item for item in graph["nodes"]
+                    if item["node_id"] == "%s.gap_loop" % mode][0]
+            self.assertTrue(node["implemented"], "%s 的 gap_loop 必须是实现节点" % mode)
+            self.assertEqual(node["deferred_to"], "")
+            self.assertEqual(node["node_kind"], "gap_loop")
+            self.assertEqual(node["stage"], "level1_retrieval")
+            self.assertIn(node["stage"], set(graph["stage_chain"]))
+            self.assertEqual(node["model_tier"], "rule", "P07 是纯规则实现（不许调模型）")
+            self.assertEqual(node["allowed_tools"], ["qa_gap_analyzer"])
+            self.assertIn("gap_loop", node["validation"])
+            # 开关默认关 → 标 skipped（与 level2 关闭同口径），且不进关键路径估算
+            self.assertEqual(node["status"], "skipped")
+            self.assertNotIn(node["node_id"], graph["budget"]["cut_nodes"])
+            self.assertNotIn(node["node_id"], graph["budget"]["critical_path"])
+            # 依赖是检索链的最后一跳（缺口分析读的就是累计证据），不是证据图
+            retrieval_ids = [item["node_id"] for item in graph["nodes"]
+                             if item["node_kind"] == "retrieve"
+                             and item["stage"] == "level1_retrieval"]
+            self.assertEqual(node["depends_on"], [retrieval_ids[-1]])
+        saved = os.environ.get("QA_GAP_ANALYZER")
+        os.environ["QA_GAP_ANALYZER"] = "1"
+        try:
+            enabled = [item for item in _graph(mode="standard")["nodes"]
+                       if item["node_id"] == "standard.gap_loop"][0]
+            self.assertEqual(enabled["status"], "pending")
+            self.assertTrue(enabled["optional"], "补充跳预算紧时可以裁")
+            self.assertTrue(enabled["budget_enforced"])
+            self.assertGreater(enabled["timeout"], 0.0)
+        finally:
+            os.environ.pop("QA_GAP_ANALYZER", None)
+            if saved is not None:
+                os.environ["QA_GAP_ANALYZER"] = saved
+        # 未实现的占位节点在 standard/fast 上一个都没有
         self.assertEqual(_graph(mode="standard")["node_counts"]["deferred"], 0)
         self.assertEqual(_graph(mode="fast")["node_counts"]["deferred"], 0)
 

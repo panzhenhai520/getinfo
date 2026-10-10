@@ -634,6 +634,51 @@ def _nodes_for_path(path: str, ctx: Mapping) -> list:
     nodes.extend(retrieval)
     retrieval_ids = [item["node_id"] for item in retrieval]
 
+    # ── 阶段 07（P07-01…P07-06）：缺口驱动的再检索循环（§12/§13/§14）──
+    # 它**真的跑在既有 `level1_retrieval` 阶段内部**（`qa_pipeline._run_multi_hop` 的每跳之后），
+    # 输入是"累计证据 + 计划 Claim"，输出是"补充跳 + 停止原因"，所以依赖**最后一跳检索节点**，
+    # 三条路径都有这个节点（不是 deep 独有）。开关 `QA_GAP_ANALYZER` **默认关** → 标 `skipped`
+    # （与 level2 关闭时那三个节点同口径），并且被 `apply_budget` 排除在预算估算之外。
+    gap_status = "skipped"
+    gap_note = ("P07 已实现（qa_gap_analyzer.GapLoopState），但 QA_GAP_ANALYZER 默认关 → "
+                "本轮不执行；打开后按 §13 的 Gap → Best Retrieval Action 补跳并在 §14 给出停止原因")
+    gap_timeout = 0.0
+    gap_optional = False
+    gap_enforced = False
+    try:
+        import qa_gap_analyzer as gap_module
+
+        extra_hops = int(gap_module.max_next_hops())
+        gap_on = bool(gap_module.gap_analyzer_enabled())
+        # 每跳分摊口径与 `_retrieval_nodes` 逐字一致（同一份 QA_MULTI_HOP_BUDGET_SECONDS）
+        per_hop_cap = max(1.0, float(ctx.get("hop_budget_seconds") or 25.0)
+                          / max(1, len(ctx.get("hops") or []) or 1))
+        if extra_hops > 0:
+            gap_timeout = float(per_hop_cap * extra_hops)
+            gap_enforced = bool(gap_on)   # 关着就不许声称"预算被执行"
+        if gap_on:
+            gap_status = "pending"
+            gap_optional = True          # 补充跳是**可选**的：预算紧就该裁掉它
+            gap_note = ("P07 交付：缺口分类/优先级（§12 十种）+ 建议通道与证据要求 + 下一跳规划"
+                        "（§13，规则实现 + 可注入点）+ seen 去重 + no-gain 收敛（§14）+ 五个停止原因")
+    except Exception as exc:          # noqa: BLE001  取不到开关就按"关"处理，并写明原因
+        gap_note += "（开关读取失败：%s）" % type(exc).__name__
+    if retrieval_ids:
+        nodes.append(_node(
+            path, "gap_loop", node_kind="gap_loop", stage="level1_retrieval",
+            purpose="缺口驱动的再检索循环（§12 Gap Analyzer / §13 Next-hop / §14 收敛与停止）",
+            depends_on=[retrieval_ids[-1]], timeout=gap_timeout, model_tier="rule",
+            allowed_tools=["qa_gap_analyzer"],
+            validation=["gap", "next_hop", "gap_loop", "search_trace"],
+            failure_policy=_policy_for_stage("level1_retrieval", QA_FAILURE_DEGRADE),
+            input_schema=_signal(SCHEMA_RESEARCH_PLAN, ["claims", "evidence_requirements"]),
+            output_schema=_signal("qa.gap_loop", ["gaps", "stop_reason", "rounds"]),
+            budget_source=("min(每跳分摊, STAGE_BUDGET_SECONDS['level1_retrieval']) × "
+                           "QA_GAP_MAX_NEXT_HOPS（QA_MULTI_HOP_BUDGET_SECONDS=%.1fs）"
+                           % float(ctx.get("hop_budget_seconds") or 25.0)),
+            budget_enforced=gap_enforced, optional=gap_optional,
+            status=gap_status, notes=gap_note))
+
     nodes.append(_node(
         path, "verify", node_kind="verify", stage="level1_retrieval",
         purpose="§2.6 Verifier 放在 Edge 上：证据层标注 + 核验判定（既有 qa_evidence/qa_verifier）",
@@ -783,16 +828,6 @@ def _nodes_for_path(path: str, ctx: Mapping) -> list:
             budget_enforced=False, status=evidence_graph_status,
             notes=evidence_graph_note))
         nodes.append(_node(
-            path, "gap_loop", node_kind="gap_loop", stage="gap_loop",
-            purpose="缺口驱动的再检索循环（§14 收敛与停止）",
-            depends_on=["%s.evidence_graph" % path], timeout=0.0, model_tier="strong",
-            allowed_tools=["qa_gap_analyzer"], validation=["search_trace"],
-            failure_policy=QA_FAILURE_DEGRADE,
-            output_schema=_signal(SCHEMA_SEARCH_TRACE, ["gap_id", "resolved_gap"]),
-            implemented=False, deferred_to="P07（Gap Analyzer / Dynamic Multi-hop）",
-            status="deferred",
-            notes="本阶段未实现：NO_GAIN/UNRESOLVABLE_CONTRADICTION 两个停止原因也归 P07"))
-        nodes.append(_node(
             path, "final_verify", node_kind="final_verify", stage="final_verify",
             purpose="最终核验（§18 deep 的最后一段）",
             depends_on=["%s.answer" % path], timeout=0.0, model_tier="strong",
@@ -802,6 +837,8 @@ def _nodes_for_path(path: str, ctx: Mapping) -> list:
             implemented=False, deferred_to="P13（Answer Composer / Final Verifier）",
             status="deferred",
             notes="本阶段未实现：Phase 13 交付"))
+        # 说明：deep 链里 P07 的 `gap_loop` 自 Phase 07 起是**真节点**（不再 deferred），
+        # 它跑在 level1_retrieval 的检索循环内部，所以声明在检索段（三条路径都有）。
     return nodes
 
 
