@@ -9,7 +9,8 @@
      （不是拼出来的字符串），这正是 MASTER_RULES 第 11 条要的可校验引用；
   3. 回溯不上的条目**必须显式 `grounded=false` + 原因**，不许伪装成有据；
   4. 反证身份来自 Phase 06 的图级关系（REFUTES）/矛盾裁决，不是这里另判的；
-  5. 图上没有的东西（memory / skill）本阶段是空段 + `deferred_to`，绝不编内容；
+  5. 图上没有的东西（memory / skill）在**没有候选**时是空段 + `deferred_to`；Phase 09 接上线后
+     给了 MEMORY_HINT 候选就填段、不再写 `deferred_to`（裁剪要说明是裁剪，不许装成"没实现"）；
   6. `item_id` 内容寻址：同输入同 id，正文不同则 id 不同。
 """
 import os
@@ -158,6 +159,52 @@ class SectionTests(unittest.TestCase):
         for name in ("system_context", "task_context", "evidence_context", "counter_evidence",
                      "constraints", "budget"):
             self.assertGreater(pack["sections"][name]["count"], 0, "%s 段不该是空的" % name)
+
+    def test_supplied_memory_items_fill_the_section_and_cancel_the_deferral(self):
+        """Phase 09（P09-04）接线上线后：给了 MEMORY_HINT 条目就该填段，不许再写 deferred_to。
+
+        本条是**追加**断言（原有的"不传就是空段 + deferred"一条都没放松）：
+        没候选 → 空段 + `deferred_to`；有候选且入选 → `implemented_by` + hint 政策。
+        """
+        memory_item = cp.make_context_item(
+            kind="memory", section="memory_context", source_stage="memory_graph",
+            text=cp.UNGROUNDED_MARK + "记忆提示", evidence_ref="article:1",
+            grounding={"grounded": True, "hint": True, "requires_revalidation": True,
+                       "verified_evidence": False},
+            metadata={"role": "memory_hint"})
+        pack = cp.build_context_pack(graph=_graph(), plan=plan(), request={"question": QUESTION},
+                                     run_id="r1", memory_items=[memory_item])
+        section = pack["sections"]["memory_context"]
+        self.assertEqual(section["count"], 1)
+        self.assertNotIn("deferred_to", section)
+        self.assertEqual(section["implemented_by"], "Phase 09（Memory Graph Core）")
+        self.assertEqual(section["requires_revalidation"], 1)
+        self.assertEqual(pack["stats"]["memory_items"], 1)
+        self.assertEqual(pack["stats"]["memory_supplied"], 1)
+        # 记忆条目**不进引用索引**：引用只标证据（MASTER_RULES 第 11 条）
+        for label, entry in pack["citation_index"].items():
+            self.assertIn(entry["section"], ("evidence_context", "counter_evidence"),
+                          "%s 指向了非证据段：%s" % (label, entry["section"]))
+        ok, note = validate("context_pack", pack)
+        self.assertTrue(ok, note)
+
+    def test_trimmed_memory_items_are_reported_as_trimmed_not_deferred(self):
+        """候选被预算裁掉是**裁剪**，不是"没实现"：段里要写清楚，且不许出现 deferred_to。"""
+        items = [cp.make_context_item(kind="memory", section="memory_context",
+                                      source_stage="memory_graph",
+                                      text="记忆提示 %d：%s" % (index, "内容" * 200),
+                                      grounding={"grounded": False, "hint": True})
+                 for index in range(4)]
+        pack = cp.build_context_pack(graph=_graph(), plan=plan(), request={"question": QUESTION},
+                                     run_id="r1", budget_tokens=600, memory_items=items)
+        section = pack["sections"]["memory_context"]
+        if section["count"] == 0:
+            self.assertNotIn("deferred_to", section)
+            self.assertEqual(section["supplied"], len(items))
+            self.assertIn("裁", section["note"])
+        else:
+            self.assertNotIn("deferred_to", section)
+            self.assertGreaterEqual(section["count"], 1)
 
     def test_system_rules_are_in_the_pack(self):
         pack = cp.build_context_pack(graph=_graph(), plan=plan(), request={"question": QUESTION},

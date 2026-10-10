@@ -115,6 +115,11 @@ GROUNDING_WARNING_VIOLATIONS = (
 UNGROUNDED_MARK = "【无证据】"
 """正文里标注"这条没有可回溯证据"的统一记号（生成端与校验端共用同一个字符串）。"""
 
+MEMORY_HINT_POLICY = ("MEMORY_HINT：记忆条目**不是证据**（§2.1 + MASTER_RULES 11/12）——"
+                      "它只是提示，必须先过 freshness/source-version 闸门并经核验才能进当前证据图；"
+                      "本阶段（P09）不实现 revalidation，故每条提示恒带 requires_revalidation=True。")
+"""`memory_context` 段的政策说明（Phase 09 接线后写进段里，生成端与 Context Inspector 共读）。"""
+
 # ── 可配置旋钮（全部可回滚；默认值写在常量里便于复算）───────────────────────
 DEFAULT_TOTAL_TOKEN_BUDGET = 6000        # §5：整包 token 预算
 DEFAULT_OUTPUT_RESERVE = 900             # §5："保留输出/工具预算"
@@ -1161,14 +1166,24 @@ def _label_order(label) -> int:
 def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: Mapping | None = None,
                        working_memory: Mapping | None = None, run_id: str = "",
                        budget_tokens: int | None = None,
-                       reserve_ratio: float | None = None) -> dict:
+                       reserve_ratio: float | None = None,
+                       memory_items: Sequence[Mapping] = ()) -> dict:
     """P08-03：组装 Context Pack（九段 + 引用索引 + 预算 + Context Gap + selection trace）。
 
     **不改任何既有结构**：只读 `graph` / `plan` / `request`，返回一个新字典；
     组装失败一律由调用方兜底（本函数自身不吞异常，方便用例钉住失败路径）。
+
+    Phase 09（P09-04）接线：`memory_items` 是 Memory Graph 召回的 **MEMORY_HINT** 上下文条目
+    （`kind="memory"` / `section="memory_context"`），由 Phase 09 侧构造（`qa_memory.
+    memory_context_items()`）后传进来。口径：
+      · 不传（默认）→ `memory_context` 仍是**空段 + `deferred_to`**，Phase 08 行为逐字不变；
+      · 传了但全被预算裁掉 → 段里写**裁剪说明**（不是 deferred，也不是编内容）；
+      · 传了且入选 → 段里记 `implemented_by`/`hint_policy`，条目**不进 citation_map**
+        （它们不是证据：MASTER_RULES 11 + §2.1）。
     """
     request = request if isinstance(request, Mapping) else {}
     plan = plan if isinstance(plan, Mapping) else {}
+    supplied_memory = [item for item in (memory_items or []) if isinstance(item, Mapping)]
     context_graph = build_context_graph(graph=graph, plan=plan, working_memory=working_memory,
                                         run_id=run_id)
     items = context_graph["items"]
@@ -1211,7 +1226,7 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
         if text:
             constraints.append(make_context_item(kind="constraint", section="constraints",
                                                  text=text, source_stage="request"))
-    candidates = list(items) + system_items + constraints
+    candidates = list(items) + list(supplied_memory) + system_items + constraints
 
     selection = select_context_items(
         candidates, task=task,
@@ -1229,8 +1244,24 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
             "count": len(rows),
         }
     if not sections["memory_context"]["count"]:
-        sections["memory_context"]["deferred_to"] = "Phase 09（Memory Graph Core）"
-        sections["memory_context"]["note"] = "本阶段不实现 Memory：空段而不是编内容"
+        if supplied_memory:
+            # Phase 09 接线上线后：候选给了但全被裁 —— 这是**裁剪**，不是"没实现"
+            sections["memory_context"]["note"] = (
+                "候选 %d 条记忆提示全部被预算裁掉（不是空段）" % len(supplied_memory))
+            sections["memory_context"]["supplied"] = len(supplied_memory)
+            sections["memory_context"]["trimmed"] = len(supplied_memory)
+            sections["memory_context"]["hint_policy"] = MEMORY_HINT_POLICY
+        else:
+            sections["memory_context"]["deferred_to"] = "Phase 09（Memory Graph Core）"
+            sections["memory_context"]["note"] = "本阶段不实现 Memory：空段而不是编内容"
+    else:
+        # Phase 09（P09-04）：记忆提示进段 —— 记清"谁提供的/什么政策"，且**不算引用**
+        sections["memory_context"]["implemented_by"] = "Phase 09（Memory Graph Core）"
+        sections["memory_context"]["hint_policy"] = MEMORY_HINT_POLICY
+        sections["memory_context"]["requires_revalidation"] = len([
+            item for item in selected
+            if str(item.get("section")) == "memory_context"
+            and bool((item.get("grounding") or {}).get("requires_revalidation"))])
     if not sections["skill_context"]["count"]:
         sections["skill_context"]["deferred_to"] = "Phase 11（Skill Registry & Router）"
         sections["skill_context"]["note"] = "本阶段不实现 Skill 注册表：空段"
@@ -1322,6 +1353,14 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
         "sections_filled": len([name for name in CONTEXT_SECTIONS
                                 if sections[name]["count"] and name not in
                                 ("memory_context", "skill_context")]),
+        # Phase 09（P09-04）：记忆提示的计数单列（不改 `sections_filled` 的既有语义），
+        # 且记忆条目**不参与 citation_map**（它们不是证据）。
+        "memory_items": len([item for item in selected
+                             if str(item.get("section")) == "memory_context"]),
+        "memory_supplied": len(supplied_memory),
+        "memory_requires_revalidation": len([
+            item for item in selected if str(item.get("section")) == "memory_context"
+            and bool((item.get("grounding") or {}).get("requires_revalidation"))]),
     })
     return pack
 
@@ -1788,7 +1827,7 @@ def selection_summary(trace: Sequence[Mapping]) -> dict:
 
 __all__ = [
     "ESTIMATOR_NOTE", "ESTIMATOR_VERSION", "GROUNDING_BLOCKING_VIOLATIONS",
-    "GROUNDING_WARNING_VIOLATIONS", "UNGROUNDED_MARK",
+    "GROUNDING_WARNING_VIOLATIONS", "MEMORY_HINT_POLICY", "UNGROUNDED_MARK",
     "build_context_graph", "build_context_pack", "build_prompt_blocks", "check_grounding",
     "citation_labels", "context_pack_enabled", "context_pack_receipt", "context_utility",
     "counter_reserve_ratio", "detect_context_gaps", "estimate_tokens", "evidence_strength",

@@ -47,6 +47,10 @@ from qa_gap_analyzer import (
     plan_next_hops, review_graph as review_gap_graph,
 )
 from qa_context_pack import context_pack_enabled
+from qa_memory import (
+    MEMORY_GRAPH_VERSION, memory_context_items, memory_graph_enabled, memory_receipt,
+    recall_from_run, write_gate_receipt, write_memories_from_graph,
+)
 from qa_verifier import (
     VERIFIER_VERSION, verification_cache, verification_of, verifier_enabled,
     verify_claim_graph, verify_evidence_batch,
@@ -739,7 +743,8 @@ def _build_evidence_graph_layer(graph: dict, *, plan: Mapping | None, run_meta: 
 
 
 def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
-                              run_meta: Mapping, working_memory: Mapping | None = None) -> dict:
+                              run_meta: Mapping, working_memory: Mapping | None = None,
+                              memory_items: Sequence[Mapping] = ()) -> dict:
     """阶段 08（P08-01…P08-06）：按任务组装最小有效 Context Pack。
 
     **只加不改**：结果挂在 `graph["context_pack"]` 这个兄弟键上（Phase 06 的
@@ -747,17 +752,92 @@ def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: 
     既有的 claims/evidence/edges/conflicts 键集与冻结契约一个字不动。
     关掉 `QA_CONTEXT_PACK`（默认关）时本函数一次都不被调用，行为逐字回到接线前。
     任何异常都吞掉并记账：组装上下文绝不能把整条 run 打断。
+
+    阶段 09（P09-04）：`memory_items` 是 Memory Graph 的 **MEMORY_HINT** 条目
+    （口子在 `qa_memory.memory_context_items()`），只填空 `memory_context` 段；
+    不传时该段仍是空段 + `deferred_to`（Phase 08 行为不变）。
     """
     try:
         from qa_context_pack import build_context_pack, context_pack_receipt
 
         pack = build_context_pack(graph=graph, plan=plan, request=request,
                                   working_memory=working_memory,
-                                  run_id=str(run_meta.get("id") or ""))
+                                  run_id=str(run_meta.get("id") or ""),
+                                  memory_items=memory_items)
         pack["receipt"] = context_pack_receipt(pack)
         return pack
     except Exception as exc:  # noqa: BLE001
         return {"pack_version": CONTEXT_PACK_VERSION,
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+
+# ── 阶段 09（P09-01…P09-06）：Memory Graph 的召回与写入接线 ────────────────────
+# 口径：默认**关**（`QA_MEMORY_GRAPH=0`）→ 一个键都不新增、一行都不写库，
+# 行为逐字回到 Phase 08；打开后只加**兄弟键** `graph["memory"]`（召回回执），
+# 写入侧只动 Phase 09 自己的八张 memory_* 表（不碰任何冻结结构）。
+
+def _build_memory_recall_layer(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
+                               run_meta: Mapping, store, vectors=None) -> dict:
+    """阶段 09（P09-04）：按 run 的作用域召回记忆（恒为 MEMORY_HINT），失败只记账。"""
+    try:
+        question = str((request or {}).get("question")
+                       or (plan or {}).get("question") or (plan or {}).get("standalone_question") or "")
+        receipt = recall_from_run(store, run_meta=run_meta, graph=graph, question=question,
+                                  mode="evidence", vectors=vectors)
+        receipt["receipt"] = memory_receipt(receipt)
+        return receipt
+    except Exception as exc:  # noqa: BLE001 —— 召回绝不能把建立证据图/出答案打断
+        return {"recall_version": "", "mode": "evidence", "hits": [], "counts": {},
+                "stats": {}, "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+
+def _memory_items_from(receipt: Mapping | None, *, limit: int = 6) -> list:
+    """把召回回执转成 `memory_context` 段的上下文条目（关掉开关时返回空列表）。"""
+    if not isinstance(receipt, Mapping) or receipt.get("error"):
+        return []
+    try:
+        return memory_context_items(receipt, max_items=limit)
+    except Exception:  # noqa: BLE001 —— 条目构造失败就当没有记忆（不编内容）
+        return []
+
+
+def _attach_memory_recall(graph: dict, *, plan: Mapping | None, request: Mapping | None,
+                          run_meta: Mapping, store) -> dict:
+    """阶段 09：把召回回执挂到 `graph["memory"]`（兄弟键；返回回执供上下文包使用）。"""
+    if not memory_graph_enabled() or store is None:
+        return {}
+    receipt = _build_memory_recall_layer(graph, plan=plan, request=request, run_meta=run_meta,
+                                         store=store)
+    graph["memory"] = receipt
+    return receipt
+
+
+def _memory_audit_logger(database):
+    """复用既有的审计记录器（Phase 09 的写入/失效都是有审计要求的动作，§11）。"""
+    try:
+        from qa_observability import QaAuditLogger
+
+        return QaAuditLogger(database)
+    except Exception:  # noqa: BLE001 —— 审计不可用时记忆仍照常写，只是少了审计行
+        return None
+
+
+def _write_memories_after_answer(graph: Mapping, *, run_meta: Mapping, store,
+                                 database=None, trace_id: str = "", audit=None) -> dict:
+    """阶段 09（P09-02/P09-03）：出答案之后跑一次 Write Gate（§9 主执行流的位置）。
+
+    只吃**已核验证据图**（不是最终答案文本）：自由生成的内容永远不进记忆库
+    （MASTER_RULES 11）。失败只记账，绝不影响已经生成的答案。
+    """
+    if not memory_graph_enabled() or store is None:
+        return {}
+    try:
+        receipt = write_memories_from_graph(
+            store, graph=graph, run_meta=run_meta, trace_id=trace_id,
+            audit=audit if audit is not None else _memory_audit_logger(database))
+        return write_gate_receipt(receipt)
+    except Exception as exc:  # noqa: BLE001
+        return {"gate_version": "", "graph_version": MEMORY_GRAPH_VERSION,
                 "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
@@ -2796,11 +2876,17 @@ def build_qa_stage_handlers(
         # 阶段 08（P08-01…P08-06）：按任务组装最小有效上下文包（默认关；结果挂兄弟键）。
         # 放在这里而不是 synthesis：`conflict_review` 的输出会整体落进 qa_stage_runs.details_json，
         # 于是上下文包连同 selection trace **免费持久化**（Phase 06 同样的手法，零迁移）。
+        # 阶段 09（P09-04）：记忆召回（默认关）——结果挂兄弟键 `graph["memory"]`，
+        # 并把 MEMORY_HINT 条目交给上下文包的 `memory_context` 段（Phase 08 的九段之一）。
+        memory_recall = _attach_memory_recall(
+            graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
+            request=context["request"], run_meta=context["run"], store=store)
         if context_pack_enabled():
             graph["context_pack"] = _build_context_pack_layer(
                 graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
                 request=context["request"], run_meta=context["run"],
-                working_memory=_context_working_memory(context))
+                working_memory=_context_working_memory(context),
+                memory_items=_memory_items_from(memory_recall))
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
             message = (f"证据图已建立：{len(graph.get('claims') or [])} 条结论、"
@@ -2846,12 +2932,19 @@ def build_qa_stage_handlers(
                         graph, graph["evidence_graph"],
                         plan=(context["outputs"].get("plan") or {}),
                         previous_stop_reason=_gap_stop_reason_from_level1(context))
+            # 阶段 09（P09-04）：fast 路径同样召回（与 standard/deep 同一口径）。
+            # 刻意放在 `context_pack_enabled()` **外面**：两个开关是两件事，
+            # 关掉上下文包不该顺带把记忆召回也关掉。
+            _fast_memory = _attach_memory_recall(
+                graph, plan=(context["outputs"].get("plan") or {}),
+                request=context["request"], run_meta=run, store=store)
             if context_pack_enabled():
                 # 阶段 08：fast 路径同样组装上下文包（口径与 standard/deep 一致，只是没有 level2 计划）
                 graph["context_pack"] = _build_context_pack_layer(
                     graph, plan=(context["outputs"].get("plan") or {}),
                     request=context["request"], run_meta=run,
-                    working_memory=_context_working_memory(context))
+                    working_memory=_context_working_memory(context),
+                    memory_items=_memory_items_from(_fast_memory))
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])
@@ -2925,6 +3018,22 @@ def build_qa_stage_handlers(
                 context_pack=context_pack,
             )
             resilience.circuit_success(dependency)
+            # 阶段 09（P09-02/P09-03）：§9 主执行流的 Write Gate 位置**在最终答案之后**。
+            # 只吃已核验证据图（不吃 result 的正文）——自由生成的内容永远不进记忆库；
+            # 只写 Phase 09 自己的 memory_* 表，失败只记账，答案已经生成、不受影响。
+            _memory_write = _write_memories_after_answer(
+                graph if isinstance(graph, Mapping) else {}, run_meta=run, store=store,
+                database=database, trace_id=str(run.get("id") or ""))
+            if _memory_write and callable(emit_stage_event):
+                emit_stage_event("stage_progress", {
+                    "message": ("记忆写入门：候选 %s 条，落库 %s 条（合并 %s / 仅会话 %s / 丢弃 %s）"
+                                % (_memory_write.get("candidates"),
+                                   _memory_write.get("persisted"),
+                                   _memory_write.get("merged"),
+                                   _memory_write.get("session_only"),
+                                   _memory_write.get("dropped"))),
+                    "memory": _memory_write,
+                })
             return result
         except Exception as exc:
             if "profile" in locals():

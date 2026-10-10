@@ -1090,9 +1090,11 @@ CONTEXT_ITEM_KINDS: Tuple[str, ...] = (
 
 CONTEXT_ITEM_SOURCES: Tuple[str, ...] = (
     "evidence_graph", "evidence", "plan", "verification", "gap_analyzer", "request", "config",
+    "memory_graph",
 )
 """ContextItem 的**来源**（provenance 的可读形态）：每一条都必须是上游阶段真实产出物，
-禁止"凭空造一条上下文"。"""
+禁止"凭空造一条上下文"。`memory_graph` 是 Phase 09 的 Memory Graph 召回产物
+（只在 `memory_context` 段出现，且恒为 MEMORY_HINT）。"""
 
 CONTEXT_DECISIONS: Tuple[str, ...] = ("included", "excluded")
 """selection trace 的两种决策。"""
@@ -1276,13 +1278,302 @@ GROUNDING_REPORT_SCHEMA = {
 """生成端 grounding 校验回执（不改冻结 FINAL_ANSWER_SCHEMA：只**校验**，不新增字段）。"""
 
 
+# ── Phase 09（P09-01…P09-06）：Memory Graph Core ───────────────────────────────
+# 边界：跨会话长期记忆及其 **Write Gate / Recall / lifecycle / provenance**。
+# 契约设计口径（与 Phase 04~08 一致，全部逐字对齐 01_V2_ARCHITECTURE）：
+#   1. §1.4 的十个节点类型入 `MEMORY_TYPES`（缺一个就有守例挂）；§2.3 的六个状态入
+#      `MEMORY_STATUSES`；§1.4 的九个关系入 `MEMORY_RELATIONS`；§14 的五个作用域入
+#      `MEMORY_SCOPES`（医疗术语按 D-002 中性映射，**取值逐字保留**，映射写在注释里）；
+#      §2.2 的四个写决策入 `MEMORY_WRITE_DECISIONS`；§10 的时效档入 `MEMORY_FRESHNESS_CLASSES`。
+#   2. §11 的两个公式**逐字**拆进 `MEMORY_WRITE_FACTORS`（写：ReuseProbability × Confidence ×
+#      Stability × InformationValue − PrivacyRisk − StalenessRisk − DuplicationPenalty）与
+#      `MEMORY_RECALL_FACTORS`（召回：SemanticRelevance × TaskApplicability × Confidence ×
+#      Freshness × HistoricalUtility − ContradictionRisk）；每个分量的口径在 `qa_memory` 里
+#      写死并可复算（无模型、无嵌入端点）。
+#   3. **谁能产出谁负责**：`MEMORY_TYPE_OWNER_PHASE` 把"本阶段可产出"与"后续 Phase 的账"
+#      写成机器可校验的形态——Phase 09 只产 VERIFIED_CLAIM / ENTITY（都要求可回溯证据），
+#      其余类型一律由 Write Gate **显式拒绝并记账**（`TYPE_DEFERRED_TO_PHASE_*`），
+#      绝不静默丢弃、也绝不提前实现后续 Phase。
+#   4. MASTER_RULES 第 11/12/16 条写成机器可校验形态：`MEMORY_HINT` 恒不冒充已核验证据
+#      （`MEMORY_RECALL_HIT_SCHEMA.requires_revalidation` 恒 True、`verified_evidence` 恒 False），
+#      外部网页指令不得升级为系统规则（`MEMORY_WRITE_REASONS` 里的
+#      `EXTERNAL_INSTRUCTION_NOT_A_RULE`）。
+MEMORY_GRAPH_VERSION = "qa-memory-graph-v1"
+"""Memory Graph 版本（schema/类型/写入门/召回/生命周期口径的总版本，落每条记忆的版本行）。"""
+
+MEMORY_WRITE_GATE_VERSION = "qa-memory-write-gate-v1"
+"""Write Gate 口径版本（§2.2/§11 的分量与阈值变更都要换这个号）。"""
+
+MEMORY_RECALL_VERSION = "qa-memory-recall-v1"
+"""Recall API 口径版本（§11 召回公式与通道口径变更要换这个号）。"""
+
+MEMORY_LIFECYCLE_VERSION = "qa-memory-lifecycle-v1"
+"""lifecycle 口径版本（§2.3 状态机与衰减规则变更要换这个号）。"""
+
+MEMORY_PROVENANCE_VERSION = "qa-memory-provenance-v1"
+"""provenance 口径版本（记忆→证据/来源/指纹的绑定方式变更要换这个号）。"""
+
+MEMORY_TYPES: Tuple[str, ...] = (
+    "MEMORY_ITEM", "VERIFIED_CLAIM", "ENTITY", "EPISODIC_RESEARCH", "STRATEGY", "FAILURE",
+    "QUERY_PATTERN", "SOURCE", "SKILL_PERFORMANCE", "USER_APPROVED_DOMAIN_RULE",
+)
+"""§1.4 Memory Graph 的节点类型**逐字**（MemoryItem / VerifiedClaimMemory / EntityMemory /
+EpisodicResearchMemory / StrategyMemory / FailureMemory / QueryPatternMemory / SourceMemory /
+SkillPerformanceMemory / UserApprovedDomainRule），命名统一成大写下划线（契约形态）。"""
+
+MEMORY_TYPE_OWNER_PHASE = {
+    "MEMORY_ITEM": "P09",
+    "VERIFIED_CLAIM": "P09",
+    "ENTITY": "P09",
+    "EPISODIC_RESEARCH": "P12",
+    "STRATEGY": "P12",
+    "FAILURE": "P12",
+    "QUERY_PATTERN": "P12",
+    "SOURCE": "P12",
+    "SKILL_PERFORMANCE": "P12",
+    "USER_APPROVED_DOMAIN_RULE": "P15",
+}
+"""每类记忆的**产出归属 Phase**（`P09` 是本阶段；`P12` = Episodic/Failure/Strategy/Source/
+Skill performance；`P15` = 作用域与规则类记忆的安全边界）。
+Write Gate 对非本阶段类型一律拒收并记账 —— 这是"不提前实现后续 Phase"的机器可校验形态。"""
+
+MEMORY_PRODUCIBLE_TYPES: Tuple[str, ...] = ("VERIFIED_CLAIM", "ENTITY")
+"""本阶段（P09）**真的能产出**的两类记忆：都要求可回溯到 Phase 02 证据 + Phase 03 核验结论。"""
+
+MEMORY_SCOPES: Tuple[str, ...] = (
+    "GLOBAL_KNOWLEDGE", "ORGANIZATION", "PATIENT_LONGITUDINAL", "ENCOUNTER", "SESSION",
+)
+"""§14 的五个作用域**逐字**（按 D-002 中性映射到本仓库，取值一个字不改）：
+`GLOBAL_KNOWLEDGE`=跨行业包通用知识；`ORGANIZATION`=本部署的组织规则（写入属 P15）；
+`PATIENT_LONGITUDINAL`=跨会话长期主体记忆（本项目里绑 industry_pack_id + 主体实体）；
+`ENCOUNTER`=本次研究任务的轮次内（含 run 级）；`SESSION`=单会话。
+**"当前状态"类记忆不得无条件跨会话当事实**（§14 最后一段）——`ENCOUNTER`/`SESSION` 作用域
+的记忆在召回时只在本作用域内可见（有守例）。"""
+
+MEMORY_STATUSES: Tuple[str, ...] = (
+    "ACTIVE", "STALE", "SUPERSEDED", "CONTRADICTED", "EXPIRED", "REVOKED",
+)
+"""§2.3 的六个生命周期状态**逐字**。
+本阶段（P09-05）只**自动产出** `ACTIVE`/`STALE`/`EXPIRED`（确定性衰减）；
+`SUPERSEDED`/`CONTRADICTED`/`REVOKED` 由 Phase 10（supersession/矛盾/污染撤销）产出，
+本阶段只**尊重**它们（非 ACTIVE 一律不作证据、且不被衰减规则"复活"）。"""
+
+MEMORY_FRESHNESS_CLASSES: Tuple[str, ...] = (
+    "LONG", "VERSION_SENSITIVE", "MEDIUM", "SHORT", "VERY_SHORT", "SESSION", "ENCOUNTER_BOUND",
+)
+"""§10 的时效档**逐字**（数学定义/历史事实 LONG；临床指南→本项目"版本敏感的规范/指引"
+VERSION_SENSITIVE；药品说明→"产品/参数说明" MEDIUM；软件/API SHORT；新闻/价格/库存
+VERY_SHORT；患者当前状态→"当前状态类" SESSION / ENCOUNTER_BOUND）。
+**Freshness Gate 的判定属 Phase 10**；本阶段只用它决定"写入门给不给 TTL、衰减多快"。"""
+
+MEMORY_RELATIONS: Tuple[str, ...] = (
+    "ABOUT", "DERIVED_FROM", "VALIDATED_BY", "SUPERSEDES", "CONTRADICTS", "EXPIRED_BY",
+    "HELPED_RESOLVE", "FAILED_ON", "APPLIES_TO",
+)
+"""§1.4 的九个关系**逐字**。P09 只**写** `ABOUT`/`DERIVED_FROM`/`VALIDATED_BY`/`APPLIES_TO`，
+`SUPERSEDES`/`CONTRADICTS`/`EXPIRED_BY` 的写入属 Phase 10、`HELPED_RESOLVE`/`FAILED_ON`
+属 Phase 12；契约先把取值域定死，免得到时候各写各的字符串。"""
+
+MEMORY_WRITE_DECISIONS: Tuple[str, ...] = ("DROP", "SESSION_ONLY", "PERSIST", "PERSIST_WITH_TTL")
+"""§2.2 Memory Write Gate 的四个出口**逐字**。"""
+
+MEMORY_WRITE_REASONS: Tuple[str, ...] = (
+    # 硬规则拒绝（MASTER_RULES 11/12/16）
+    "NO_VERIFIED_EVIDENCE", "EXTERNAL_INSTRUCTION_NOT_A_RULE", "SENSITIVE_CONTENT",
+    # 归属与形状
+    "TYPE_DEFERRED_TO_PHASE_12", "TYPE_DEFERRED_TO_PHASE_15", "TYPE_NOT_SUPPORTED",
+    "EMPTY_CONTENT", "SCOPE_MISSING",
+    # 效用与去重
+    "UTILITY_BELOW_FLOOR", "DUPLICATE_MERGED", "SESSION_SCOPE_ONLY", "STALENESS_RISK",
+    "PRIVACY_RISK",
+    # 通过
+    "UTILITY_ABOVE_FLOOR", "TTL_REQUIRED_BY_FRESHNESS",
+)
+"""写决策的理由码（每条决策必须带一个，可复算"为什么这条没被记住"）。"""
+
+MEMORY_WRITE_FACTORS: Tuple[str, ...] = (
+    "reuse_probability", "confidence", "stability", "information_value",
+    "privacy_risk", "staleness_risk", "duplication_penalty",
+)
+"""§11 `MemoryWriteUtility` 的七项**逐字**：
+`ReuseProbability × Confidence × Stability × InformationValue − PrivacyRisk −
+StalenessRisk − DuplicationPenalty`。前三项为乘子（∈[0,1]），后三项为减项（∈[0,1]）。"""
+
+MEMORY_RECALL_FACTORS: Tuple[str, ...] = (
+    "semantic_relevance", "task_applicability", "confidence", "freshness",
+    "historical_utility", "contradiction_risk",
+)
+"""§11 `MemoryRecallScore` 的六项**逐字**：
+`SemanticRelevance × TaskApplicability × Confidence × Freshness × HistoricalUtility −
+ContradictionRisk`（前五项乘子，最后一项减项）。"""
+
+MEMORY_RECALL_MODES: Tuple[str, ...] = ("planning", "evidence")
+"""§10 的两种召回模式：`planning`（Research Planner 之前，只召回策略/失败/查询模式类，
+避免旧事实污染规划）、`evidence`（缺口出现后召回已验证结论/来源类，但必须先标 MEMORY_HINT）。"""
+
+MEMORY_RECALL_CHANNELS: Tuple[str, ...] = ("relational", "graph", "vector", "lexical")
+"""P09-06 的四种召回通道：关系库过滤 / 图关系扩展 / **库内已有向量**的余弦（零端点调用）/
+词面匹配。四通道的命中都要能被 `explain` 复算。"""
+
+MEMORY_LIFECYCLE_TRANSITIONS = {
+    ("ACTIVE", "STALE"): "DECAY_BELOW_STALE_FLOOR",
+    ("ACTIVE", "EXPIRED"): "VALID_UNTIL_PASSED",
+    ("STALE", "EXPIRED"): "DECAY_BELOW_EXPIRE_FLOOR",
+    ("STALE", "ACTIVE"): "DECAY_ABOVE_STALE_FLOOR",
+    ("EXPIRED", "EXPIRED"): "NO_CHANGE",
+}
+"""P09-05 **允许自动发生的状态迁移**（其余迁移一律拒绝，包括"复活 REVOKED"）：
+值 = 理由码。`ACTIVE→STALE→EXPIRED` 是单向衰减，`STALE→ACTIVE` 只在衰减分回升时发生
+（例如后来又被核验/复用），`EXPIRED` 不再自动回退（回退要 Phase 10 的 revalidation）。"""
+
+MEMORY_RECALL_HINT_VERSION = "qa-memory-hint-v1"
+"""MEMORY_HINT 的记法版本（§2.1：memory hint 经时效/版本/适用性闸门与 Verifier 后才可进证据图）。"""
+
+MEMORY_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "memory_id": {"type": "string"},
+        "memory_type": {"type": "string", "enum": list(MEMORY_TYPES)},
+        "canonical_content": {"type": "string"},
+        "content_fingerprint": {"type": "string"},
+        "confidence": {"type": "number"},
+        "freshness_class": {"type": "string", "enum": list(MEMORY_FRESHNESS_CLASSES)},
+        "valid_from": {"type": "string"},
+        "valid_until": {"type": "string"},
+        "last_verified_at": {"type": "string"},
+        "status": {"type": "string", "enum": list(MEMORY_STATUSES)},
+        "scope": {"type": "string", "enum": list(MEMORY_SCOPES)},
+        "scope_key": {"type": "string"},
+        "entity_ids": {"type": "array", "items": {"type": "string"}},
+        "source_evidence_ids": {"type": "array", "items": {"type": "string"}},
+        "superseded_by": {"type": "string"},
+        "reuse_count": {"type": "integer", "minimum": 0},
+        "created_from_session_id": {"type": "string"},
+        "created_at": {"type": "string"},
+        "updated_at": {"type": "string"},
+        "version": {"type": "integer", "minimum": 1},
+        "decay_score": {"type": "number"},
+        "metadata": {"type": "object"},
+    },
+    "required": ["memory_id", "memory_type", "canonical_content", "confidence",
+                 "freshness_class", "status", "scope"],
+    "additionalProperties": True,
+}
+"""MemoryItem（P09-01/P09-02）：§2.3 要求的字段一个不少（`id/memory_type/canonical_content/
+confidence/freshness_class/valid_from/valid_until/last_verified_at/status/scope/
+created_from_session_id/created_at` + `entity_ids/source_evidence_ids/superseded_by/reuse_count`）。"""
+
+MEMORY_WRITE_DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "decision_id": {"type": "string"},
+        "run_id": {"type": "string"},
+        "memory_type": {"type": "string", "enum": list(MEMORY_TYPES) + [""]},
+        "decision": {"type": "string", "enum": list(MEMORY_WRITE_DECISIONS)},
+        "reason": {"type": "string", "enum": list(MEMORY_WRITE_REASONS)},
+        "utility": {"type": "number"},
+        "factors": {"type": "object"},
+        "memory_id": {"type": "string"},
+        "content_fingerprint": {"type": "string"},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "scope": {"type": "string", "enum": list(MEMORY_SCOPES) + [""]},
+        "gate_version": {"type": "string"},
+    },
+    "required": ["decision_id", "decision", "reason", "gate_version"],
+    "additionalProperties": True,
+}
+"""写决策留痕（P09-03）：**每一条候选记忆**都要留下一行（含被 DROP 的），
+`factors` 逐项可复算 —— 这是"为什么没记住"的唯一权威来源。"""
+
+MEMORY_RECALL_HIT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "memory_id": {"type": "string"},
+        "memory_type": {"type": "string", "enum": list(MEMORY_TYPES)},
+        "canonical_content": {"type": "string"},
+        "status": {"type": "string", "enum": list(MEMORY_STATUSES)},
+        "scope": {"type": "string", "enum": list(MEMORY_SCOPES)},
+        "freshness_class": {"type": "string", "enum": list(MEMORY_FRESHNESS_CLASSES)},
+        "score": {"type": "number"},
+        "factors": {"type": "object"},
+        "channels": {"type": "array",
+                     "items": {"type": "string", "enum": list(MEMORY_RECALL_CHANNELS)}},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "hint": {"type": "boolean"},
+        "hint_version": {"type": "string"},
+        "requires_revalidation": {"type": "boolean"},
+        "verified_evidence": {"type": "boolean"},
+        "explain": {"type": "string"},
+    },
+    "required": ["memory_id", "memory_type", "status", "score", "channels", "hint",
+                 "requires_revalidation", "verified_evidence"],
+    "additionalProperties": True,
+}
+"""召回命中（P09-04）：**恒是 MEMORY_HINT**，不是证据。
+`requires_revalidation` 恒 True、`verified_evidence` 恒 False（§2.1 + MASTER_RULES 11/12），
+本阶段**不实现** revalidation（属 Phase 10）——所以只能说"这是提示，用前必须重验"。"""
+
+MEMORY_RECALL_RECEIPT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "recall_version": {"type": "string"},
+        "mode": {"type": "string", "enum": list(MEMORY_RECALL_MODES)},
+        "channels": {"type": "array",
+                     "items": {"type": "string", "enum": list(MEMORY_RECALL_CHANNELS)}},
+        "hits": {"type": "array", "items": MEMORY_RECALL_HIT_SCHEMA},
+        "counts": {"type": "object"},
+        "stats": {"type": "object"},
+        "scope": {"type": "object"},
+        "trace_id": {"type": "string"},
+    },
+    "required": ["recall_version", "mode", "channels", "hits", "counts"],
+    "additionalProperties": True,
+}
+"""召回回执（P09-04）：命中清单 + 各通道计数 + 边界原因（无向量/无种子/非 ACTIVE 被排除）。"""
+
+MEMORY_LIFECYCLE_REPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "lifecycle_version": {"type": "string"},
+        "checked": {"type": "integer", "minimum": 0},
+        "transitions": {"type": "array", "items": {"type": "object"}},
+        "transition_counts": {"type": "object"},
+        "status_counts": {"type": "object"},
+        "decay_bands": {"type": "object"},
+        "factors": {"type": "object"},
+        "note": {"type": "string"},
+    },
+    "required": ["lifecycle_version", "checked", "transitions"],
+    "additionalProperties": True,
+}
+"""lifecycle 维护回执（P09-05）：迁移明细 + 状态/衰减分布（同样输入同样输出、可重复运行）。"""
+
+MEMORY_PROVENANCE_REPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "provenance_version": {"type": "string"},
+        "checked": {"type": "integer", "minimum": 0},
+        "traceable": {"type": "integer", "minimum": 0},
+        "untraceable": {"type": "array", "items": {"type": "object"}},
+        "links": {"type": "object"},
+        "channels": {"type": "object"},
+        "note": {"type": "string"},
+    },
+    "required": ["provenance_version", "checked", "traceable", "links"],
+    "additionalProperties": True,
+}
+"""provenance 审计回执（P09-06）：**每条记忆都必须能回到证据条目/来源指纹**，
+回溯不上的必须列进 `untraceable`（不许四舍五入成"都能回溯"）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
-            "缺口类型 %d / 优先级分档 %d / Context 段 %d / ContextItem 种类 %d / Context Gap 动作 %d"
+            "缺口类型 %d / 优先级分档 %d / Context 段 %d / ContextItem 种类 %d / Context Gap 动作 %d / "
+            "记忆类型 %d / 记忆状态 %d / 记忆关系 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
@@ -1292,7 +1583,8 @@ def describe() -> str:
                len(EVIDENCE_GRAPH_NODE_TYPES), len(EVIDENCE_GRAPH_RELATIONSHIPS),
                len(CONTRADICTION_RESOLUTION_CODES),
                len(QA_GAP_TYPES), len(GAP_PRIORITY_BANDS),
-               len(CONTEXT_SECTIONS), len(CONTEXT_ITEM_KINDS), len(CONTEXT_GAP_ACTIONS)))
+               len(CONTEXT_SECTIONS), len(CONTEXT_ITEM_KINDS), len(CONTEXT_GAP_ACTIONS),
+               len(MEMORY_TYPES), len(MEMORY_STATUSES), len(MEMORY_RELATIONS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -1371,6 +1663,13 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "context_gap": CONTEXT_GAP_SCHEMA,
         "context_pack": CONTEXT_PACK_SCHEMA,
         "grounding_report": GROUNDING_REPORT_SCHEMA,
+        # Phase 09（P09-01…P09-06）
+        "memory_item": MEMORY_ITEM_SCHEMA,
+        "memory_write_decision": MEMORY_WRITE_DECISION_SCHEMA,
+        "memory_recall_hit": MEMORY_RECALL_HIT_SCHEMA,
+        "memory_recall_receipt": MEMORY_RECALL_RECEIPT_SCHEMA,
+        "memory_lifecycle_report": MEMORY_LIFECYCLE_REPORT_SCHEMA,
+        "memory_provenance_report": MEMORY_PROVENANCE_REPORT_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

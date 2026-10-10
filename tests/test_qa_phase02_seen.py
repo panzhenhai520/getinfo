@@ -52,7 +52,12 @@ def _item(ref="article:1", **overrides):
 
 class SchemaV7Tests(unittest.TestCase):
     def test_schema_version_is_v7(self):
-        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v7")
+        """Phase 02 的 seen 表在 v7 落地；Phase 09 起版本号为 **v8**（新增八张 memory_* 表）。
+
+        断言仍是**字面量钉死**（不是"大于等于"）：版本漂移必须当场红；
+        本条只做版本同步，v7 的列清单断言一条都没放松。
+        """
+        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v8")
 
     def test_v6_columns_are_still_declared(self):
         """v6 → v7 只是新增一张表：Phase 01 的 ADD COLUMN 清单一个都不能少。"""

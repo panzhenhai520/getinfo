@@ -49,12 +49,12 @@
 |P08-04|counter-evidence reservation| PASS | 反证预留：预算里为 REFUTES 侧留额度；真机 qa_conflicts 与 REFUTES 边全为 0（对象为 0），能力证据来自构造用例（与 Phase 06 同一处置口径）；10 例 | 2026-10-11 |
 |P08-05|Context Gap| PASS | Context Gap 与动作：TRUNCATED_SPAN 12 / SKILL_NOT_AVAILABLE 9 / UNGROUNDED_CLAIM 6，对应动作 EXPAND_EVIDENCE_SPAN 12 / LOAD_SKILL 9 / REPACK_CONTEXT 6，**触发新检索 0 条**（§6 与 MASTER_RULES 13）；10 例 | 2026-10-11 |
 |P08-06|selection trace| PASS | selection trace：逐项记录入选与被裁原因（真机裁剪 75 条原因全为 OVER_TOKEN_BUDGET）；11 例 | 2026-10-11 |
-|P09-01|memory schema/version/relations|NOT_STARTED|||
-|P09-02|memory types|NOT_STARTED|||
-|P09-03|Write Gate|NOT_STARTED|||
-|P09-04|Recall API|NOT_STARTED|||
-|P09-05|lifecycle|NOT_STARTED|||
-|P09-06|provenance/vector+graph+relational|NOT_STARTED|||
+|P09-01|memory schema/version/relations| PASS | 库表 v7→v8，新增八张 memory_ 表（零 ADD COLUMN、10 个索引，老库补建与回滚都有用例）；§1.4 十类型与九关系、六状态、五作用域、四决策、两个公式逐字入契约；QaStore 新增 13 个记忆仓储方法；内容寻址 memory_id 加 scope_key（把会话与轮次编进键，使「当前状态不得跨会话」成为数据库精确匹配）；19 例 | 2026-10-11 |
+|P09-02|memory types| PASS | 十类记忆全量入契约（含 owner_phase 与七档时效规则判定）；本阶段**可产 2 类**：VERIFIED_CLAIM 必须绑 Phase 03 判 SUPPORTED 的证据、ENTITY 必须出现在证据实体表；其余 8 类写门显式拒收并记账（归 Phase 12/15）；18 例 | 2026-10-11 |
+|P09-03|Write Gate| PASS | 写门四出口与七项效用**逐项可复算**（手算对账用例）；MASTER_RULES 11/16/18 落成硬规则；幂等（第二遍全 DUPLICATE_MERGED、不新增记忆行）；真机候选 278 → 82 条记忆；20 例 | 2026-10-11 |
+|P09-04|Recall API| PASS | 召回六项打分；**每条命中恒为 MEMORY_HINT**（hint=True、requires_revalidation=True、verified_evidence=False）；非 ACTIVE 不进命中；作用域隔离；召回留痕且 recall_count 与 reuse_count 分开计；21 例 | 2026-10-11 |
+|P09-05|lifecycle| PASS | 确定性衰减（半衰期按七档乘置信乘证据乘复用，纯函数）加状态机（只自动产 ACTIVE/STALE/EXPIRED，其余只尊重）；幂等（同钟第二次 0 迁移）与确定性（两独立库同序列分布逐字相同）；真机 +0/+30/+90/+365 天衰减分布与 STALE/EXPIRED 迁移数已记录；17 例 | 2026-10-11 |
+|P09-06|provenance/vector+graph+relational| PASS | 四通道召回；向量通道只用**库内已有向量**（真机 119 条 1024 维、覆盖被引用 73 篇），查询向量为离线质心、零嵌入端点调用；图通道为有向一跳；provenance 真机 82/82 可回溯且与 Phase 02 seen 指纹逐条同口径（122/122）；污染率全 0；16 例 | 2026-10-11 |
 |P10-01|freshness/TTL|NOT_STARTED|||
 |P10-02|source-version detection|NOT_STARTED|||
 |P10-03|MEMORY_HINT revalidation|NOT_STARTED|||

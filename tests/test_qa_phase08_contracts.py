@@ -126,8 +126,8 @@ class FrozenContractTests(unittest.TestCase):
         self.assertEqual(len(contracts.CONTEXT_UTILITY_FACTORS), 5)
 
     def test_schema_version_and_columns_unchanged(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v7",
-                         "Phase 08 没有库表变更，版本号不许动")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v8",
+                         "Phase 08 自身零库表变更；v8 是 Phase 09 的变更（八张 memory_* 表），本条仍钉死字面量")
         blob = " ".join(qa_schema.QA_TABLE_DDL)
         for marker in ("qa_context", "qa_context_pack", "qa_context_item"):
             self.assertNotIn(marker, blob, "不许为上下文包新建表（回执免费持久化在既有表）")

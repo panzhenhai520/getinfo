@@ -224,3 +224,11 @@
 |P08-05/06|Context Gap 与 selection trace|`python -m pytest tests/test_qa_phase08_gaps.py tests/test_qa_phase08_trace.py -q`|缺口给动作、逐项记录入选与被裁原因|真机 TRUNCATED_SPAN 12 / SKILL_NOT_AVAILABLE 9 / UNGROUNDED_CLAIM 6，**触发新检索 0 条**；21 例|PASS|同上|
 |P08-R1|生成端 grounding 校验|`python -m pytest tests/test_qa_phase08_grounding.py -q`|无证据断言必须被拦或标注|真机 13 条最终答案：阻断级违规 0（真机分母 0）、85 处数字不在被引用 span 内、40 条 claim 引用了未验证支持，13/13 全部显式标注；构造注入（抹证据绑定、包外引用、span 外数字）各 13/13 检出、拦截率 1.0|PASS|同上|
 |P08-R2|冻结契约与基线|`python -m pytest tests/test_qa_phase08_contracts.py -q`|七指纹不变、不改冻结 schema|**20 passed**；全量 2428 passed / 1 skipped / 0 failed（Phase 07 基线 2311+1 未破）；零迁移|PASS|同上|
+|P09-01|记忆 schema 与仓储|`python -m pytest tests/test_qa_phase09_schema.py -q`|v8 八表零 ADD COLUMN、老库可补建可回滚|**19 passed**；十类型九关系六状态五作用域四决策入契约；内容寻址加 scope_key；13 个仓储方法|PASS|`qa_schema.py:405-660`；`qa_storage.py:1397-2039`|
+|P09-02|记忆类型与写门边界|`python -m pytest tests/test_qa_phase09_types.py -q`|可产类型必须绑已验证证据；不可产类型显式拒收|**18 passed**；本阶段可产 VERIFIED_CLAIM 与 ENTITY（后者须出现在证据实体表）；其余 8 类记 TYPE_DEFERRED|PASS|`qa_memory.py:385-540`|
+|P09-03|Write Gate|`python -m pytest tests/test_qa_phase09_write_gate.py -q`|四出口与七项效用可复算、幂等|**20 passed**；真机候选 278 → 82 条记忆（去重后）；决策 PERSIST 121 / PERSIST_WITH_TTL 82 / DROP 75|PASS|`baseline/qa-memory-acceptance.json`|
+|P09-04|Recall API|`python -m pytest tests/test_qa_phase09_recall.py -q`|命中恒为提示、非 ACTIVE 不召回、作用域隔离|**21 passed**；真机跨会话命中 **0 → 96**（12/15 run，中位分 0.5258），hint 违规 0、非 ACTIVE 命中 0|PASS|同上|
+|P09-05|生命周期与衰减|`python -m pytest tests/test_qa_phase09_lifecycle.py -q`|衰减确定性、状态机只自动产三态|**17 passed**；真机 +0/+30/+90/+365 天分布：0.8-1.0 桶 60→59→0→0、0.25-0.5 桶 0→4→11→68；幂等与确定性均 true|PASS|同上|
+|P09-06|provenance 与四通道|`python -m pytest tests/test_qa_phase09_provenance.py -q`|每条记忆可回溯到证据、与 seen 指纹同口径|**16 passed**；真机 82/82 可回溯、与 Phase 02 seen 指纹 122/122 同口径；污染率全 0；向量只用库内已有（119 条）|PASS|同上|
+|P09-R1|Phase 08 memory_context 接线|`python -m pytest tests/test_qa_phase08_context.py tests/test_qa_phase09_pipeline.py -q`|填段并写 implemented_by、不再写 deferred_to|Phase 08 新增 2 例、**原断言一条未放松**；管线新增兄弟键且默认关（关掉时键集与写库行数逐字不变）|PASS|`qa_context_pack.py:1170-1360`；`qa_pipeline.py:779-845`|
+|P09-R2|跨阶段契约变更（v7→v8）|`python -m pytest tests/test_qa_phase09_contracts.py -q`|版本字面量同步但断言未放宽、指纹不变|**13 passed**；9 处版本断言同步为 v8 且仍为等值断言；七契约指纹复算不变|PASS|同上|

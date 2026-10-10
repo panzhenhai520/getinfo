@@ -88,8 +88,8 @@ class FrozenContractTests(unittest.TestCase):
         self.assertTrue(ok)
 
     def test_schema_version_and_columns_unchanged(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v7",
-                         "阶段 05 没有库表变更，版本号不许动")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v8",
+                         "阶段 05 自身零库表变更；v8 是 Phase 09 的变更（八张 memory_* 表），本条仍钉死字面量")
         self.assertEqual(len(qa_schema.QA_ADDED_COLUMNS_V6), 15,
                          "ADD COLUMN 清单被改动了（阶段 05 声明零迁移）")
         blob = " ".join(qa_schema.QA_TABLE_DDL)

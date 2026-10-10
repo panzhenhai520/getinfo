@@ -1,0 +1,1026 @@
+{
+ "report_version": "qa-memory-acceptance-v1",
+ "generated_at_utc": "2026-10-10T22:36:32Z",
+ "snapshot": {
+  "path": "baseline\\qa-memory-real-sample.json",
+  "captured_at_utc": "2026-10-10T22:23:32Z",
+  "source": {
+   "host": "117.50.211.93",
+   "container": "collectinfo-postgres",
+   "database": "collectinfo",
+   "access": "readonly (BEGIN READ ONLY + statement_timeout=20s + LIMIT)",
+   "query": "qa_runs/qa_claims/qa_claim_evidence/qa_evidence/qa_conflicts/qa_evidence_seen/qa_stage_runs + memory_*（各一条 SELECT，带 LIMIT）",
+   "snapshot_version": "qa-memory-real-sample-v1"
+  },
+  "catalog": {
+   "qa_runs": 15,
+   "qa_claims": 129,
+   "qa_claim_evidence": 57,
+   "qa_evidence": 93,
+   "qa_conflicts": 0,
+   "qa_evidence_seen": 0,
+   "qa_stage_runs": 118
+  },
+  "missing_tables": [
+   "memory_item",
+   "memory_version",
+   "memory_entity_link",
+   "memory_evidence_link",
+   "memory_relation",
+   "memory_recall_log",
+   "memory_write_decision",
+   "memory_usage_stat"
+  ],
+  "memory_tables_present": []
+ },
+ "real_counts": {
+  "runs": 15,
+  "claims": 129,
+  "edges": 57,
+  "evidence": 93,
+  "conflicts": 0,
+  "evidence_seen": 0
+ },
+ "write_gate": {
+  "runs": 15,
+  "candidates": 278,
+  "persisted": 203,
+  "merged": 121,
+  "session_only": 0,
+  "dropped": 75,
+  "decision_counts": {
+   "PERSIST": 121,
+   "PERSIST_WITH_TTL": 82,
+   "DROP": 75
+  },
+  "reason_counts": {
+   "DUPLICATE_MERGED": 121,
+   "TTL_REQUIRED_BY_FRESHNESS": 82,
+   "UTILITY_BELOW_FLOOR": 42,
+   "NO_VERIFIED_EVIDENCE": 33
+  },
+  "by_type": {
+   "VERIFIED_CLAIM": 129,
+   "ENTITY": 149
+  },
+  "by_freshness": {
+   "SHORT": 72,
+   "VERSION_SENSITIVE": 15,
+   "MEDIUM": 182,
+   "VERY_SHORT": 9
+  },
+  "per_run": [
+   {
+    "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+    "question": "最近融资近3亿元的公司是哪个公司",
+    "claims": 3,
+    "evidence": 3,
+    "candidates": 3,
+    "persisted": 0,
+    "decision_counts": {
+     "DROP": 3
+    },
+    "reason_counts": {
+     "NO_VERIFIED_EVIDENCE": 3
+    }
+   },
+   {
+    "run_id": "162612f141e84ead98c36047f4dfd64b",
+    "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+    "claims": 12,
+    "evidence": 6,
+    "candidates": 37,
+    "persisted": 37,
+    "decision_counts": {
+     "PERSIST_WITH_TTL": 29,
+     "PERSIST": 8
+    },
+    "reason_counts": {
+     "TTL_REQUIRED_BY_FRESHNESS": 29,
+     "DUPLICATE_MERGED": 8
+    }
+   },
+   {
+    "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+    "question": "最近一周最重要的技术进展是什么",
+    "claims": 6,
+    "evidence": 2,
+    "candidates": 26,
+    "persisted": 15,
+    "decision_counts": {
+     "DROP": 11,
+     "PERSIST_WITH_TTL": 11,
+     "PERSIST": 4
+    },
+    "reason_counts": {
+     "TTL_REQUIRED_BY_FRESHNESS": 11,
+     "UTILITY_BELOW_FLOOR": 11,
+     "DUPLICATE_MERGED": 4
+    }
+   },
+   {
+    "run_id": "48855683e91d48b6b213e8aa8195df50",
+    "question": "帮我总结一下当前行业的主要风险",
+    "claims": 9,
+    "evidence": 3,
+    "candidates": 29,
+    "persisted": 25,
+    "decision_counts": {
+     "PERSIST": 24,
+     "DROP": 4,
+     "PERSIST_WITH_TTL": 1
+    },
+    "reason_counts": {
+     "DUPLICATE_MERGED": 24,
+     "UTILITY_BELOW_FLOOR": 4,
+     "TTL_REQUIRED_BY_FRESHNESS": 1
+    }
+   },
+   {
+    "run_id": "613514876a1e40698cb1e1e636a0c21b",
+    "question": "出货量超1.9万台，占全球约77.9%的是什么",
+    "claims": 12,
+    "evidence": 12,
+    "candidates": 19,
+    "persisted": 12,
+    "decision_counts": {
+     "PERSIST_WITH_TTL": 8,
+     "DROP": 7,
+     "PERSIST": 4
+    },
+    "reason_counts": {
+     "TTL_REQUIRED_BY_FRESHNESS": 8,
+     "NO_VERIFIED_EVIDENCE": 6,
+     "DUPLICATE_MERGED": 4,
+     "UTILITY_BELOW_FLOOR": 1
+    }
+   },
+   {
+    "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+    "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+    "claims": 12,
+    "evidence": 12,
+    "candidates": 20,
+    "persisted": 19,
+    "decision_counts": {
+     "PERSIST_WITH_TTL": 11,
+     "PERSIST": 8,
+     "DROP": 1
+    },
+    "reason_counts": {
+     "TTL_REQUIRED_BY_FRESHNESS": 11,
+     "DUPLICATE_MERGED": 8,
+     "UTILITY_BELOW_FLOOR": 1
+    }
+   },
+   {
+    "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+    "question": "这个行业最近最大的一笔融资是多少",
+    "claims": 0,
+    "evidence": 0,
+    "candidates": 0,
+    "persisted": 0,
+    "decision_counts": {},
+    "reason_counts": {}
+   },
+   {
+    "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+    "question": "这个行业最近最大的一笔融资是多少",
+    "claims": 6,
+    "evidence": 2,
+    "candidates": 23,
+    "persisted": 19,
+    "decision_counts": {
+     "PERSIST": 19,
+     "DROP": 4
+    },
+    "reason_counts": {
+     "DUPLICATE_MERGED": 19,
+     "UTILITY_BELOW_FLOOR": 4
+    }
+   },
+   {
+    "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+    "question": "特斯拉无人驾驶出租车已经在运行了吗",
+    "claims": 6,
+    "evidence": 1,
+    "candidates": 6,
+    "persisted": 0,
+    "decision_counts": {
+     "DROP": 6
+    },
+    "reason_counts": {
+     "NO_VERIFIED_EVIDENCE": 6
+    }
+   },
+   {
+    "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+    "question": "行业里排名靠前的公司最近有什么动作",
+    "claims": 9,
+    "evidence": 3,
+    "candidates": 34,
+    "persisted": 27,
+    "decision_counts": {
+     "PERSIST": 27,
+     "DROP": 7
+    },
+    "reason_counts": {
+     "DUPLICATE_MERGED": 27,
+     "UTILITY_BELOW_FLOOR": 7
+    }
+   },
+   {
+    "run_id": "a419bd545c70440ea78f24eaaa884b76",
+    "question": "最近有哪些值得关注的政策变化",
+    "claims": 0,
+    "evidence": 0,
+    "candidates": 0,
+    "persisted": 0,
+    "decision_counts": {},
+    "reason_counts": {}
+   },
+   {
+    "run_id": "adebd40548d343eda11e765cdbaede3f",
+    "question": "最近融资近3亿元的公司是哪个公司",
+    "claims": 12,
+    "evidence": 7,
+    "candidates": 19,
+    "persisted": 10,
+    "decision_counts": {
+     "DROP": 9,
+     "PERSIST_WITH_TTL": 6,
+     "PERSIST": 4
+    },
+    "reason_counts": {
+     "NO_VERIFIED_EVIDENCE": 6,
+     "TTL_REQUIRED_BY_FRESHNESS": 6,
+     "DUPLICATE_MERGED": 4,
+     "UTILITY_BELOW_FLOOR": 3
+    }
+   },
+   {
+    "run_id": "b76aa77a29c046fa84d55e7db517e810",
+    "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+    "claims": 15,
+    "evidence": 15,
+    "candidates": 23,
+    "persisted": 18,
+    "decision_counts": {
+     "PERSIST": 10,
+     "PERSIST_WITH_TTL": 8,
+     "DROP": 5
+    },
+    "reason_counts": {
+     "DUPLICATE_MERGED": 10,
+     "TTL_REQUIRED_BY_FRESHNESS": 8,
+     "UTILITY_BELOW_FLOOR": 5
+    }
+   },
+   {
+    "run_id": "c3fd469f115d4002bd2824b397425756",
+    "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+    "claims": 15,
+    "evidence": 15,
+    "candidates": 24,
+    "persisted": 10,
+    "decision_counts": {
+     "DROP": 14,
+     "PERSIST_WITH_TTL": 6,
+     "PERSIST": 4
+    },
+    "reason_counts": {
+     "NO_VERIFIED_EVIDENCE": 9,
+     "TTL_REQUIRED_BY_FRESHNESS": 6,
+     "UTILITY_BELOW_FLOOR": 5,
+     "DUPLICATE_MERGED": 4
+    }
+   },
+   {
+    "run_id": "e280beda3f7b48a596293c032f6a15e2",
+    "question": "最近工信部在人形机器人领域有什么动态",
+    "claims": 12,
+    "evidence": 12,
+    "candidates": 15,
+    "persisted": 11,
+    "decision_counts": {
+     "PERSIST": 9,
+     "DROP": 4,
+     "PERSIST_WITH_TTL": 2
+    },
+    "reason_counts": {
+     "DUPLICATE_MERGED": 9,
+     "NO_VERIFIED_EVIDENCE": 3,
+     "TTL_REQUIRED_BY_FRESHNESS": 2,
+     "UTILITY_BELOW_FLOOR": 1
+    }
+   }
+  ]
+ },
+ "verification": {
+  "claim_verdicts": {
+   "SUPPORTED": 76,
+   "UNVERIFIED": 25,
+   "QUALIFIED": 3,
+   "REFUTED": 2
+  },
+  "claims": 129,
+  "claims_with_supported_evidence": 96,
+  "supported_rate": 0.744186
+ },
+ "memory_graph": {
+  "items": 82,
+  "by_type": {
+   "ENTITY": 58,
+   "VERIFIED_CLAIM": 24
+  },
+  "by_status": {
+   "ACTIVE": 82
+  },
+  "by_freshness": {
+   "MEDIUM": 66,
+   "SHORT": 12,
+   "VERSION_SENSITIVE": 3,
+   "VERY_SHORT": 1
+  },
+  "by_scope": {
+   "PATIENT_LONGITUDINAL": 82
+  },
+  "links": {
+   "evidence": 122,
+   "entity": 213,
+   "relation": 417
+  },
+  "decisions": {
+   "DROP": 53,
+   "PERSIST": 81,
+   "PERSIST_WITH_TTL": 82
+  },
+  "recalls": {
+   "rows": 15,
+   "hits": 96
+  },
+  "error": ""
+ },
+ "before_after": {
+  "memories_before": 0,
+  "memories_after": 82,
+  "write_operations": 203,
+  "merged_writes": 121,
+  "recall_hits_before": 0,
+  "recall_hits_after": 96,
+  "runs_with_hits_before": 0,
+  "runs_with_hits_after": 12,
+  "note": "before = A 机当前状态（八张 memory_* 表不存在、qa_evidence_seen 在但 0 行）；after = 同一份真实证据离线跑完 Write Gate 之后的记忆图"
+ },
+ "recall": {
+  "before": {
+   "runs": 15,
+   "runs_with_hits": 0,
+   "hits_total": 0,
+   "by_channel": {},
+   "by_type": {},
+   "hint_violations": 0,
+   "non_active_hits": 0,
+   "top_scores": [],
+   "boundaries": {
+    "no_lexical_seed": 15
+   },
+   "per_run": [
+    {
+     "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+     "question": "最近融资近3亿元的公司是哪个公司",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "question": "最近一周最重要的技术进展是什么",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "48855683e91d48b6b213e8aa8195df50",
+     "question": "帮我总结一下当前行业的主要风险",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "question": "出货量超1.9万台，占全球约77.9%的是什么",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+     "question": "这个行业最近最大的一笔融资是多少",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+     "question": "这个行业最近最大的一笔融资是多少",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "question": "特斯拉无人驾驶出租车已经在运行了吗",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+     "question": "行业里排名靠前的公司最近有什么动作",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "a419bd545c70440ea78f24eaaa884b76",
+     "question": "最近有哪些值得关注的政策变化",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "question": "最近融资近3亿元的公司是哪个公司",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "c3fd469f115d4002bd2824b397425756",
+     "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "question": "最近工信部在人形机器人领域有什么动态",
+     "hits": 0,
+     "channels": {}
+    }
+   ],
+   "planning_hits": 0,
+   "raw_top_scores": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scores": {
+    "runs": 15,
+    "min": 0.0,
+    "median": 0.0,
+    "max": 0.0,
+    "zero": 15,
+    "top_scores": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   "threshold_sensitivity": {
+    "0.02": 0,
+    "0.05": 0,
+    "0.1": 0,
+    "0.2": 0
+   },
+   "min_score": 0.05,
+   "memory_stats": {
+    "items": 0,
+    "by_type": {},
+    "by_status": {},
+    "by_freshness": {},
+    "by_scope": {},
+    "links": {
+     "evidence": 0,
+     "entity": 0,
+     "relation": 0
+    },
+    "decisions": {},
+    "recalls": {
+     "rows": 15,
+     "hits": 0
+    },
+    "error": ""
+   },
+   "planning_note": "planning 模式只召回 STRATEGY/FAILURE/QUERY_PATTERN（Phase 12 的账）"
+  },
+  "after": {
+   "runs": 15,
+   "runs_with_hits": 12,
+   "hits_total": 96,
+   "by_channel": {
+    "lexical": 92,
+    "vector": 96
+   },
+   "by_type": {
+    "ENTITY": 43,
+    "VERIFIED_CLAIM": 53
+   },
+   "hint_violations": 0,
+   "non_active_hits": 0,
+   "top_scores": [
+    0.6404,
+    0.5839,
+    0.6434,
+    0.5851,
+    0.6372,
+    0.6423,
+    0.2388,
+    0.3996,
+    0.6111,
+    0.5258,
+    0.3334,
+    0.5905
+   ],
+   "boundaries": {
+    "no_lexical_seed": 3
+   },
+   "per_run": [
+    {
+     "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+     "question": "最近融资近3亿元的公司是哪个公司",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "question": "最近一周最重要的技术进展是什么",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "48855683e91d48b6b213e8aa8195df50",
+     "question": "帮我总结一下当前行业的主要风险",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "question": "出货量超1.9万台，占全球约77.9%的是什么",
+     "hits": 8,
+     "channels": {
+      "vector": 8,
+      "lexical": 7
+     }
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+     "hits": 8,
+     "channels": {
+      "vector": 8,
+      "lexical": 7
+     }
+    },
+    {
+     "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+     "question": "这个行业最近最大的一笔融资是多少",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+     "question": "这个行业最近最大的一笔融资是多少",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "question": "特斯拉无人驾驶出租车已经在运行了吗",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+     "question": "行业里排名靠前的公司最近有什么动作",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "a419bd545c70440ea78f24eaaa884b76",
+     "question": "最近有哪些值得关注的政策变化",
+     "hits": 0,
+     "channels": {}
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "question": "最近融资近3亿元的公司是哪个公司",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    },
+    {
+     "run_id": "c3fd469f115d4002bd2824b397425756",
+     "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+     "hits": 8,
+     "channels": {
+      "vector": 8,
+      "lexical": 6
+     }
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "question": "最近工信部在人形机器人领域有什么动态",
+     "hits": 8,
+     "channels": {
+      "lexical": 8,
+      "vector": 8
+     }
+    }
+   ],
+   "planning_hits": 0,
+   "raw_top_scores": [
+    0.0,
+    0.640408,
+    0.583899,
+    0.643375,
+    0.58515,
+    0.637184,
+    0.0,
+    0.401429,
+    0.218473,
+    0.399605,
+    0.0,
+    0.611052,
+    0.52583,
+    0.333422,
+    0.590452
+   ],
+   "scores": {
+    "runs": 15,
+    "min": 0.0,
+    "median": 0.52583,
+    "max": 0.643375,
+    "zero": 3,
+    "top_scores": [
+     0.0,
+     0.640408,
+     0.583899,
+     0.643375,
+     0.58515,
+     0.637184,
+     0.0,
+     0.401429,
+     0.218473,
+     0.399605,
+     0.0,
+     0.611052,
+     0.52583,
+     0.333422,
+     0.590452
+    ]
+   },
+   "threshold_sensitivity": {
+    "0.02": 12,
+    "0.05": 12,
+    "0.1": 12,
+    "0.2": 12
+   },
+   "min_score": 0.05,
+   "memory_stats": {
+    "items": 82,
+    "by_type": {
+     "ENTITY": 58,
+     "VERIFIED_CLAIM": 24
+    },
+    "by_status": {
+     "ACTIVE": 82
+    },
+    "by_freshness": {
+     "MEDIUM": 66,
+     "SHORT": 12,
+     "VERSION_SENSITIVE": 3,
+     "VERY_SHORT": 1
+    },
+    "by_scope": {
+     "PATIENT_LONGITUDINAL": 82
+    },
+    "links": {
+     "evidence": 122,
+     "entity": 213,
+     "relation": 417
+    },
+    "decisions": {
+     "DROP": 53,
+     "PERSIST": 81,
+     "PERSIST_WITH_TTL": 82
+    },
+    "recalls": {
+     "rows": 15,
+     "hits": 96
+    },
+    "error": ""
+   },
+   "planning_note": "planning 模式只召回 STRATEGY/FAILURE/QUERY_PATTERN（Phase 12 的账）"
+  }
+ },
+ "vector_source": {
+  "rows": 119,
+  "articles": 73,
+  "ids": 119,
+  "dim": 1024,
+  "note": "库内**已有**向量的只读导出（被真实证据引用到的文章）；查询向量是离线质心，全程零嵌入端点调用"
+ },
+ "lifecycle": {
+  "base": "2026-10-10T22:23:32+00:00",
+  "at_days": {
+   "0": {
+    "checked": 82,
+    "transitions": 82,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 81,
+     "ACTIVE->EXPIRED/VALID_UNTIL_PASSED": 1
+    },
+    "status_counts": {
+     "ACTIVE": 82
+    },
+    "decay_bands": {
+     "0-0.05": 1,
+     "0.05-0.25": 0,
+     "0.25-0.5": 0,
+     "0.5-0.8": 21,
+     "0.8-1.0": 60
+    }
+   },
+   "30": {
+    "checked": 82,
+    "transitions": 81,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 80,
+     "ACTIVE->STALE/DECAY_BELOW_STALE_FLOOR": 1
+    },
+    "status_counts": {
+     "ACTIVE": 81,
+     "EXPIRED": 1
+    },
+    "decay_bands": {
+     "0-0.05": 1,
+     "0.05-0.25": 1,
+     "0.25-0.5": 4,
+     "0.5-0.8": 17,
+     "0.8-1.0": 59
+    }
+   },
+   "90": {
+    "checked": 82,
+    "transitions": 81,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 80,
+     "STALE->EXPIRED/DECAY_BELOW_EXPIRE_FLOOR": 1
+    },
+    "status_counts": {
+     "ACTIVE": 80,
+     "EXPIRED": 1,
+     "STALE": 1
+    },
+    "decay_bands": {
+     "0-0.05": 2,
+     "0.05-0.25": 0,
+     "0.25-0.5": 11,
+     "0.5-0.8": 69,
+     "0.8-1.0": 0
+    }
+   },
+   "365": {
+    "checked": 82,
+    "transitions": 80,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 69,
+     "ACTIVE->STALE/DECAY_BELOW_STALE_FLOOR": 11
+    },
+    "status_counts": {
+     "ACTIVE": 80,
+     "EXPIRED": 2
+    },
+    "decay_bands": {
+     "0-0.05": 12,
+     "0.05-0.25": 1,
+     "0.25-0.5": 68,
+     "0.5-0.8": 1,
+     "0.8-1.0": 0
+    }
+   }
+  },
+  "idempotent": true,
+  "deterministic": true,
+  "second_pass_transitions": 0
+ },
+ "provenance": {
+  "provenance_version": "qa-memory-provenance-v1",
+  "graph_version": "qa-memory-graph-v1",
+  "run_id": "",
+  "checked": 82,
+  "traceable": 82,
+  "untraceable": [],
+  "links": {
+   "evidence": 122,
+   "with_source_fingerprint": 122,
+   "with_span": 122,
+   "with_run_id": 122,
+   "with_corpus_version": 0,
+   "verified_verdict": 122
+  },
+  "channels": {
+   "relational": "作用域+状态精确匹配（scope_key）",
+   "graph": "memory_relation 一跳扩展",
+   "vector": "库内已有向量余弦（离线质心，零端点调用）",
+   "lexical": "词面覆盖（qa_verifier.term_set 口径）"
+  },
+  "note": "每条记忆都必须能回到 Phase 02 的来源指纹 + 最小 span；回溯不上的逐条列出，不做四舍五入",
+  "contract_ok": true
+ },
+ "pollution": {
+  "unsupported_evidence_links": 0,
+  "memories_without_evidence_link": 0,
+  "sensitive_memories": 0,
+  "external_instruction_memories": 0
+ },
+ "distribution": {
+  "by_type": {
+   "ENTITY": 58,
+   "VERIFIED_CLAIM": 24
+  },
+  "by_status": {
+   "ACTIVE": 82
+  },
+  "by_freshness": {
+   "MEDIUM": 66,
+   "SHORT": 12,
+   "VERSION_SENSITIVE": 3,
+   "VERY_SHORT": 1
+  }
+ },
+ "phase02_alignment": {
+  "links_checked": 122,
+  "fingerprint_matched": 122,
+  "match_rate": 1.0,
+  "seen_rows_in_snapshot": 0,
+  "note": "记忆链的来源指纹与 `qa_evidence.source_fingerprint()` 同口径；A 机 `qa_evidence_seen` 当前 0 行（表在、暂无行），所以 seen 侧的分布只能报 0，不编数"
+ },
+ "determinism": {
+  "decision_distribution_equal": true,
+  "reason_distribution_equal": true,
+  "memory_ids_equal": true,
+  "persisted_equal": true
+ },
+ "checks": [
+  {
+   "name": "write_gate_produces_memories",
+   "passed": true,
+   "detail": "真实数据上落库 203 条记忆（候选 278）"
+  },
+  {
+   "name": "write_gate_all_four_decisions_reachable_in_tests",
+   "passed": true,
+   "detail": "候选决策分布：{\"PERSIST_WITH_TTL\": 189, \"DROP\": 89}"
+  },
+  {
+   "name": "memory_item_contract",
+   "passed": true,
+   "detail": "82/82 条记忆过 memory_item 契约"
+  },
+  {
+   "name": "provenance_traceable",
+   "passed": true,
+   "detail": "回溯 82/82"
+  },
+  {
+   "name": "no_unsupported_evidence_in_memory",
+   "passed": true,
+   "detail": "非 SUPPORTED 证据链接 0 条（MASTER_RULES 11）"
+  },
+  {
+   "name": "no_memory_without_evidence_link",
+   "passed": true,
+   "detail": "无证据链接的记忆 0 条"
+  },
+  {
+   "name": "no_sensitive_memory",
+   "passed": true,
+   "detail": "含敏感串的记忆 0 条（MASTER_RULES 18）"
+  },
+  {
+   "name": "no_external_instruction_memory",
+   "passed": true,
+   "detail": "外部指令性内容 0 条（MASTER_RULES 16）"
+  },
+  {
+   "name": "recall_hint_invariants",
+   "passed": true,
+   "detail": "hint 违规 0 / 非 ACTIVE 命中 0"
+  },
+  {
+   "name": "recall_before_after",
+   "passed": true,
+   "detail": "before 命中 0、after 命中 96（跨 15 个真实 run）"
+  },
+  {
+   "name": "lifecycle_idempotent",
+   "passed": true,
+   "detail": "同一时钟第二次迁移 0 条"
+  },
+  {
+   "name": "lifecycle_deterministic",
+   "passed": true,
+   "detail": "两个独立库在 +90 天得到相同状态/衰减分布"
+  },
+  {
+   "name": "phase02_fingerprint_alignment",
+   "passed": true,
+   "detail": "122/122 条证据链接指纹与 Phase 02 同口径"
+  },
+  {
+   "name": "write_gate_determinism",
+   "passed": true,
+   "detail": "{\"decision_distribution_equal\": true, \"reason_distribution_equal\": true, \"memory_ids_equal\": true, \"persisted_equal\": true}"
+  }
+ ],
+ "acceptance": {
+  "passed": true,
+  "failed": [],
+  "checks": 14,
+  "passed_checks": 14
+ },
+ "limits": [
+  "向量通道用快照导出的**库内已有向量**（只覆盖被真实证据引用到的文章），覆盖不到的记忆一律记 no_vectors 边界；查询向量是离线质心，零嵌入端点调用",
+  "真机 run 早于本阶段接线：记忆图是离线重建（同一份代码/证据），线上路径由管线用例覆盖",
+  "qa_evidence_seen 在 A 机当前 0 行，所以 seen 分布只能报 0（不编数）"
+ ]
+}

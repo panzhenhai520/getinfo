@@ -1394,5 +1394,646 @@ class QaStore:
             result.append(value)
         return result
 
+    # ── Phase 09（P09-01…P09-06）：Memory Graph Core 仓储 ────────────────────
+    # 口径（与 Phase 02 的 seen 表一致）：
+    #   · 记忆**不物理覆盖**（§2.3）：每次变更都追加一行 memory_version，memory_item 只是当前视图；
+    #   · 每条记忆都要能回到证据（§12 provenance）：memory_evidence_link 存 Phase 02 的
+    #     来源指纹/span 指纹 + Phase 03 的 verdict；
+    #   · 读侧一律"异常退化成空/错误码"，绝不把召回或留痕的失败冒泡成问答失败。
+
+    def save_memory_item(self, item: Mapping) -> dict:
+        """写入/刷新一条记忆（按 `memory_id` 内容寻址 + 作用域内容指纹 upsert）。
+
+        语义（确定性、可复跑）：
+          · 同一个 `memory_id` 再写一次**不覆盖历史**：`memory_version` 追加一行，
+            `memory_item` 更新成当前视图（version 递增）；
+          · `reuse_count` / `recall_count` / `created_*` 由**既有行保留**（写入方不负责回填历史）；
+          · 返回写入行（含 version 与是否新建）。异常吞掉并回 `{..., "error": ...}`。
+        """
+        item = dict(item) if isinstance(item, Mapping) else {}
+        now = _now()
+        memory_id = str(item.get("memory_id") or "")
+        result = {"memory_id": memory_id, "created": False, "version": 0, "error": ""}
+        if not memory_id:
+            result["error"] = "memory_id 为空"
+            return result
+        entities = list(item.get("entity_ids") or [])
+        evidence_ids = list(item.get("source_evidence_ids") or [])
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    existing = cursor.execute(
+                        "SELECT version, reuse_count, recall_count, created_at FROM memory_item "
+                        "WHERE memory_id=?", (memory_id,)).fetchone()
+                    current = _row_dict(existing) or {}
+                    version = int(current.get("version") or 0) + 1
+                    created = not current
+                    cursor.execute(
+                        """
+                        INSERT INTO memory_item(
+                            memory_id,memory_type,canonical_content,content_fingerprint,confidence,
+                            freshness_class,valid_from,valid_until,last_verified_at,status,scope,
+                            scope_key,owner_user_id,session_id,industry_pack_id,entity_ids_json,
+                            source_evidence_ids_json,superseded_by,reuse_count,recall_count,
+                            created_from_session_id,created_from_run_id,version,decay_score,
+                            payload_json,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(memory_id) DO UPDATE SET
+                            canonical_content=excluded.canonical_content,
+                            content_fingerprint=excluded.content_fingerprint,
+                            confidence=excluded.confidence,
+                            freshness_class=excluded.freshness_class,
+                            valid_from=excluded.valid_from,
+                            valid_until=excluded.valid_until,
+                            last_verified_at=excluded.last_verified_at,
+                            status=excluded.status,
+                            scope=excluded.scope,
+                            scope_key=excluded.scope_key,
+                            entity_ids_json=excluded.entity_ids_json,
+                            source_evidence_ids_json=excluded.source_evidence_ids_json,
+                            superseded_by=excluded.superseded_by,
+                            version=excluded.version,
+                            decay_score=excluded.decay_score,
+                            payload_json=excluded.payload_json,
+                            updated_at=excluded.updated_at
+                        """,
+                        (
+                            memory_id, str(item.get("memory_type") or "VERIFIED_CLAIM"),
+                            str(item.get("canonical_content") or ""),
+                            str(item.get("content_fingerprint") or ""),
+                            float(item.get("confidence") or 0),
+                            str(item.get("freshness_class") or "MEDIUM"),
+                            str(item.get("valid_from") or ""), str(item.get("valid_until") or ""),
+                            str(item.get("last_verified_at") or ""),
+                            str(item.get("status") or "ACTIVE"), str(item.get("scope") or "SESSION"),
+                            str(item.get("scope_key") or ""),
+                            str(item.get("owner_user_id") or ""), str(item.get("session_id") or ""),
+                            str(item.get("industry_pack_id") or ""), _json(entities),
+                            _json(evidence_ids), str(item.get("superseded_by") or ""),
+                            int(current.get("reuse_count") or 0), int(current.get("recall_count") or 0),
+                            str(item.get("created_from_session_id") or ""),
+                            str(item.get("created_from_run_id") or ""), version,
+                            float(item.get("decay_score") or 0),
+                            _json(item.get("metadata") or {}),
+                            str(current.get("created_at") or now), now,
+                        ),
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO memory_version(
+                            memory_id,version,change,status,confidence,canonical_content,
+                            valid_until,last_verified_at,decay_score,reason,payload_json,created_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(memory_id,version) DO UPDATE SET
+                            change=excluded.change, status=excluded.status,
+                            confidence=excluded.confidence, decay_score=excluded.decay_score,
+                            reason=excluded.reason, payload_json=excluded.payload_json
+                        """,
+                        (
+                            memory_id, version, str(item.get("change") or "CREATE"),
+                            str(item.get("status") or "ACTIVE"), float(item.get("confidence") or 0),
+                            str(item.get("canonical_content") or ""), str(item.get("valid_until") or ""),
+                            str(item.get("last_verified_at") or ""), float(item.get("decay_score") or 0),
+                            str(item.get("change_reason") or ""), _json(item.get("metadata") or {}), now,
+                        ),
+                    )
+                    for entity in entities:
+                        if isinstance(entity, Mapping):
+                            key = str(entity.get("entity_key") or entity.get("text") or "")
+                            text = str(entity.get("text") or key)
+                            role = str(entity.get("role") or "subject")
+                        else:
+                            key = text = str(entity or "")
+                            role = "subject"
+                        if not key:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_entity_link(memory_id,entity_key,entity_text,role,payload_json,created_at)
+                            VALUES(?,?,?,?,?,?)
+                            ON CONFLICT(memory_id,entity_key,role) DO UPDATE SET
+                                entity_text=excluded.entity_text
+                            """,
+                            (memory_id, key, text, role, _json({}), now),
+                        )
+                    self.database.connection.commit()
+                    result.update({"created": created, "version": version})
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return result
+
+    def link_memory_evidence(self, memory_id: str, links: list) -> int:
+        """绑定记忆↔证据（§12 memory_evidence_link）：provenance 的唯一载体。
+
+        主键 (memory_id, evidence_ref, source_fingerprint) 保证同一绑定只留一行（幂等）。
+        """
+        rows = [dict(row) for row in (links or []) if isinstance(row, Mapping)]
+        if not rows:
+            return 0
+        now = _now()
+        written = 0
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows:
+                        evidence_ref = str(row.get("evidence_ref") or "")
+                        if not evidence_ref:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_evidence_link(
+                                memory_id,evidence_ref,source_fingerprint,span_fingerprint,run_id,
+                                stage,route,corpus_version,verdict,evidence_score,relationship,
+                                payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(memory_id,evidence_ref,source_fingerprint) DO UPDATE SET
+                                span_fingerprint=excluded.span_fingerprint,
+                                verdict=excluded.verdict, evidence_score=excluded.evidence_score,
+                                relationship=excluded.relationship, payload_json=excluded.payload_json
+                            """,
+                            (
+                                str(memory_id), evidence_ref,
+                                str(row.get("source_fingerprint") or ""),
+                                str(row.get("span_fingerprint") or ""), str(row.get("run_id") or ""),
+                                str(row.get("stage") or ""), str(row.get("route") or ""),
+                                str(row.get("corpus_version") or ""), str(row.get("verdict") or ""),
+                                float(row.get("evidence_score") or 0),
+                                str(row.get("relationship") or ""),
+                                _json(row.get("metadata") or {}), now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001 —— 绑定失败不冒泡（写入方按"未绑定"处理）
+            return 0
+        return written
+
+    def add_memory_relation(self, rows: list) -> int:
+        """写记忆图关系（§1.4 的九个取值由契约守门；本阶段只写四个自有关系）。"""
+        written = 0
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows or []:
+                        if not isinstance(row, Mapping):
+                            continue
+                        memory_id = str(row.get("memory_id") or "")
+                        relation = str(row.get("relation") or "")
+                        if not memory_id or not relation:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_relation(
+                                memory_id,relation,target_memory_id,target_kind,target_ref,weight,
+                                rationale,created_from_run_id,version,payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(memory_id,relation,target_memory_id,target_ref) DO UPDATE SET
+                                weight=excluded.weight, rationale=excluded.rationale,
+                                payload_json=excluded.payload_json
+                            """,
+                            (
+                                memory_id, relation, str(row.get("target_memory_id") or ""),
+                                str(row.get("target_kind") or "memory"), str(row.get("target_ref") or ""),
+                                float(row.get("weight") or 0), str(row.get("rationale") or ""),
+                                str(row.get("run_id") or ""), int(row.get("version") or 1),
+                                _json(row.get("metadata") or {}), now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001
+            return 0
+        return written
+
+    def record_memory_write_decision(self, rows: list) -> int:
+        """落写决策留痕（P09-03）：**每一条候选记忆**都要有一行（含 DROP）。"""
+        written = 0
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows or []:
+                        if not isinstance(row, Mapping):
+                            continue
+                        decision_id = str(row.get("decision_id") or "")
+                        if not decision_id:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_write_decision(
+                                decision_id,run_id,memory_type,decision,reason,utility,factors_json,
+                                memory_id,content_fingerprint,evidence_refs_json,scope,scope_key,
+                                gate_version,payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(decision_id) DO UPDATE SET
+                                decision=excluded.decision, reason=excluded.reason,
+                                utility=excluded.utility, factors_json=excluded.factors_json,
+                                payload_json=excluded.payload_json
+                            """,
+                            (
+                                decision_id, str(row.get("run_id") or ""),
+                                str(row.get("memory_type") or ""), str(row.get("decision") or "DROP"),
+                                str(row.get("reason") or ""), float(row.get("utility") or 0),
+                                _json(row.get("factors") or {}), str(row.get("memory_id") or ""),
+                                str(row.get("content_fingerprint") or ""),
+                                _json(row.get("evidence_refs") or []), str(row.get("scope") or ""),
+                                str(row.get("scope_key") or ""), str(row.get("gate_version") or ""),
+                                _json(row.get("metadata") or {}), now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001
+            return 0
+        return written
+
+    def record_memory_recall(self, row: Mapping) -> bool:
+        """落一条召回日志（P09-04）：谁在什么模式/作用域下召回了什么，可复算。"""
+        row = dict(row) if isinstance(row, Mapping) else {}
+        recall_id = str(row.get("recall_id") or "")
+        if not recall_id:
+            return False
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO memory_recall_log(
+                            recall_id,trace_id,run_id,mode,scope_key,owner_user_id,session_id,
+                            industry_pack_id,query_fingerprint,channels_json,hits,top_score,
+                            counts_json,payload_json,created_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(recall_id) DO UPDATE SET
+                            hits=excluded.hits, top_score=excluded.top_score,
+                            counts_json=excluded.counts_json, payload_json=excluded.payload_json
+                        """,
+                        (
+                            recall_id, str(row.get("trace_id") or ""), str(row.get("run_id") or ""),
+                            str(row.get("mode") or ""), str(row.get("scope_key") or ""),
+                            str(row.get("owner_user_id") or ""), str(row.get("session_id") or ""),
+                            str(row.get("industry_pack_id") or ""),
+                            str(row.get("query_fingerprint") or ""),
+                            _json(row.get("channels") or []), int(row.get("hits") or 0),
+                            float(row.get("top_score") or 0), _json(row.get("counts") or {}),
+                            _json(row.get("metadata") or {}), _now(),
+                        ),
+                    )
+                    self.database.connection.commit()
+                    return True
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001
+            return False
+
+    def bump_memory_usage(self, memory_ids, *, day: str = "", recalled: int = 0,
+                          used: int = 0, helped: int = 0, reuse: bool = False) -> int:
+        """按天累计记忆使用统计（P09-04 `memory_usage_stat` + `memory_item.reuse_count`）。
+
+        `reuse=True` 才递增 `memory_item.reuse_count`（§2.3 的"复用次数"）：
+        召回只是"给过提示"，**用过**才算复用 —— 两者分开记，召回分才不会被刷高。
+        """
+        keys = [str(item) for item in (memory_ids or []) if str(item or "")]
+        if not keys:
+            return 0
+        day = str(day or _now()[:10])
+        now = _now()
+        written = 0
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for memory_id in keys:
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_usage_stat(memory_id,day,recalled,used,helped,created_at,updated_at)
+                            VALUES(?,?,?,?,?,?,?)
+                            ON CONFLICT(memory_id,day) DO UPDATE SET
+                                recalled=memory_usage_stat.recalled+excluded.recalled,
+                                used=memory_usage_stat.used+excluded.used,
+                                helped=memory_usage_stat.helped+excluded.helped,
+                                updated_at=excluded.updated_at
+                            """,
+                            (memory_id, day, int(recalled or 0), int(used or 0), int(helped or 0), now, now),
+                        )
+                        cursor.execute(
+                            "UPDATE memory_item SET recall_count=recall_count+?, "
+                            "reuse_count=reuse_count+?, updated_at=? WHERE memory_id=?",
+                            (int(recalled or 0), (int(used or 0) if reuse else 0), now, memory_id),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001
+            return 0
+        return written
+
+    def memory_usage(self, memory_ids=(), *, day: str = "") -> dict:
+        """按记忆 id 取使用统计（召回/用过/帮上忙）→ {memory_id: {...}}。"""
+        keys = [str(item) for item in (memory_ids or []) if str(item or "")]
+        if not keys:
+            return {}
+        try:
+            self.ensure_schema()
+            where = ["memory_id IN (%s)" % ",".join("?" for _ in keys)]
+            params: list = list(keys)
+            if day:
+                where.append("day=?")
+                params.append(str(day))
+            with self.database.lock:
+                rows = self.database.connection.execute(
+                    "SELECT memory_id,SUM(recalled) AS recalled,SUM(used) AS used,"
+                    "SUM(helped) AS helped FROM memory_usage_stat WHERE " + " AND ".join(where)
+                    + " GROUP BY memory_id", tuple(params)).fetchall()
+            return {str((_row_dict(row) or {}).get("memory_id")): {
+                "recalled": int((_row_dict(row) or {}).get("recalled") or 0),
+                "used": int((_row_dict(row) or {}).get("used") or 0),
+                "helped": int((_row_dict(row) or {}).get("helped") or 0),
+            } for row in rows}
+        except Exception:  # noqa: BLE001
+            return {}
+
+    def load_memory_items(self, *, scope_keys=(), memory_ids=(), memory_types=(), statuses=(),
+                          owner_user_id: str = "", industry_pack_id: str = "",
+                          include_all_scopes: bool = False, limit: int = 500) -> list[dict]:
+        """按作用域/类型/状态读记忆（召回与生命周期维护的共同读侧）。
+
+        作用域口径（§14 + MASTER_RULES 12）：默认**只读给定作用域**；`include_all_scopes=True`
+        才允许跨作用域读（维护任务/验收统计用），调用方必须自己为此负责。
+        坏 JSON 一律退化成默认值，绝不因一条脏行让整次召回失败。
+        """
+        result: list[dict] = []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            keys = [str(item) for item in (scope_keys or []) if str(item or "")]
+            ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+            types = [str(item) for item in (memory_types or []) if str(item or "")]
+            stats = [str(item) for item in (statuses or []) if str(item or "")]
+            if ids:
+                where.append("memory_id IN (%s)" % ",".join("?" for _ in ids))
+                params.extend(ids)
+            if keys and not include_all_scopes:
+                where.append("scope_key IN (%s)" % ",".join("?" for _ in keys))
+                params.extend(keys)
+            if types:
+                where.append("memory_type IN (%s)" % ",".join("?" for _ in types))
+                params.extend(types)
+            if stats:
+                where.append("status IN (%s)" % ",".join("?" for _ in stats))
+                params.extend(stats)
+            if owner_user_id:
+                where.append("owner_user_id=?")
+                params.append(str(owner_user_id))
+            if industry_pack_id:
+                where.append("industry_pack_id=?")
+                params.append(str(industry_pack_id))
+            sql = "SELECT * FROM memory_item"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY updated_at DESC, memory_id LIMIT ?"
+            params.append(max(1, min(int(limit), 5000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["entity_ids"] = _decode_json(value.get("entity_ids_json"), [])
+                value["source_evidence_ids"] = _decode_json(value.get("source_evidence_ids_json"), [])
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
+                result.append(value)
+            return result
+        except Exception:  # noqa: BLE001
+            return result
+
+    def memory_evidence(self, memory_ids=(), *, evidence_refs=()) -> list[dict]:
+        """取记忆↔证据绑定行（provenance 读侧；两个过滤条件都可单独用）。"""
+        ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+        refs = [str(item) for item in (evidence_refs or []) if str(item or "")]
+        if not ids and not refs:
+            return []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            if ids:
+                where.append("memory_id IN (%s)" % ",".join("?" for _ in ids))
+                params.extend(ids)
+            if refs:
+                where.append("evidence_ref IN (%s)" % ",".join("?" for _ in refs))
+                params.extend(refs)
+            with self.database.lock:
+                rows = self.database.connection.execute(
+                    "SELECT * FROM memory_evidence_link WHERE " + " AND ".join(where)
+                    + " ORDER BY memory_id, evidence_ref", tuple(params)).fetchall()
+            out = []
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
+                out.append(value)
+            return out
+        except Exception:  # noqa: BLE001
+            return []
+
+    def memory_relations(self, memory_ids=(), *, relations=()) -> list[dict]:
+        """取记忆图关系（P09-06 图通道；Phase 10 的 SUPERSEDES/CONTRADICTS 也从这里读）。"""
+        ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+        if not ids:
+            return []
+        try:
+            self.ensure_schema()
+            where = ["memory_id IN (%s)" % ",".join("?" for _ in ids)]
+            params: list = list(ids)
+            picked = [str(item) for item in (relations or []) if str(item or "")]
+            if picked:
+                where.append("relation IN (%s)" % ",".join("?" for _ in picked))
+                params.extend(picked)
+            with self.database.lock:
+                rows = self.database.connection.execute(
+                    "SELECT * FROM memory_relation WHERE " + " AND ".join(where), tuple(params)).fetchall()
+            return [_row_dict(row) or {} for row in rows]
+        except Exception:  # noqa: BLE001
+            return []
+
+    def update_memory_status(self, memory_id: str, *, status: str, decay_score: float | None = None,
+                             reason: str = "", change: str = "STATUS", now: str = "",
+                             append_version: bool = True) -> dict:
+        """生命周期迁移的唯一写入口（P09-05）：状态 + 衰减分 + 追加版本行。
+
+        **不物理覆盖历史**：每次**状态迁移**都追加 `memory_version`（change=STATUS/DECAY/EXPIRE）。
+        `append_version=False` 只给"纯衰减分刷新"用：衰减分是 (last_verified_at / 时效档 /
+        confidence / reuse_count) 的**可复算派生量**（`qa_memory.decay_score()`），
+        为它每跑一次维护就追加一行版本会让版本表无限增长而**不携带任何新信息**；
+        状态迁移与内容/置信变化仍然一条不落地追加。
+        返回 {memory_id, from, to, version, changed}。
+        """
+        memory_id = str(memory_id or "")
+        result = {"memory_id": memory_id, "from": "", "to": str(status or ""), "version": 0,
+                  "changed": False, "error": ""}
+        if not memory_id:
+            result["error"] = "memory_id 为空"
+            return result
+        stamp = str(now or _now())
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    row = cursor.execute(
+                        "SELECT status,version,confidence,canonical_content,valid_until,"
+                        "last_verified_at,decay_score FROM memory_item WHERE memory_id=?",
+                        (memory_id,)).fetchone()
+                    current = _row_dict(row)
+                    if current is None:
+                        result["error"] = "记忆不存在"
+                        return result
+                    before = str(current.get("status") or "")
+                    result["from"] = before
+                    version = int(current.get("version") or 0)
+                    score = float(current.get("decay_score") or 0) if decay_score is None \
+                        else float(decay_score)
+                    if before == str(status) and decay_score is None:
+                        result["version"] = version
+                        return result
+                    version += 1
+                    cursor.execute(
+                        "UPDATE memory_item SET status=?, decay_score=?, version=?, updated_at=? "
+                        "WHERE memory_id=?",
+                        (str(status), score, version, stamp, memory_id),
+                    )
+                    if append_version:
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_version(
+                                memory_id,version,change,status,confidence,canonical_content,
+                                valid_until,last_verified_at,decay_score,reason,payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(memory_id,version) DO UPDATE SET
+                                change=excluded.change,status=excluded.status,
+                                decay_score=excluded.decay_score,reason=excluded.reason
+                            """,
+                            (
+                                memory_id, version, str(change or "STATUS"), str(status),
+                                float(current.get("confidence") or 0),
+                                str(current.get("canonical_content") or ""),
+                                str(current.get("valid_until") or ""),
+                                str(current.get("last_verified_at") or ""), score, str(reason or ""),
+                                _json({}), stamp,
+                            ),
+                        )
+                    self.database.connection.commit()
+                    result.update({"version": version, "changed": True})
+                    return result
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+            return result
+
+    def memory_stats(self, *, scope_keys=(), include_all_scopes: bool = True) -> dict:
+        """记忆图统计（验收/运维自检）：按类型/状态/时效档/作用域分组 + 时间范围。"""
+        stats = {"items": 0, "by_type": {}, "by_status": {}, "by_freshness": {}, "by_scope": {},
+                 "links": {"evidence": 0, "entity": 0, "relation": 0},
+                 "decisions": {}, "recalls": {"rows": 0, "hits": 0}, "error": ""}
+        try:
+            self.ensure_schema()
+            keys = [str(item) for item in (scope_keys or []) if str(item or "")]
+            where, params = "", []
+            if keys and not include_all_scopes:
+                where = " WHERE scope_key IN (%s)" % ",".join("?" for _ in keys)
+                params = list(keys)
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                for column, target in (("memory_type", "by_type"), ("status", "by_status"),
+                                       ("freshness_class", "by_freshness"), ("scope", "by_scope")):
+                    for row in cursor.execute(
+                            "SELECT %s AS k, count(*) AS n FROM memory_item%s GROUP BY 1"
+                            % (column, where), tuple(params)).fetchall():
+                        value = _row_dict(row) or {}
+                        stats[target][str(value.get("k") or "")] = int(value.get("n") or 0)
+                stats["items"] = sum(stats["by_status"].values())
+                stats["links"]["evidence"] = int(cursor.execute(
+                    "SELECT count(*) FROM memory_evidence_link").fetchone()[0] or 0)
+                stats["links"]["entity"] = int(cursor.execute(
+                    "SELECT count(*) FROM memory_entity_link").fetchone()[0] or 0)
+                stats["links"]["relation"] = int(cursor.execute(
+                    "SELECT count(*) FROM memory_relation").fetchone()[0] or 0)
+                for row in cursor.execute(
+                        "SELECT decision, count(*) AS n FROM memory_write_decision GROUP BY 1").fetchall():
+                    value = _row_dict(row) or {}
+                    stats["decisions"][str(value.get("decision") or "")] = int(value.get("n") or 0)
+                row = cursor.execute(
+                    "SELECT count(*) AS rows, coalesce(sum(hits),0) AS hits FROM memory_recall_log"
+                ).fetchone()
+                value = _row_dict(row) or {}
+                stats["recalls"] = {"rows": int(value.get("rows") or 0),
+                                    "hits": int(value.get("hits") or 0)}
+                cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return stats
+
+    def memory_write_decisions(self, *, run_id: str = "", limit: int = 500) -> list[dict]:
+        """读写决策留痕（验收脚本/运维自检用）。"""
+        try:
+            self.ensure_schema()
+            where, params = "", []
+            if run_id:
+                where = " WHERE run_id=?"
+                params.append(str(run_id))
+            params.append(max(1, min(int(limit), 5000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(
+                    "SELECT * FROM memory_write_decision" + where
+                    + " ORDER BY id LIMIT ?", tuple(params)).fetchall()
+            out = []
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["factors"] = _decode_json(value.get("factors_json"), {})
+                value["evidence_refs"] = _decode_json(value.get("evidence_refs_json"), [])
+                out.append(value)
+            return out
+        except Exception:  # noqa: BLE001
+            return []
+
 
 __all__ = ["QaStore"]

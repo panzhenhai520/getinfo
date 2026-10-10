@@ -21,7 +21,22 @@ import hashlib
 #     自动补建，不需要 ADD COLUMN，也就不存在"老库有列新库没有"的漂移风险。
 #   · 回滚：`DROP TABLE qa_evidence_seen`（外加把本常量改回 v6）即可，既有表一字不动；
 #     代码侧还有 QA_EVIDENCE_LAYER_ENABLED=0 一键回到 Phase 01 行为。
-QA_SCHEMA_VERSION = "unified-qa-schema-v7"
+#
+# v7 → v8（graph-rag-v2 通用包 Phase 09 · P09-01）：
+#   · 新增 **八张表**（跨会话记忆图，§12）：memory_item / memory_version /
+#     memory_entity_link / memory_evidence_link / memory_relation / memory_recall_log /
+#     memory_write_decision / memory_usage_stat；
+#   · **没有新增列、没有改既有列语义**：老库执行 ensure_qa_tables 时按
+#     `CREATE TABLE IF NOT EXISTS` 自动补建八张新表（`QA_ADDED_COLUMNS_V8` 为空元组，
+#     与 Phase 02 同一手法），既有 QA 表一个字不动；
+#   · §12 的 `memory_validation` / `memory_contradiction` **刻意不在本阶段建**：
+#     它们是 Phase 10（revalidation / 冲突 / supersession）的账，提前建空表等于把
+#     后续阶段的形态写死（见 DECISION_LOG D-033）。同理 `skill_performance_memory` /
+#     `source_reliability_memory` 属 Phase 12。
+#   · 回滚：`DROP TABLE memory_usage_stat, memory_write_decision, memory_recall_log,
+#     memory_relation, memory_evidence_link, memory_entity_link, memory_version,
+#     memory_item;` + 本常量改回 v7；代码侧 `QA_MEMORY_GRAPH=0`（默认）即回到 Phase 08 行为。
+QA_SCHEMA_VERSION = "unified-qa-schema-v8"
 
 QA_TABLE_DDL = (
     """
@@ -387,6 +402,158 @@ QA_TABLE_DDL = (
         UNIQUE(owner_user_id, session_id, industry_pack_id, source_fingerprint)
     )
     """,
+    # ── Phase 09（P09-01）：Memory Graph Core 的八张表（§12 的子集，见文件头 v8 说明）──
+    """
+    CREATE TABLE IF NOT EXISTS memory_item (
+        memory_id TEXT PRIMARY KEY,
+        memory_type TEXT NOT NULL,
+        canonical_content TEXT NOT NULL,
+        content_fingerprint TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0,
+        freshness_class TEXT NOT NULL DEFAULT 'MEDIUM',
+        valid_from TEXT DEFAULT '',
+        valid_until TEXT DEFAULT '',
+        last_verified_at TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        scope TEXT NOT NULL DEFAULT 'SESSION',
+        scope_key TEXT NOT NULL DEFAULT '',
+        owner_user_id TEXT NOT NULL DEFAULT '',
+        session_id TEXT NOT NULL DEFAULT '',
+        industry_pack_id TEXT NOT NULL DEFAULT '',
+        entity_ids_json TEXT NOT NULL DEFAULT '[]',
+        source_evidence_ids_json TEXT NOT NULL DEFAULT '[]',
+        superseded_by TEXT DEFAULT '',
+        reuse_count INTEGER NOT NULL DEFAULT 0,
+        recall_count INTEGER NOT NULL DEFAULT 0,
+        created_from_session_id TEXT NOT NULL DEFAULT '',
+        created_from_run_id TEXT NOT NULL DEFAULT '',
+        version INTEGER NOT NULL DEFAULT 1,
+        decay_score REAL NOT NULL DEFAULT 0,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(scope_key, memory_type, content_fingerprint)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_version (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        memory_id TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        change TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT '',
+        confidence REAL NOT NULL DEFAULT 0,
+        canonical_content TEXT NOT NULL DEFAULT '',
+        valid_until TEXT DEFAULT '',
+        last_verified_at TEXT DEFAULT '',
+        decay_score REAL NOT NULL DEFAULT 0,
+        reason TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(memory_id, version)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_entity_link (
+        memory_id TEXT NOT NULL,
+        entity_key TEXT NOT NULL,
+        entity_text TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'subject',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(memory_id, entity_key, role)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_evidence_link (
+        memory_id TEXT NOT NULL,
+        evidence_ref TEXT NOT NULL,
+        source_fingerprint TEXT NOT NULL DEFAULT '',
+        span_fingerprint TEXT NOT NULL DEFAULT '',
+        run_id TEXT NOT NULL DEFAULT '',
+        stage TEXT NOT NULL DEFAULT '',
+        route TEXT NOT NULL DEFAULT '',
+        corpus_version TEXT NOT NULL DEFAULT '',
+        verdict TEXT NOT NULL DEFAULT '',
+        evidence_score REAL NOT NULL DEFAULT 0,
+        relationship TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY(memory_id, evidence_ref, source_fingerprint)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_relation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        memory_id TEXT NOT NULL,
+        relation TEXT NOT NULL,
+        target_memory_id TEXT NOT NULL DEFAULT '',
+        target_kind TEXT NOT NULL DEFAULT 'memory',
+        target_ref TEXT NOT NULL DEFAULT '',
+        weight REAL NOT NULL DEFAULT 0,
+        rationale TEXT NOT NULL DEFAULT '',
+        created_from_run_id TEXT NOT NULL DEFAULT '',
+        version INTEGER NOT NULL DEFAULT 1,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(memory_id, relation, target_memory_id, target_ref)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_recall_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recall_id TEXT NOT NULL,
+        trace_id TEXT NOT NULL DEFAULT '',
+        run_id TEXT NOT NULL DEFAULT '',
+        mode TEXT NOT NULL DEFAULT '',
+        scope_key TEXT NOT NULL DEFAULT '',
+        owner_user_id TEXT NOT NULL DEFAULT '',
+        session_id TEXT NOT NULL DEFAULT '',
+        industry_pack_id TEXT NOT NULL DEFAULT '',
+        query_fingerprint TEXT NOT NULL DEFAULT '',
+        channels_json TEXT NOT NULL DEFAULT '[]',
+        hits INTEGER NOT NULL DEFAULT 0,
+        top_score REAL NOT NULL DEFAULT 0,
+        counts_json TEXT NOT NULL DEFAULT '{}',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(recall_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_write_decision (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        decision_id TEXT NOT NULL,
+        run_id TEXT NOT NULL DEFAULT '',
+        memory_type TEXT NOT NULL DEFAULT '',
+        decision TEXT NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        utility REAL NOT NULL DEFAULT 0,
+        factors_json TEXT NOT NULL DEFAULT '{}',
+        memory_id TEXT NOT NULL DEFAULT '',
+        content_fingerprint TEXT NOT NULL DEFAULT '',
+        evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+        scope TEXT NOT NULL DEFAULT '',
+        scope_key TEXT NOT NULL DEFAULT '',
+        gate_version TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(decision_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_usage_stat (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        memory_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        recalled INTEGER NOT NULL DEFAULT 0,
+        used INTEGER NOT NULL DEFAULT 0,
+        helped INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(memory_id, day)
+    )
+    """,
 )
 
 QA_INDEX_DDL = (
@@ -415,6 +582,18 @@ QA_INDEX_DDL = (
     # Phase 02（P02-03）：证据 seen 集合按 (用户, 会话, 行业包) 作用域查，别让它全表扫。
     "CREATE INDEX IF NOT EXISTS idx_qa_evidence_seen_scope"
     " ON qa_evidence_seen(owner_user_id, session_id, industry_pack_id, status)",
+    # Phase 09（P09-01）：记忆图的四类热路径查询（作用域+状态、类型、证据反查、按天统计）。
+    "CREATE INDEX IF NOT EXISTS idx_memory_item_scope ON memory_item(scope_key, status)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_item_type ON memory_item(memory_type, status)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_item_freshness"
+    " ON memory_item(freshness_class, valid_until)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_evidence_ref ON memory_evidence_link(evidence_ref)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_evidence_memory ON memory_evidence_link(memory_id)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_entity_key ON memory_entity_link(entity_key)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_relation_memory ON memory_relation(memory_id, relation)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_recall_run ON memory_recall_log(run_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_write_run ON memory_write_decision(run_id, decision)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_usage_day ON memory_usage_stat(memory_id, day)",
 )
 
 QA_REQUIRED_TABLES = frozenset(
@@ -443,6 +622,15 @@ QA_REQUIRED_TABLES = frozenset(
         "qa_reasoning_traces",
         "qa_session_constraints",
         "qa_evidence_seen",
+        # Phase 09（v8）：跨会话记忆图八张表
+        "memory_item",
+        "memory_version",
+        "memory_entity_link",
+        "memory_evidence_link",
+        "memory_relation",
+        "memory_recall_log",
+        "memory_write_decision",
+        "memory_usage_stat",
     }
 )
 
@@ -473,6 +661,13 @@ QA_ADDED_COLUMNS_V6 = (
 与上面 `QA_TABLE_DDL` 的建表文本**必须一致**：清库建表走 DDL，老库升级走这里；
 `tests/test_qa_phase01_schema.py` 会同时校验两条路径产出的列完全相同。
 """
+
+QA_ADDED_COLUMNS_V8 = ()
+"""Phase 09（v7 → v8）新增列清单：**空**。
+
+v8 只新增八张表（走 `CREATE TABLE IF NOT EXISTS`，老库执行 `ensure_qa_tables` 自动补建），
+一行 ADD COLUMN 都不需要 —— 与 Phase 02 的 v7 同一手法，回滚只需 DROP 八张新表。
+`tests/test_qa_phase09_schema.py` 断言本元组为空，防止后续有人偷偷往老表加列。"""
 
 
 def _existing_columns(cursor, table_name: str) -> set:
@@ -545,6 +740,7 @@ def ensure_qa_tables(cursor) -> None:
 
 __all__ = [
     "QA_ADDED_COLUMNS_V6",
+    "QA_ADDED_COLUMNS_V8",
     "QA_INDEX_DDL",
     "QA_REQUIRED_TABLES",
     "QA_SCHEMA_VERSION",
