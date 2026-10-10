@@ -8,6 +8,10 @@
     → 双达标才 stage(status="verified")，否则 stage(status="rejected"，并写清原因)
     → 人工同意 → 调用方走 industry_pack_activation 发布激活 → record_after_apply 回填复测
 
+信源类建议另有一道**独立闸门**（2026-10 真机事故后补）：必须先用 ``probe_sources`` 对信源 URL
+做真实探测，拿到"这个源真的坏了"的第一手证据（reachable=False 或 verdict ∈
+{URL 失效, 需登录或反爬, 空 feed}）才允许 verified；"零产出"这类机械规则**不是**停用理由。
+
 本模块自身的硬约束（请勿放宽）：
 * **纯 CPU、纯规则**：判定只调用 ``intel_classifier.classify_article``（规则链路），
   绝不调用 LLM / 向量模型 / 任何模型端点，也不碰 GPU。
@@ -159,17 +163,60 @@ SELF_TEST_SOURCE = "run_self_test_and_stage"
 # 生成新版本时写进审计的 actor（便于在行业包生命周期事件里认出"这是改进建议落地的版本"）。
 PREPARE_ACTOR = "intel_pack_improvement"
 
-# 信源类建议规则（为什么这么定）：
-#   零产出     → 建议停用（启用中却长期 0 篇产出，白占抓取槽位）；
-#   长期无新文 → 建议替换（历史有产出但已停更，需要人工找替代源）；
-#   准入率低   → 保留观察：产出正常，落 other 是**关键词覆盖**问题，应随关键词改进解决，
-#                把它当成"坏信源"停掉会误伤真实产出；
+# 信源类建议规则（2026-10 真机事故后改写，为什么这么定）：
+#   **零产出不再是停用理由**。上一轮 A 机 invest_mgmt 就是按"零产出 → 建议停用"这条机械规则
+#   产出了"停用全部 65 个零产出源"的 verified 建议，事后逐源探测证明 46 个（71%）URL 完全正常，
+#   URL 只是没被调度扫到。真正该停用的只有 9 个。
+#   现在：停用/替换**只认 probe_sources 的实测证据**（reachable=False 或 verdict ∈
+#   {URL 失效, 需登录或反爬, 空 feed}）；零产出源只能进 keep_sources + notes
+#   （"零产出，需先确认调度/映射是否正常"）。
+#   长期无新文 + 探测证明不可用 → 建议替换（历史有产出但源已坏，需要人工找替代源）；
+#   准入率低   → 保留观察：产出正常，落 other 是**关键词覆盖**问题，应随关键词改进解决；
 #   有效       → 保留。
-# 安全边界：零产出但**本次探针抓取失败**时只标记 unverified_sources（"无法确认该源状态"），
-# 绝不进停用建议——抓不到不等于没产出。
+# 安全边界：抓文章探针（crawl_probe）失败的源只标记 unverified_sources（"无法确认该源状态"），
+# 绝不进停用建议——抓不到不等于坏。
 SOURCE_VERDICT_DISABLE = "零产出"
 SOURCE_VERDICT_REPLACE = "长期无新文"
 SOURCE_VERDICT_KEEP = "准入率低"
+
+# ─────────────── 信源实测探针（probe_sources）口径 ───────────────
+# 为什么需要它：信源类建议过去没有任何"这个源真的坏了"的第一手证据，判 verified 只看机械规则。
+# 本探针是**唯一合法证据来源**（``generated_by="probe_sources"``，闸门会校验），
+# 纯 HTTP + 仓库既有解析（rss_feed_contract / intel_light_scanner），不启浏览器、不调模型。
+SOURCE_PROBE_TIMEOUT_SECONDS = 12      # 单源请求预算（连接 min(10,预算)、读取 min(20,预算)）
+SOURCE_PROBE_MAX_SOURCES = 20          # 默认最多探测 20 个源（串行、每源最多 1 次请求）
+SOURCE_PROBE_ITEM_LIMIT = 20           # 单源最多数多少条条目（数够判断"有没有内容"即可）
+SOURCE_PROBE_GENERATOR = "probe_sources"   # evidence.source_probe.generated_by 必须是它
+
+# 逐源 verdict（六选一，口径见 _probe_source_verdict）：
+#   可用          200/2xx 且能解析出 ≥1 条条目；
+#   空 feed       URL 是 feed（XML/JSON 等非 HTML）但解析出 0 条；
+#   页面不可解析   200 且是 HTML，但静态解析出 0 条（改版/JS 渲染都可能这样，**不构成停用依据**）；
+#   URL 失效      404/410、DNS 失败、超时、SSL/连接被重置、其它非 2xx（拿不到内容）；
+#   需登录或反爬   401/403（不做任何绕过）；
+#   未启用        is_enabled=0：不发起请求，也不是坏源证据。
+PROBE_VERDICT_OK = "可用"
+PROBE_VERDICT_EMPTY_FEED = "空 feed"
+PROBE_VERDICT_UNPARSABLE = "页面不可解析"
+PROBE_VERDICT_DEAD = "URL 失效"
+PROBE_VERDICT_BLOCKED = "需登录或反爬"
+PROBE_VERDICT_DISABLED = "未启用"
+SOURCE_PROBE_VERDICTS = (
+    PROBE_VERDICT_OK,
+    PROBE_VERDICT_EMPTY_FEED,
+    PROBE_VERDICT_UNPARSABLE,
+    PROBE_VERDICT_DEAD,
+    PROBE_VERDICT_BLOCKED,
+    PROBE_VERDICT_DISABLED,
+)
+# 可作"停用/替换"依据的 verdict（用户给定口径，勿放宽）。
+# 「页面不可解析」刻意不在里面：200 但静态解析不出条目，多半是改版/JS 渲染/列表页 URL 配错，
+# 当坏源停用会误杀（A 机 65 源里 11 个属此类，人工复核后 9 个保留）。要放行只需把它加到这里。
+SOURCE_PROBE_BAD_VERDICTS = (
+    PROBE_VERDICT_DEAD,
+    PROBE_VERDICT_BLOCKED,
+    PROBE_VERDICT_EMPTY_FEED,
+)
 
 # 版本号递增（发布改进版本时用）：形如 X.Y.Z 则补丁位 +1，否则追加 ".1"。
 _PACK_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
@@ -2206,6 +2253,414 @@ def _probe_error_text(exc: Exception) -> str:
         return _truncate(f"{type(exc).__name__}: {exc}", 300)
 
 
+# ─────────────────────────── 交付物 1.7b：信源实测探针 probe_sources ───────────────────────────
+class _ProbeResponse:
+    """把探测结果伪装成 ``intel_http.HTTPFetchResult``（``parse_rss_feed`` 只读这 4 个属性）。"""
+
+    __slots__ = ("url", "status_code", "content", "content_type")
+
+    def __init__(self, url: str, status_code, content: bytes, content_type: str):
+        self.url = str(url or "")
+        self.status_code = _as_int(status_code)
+        self.content = bytes(content or b"")
+        self.content_type = str(content_type or "")
+
+
+def _load_source_rows(source_ids: Sequence) -> Dict[int, Dict]:
+    """按 id 直接取信源（含未启用的）：显式点名探测时用，补 ``_source_stats`` 覆盖不到的源。"""
+    ids = []
+    for item in source_ids or []:
+        source_id = _as_int(item)
+        if source_id > 0 and source_id not in ids:
+            ids.append(source_id)
+    if not ids:
+        return {}
+    placeholders = ",".join("?" for _ in ids)
+    out: Dict[int, Dict] = {}
+    for row in _query(
+        f"SELECT id, source_name, source_url, source_type, metadata_json, is_enabled "
+        f"FROM intel_sources WHERE id IN ({placeholders})",
+        ids,
+    ):
+        source_id = _as_int(row.get("id"))
+        out[source_id] = {
+            "source_id": source_id,
+            "source_name": str(row.get("source_name") or ""),
+            "source_url": str(row.get("source_url") or ""),
+            "source_type": str(row.get("source_type") or "website"),
+            "metadata": _json_loads(row.get("metadata_json"), {}),
+            "is_enabled": bool(_as_int(row.get("is_enabled"))),
+        }
+    return out
+
+
+def _probe_source_select(pack_id: str, source_ids, limit: int) -> List[Dict]:
+    """挑要探测的信源：显式 source_ids 优先（按给定顺序），否则取"零产出/准入率低"优先的前 limit 个。"""
+    cap = max(1, _as_int(limit, SOURCE_PROBE_MAX_SOURCES))
+    wanted = []
+    for item in source_ids or []:
+        source_id = _as_int(item)
+        if source_id > 0 and source_id not in wanted:
+            wanted.append(source_id)
+    if wanted:
+        found = _load_source_rows(wanted)
+        selected = []
+        for source_id in wanted[:cap]:
+            row = found.get(source_id)
+            if row is None:
+                # 库里没有这个 id：记成"未启用"（不构成坏源证据），而不是当成坏源
+                row = {
+                    "source_id": source_id,
+                    "source_name": "",
+                    "source_url": "",
+                    "source_type": "",
+                    "metadata": {},
+                    "is_enabled": False,
+                    "missing": True,
+                }
+            selected.append(row)
+        return selected
+    rows = _source_stats(pack_id)
+    rows.sort(key=lambda row: (_probe_rank(row), _as_int(row.get("source_id"))))
+    selected = []
+    for row in rows[:cap]:
+        item = dict(row)
+        item["is_enabled"] = True  # _source_stats 只返回 is_enabled=1 的源
+        selected.append(item)
+    return selected
+
+
+def _probe_source_url(source: Dict) -> Tuple[str, bool]:
+    """探针要抓的 URL + 是否按 feed 口径解析（rss 类型或 metadata.rss_url 命中即按 feed）。"""
+    metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
+    rss_url = str(metadata.get("rss_url") or "").strip()
+    is_rss = str(source.get("source_type") or "") == "rss" or bool(rss_url)
+    return (rss_url or str(source.get("source_url") or "").strip(), is_rss)
+
+
+def _default_source_probe_fetcher(source: Dict, url: str, timeout_seconds: float) -> Dict:
+    """默认抓取器：真发一次 HTTP GET（复用 ``intel_http.SafeHTTPClient``，无浏览器、无模型）。
+
+    只在连接层抛异常时返回 ``status_code=None``；HTTP 4xx/5xx 也在这里落成状态码，交给
+    ``_probe_source_verdict`` 判"URL 失效/需登录或反爬"。
+    """
+    from intel_http import SafeHTTPClient
+    from intel_light_scanner import USER_AGENT
+
+    try:
+        response = SafeHTTPClient().get(
+            url,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept": "application/rss+xml, application/xml, text/xml, text/html, application/xhtml+xml",
+            },
+            timeout=_probe_request_timeout(timeout_seconds),
+        )
+    except Exception as exc:
+        status = _as_int(getattr(getattr(exc, "response", None), "status_code", 0))
+        return {
+            "status_code": status or None,
+            "content": b"",
+            "content_type": "",
+            "url": url,
+            "error": _probe_error_text(exc),
+        }
+    return {
+        "status_code": response.status_code,
+        "content": response.content,
+        "content_type": response.content_type,
+        "url": response.url,
+        "error": "",
+    }
+
+
+def _normalize_probe_response(raw) -> Dict:
+    """归一 fetcher 返回值：dict 或带同名属性的对象都接受；content 统一成 bytes。"""
+    if isinstance(raw, dict):
+        status = raw.get("status_code")
+        content = raw.get("content")
+        if content is None:
+            content = raw.get("text")
+        content_type = raw.get("content_type")
+        url = raw.get("url")
+        error = raw.get("error")
+    else:
+        status = getattr(raw, "status_code", None)
+        content = getattr(raw, "content", None)
+        content_type = getattr(raw, "content_type", "")
+        url = getattr(raw, "url", "")
+        error = getattr(raw, "error", "")
+    if isinstance(content, str):
+        content = content.encode("utf-8", "replace")
+    return {
+        "status_code": _as_int(status) or None,
+        "content": bytes(content or b""),
+        "content_type": str(content_type or ""),
+        "url": str(url or ""),
+        "error": str(error or ""),
+    }
+
+
+def _probe_source_parse(
+    source: Dict, response: Dict, *, is_rss: bool, limit: int
+) -> Tuple[int, str]:
+    """解析条目数：feed 走 ``rss_feed_contract.parse_rss_feed``，列表页走 ``ListPageScanner.scan_html``。
+
+    两者都是仓库既有能力（纯解析）。**刻意不走 ``ListPageScanner.scan``**：那条路会调
+    ``site_scraper_models.extract_with_model``（模型提取），违反"不调任何模型端点"的硬约束。
+    解析异常不抛出去，返回 ``(0, 错误原文)``，由 verdict 判"空 feed / 页面不可解析"。
+    """
+    content = response.get("content") or b""
+    url = str(response.get("url") or "")
+    if is_rss:
+        from rss_feed_contract import parse_rss_feed
+
+        try:
+            items = parse_rss_feed(
+                _ProbeResponse(url, response.get("status_code"), content, response.get("content_type")),
+                limit=max(1, _as_int(limit, SOURCE_PROBE_ITEM_LIMIT)),
+            )
+        except Exception as exc:
+            return 0, _probe_error_text(exc)
+        return len(items or []), ""
+    from intel_light_scanner import ListPageScanner
+
+    metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
+    include_pattern = str(metadata.get("link_include_pattern") or "").strip() or None
+    try:
+        items = ListPageScanner().scan_html(
+            url or str(source.get("source_url") or ""),
+            content,
+            limit=max(1, _as_int(limit, SOURCE_PROBE_ITEM_LIMIT)),
+            include_pattern=include_pattern,
+        )
+    except Exception as exc:
+        return 0, _probe_error_text(exc)
+    return len(items or []), ""
+
+
+def _probe_source_verdict(
+    status_code, content_type: str, parsed_items: int, *, is_rss: bool
+) -> str:
+    """逐源 verdict（口径写在模块常量那一节，改口径就改这里）。"""
+    if status_code is None:
+        # DNS 失败/超时/SSL/连接被重置：拿不到任何响应，等同 URL 不可用（原文留在 error 里）
+        return PROBE_VERDICT_DEAD
+    if int(status_code) in (401, 403):
+        return PROBE_VERDICT_BLOCKED
+    if int(status_code) in (404, 410):
+        return PROBE_VERDICT_DEAD
+    if not 200 <= int(status_code) < 300:
+        # 其它非 2xx（含 5xx/502）：拿不到内容就等同该 URL 不可用，状态码留在 http_status 供人工区分
+        return PROBE_VERDICT_DEAD
+    if parsed_items > 0:
+        return PROBE_VERDICT_OK
+    media = str(content_type or "").split(";")[0].strip().casefold()
+    if media:
+        return PROBE_VERDICT_UNPARSABLE if "html" in media else PROBE_VERDICT_EMPTY_FEED
+    # 没有 Content-Type（部分老旧站点）：按源类型兜底
+    return PROBE_VERDICT_EMPTY_FEED if is_rss else PROBE_VERDICT_UNPARSABLE
+
+
+def probe_sources(
+    pack_id: str,
+    *,
+    source_ids=None,
+    limit: int = SOURCE_PROBE_MAX_SOURCES,
+    timeout_seconds: float = SOURCE_PROBE_TIMEOUT_SECONDS,
+    fetcher=None,
+) -> Dict:
+    """对信源 URL 做一次真实探测，产出"这个源到底还能不能用"的逐源第一手证据。
+
+    **为什么必须有它**：信源类建议过去只按"零产出 → 建议停用"的机械规则就判 verified，
+    实测证明会大规模误杀（A 机 invest_mgmt 65 个零产出源里 46 个 URL 完全正常，只是调度从未
+    执行）。所以停用/替换前必须先探测，本函数是这条证据的唯一合法来源
+    （输出带 ``generated_by="probe_sources"``，闸门会校验，手工伪造的一律不认）。
+
+    参数：
+      * ``source_ids``：显式指定要探测的源（按给定顺序，最多 ``limit`` 个）；缺省时按
+        "准入率低/零产出优先"取本包已启用信源的前 ``limit`` 个。
+      * ``limit``：最多探测多少个源，默认 20。
+      * ``timeout_seconds``：单源请求预算，默认 12 秒；总预算 = ``timeout_seconds`` ×
+        实际探测源数，每次请求的超时取 ``min(剩余总预算, timeout_seconds)``。
+      * ``fetcher``：抓取器注入点（测试打桩）。签名 ``fetcher(source, url, timeout_seconds)``，
+        返回 dict（``status_code``/``content``/``content_type``/``url``/``error``）或任何带这
+        几个属性的对象；抛异常视为连接层失败（判 URL 失效）。默认实现走 ``SafeHTTPClient``。
+
+    硬约束：**串行、每源最多 1 次请求、不启浏览器、不调模型**；返回只含 JSON 可序列化类型。
+    """
+    started = time.monotonic()
+    cap = max(1, _as_int(limit, SOURCE_PROBE_MAX_SOURCES))
+    per_source_timeout = max(
+        1.0, _as_float(timeout_seconds, float(SOURCE_PROBE_TIMEOUT_SECONDS)) or float(SOURCE_PROBE_TIMEOUT_SECONDS)
+    )
+    selected = _probe_source_select(pack_id, source_ids, cap)
+    deadline = started + per_source_timeout * max(1, len(selected))
+    rows: List[Dict] = []
+    errors: List[Dict] = []
+    for source in selected:
+        source_id = _as_int(source.get("source_id"))
+        url, is_rss = _probe_source_url(source)
+        record = {
+            "source_id": source_id,
+            "source_name": str(source.get("source_name") or ""),
+            "source_url": str(source.get("source_url") or ""),
+            "probe_url": url,
+            "source_type": str(source.get("source_type") or ""),
+            "is_enabled": bool(source.get("is_enabled")),
+            "probed": False,
+            "reachable": False,
+            "http_status": None,
+            "content_type": "",
+            "parsed_items": 0,
+            "error": "",
+            "verdict": PROBE_VERDICT_DISABLED,
+            "probed_at": utc_text(),
+        }
+        rows.append(record)
+        if not record["is_enabled"]:
+            record["error"] = "信源未启用（is_enabled=0），未发起探测"
+            continue
+        if not url:
+            record["probed"] = True
+            record["error"] = "信源没有可探测的 URL"
+            record["verdict"] = PROBE_VERDICT_DEAD
+            errors.append({"source_id": source_id, "error": record["error"]})
+            continue
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            # 没发起请求就不算证据（闸门只认 probed=True 的记录），仅记录跳过原因
+            record["error"] = "探测总预算已用尽，未发起请求（不构成停用依据）"
+            continue
+        record["probed"] = True
+        try:
+            raw = (fetcher or _default_source_probe_fetcher)(
+                source, url, min(per_source_timeout, remaining)
+            )
+        except Exception as exc:
+            response = {
+                "status_code": None,
+                "content": b"",
+                "content_type": "",
+                "url": url,
+                "error": _probe_error_text(exc),
+            }
+        else:
+            response = _normalize_probe_response(raw)
+        record["http_status"] = response["status_code"]
+        record["content_type"] = response["content_type"][:120]
+        record["reachable"] = bool(
+            response["status_code"] and 200 <= int(response["status_code"]) < 300
+        )
+        record["error"] = response["error"][:300]
+        if record["reachable"]:
+            parsed, parse_error = _probe_source_parse(
+                source, response, is_rss=is_rss, limit=SOURCE_PROBE_ITEM_LIMIT
+            )
+            record["parsed_items"] = parsed
+            if parse_error and not record["error"]:
+                record["error"] = parse_error[:300]
+        record["verdict"] = _probe_source_verdict(
+            response["status_code"], response["content_type"], record["parsed_items"], is_rss=is_rss
+        )
+        if record["verdict"] in (PROBE_VERDICT_DEAD, PROBE_VERDICT_BLOCKED):
+            errors.append(
+                {
+                    "source_id": source_id,
+                    "error": record["error"] or f"HTTP {record['http_status']}",
+                }
+            )
+    verdict_counts: Dict[str, int] = {}
+    for record in rows:
+        verdict_counts[record["verdict"]] = verdict_counts.get(record["verdict"], 0) + 1
+    probed_count = sum(1 for record in rows if record["probed"])
+    reachable_count = sum(1 for record in rows if record["reachable"])
+    return {
+        "pack_id": str(pack_id),
+        "generated_by": SOURCE_PROBE_GENERATOR,
+        "probed_at": utc_text(),
+        "limit": cap,
+        "timeout_seconds": per_source_timeout,
+        "budget_seconds": round(per_source_timeout * max(1, len(selected)), 3),
+        "duration_seconds": round(time.monotonic() - started, 3),
+        "sources": rows,
+        "sources_selected": [
+            {
+                "source_id": _as_int(source.get("source_id")),
+                "source_name": str(source.get("source_name") or ""),
+                "source_url": str(source.get("source_url") or ""),
+            }
+            for source in selected
+        ],
+        "sources_probed": probed_count,
+        "sources_reachable": reachable_count,
+        "sample_available": reachable_count > 0,
+        "verdict_counts": verdict_counts,
+        "errors": errors,
+    }
+
+
+def _source_probe_index(source_probe) -> Dict[int, Dict]:
+    """逐源探测记录按 source_id 建索引（非 dict/缺 id 的记录直接丢）。"""
+    if not isinstance(source_probe, dict):
+        return {}
+    out: Dict[int, Dict] = {}
+    for row in source_probe.get("sources") or []:
+        if isinstance(row, dict):
+            out[_as_int(row.get("source_id"))] = row
+    return out
+
+
+def _source_probe_proves_bad(row) -> bool:
+    """这条探测记录能不能当"该源不可用"的证据（停用/替换的**唯一**合法依据）。
+
+    * 必须真的探测过（``probed=True``）——「未启用」「探针总预算用尽」都不是证据；
+    * ``reachable=False``（连不上 / 非 2xx）或 verdict ∈ {URL 失效, 需登录或反爬, 空 feed}；
+    * 「页面不可解析」不算（200 但静态解析不出条目：改版/JS 渲染/列表页 URL 配错都会这样），
+      只进 keep_sources + notes 等人工确认。
+    """
+    if not isinstance(row, dict) or not row.get("probed"):
+        return False
+    verdict = str(row.get("verdict") or "")
+    if verdict == PROBE_VERDICT_DISABLED:
+        return False
+    if verdict in SOURCE_PROBE_BAD_VERDICTS:
+        return True
+    return row.get("reachable") is False and bool(str(row.get("error") or "").strip())
+
+
+def _slim_source_probe(source_probe) -> Optional[Dict]:
+    """信源探测的精简版（供 metrics/接口回传，不缩水判定所需字段）。"""
+    if not isinstance(source_probe, dict):
+        return None
+    return {
+        "pack_id": str(source_probe.get("pack_id") or ""),
+        "generated_by": str(source_probe.get("generated_by") or ""),
+        "probed_at": str(source_probe.get("probed_at") or ""),
+        "timeout_seconds": _as_float(source_probe.get("timeout_seconds")),
+        "sources_probed": _as_int(source_probe.get("sources_probed")),
+        "sources_reachable": _as_int(source_probe.get("sources_reachable")),
+        "sample_available": bool(source_probe.get("sample_available")),
+        "verdict_counts": dict(source_probe.get("verdict_counts") or {}),
+        "sources": [
+            {
+                "source_id": _as_int(row.get("source_id")),
+                "source_name": str(row.get("source_name") or ""),
+                "source_url": str(row.get("source_url") or ""),
+                "probed": bool(row.get("probed")),
+                "reachable": bool(row.get("reachable")),
+                "http_status": row.get("http_status"),
+                "parsed_items": _as_int(row.get("parsed_items")),
+                "verdict": str(row.get("verdict") or ""),
+                "error": str(row.get("error") or "")[:200],
+            }
+            for row in (source_probe.get("sources") or [])
+            if isinstance(row, dict)
+        ],
+        "errors": list(source_probe.get("errors") or []),
+    }
+
+
 # ─────────────────────────── 交付物 1.4~1.6：建议暂存与闭环 ───────────────────────────
 _METRIC_KEYS = ("admit_rate", "false_positive", "topic_assoc", "other_pct")
 
@@ -2291,26 +2746,118 @@ def _normalize_payload(kind: str, payload) -> Dict:
     return result
 
 
-def _verified_justified(kind: str, metrics: Dict) -> Tuple[bool, str]:
+def _collect_source_ids(container, key: str) -> List[int]:
+    """从 ``container[key]``（source_id 列表或 {source_id:...} 列表）取 source_id。"""
+    ids: List[int] = []
+    if not isinstance(container, dict):
+        return ids
+    for item in container.get(key) or []:
+        source_id = _as_int(item.get("source_id")) if isinstance(item, dict) else _as_int(item)
+        if source_id > 0 and source_id not in ids:
+            ids.append(source_id)
+    return ids
+
+
+def _payload_actionable_source_ids(payload, *containers) -> List[int]:
+    """被建议停用/替换的 source_id：payload 两个桶 + 证据里登记的 disable/replace ids 的**并集**。
+
+    取并集是为了"任何一处提到的源都必须有探测证据"——只看 payload 的话，把源写进 evidence 的
+    disable_source_ids 而 payload 里另写一个，就能绕过；只看 evidence 同理。
+    """
+    ids = _collect_source_ids(payload, "disable_sources") + _collect_source_ids(
+        payload, "replace_sources"
+    )
+    for container in containers:
+        ids.extend(_collect_source_ids(container, "disable_source_ids"))
+        ids.extend(_collect_source_ids(container, "replace_source_ids"))
+    return ids
+
+
+def _source_probe_evidence(metrics: Dict, evidence) -> Optional[Dict]:
+    """取信源探测记录：优先 ``evidence.source_probe``，其次 ``metrics.source_evidence.source_probe``。"""
+    for container in (evidence, (metrics or {}).get("source_evidence")):
+        if isinstance(container, dict) and isinstance(container.get("source_probe"), dict):
+            return container["source_probe"]
+    return None
+
+
+def _source_probe_gaps(payload, probe, *extra_containers) -> List[str]:
+    """信源类建议的 verified 闸门（按当前口径复算，不看调用方的"通过"标志）。
+
+    三条硬口径（2026-10 真机事故后定）：
+      ① 每条被建议停用/替换的源，都要有 ``probe_sources`` 的真实探测记录，且该记录**证明它
+         不可用**（reachable=False 或 verdict ∈ {URL 失效, 需登录或反爬, 空 feed}）；记录必须带
+         ``generated_by="probe_sources"``——手工伪造的探测结果一律不认；
+      ② 探测显示可用（或只是"页面不可解析"）的源，绝不许出现在停用/替换里——"零产出"不能
+         当停用理由；
+      ③ 探测样本必须 ≥1：一个源都没探到，或探测**全部失败**（无法区分信源故障与探针网络故障）
+         → 一律 rejected，理由写"未取得探测样本，无法验证"。
+    """
+    actionable = _payload_actionable_source_ids(payload, *extra_containers)
+    if not actionable:
+        # 先判"有没有可执行项"：没有停用/替换项时，连探测记录都不必看
+        return ["信源类建议没有可执行项（没有探测证明不可用的停用/替换项）"]
+    if probe is None:
+        return [
+            "缺少信源探测记录（evidence.source_probe）：信源类建议必须先跑 probe_sources 真实探测"
+        ]
+    gaps: List[str] = []
+    generated_by = str(probe.get("generated_by") or "")
+    if generated_by != SOURCE_PROBE_GENERATOR:
+        gaps.append(
+            f"信源探测记录来源不可信（generated_by={generated_by!r}，只认 "
+            f"{SOURCE_PROBE_GENERATOR!r}）：拒绝手工伪造的探测结果"
+        )
+    index = _source_probe_index(probe)
+    if not index:
+        gaps.append("未取得探测样本，无法验证（探测记录里没有任何信源）")
+    elif not any(row.get("reachable") for row in index.values()):
+        gaps.append(
+            "未取得探测样本，无法验证（本次探测全部失败，无法区分信源故障与探针网络故障）"
+        )
+    for source_id in actionable:
+        row = index.get(source_id)
+        if row is None:
+            gaps.append(f"信源 #{source_id} 缺少真实探测记录，无法验证（探测覆盖不全）")
+            continue
+        if _source_probe_proves_bad(row):
+            continue
+        gaps.append(
+            f"信源 #{source_id} 的探测结论为「{row.get('verdict') or '未知'}」"
+            f"（HTTP {row.get('http_status')}，解析出 {_as_int(row.get('parsed_items'))} 条），"
+            "不构成停用/替换依据（只认 reachable=false 或 verdict ∈ "
+            "{URL 失效, 需登录或反爬, 空 feed}）"
+        )
+    return gaps
+
+
+def _verified_justified(kind: str, metrics: Dict, evidence=None, payload=None) -> Tuple[bool, str]:
     """复算"自测达标"结论：不接受外部传入的"通过"标志，一律按当前阈值重算。
 
     两道闸门：
       1. metrics 必须带 ``self_test`` 来源标记（只有 ``run_self_test_and_stage`` 会写）；
       2. 关键词建议：影子重跑 + 抓文章实测都按**当前**阈值复算通过；
-         信源建议：必须存在可执行项（可停用/可替换的信源 ≥1）。
+         信源建议：**先探测、后 verified**——每条停用/替换项都要有 probe_sources 的实测证据，
+         零产出等机械规则不算理由（见 ``_source_probe_gaps``）。
     """
     gaps: List[str] = []
     marker = metrics.get("self_test") if isinstance(metrics.get("self_test"), dict) else {}
     if marker.get("source") != SELF_TEST_SOURCE or not marker.get("passed"):
         gaps.append("缺少自测来源标记（verified 只能由自测判定产生，不接受外部传入的通过标志）")
     if str(kind) == "source":
-        evidence = (
+        source_evidence = (
             metrics.get("source_evidence")
             if isinstance(metrics.get("source_evidence"), dict)
             else {}
         )
-        if _as_int(evidence.get("actionable_count")) < 1:
-            gaps.append("信源类建议没有可执行项（既无零产出可停用源、也无停更可替换源）")
+        gaps.extend(
+            _source_probe_gaps(
+                payload,
+                _source_probe_evidence(metrics, evidence),
+                source_evidence,
+                evidence if isinstance(evidence, dict) else {},
+            )
+        )
         return (not gaps), "；".join(gaps)
 
     before, after = metrics.get("before") or {}, metrics.get("after") or {}
@@ -2432,7 +2979,9 @@ def stage_suggestion(
     normalized_evidence = evidence if isinstance(evidence, dict) else {}
     final_reason = str(reason or "").strip()
     if normalized_status == "verified":
-        justified, gaps = _verified_justified(normalized_kind, normalized_metrics)
+        justified, gaps = _verified_justified(
+            normalized_kind, normalized_metrics, normalized_evidence, normalized_payload
+        )
         if not justified:
             normalized_status = "rejected"
             final_reason = (
@@ -2819,34 +3368,58 @@ def prepare_pack_version(
 
 
 # ─────────────────────────── 信源类建议 ───────────────────────────
-def _build_source_suggestion(assessment: Dict, probe) -> Dict:
-    """按信源 verdict + 抓文章探针实测，生成信源类改进建议（payload/metrics/evidence）。
+def _source_probe_text(row: Dict) -> str:
+    """把一条探测记录写成人话（进 disable/replace/keep 的 reason，人工审核就看它）。"""
+    verdict = str(row.get("verdict") or "未知")
+    status = row.get("http_status")
+    parsed = _as_int(row.get("parsed_items"))
+    error = str(row.get("error") or "").strip()
+    text = f"本次真实探测：{verdict}"
+    text += f"（HTTP {status}）" if status is not None else "（未取得 HTTP 响应）"
+    text += f"，解析出 {parsed} 条"
+    if error:
+        text += f"；错误原文：{error[:160]}"
+    return text
 
-    自测口径（与关键词建议不同）：不做影子重跑（信源调整不影响规则判定），
-    但**必须**带上探针的逐源 fetched/parse_failed/errors；且只有"存在可执行项"
-    （可停用或可替换的信源 ≥1 个）才算达标。
+
+def _build_source_suggestion(assessment: Dict, probe, source_probe=None) -> Dict:
+    """按信源 verdict + 真实探测（``probe_sources``）证据，生成信源类改进建议。
+
+    硬口径（2026-10 真机事故后改写，勿放宽）：
+      * **"零产出 → 建议停用"这条机械规则已删除**：零产出本身不是停用理由，探测显示可用的
+        零产出源只进 ``keep_sources`` + ``notes``（写明"零产出，需先确认调度/映射是否正常"）；
+      * 只有 ``probe_sources`` 的逐源探测**证明该源不可用**（reachable=False 或 verdict ∈
+        {URL 失效, 需登录或反爬, 空 feed}）才进 disable/replace；探测记录随 evidence 一起落库，
+        闸门（``_source_probe_gaps``）会逐条复核；
+      * 抓文章探针（crawl_probe）失败、或该源没有探测记录的，一律进 ``unverified_sources``
+        （"无法确认该源状态"），绝不进停用建议——抓不到不等于坏。
     """
     sources = list(assessment.get("sources") or [])
-    probe_sources = {}
+    crawl_rows = {}
     for row in (probe or {}).get("sources") or []:
-        probe_sources[_as_int(row.get("source_id"))] = row
-    probe_errors = {}
+        crawl_rows[_as_int(row.get("source_id"))] = row
+    crawl_errors = {}
     for item in (probe or {}).get("errors") or []:
-        probe_errors.setdefault(_as_int(item.get("source_id")), []).append(
+        crawl_errors.setdefault(_as_int(item.get("source_id")), []).append(
             {
                 "stage": str(item.get("stage") or ""),
                 "error": str(item.get("error") or "")[:300],
             }
         )
+    probe_index = _source_probe_index(source_probe)
 
     disable: List[Dict] = []
     replace: List[Dict] = []
     keep: List[Dict] = []
     unverified: List[Dict] = []
+    zero_output_ok: List[Dict] = []
     for row in sources:
         source_id = _as_int(row.get("source_id"))
-        probe_row = probe_sources.get(source_id) or {}
-        listing_status = str(probe_row.get("listing_status") or ("not_probed" if not probe_row else ""))
+        crawl_row = crawl_rows.get(source_id) or {}
+        probe_row = probe_index.get(source_id) or {}
+        listing_status = str(
+            crawl_row.get("listing_status") or ("not_probed" if not crawl_row else "")
+        )
         item = {
             "source_id": source_id,
             "source_name": str(row.get("source_name") or ""),
@@ -2856,40 +3429,62 @@ def _build_source_suggestion(assessment: Dict, probe) -> Dict:
             "admitted_count": _as_int(row.get("admitted_count")),
             "admitted_pct": _as_float(row.get("admitted_pct")),
             "last_article_at": str(row.get("last_article_at") or ""),
+            # 抓文章探针（crawl_probe）的口径
             "probe_status": listing_status or "not_probed",
-            "fetched": _as_int(probe_row.get("fetched")),
-            "parse_failed": _as_int(probe_row.get("parse_failed")),
-            "errors": probe_errors.get(source_id, []),
+            "fetched": _as_int(crawl_row.get("fetched")),
+            "parse_failed": _as_int(crawl_row.get("parse_failed")),
+            "errors": crawl_errors.get(source_id, []),
+            # 信源实测探针（probe_sources）的口径：停用/替换的唯一依据
+            "source_probe": dict(probe_row) if probe_row else None,
             "reason": "",
         }
-        fetch_failed = listing_status == "failed"
-        if item["verdict"] == SOURCE_VERDICT_DISABLE:
-            if fetch_failed:
+        proves_bad = _source_probe_proves_bad(probe_row)
+        if proves_bad:
+            probe_text = _source_probe_text(probe_row)
+            if item["article_count"] > 0:
                 item["reason"] = (
-                    f"启用中但历史产出 0 篇；本次探针抓取失败（{item['probe_status']}），"
-                    "无法确认该源状态，因此不建议停用，需人工复核"
+                    f"历史入库产出 {item['article_count']} 篇，最近一篇 "
+                    f"{item['last_article_at'] or '未知'}；{probe_text} → "
+                    "建议替换为可用信源，或人工确认站点是否改版/换域名"
                 )
-                unverified.append(item)
+                replace.append(item)
             else:
-                probed = (
-                    f"，本次探针可访问并取到 {item['fetched']} 条列表"
-                    if item["probe_status"] == "ok"
-                    else "，本次探针未覆盖该源"
-                )
                 item["reason"] = (
-                    f"启用中但历史入库产出 0 篇{probed}；建议停用或替换为可产出信源"
+                    f"启用中但历史入库产出 0 篇；{probe_text} → 建议停用或替换为可用信源"
                 )
                 disable.append(item)
-        elif item["verdict"] == SOURCE_VERDICT_REPLACE:
+        elif not probe_row:
             item["reason"] = (
-                f"最近一篇 {item['last_article_at'] or '未知'}，已超过 "
-                f"{SOURCE_VERDICT_IDLE_DAYS} 天无新文；建议替换或人工确认站点是否改版"
+                "本次未做信源探测（缺少探测记录），无法确认该源状态，"
+                "不纳入停用建议，需人工复核"
             )
-            replace.append(item)
+            unverified.append(item)
+        elif str(listing_status) == "failed":
+            item["reason"] = (
+                f"{_source_probe_text(probe_row)}；但本次抓文章探针抓取失败"
+                f"（{item['probe_status']}），仍无法确认该源状态，不纳入停用建议，需人工复核"
+            )
+            unverified.append(item)
+        elif item["verdict"] == SOURCE_VERDICT_DISABLE:
+            # 零产出但探测未证明不可用：不许停用，只能保留 + 提示先查调度/映射
+            item["reason"] = (
+                f"启用中但历史入库产出 0 篇；{_source_probe_text(probe_row)}，"
+                "探测未证明该源不可用，零产出不能作为停用理由——零产出，需先确认调度/映射是否正常"
+            )
+            zero_output_ok.append(item)
+            keep.append(item)
         elif item["verdict"] == SOURCE_VERDICT_KEEP:
             item["reason"] = (
                 f"产出正常（{item['article_count']} 篇）但准入率仅 {item['admitted_pct']}%；"
                 "属关键词覆盖不足，建议随关键词改进观察，不要当坏源停用"
+            )
+            keep.append(item)
+        elif item["verdict"] == SOURCE_VERDICT_REPLACE:
+            # 停更但探测可用：站点没坏，属停更/调度问题，不能拿"长期无新文"当坏源停用或替换
+            item["reason"] = (
+                f"最近一篇 {item['last_article_at'] or '未知'}，已超过 {SOURCE_VERDICT_IDLE_DAYS} "
+                f"天无新文；{_source_probe_text(probe_row)} → 站点本身可用，"
+                "建议人工确认改版/停更后再决定是否替换"
             )
             keep.append(item)
         else:
@@ -2898,33 +3493,67 @@ def _build_source_suggestion(assessment: Dict, probe) -> Dict:
 
     actionable = len(disable) + len(replace)
     passed = actionable >= 1
+    disabled_zero = [item for item in disable if item["verdict"] == SOURCE_VERDICT_DISABLE]
+    unverified_note = (
+        f"{len(unverified)} 个源本次抓取失败或缺探测记录，无法确认该源状态"
+    )
     if passed:
+        parts = []
+        if disabled_zero:
+            parts.append(
+                f"建议停用 {len(disabled_zero)} 个零产出源（均已由真实探测证明不可用）"
+            )
+        if len(disable) - len(disabled_zero):
+            parts.append(f"另有 {len(disable) - len(disabled_zero)} 个探测证明不可用的源建议停用")
+        parts.append(f"替换 {len(replace)} 个探测证明不可用但有历史产出的源")
+        # 不说"正常源"：keep 里既有正常的，也有"探测未证明不可用但结论存疑"的（如页面不可解析）
+        parts.append(f"保留 {len(keep)} 个源（探测未证明不可用）")
+        reason = "信源体检：" + "、".join(parts)
+        if zero_output_ok:
+            reason += (
+                f"；其中 {len(zero_output_ok)} 个零产出源本次探测可用，"
+                "零产出不作为停用理由（需先确认调度/映射是否正常）"
+            )
+        if unverified:
+            reason += f"；另有 {unverified_note}（已单列 unverified_sources，未纳入停用建议）"
+    else:
         reason = (
-            f"信源体检：建议停用 {len(disable)} 个零产出源、替换 {len(replace)} 个停更源、"
-            f"保留 {len(keep)} 个正常源"
+            "信源体检：没有可执行的信源调整项（没有探测证明不可用的信源），"
+            "不生成可发布的信源建议"
         )
         if unverified:
-            reason += (
-                f"；另有 {len(unverified)} 个源本次抓取失败，无法确认该源状态"
-                "（已单列 unverified_sources，未纳入停用建议）"
-            )
-    else:
-        reason = "信源体检：没有可执行的信源调整项（无零产出/停更源），不生成可发布的信源建议"
-        if unverified:
-            reason += f"；{len(unverified)} 个源本次抓取失败，无法确认该源状态"
+            reason += f"；{unverified_note}"
 
     probe_parsed = _as_int((probe or {}).get("parsed_total"))
     probe_failed = _as_int((probe or {}).get("parse_failed_total"))
+    source_probe = source_probe if isinstance(source_probe, dict) else None
+    probed_ids = _source_probe_index(source_probe)
+    notes = [
+        "add_sources 需要人工提供具体 URL（引擎不臆造信源地址）",
+        f"抓文章探针：解析成功 {probe_parsed} 篇、解析失败 {probe_failed} 篇",
+        "信源停用/替换只认 probe_sources 的真实探测证据"
+        "（reachable=false 或 verdict ∈ {URL 失效, 需登录或反爬, 空 feed}）；"
+        "「零产出」不是停用理由。",
+    ]
+    if zero_output_ok:
+        notes.append(
+            f"{len(zero_output_ok)} 个零产出源本次探测可用（HTTP 200 且能解析出条目）："
+            "零产出，需先确认调度/映射是否正常，不要停用"
+        )
+    if not probed_ids:
+        notes.append("本次没有信源探测记录（probe_sources 未执行或执行失败）：所有源都不构成停用依据")
+    else:
+        notes.append(
+            f"信源实测探针：探测 {len(probed_ids)} 个源，"
+            f"结论分布 {dict((source_probe or {}).get('verdict_counts') or {})}"
+        )
     payload = {
         "disable_sources": disable,
         "replace_sources": replace,
         "add_sources": [],
         "keep_sources": keep,
         "unverified_sources": unverified,
-        "notes": [
-            "add_sources 需要人工提供具体 URL（引擎不臆造信源地址）",
-            f"抓文章探针：解析成功 {probe_parsed} 篇、解析失败 {probe_failed} 篇",
-        ],
+        "notes": notes,
     }
     other_pct = _as_float(assessment.get("other_pct"))
     before_admit = None if other_pct is None else round(100.0 - other_pct, 4)
@@ -2934,7 +3563,11 @@ def _build_source_suggestion(assessment: Dict, probe) -> Dict:
         "unverified_count": len(unverified),
         "disable_source_ids": [item["source_id"] for item in disable],
         "replace_source_ids": [item["source_id"] for item in replace],
+        "keep_source_ids": [item["source_id"] for item in keep],
         "probe_errors": (probe or {}).get("errors") or [],
+        # 闸门的唯一依据：逐源真实探测记录（带 generated_by="probe_sources"）
+        "source_probe": source_probe,
+        "source_probe_verdict_counts": dict((source_probe or {}).get("verdict_counts") or {}),
     }
     metrics = _normalize_metrics(
         {
@@ -2952,6 +3585,7 @@ def _build_source_suggestion(assessment: Dict, probe) -> Dict:
                 "topic_assoc": None,
             },
             "crawl_probe": _slim_probe(probe),
+            "source_probe": _slim_source_probe(source_probe),
             "source_evidence": evidence,
             # 信源类建议不跑影子/抓文章双达标，用自己的证据口径 + 来源标记
             "self_test": {
@@ -2983,12 +3617,19 @@ def run_self_test_and_stage(
     per_source: int = CRAWL_PROBE_PER_SOURCE,
     probe_timeout_seconds: float = CRAWL_PROBE_TIMEOUT_SECONDS,
     probe_max_sources: int = CRAWL_PROBE_MAX_SOURCES,
+    source_probe_runner=None,
+    source_probe_limit: int = SOURCE_PROBE_MAX_SOURCES,
+    source_probe_timeout_seconds: float = SOURCE_PROBE_TIMEOUT_SECONDS,
 ) -> Dict:
     """评估 → 挖候选 → 影子自测 → 抓文章实测 → **双达标才 verified**，否则 rejected。
 
     ``probe_runner`` 需满足
     ``(pack_id, candidates, *, per_source, timeout_seconds, max_sources) -> dict`` 签名，
     默认用 ``crawl_probe``（真联网）；测试传入桩函数即可完全离线。
+
+    信源类建议另跑一道**信源实测探针**：``source_probe_runner`` 需满足
+    ``(pack_id, *, limit, timeout_seconds) -> dict`` 签名，默认用 ``probe_sources``（真联网）；
+    测试同样可以打桩（信源建议的 verified 依据就是它，缺了必然 rejected）。
     """
     pack = _load_pack(pack_id)
     assessment = assess_pack(pack_id, sample_limit=sample_limit)
@@ -3049,7 +3690,15 @@ def run_self_test_and_stage(
             reason=reason,
         )
         result = _self_test_result(record, assessment, None, probe, reason)
-        return _stage_source_suggestion(result, pack_id, assessment, probe)
+        return _stage_source_suggestion(
+            result,
+            pack_id,
+            assessment,
+            probe,
+            source_probe_runner=source_probe_runner,
+            source_probe_limit=source_probe_limit,
+            source_probe_timeout_seconds=source_probe_timeout_seconds,
+        )
 
     shadow = shadow_test(pack_id, candidates, sample_limit=sample_limit)
     verdict = _evaluate_self_test(shadow, probe)
@@ -3099,14 +3748,59 @@ def run_self_test_and_stage(
         reason=verdict["reason"],
     )
     result = _self_test_result(record, assessment, shadow, probe, verdict["reason"], verdict)
-    return _stage_source_suggestion(result, pack_id, assessment, probe)
+    return _stage_source_suggestion(
+        result,
+        pack_id,
+        assessment,
+        probe,
+        source_probe_runner=source_probe_runner,
+        source_probe_limit=source_probe_limit,
+        source_probe_timeout_seconds=source_probe_timeout_seconds,
+    )
 
 
 def _stage_source_suggestion(
-    result: Dict, pack_id: str, assessment: Dict, probe
+    result: Dict,
+    pack_id: str,
+    assessment: Dict,
+    probe,
+    *,
+    source_probe_runner=None,
+    source_probe_limit: int = SOURCE_PROBE_MAX_SOURCES,
+    source_probe_timeout_seconds: float = SOURCE_PROBE_TIMEOUT_SECONDS,
 ) -> Dict:
-    """同时落一条信源类建议（【改进】页的"信源类建议"区块靠它出数据）。"""
-    built = _build_source_suggestion(assessment, probe)
+    """同时落一条信源类建议（【改进】页的"信源类建议"区块靠它出数据）。
+
+    信源建议的 verified 依据是 ``probe_sources`` 的**真实探测**（不是"零产出"规则），所以这里
+    先跑一次信源实测探针，把逐源结论随 evidence 一起落库；探针整体失败也不影响关键词建议的
+    结论，只是信源建议必然被闸门降级（没有探测证据 → rejected）。
+    """
+    runner = source_probe_runner or probe_sources
+    try:
+        source_probe = runner(
+            pack_id, limit=source_probe_limit, timeout_seconds=source_probe_timeout_seconds
+        )
+    except Exception as exc:
+        source_probe = {
+            "pack_id": str(pack_id),
+            "generated_by": SOURCE_PROBE_GENERATOR,
+            "probed_at": utc_text(),
+            "sources": [],
+            "sources_probed": 0,
+            "sources_reachable": 0,
+            "sample_available": False,
+            "verdict_counts": {},
+            "errors": [{"source_id": None, "error": _probe_error_text(exc)}],
+        }
+    if not isinstance(source_probe, dict):
+        source_probe = {
+            "pack_id": str(pack_id),
+            "generated_by": SOURCE_PROBE_GENERATOR,
+            "sources": [],
+            "errors": [{"source_id": None, "error": "信源探针返回结构异常（不是对象）"}],
+        }
+    built = _build_source_suggestion(assessment, probe, source_probe)
+    result["source_probe"] = _slim_source_probe(source_probe)
     try:
         record = stage_suggestion(
             pack_id,
@@ -3199,6 +3893,7 @@ __all__ = [
     "mine_keyword_candidates",
     "shadow_test",
     "crawl_probe",
+    "probe_sources",
     "stage_suggestion",
     "list_suggestions",
     "get_suggestion",
@@ -3219,4 +3914,14 @@ __all__ = [
     "SUGGESTION_KINDS",
     "SUGGESTION_STATUSES",
     "SELF_TEST_SOURCE",
+    "SOURCE_PROBE_GENERATOR",
+    "SOURCE_PROBE_MAX_SOURCES",
+    "SOURCE_PROBE_TIMEOUT_SECONDS",
+    "SOURCE_PROBE_BAD_VERDICTS",
+    "PROBE_VERDICT_OK",
+    "PROBE_VERDICT_EMPTY_FEED",
+    "PROBE_VERDICT_UNPARSABLE",
+    "PROBE_VERDICT_DEAD",
+    "PROBE_VERDICT_BLOCKED",
+    "PROBE_VERDICT_DISABLED",
 ]

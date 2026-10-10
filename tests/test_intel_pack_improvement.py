@@ -958,7 +958,11 @@ class IntelPackImprovementTests(unittest.TestCase):
         }
 
     def _passing_source_metrics(self):
-        """信源类建议的达标指标（口径：有可执行项 + 自测来源标记）。"""
+        """信源类建议的达标指标（口径：有探测证明不可用的可执行项 + 自测来源标记）。
+
+        2026-10 起信源类建议不再看"零产出"这类机械规则，只认 probe_sources 的实测证据，
+        所以 fixture 里也带上一份"证明 #9 坏、#99 正常"的逐源探测记录。
+        """
         return {
             "before": {"admit_rate": 0.0, "false_positive": None, "topic_assoc": None, "other_pct": 100.0},
             "after": {"admit_rate": None, "false_positive": None, "topic_assoc": None, "other_pct": None},
@@ -970,12 +974,20 @@ class IntelPackImprovementTests(unittest.TestCase):
                 "sources": [],
                 "errors": [],
             },
-            "source_evidence": {"actionable_count": 1, "unverified_count": 0},
+            "source_evidence": {
+                "actionable_count": 1,
+                "unverified_count": 0,
+                "disable_source_ids": [9],
+                "source_probe": self._source_probe_fixture(
+                    [{"source_id": 9, "verdict": m.PROBE_VERDICT_DEAD, "http_status": 404,
+                      "reachable": False, "parsed_items": 0, "error": "HTTP 404"}]
+                ),
+            },
             "self_test": {
                 "source": m.SELF_TEST_SOURCE,
                 "kind": "source",
                 "passed": True,
-                "reason": "信源体检：建议停用 1 个零产出源",
+                "reason": "信源体检：建议停用 1 个源（探测证明不可用）",
             },
         }
 
@@ -1202,7 +1214,17 @@ class IntelPackImprovementTests(unittest.TestCase):
             {"disable_sources": [{"source_id": 1}], "replace_sources": [], "add_sources": [], "keep_sources": []},
             {
                 "before": {}, "after": {},
-                "source_evidence": {"actionable_count": 1},
+                "source_evidence": {
+                    "actionable_count": 1,
+                    "disable_source_ids": [1],
+                    # 信源类建议要 verified 必须带 probe_sources 的真实探测证据（#1 实测不可用）
+                    "source_probe": self._source_probe_fixture(
+                        [
+                            {"source_id": 1, "verdict": m.PROBE_VERDICT_DEAD, "http_status": 404,
+                             "reachable": False, "parsed_items": 0, "error": "HTTP 404"}
+                        ]
+                    ),
+                },
                 "self_test": {"source": m.SELF_TEST_SOURCE, "kind": "source", "passed": True},
             },
             status="verified",
@@ -1234,6 +1256,73 @@ class IntelPackImprovementTests(unittest.TestCase):
                 "sample_available": parsed_total > 0,
                 "errors": list(errors or []),
             }
+
+        return _runner
+
+    # ── 信源实测探针（probe_sources）夹具 ──
+    def _source_probe_fixture(self, rows, *, healthy_id=99):
+        """造一份 probe_sources 形态的探测记录（默认再补一个"可达"样本，便于过样本闸门）。"""
+        records = [
+            {
+                "source_id": int(row["source_id"]),
+                "source_name": row.get("source_name", f"源{row['source_id']}"),
+                "source_url": row.get("source_url", f"https://s{row['source_id']}.example.com/rss"),
+                "probe_url": row.get("source_url", f"https://s{row['source_id']}.example.com/rss"),
+                "source_type": "rss",
+                "is_enabled": True,
+                "probed": row.get("probed", True),
+                "reachable": bool(row.get("reachable")),
+                "http_status": row.get("http_status"),
+                "content_type": row.get("content_type", ""),
+                "parsed_items": int(row.get("parsed_items") or 0),
+                "error": row.get("error", ""),
+                "verdict": row["verdict"],
+                "probed_at": "2026-01-01T00:00:00Z",
+            }
+            for row in rows
+        ]
+        if healthy_id is not None and not any(r["reachable"] for r in records):
+            records.append(
+                {
+                    "source_id": int(healthy_id),
+                    "source_name": "正常源",
+                    "source_url": "https://healthy.example.com/rss",
+                    "probe_url": "https://healthy.example.com/rss",
+                    "source_type": "rss",
+                    "is_enabled": True,
+                    "probed": True,
+                    "reachable": True,
+                    "http_status": 200,
+                    "content_type": "application/rss+xml",
+                    "parsed_items": 12,
+                    "error": "",
+                    "verdict": m.PROBE_VERDICT_OK,
+                    "probed_at": "2026-01-01T00:00:00Z",
+                }
+            )
+        verdict_counts = {}
+        for record in records:
+            verdict_counts[record["verdict"]] = verdict_counts.get(record["verdict"], 0) + 1
+        return {
+            "pack_id": "demo_pack",
+            "generated_by": m.SOURCE_PROBE_GENERATOR,
+            "probed_at": "2026-01-01T00:00:00Z",
+            "limit": 20,
+            "timeout_seconds": 12,
+            "sources": records,
+            "sources_probed": sum(1 for record in records if record["probed"]),
+            "sources_reachable": sum(1 for record in records if record["reachable"]),
+            "sample_available": any(record["reachable"] for record in records),
+            "verdict_counts": verdict_counts,
+            "errors": [],
+        }
+
+    def _source_probe_stub(self, rows, **kwargs):
+        """probe_sources 的桩（完全离线）：回放给定逐源记录。"""
+        fixture = self._source_probe_fixture(rows, **kwargs)
+
+        def _runner(pack_id, *, limit, timeout_seconds):
+            return dict(fixture, pack_id=pack_id, limit=limit, timeout_seconds=timeout_seconds)
 
         return _runner
 
@@ -1270,7 +1359,20 @@ class IntelPackImprovementTests(unittest.TestCase):
         ]
 
         result = m.run_self_test_and_stage(
-            "demo_pack", sample_limit=50, probe_runner=self._probe_stub(probe_rows)
+            "demo_pack",
+            sample_limit=50,
+            probe_runner=self._probe_stub(probe_rows),
+            # 信源实测探针：只有探测证明坏的源才允许进停用/替换（零产出不再作依据）
+            source_probe_runner=self._source_probe_stub(
+                [
+                    {"source_id": zero, "verdict": m.PROBE_VERDICT_DEAD, "http_status": 404,
+                     "reachable": False, "parsed_items": 0, "error": "HTTP 404"},
+                    {"source_id": low, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 8},
+                    {"source_id": idle, "verdict": m.PROBE_VERDICT_EMPTY_FEED, "http_status": 200,
+                     "reachable": True, "parsed_items": 0},
+                ]
+            ),
         )
 
         self.assertIn("source_suggestion", result)
@@ -1326,6 +1428,17 @@ class IntelPackImprovementTests(unittest.TestCase):
             "demo_pack",
             sample_limit=50,
             probe_runner=self._probe_stub(probe_rows, errors=errors),
+            # 信源探测显示零产出源可用（#zero 可达）→ 不许停用，只能进 unverified
+            source_probe_runner=self._source_probe_stub(
+                [
+                    {"source_id": zero, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 5},
+                    {"source_id": low, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 5},
+                    {"source_id": idle, "verdict": m.PROBE_VERDICT_EMPTY_FEED, "http_status": 200,
+                     "reachable": True, "parsed_items": 0},
+                ]
+            ),
         )
 
         suggestion = result["source_suggestion"]
@@ -1390,6 +1503,355 @@ class IntelPackImprovementTests(unittest.TestCase):
         )
         self.assertEqual(record["status"], "rejected")
         self.assertIn("没有可执行项", record["reason"])
+
+    # ── 信源实测探针 probe_sources（注入假 fetcher，全程离线） ──
+    def test_probe_sources_verdicts_cover_ok_dead_dns_blocked_and_empty(self):
+        """五种情形（可用/404/DNS 失败/403/200 但 0 条）+ 200 HTML 空页面，verdict 与条目数都要对。"""
+        ok = self._insert_source("demo_pack", "可用 RSS", "https://ok.example.com/rss")
+        dead = self._insert_source("demo_pack", "404 源", "https://dead.example.com/rss")
+        dns = self._insert_source("demo_pack", "DNS 失败源", "https://dns.example.com/rss")
+        blocked = self._insert_source("demo_pack", "403 源", "https://blocked.example.com/rss")
+        empty = self._insert_source("demo_pack", "空 feed 源", "https://empty.example.com/rss")
+        shell = self._insert_source("demo_pack", "空壳首页", "https://shell.example.com/news")
+        feed_ok = (
+            "<?xml version='1.0' encoding='UTF-8'?><rss version='2.0'><channel>"
+            + "".join(
+                f"<item><title>条目{i}</title><link>https://ok.example.com/a{i}</link>"
+                f"<pubDate>Mon, 05 Oct 2026 0{i}:00:00 GMT</pubDate></item>"
+                for i in range(3)
+            )
+            + "</channel></rss>"
+        )
+        feed_empty = (
+            "<?xml version='1.0' encoding='UTF-8'?><rss version='2.0'><channel>"
+            "<title>空</title></channel></rss>"
+        )
+        calls = []
+
+        def fake_fetcher(source, url, timeout_seconds):
+            calls.append((source["source_id"], url, timeout_seconds))
+            source_id = source["source_id"]
+            if source_id == ok:
+                return {"status_code": 200, "content": feed_ok,
+                        "content_type": "application/rss+xml", "url": url}
+            if source_id == dead:
+                return {"status_code": 404, "content": b"<html>gone</html>",
+                        "content_type": "text/html", "url": url}
+            if source_id == dns:
+                raise OSError("Name or service not known")
+            if source_id == blocked:
+                return {"status_code": 403, "content": b"<html>forbidden</html>",
+                        "content_type": "text/html", "url": url}
+            if source_id == empty:
+                return {"status_code": 200, "content": feed_empty,
+                        "content_type": "application/rss+xml", "url": url}
+            return {"status_code": 200,
+                    "content": b"<html><body><p>nothing here</p></body></html>",
+                    "content_type": "text/html; charset=utf-8", "url": url}
+
+        probe = m.probe_sources(
+            "demo_pack",
+            source_ids=[ok, dead, dns, blocked, empty, shell],
+            limit=20,
+            timeout_seconds=12,
+            fetcher=fake_fetcher,
+        )
+
+        by_id = {row["source_id"]: row for row in probe["sources"]}
+        self.assertEqual(probe["generated_by"], "probe_sources")
+        self.assertEqual(len(probe["sources"]), 6)
+        # 每源最多 1 次请求（串行、不重试）
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(by_id[ok]["verdict"], m.PROBE_VERDICT_OK)
+        self.assertEqual(by_id[ok]["parsed_items"], 3)
+        self.assertTrue(by_id[ok]["reachable"])
+        self.assertEqual(by_id[dead]["verdict"], m.PROBE_VERDICT_DEAD)
+        self.assertEqual(by_id[dead]["http_status"], 404)
+        self.assertEqual(by_id[dead]["parsed_items"], 0)
+        self.assertFalse(by_id[dead]["reachable"])
+        self.assertEqual(by_id[dns]["verdict"], m.PROBE_VERDICT_DEAD)
+        self.assertIsNone(by_id[dns]["http_status"])
+        self.assertIn("Name or service not known", by_id[dns]["error"])
+        self.assertEqual(by_id[blocked]["verdict"], m.PROBE_VERDICT_BLOCKED)
+        self.assertEqual(by_id[blocked]["http_status"], 403)
+        self.assertEqual(by_id[empty]["verdict"], m.PROBE_VERDICT_EMPTY_FEED)
+        self.assertEqual(by_id[empty]["parsed_items"], 0)
+        # 200 + HTML + 0 条 = 页面不可解析（不是"空 feed"，也**不是**停用依据）
+        self.assertEqual(by_id[shell]["verdict"], m.PROBE_VERDICT_UNPARSABLE)
+        self.assertTrue(by_id[shell]["reachable"])
+        self.assertEqual(probe["sources_probed"], 6)
+        self.assertEqual(probe["sources_reachable"], 3)
+        self.assertTrue(probe["sample_available"])
+        self.assertEqual(probe["verdict_counts"][m.PROBE_VERDICT_DEAD], 2)
+        # 口径固定：只有这三种 verdict（或 reachable=False）才算"探测证明坏"
+        self.assertTrue(m._source_probe_proves_bad(by_id[dead]))
+        self.assertTrue(m._source_probe_proves_bad(by_id[blocked]))
+        self.assertTrue(m._source_probe_proves_bad(by_id[empty]))
+        self.assertFalse(m._source_probe_proves_bad(by_id[shell]))
+        self.assertFalse(m._source_probe_proves_bad(by_id[ok]))
+
+    def test_probe_sources_default_selection_respects_limit(self):
+        """缺省选源走"零产出/准入率低优先"，且遵守 limit（默认口径最多 20 个源）。"""
+        for index in range(4):
+            self._insert_source("demo_pack", f"零产出源{index}", f"https://z{index}.example.com/rss")
+        calls = []
+
+        def fake_fetcher(source, url, timeout_seconds):
+            calls.append(source["source_id"])
+            return {"status_code": 200, "content": b"<html><body>x</body></html>",
+                    "content_type": "text/html", "url": url}
+
+        probe = m.probe_sources("demo_pack", limit=2, timeout_seconds=12, fetcher=fake_fetcher)
+        self.assertEqual(len(probe["sources"]), 2)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(probe["sources"][0]["verdict"], m.PROBE_VERDICT_UNPARSABLE)
+
+    # ── 信源类建议的 verified 闸门（先探测、后 verified） ──
+    def _stage_source_probe_suggestion(self, payload, source_probe, *, reason="信源体检"):
+        """按引擎口径落一条信源建议（带自测来源标记），返回落库后的记录。"""
+        metrics = {
+            "before": {}, "after": {},
+            "source_evidence": {
+                "actionable_count": len(payload.get("disable_sources") or [])
+                + len(payload.get("replace_sources") or []),
+                "source_probe": source_probe,
+            },
+            "self_test": {
+                "source": m.SELF_TEST_SOURCE, "kind": "source",
+                "pack_id": "demo_pack", "passed": True, "reason": reason,
+            },
+        }
+        return m.stage_suggestion(
+            "demo_pack", "source", payload, metrics,
+            status="verified", evidence={"source_probe": source_probe}, reason=reason,
+        )
+
+    def test_source_gate_rejects_disabling_healthy_zero_output_source(self):
+        """上一轮真实事故回归：零产出但 URL 正常的源被建议停用 → 必须 rejected。
+
+        A 机 invest_mgmt 就是按"零产出 → 停用"机械规则产出了"停用全部 65 个源"的 verified 建议，
+        实测其中 46 个 URL 完全正常（只是调度没跑）。这条口径必须永远拦住它。
+        """
+        probe = self._source_probe_fixture(
+            [{"source_id": 501, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+              "reachable": True, "parsed_items": 18}]
+        )
+        payload = {
+            "disable_sources": [
+                {"source_id": 501, "source_name": "零产出正常源", "reason": "零产出 → 建议停用"}
+            ],
+            "replace_sources": [],
+            "add_sources": [],
+            "keep_sources": [],
+        }
+        record = self._stage_source_probe_suggestion(payload, probe)
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("判定为 verified 但按当前阈值复算未达标", record["reason"])
+        self.assertIn("#501", record["reason"])
+        self.assertIn("不构成停用/替换依据", record["reason"])
+
+    def test_source_gate_rejects_when_probe_evidence_missing(self):
+        """探测记录缺失 → rejected（信源类建议不能只凭机械规则判 verified）。"""
+        payload = {
+            "disable_sources": [{"source_id": 501, "reason": "零产出"}],
+            "replace_sources": [], "add_sources": [], "keep_sources": [],
+        }
+        metrics = {
+            "before": {}, "after": {},
+            "source_evidence": {"actionable_count": 1},
+            "self_test": {
+                "source": m.SELF_TEST_SOURCE, "kind": "source",
+                "pack_id": "demo_pack", "passed": True,
+            },
+        }
+        record = m.stage_suggestion(
+            "demo_pack", "source", payload, metrics, status="verified"
+        )
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("缺少信源探测记录", record["reason"])
+
+    def test_source_gate_rejects_forged_probe_generated_by(self):
+        """探测记录来源标记被伪造（generated_by 不是 probe_sources）→ rejected。"""
+        forged = self._source_probe_fixture(
+            [{"source_id": 501, "verdict": m.PROBE_VERDICT_DEAD, "http_status": 404,
+              "reachable": False, "parsed_items": 0, "error": "HTTP 404"}]
+        )
+        forged["generated_by"] = "manual_probe_20261010"
+        payload = {
+            "disable_sources": [{"source_id": 501, "reason": "URL 失效"}],
+            "replace_sources": [], "add_sources": [], "keep_sources": [],
+        }
+        record = self._stage_source_probe_suggestion(payload, forged)
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("来源不可信", record["reason"])
+
+    def test_source_gate_rejects_when_probe_reached_nothing(self):
+        """抓取全失败（一个源都没探到）→ rejected，理由含"未取得探测样本"。"""
+        all_failed = self._source_probe_fixture(
+            [
+                {"source_id": 501, "verdict": m.PROBE_VERDICT_DEAD, "http_status": None,
+                 "reachable": False, "parsed_items": 0, "error": "ConnectTimeout"},
+                {"source_id": 502, "verdict": m.PROBE_VERDICT_DEAD, "http_status": None,
+                 "reachable": False, "parsed_items": 0, "error": "Name or service not known"},
+            ],
+            healthy_id=None,
+        )
+        payload = {
+            "disable_sources": [
+                {"source_id": 501, "reason": "URL 失效"},
+                {"source_id": 502, "reason": "URL 失效"},
+            ],
+            "replace_sources": [], "add_sources": [], "keep_sources": [],
+        }
+        record = self._stage_source_probe_suggestion(payload, all_failed)
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("未取得探测样本，无法验证", record["reason"])
+
+        # 一条记录都没有（探针整个没跑成）同样必须被拦住
+        empty = self._source_probe_fixture([], healthy_id=None)
+        empty["sources"] = []
+        record = self._stage_source_probe_suggestion(payload, empty)
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("未取得探测样本，无法验证", record["reason"])
+
+        # 探测覆盖不全（#502 没有探测记录）也必须 rejected
+        partial = self._source_probe_fixture(
+            [{"source_id": 501, "verdict": m.PROBE_VERDICT_DEAD, "http_status": 404,
+              "reachable": False, "parsed_items": 0, "error": "HTTP 404"}]
+        )
+        record = self._stage_source_probe_suggestion(payload, partial)
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("#502", record["reason"])
+        self.assertIn("探测覆盖不全", record["reason"])
+
+    def test_source_gate_allows_verified_when_probe_proves_dead(self):
+        """探测证明坏 → 允许 verified；同时"页面不可解析"的源不许进停用桶。"""
+        probe = self._source_probe_fixture(
+            [
+                {"source_id": 501, "verdict": m.PROBE_VERDICT_DEAD, "http_status": 404,
+                 "reachable": False, "parsed_items": 0, "error": "HTTP 404"},
+                {"source_id": 502, "verdict": m.PROBE_VERDICT_BLOCKED, "http_status": 403,
+                 "reachable": False, "parsed_items": 0, "error": "HTTP 403"},
+                {"source_id": 503, "verdict": m.PROBE_VERDICT_EMPTY_FEED, "http_status": 200,
+                 "reachable": True, "parsed_items": 0},
+                {"source_id": 504, "verdict": m.PROBE_VERDICT_UNPARSABLE, "http_status": 200,
+                 "reachable": True, "parsed_items": 0},
+            ]
+        )
+        payload = {
+            "disable_sources": [
+                {"source_id": 501, "reason": "URL 失效"},
+                {"source_id": 502, "reason": "需登录或反爬"},
+                {"source_id": 503, "reason": "空 feed"},
+            ],
+            "replace_sources": [], "add_sources": [],
+            "keep_sources": [{"source_id": 504, "reason": "页面不可解析，需人工确认"}],
+        }
+        record = self._stage_source_probe_suggestion(payload, probe)
+        self.assertEqual(record["status"], "verified")
+
+        # 把"页面不可解析"的源也塞进停用桶 → 立刻 reject（口径：它不算坏源证据）
+        bad_payload = copy.deepcopy(payload)
+        bad_payload["disable_sources"].append({"source_id": 504, "reason": "解析不出条目"})
+        record = self._stage_source_probe_suggestion(bad_payload, probe)
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("页面不可解析", record["reason"])
+
+    def test_source_suggestion_keeps_zero_output_source_when_probe_is_healthy(self):
+        """引擎侧回归：零产出 + 探测可用 → 进 keep_sources + notes，不进 disable_sources。"""
+        zero, low, idle = self._seed_source_mix()
+        probe_rows = [
+            {"source_id": zero, "source_name": "零产出源", "listing_status": "ok",
+             "listing_error": "", "fetched": 3, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "零产出"},
+            {"source_id": low, "source_name": "低准入源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 1,
+             "articles": [], "verdict": "准入率低"},
+            {"source_id": idle, "source_name": "停更源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "长期无新文"},
+        ]
+
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=50,
+            probe_runner=self._probe_stub(probe_rows),
+            # 三个源都探测得到内容：谁都不该被停用/替换
+            source_probe_runner=self._source_probe_stub(
+                [
+                    {"source_id": zero, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 21},
+                    {"source_id": low, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 9},
+                    {"source_id": idle, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 4},
+                ]
+            ),
+        )
+
+        suggestion = result["source_suggestion"]
+        payload = suggestion["payload"]
+        self.assertEqual(payload["disable_sources"], [])
+        self.assertEqual(payload["replace_sources"], [])
+        self.assertEqual(payload["unverified_sources"], [])
+        self.assertEqual(
+            sorted(item["source_id"] for item in payload["keep_sources"]),
+            sorted([zero, low, idle]),
+        )
+        zero_item = next(
+            item for item in payload["keep_sources"] if item["source_id"] == zero
+        )
+        self.assertIn("零产出不能作为停用理由", zero_item["reason"])
+        self.assertIn("需先确认调度/映射是否正常", zero_item["reason"])
+        self.assertIn("历史入库产出 0 篇", zero_item["reason"])
+        self.assertTrue(
+            any("零产出，需先确认调度/映射是否正常" in note for note in payload["notes"])
+        )
+        # 没有可执行项 → 不可 verified；探测记录必须随证据落库，供闸门复算
+        self.assertEqual(suggestion["status"], "rejected")
+        self.assertIn("没有可执行的信源调整项", suggestion["reason"])
+        self.assertEqual(
+            suggestion["evidence"]["source_probe"]["generated_by"], "probe_sources"
+        )
+
+    def test_source_suggestion_marks_unprobed_source_as_unverified(self):
+        """没有探测记录的源（探针没覆盖）→ unverified，不许进停用桶。"""
+        zero, low, idle = self._seed_source_mix()
+        probe_rows = [
+            {"source_id": zero, "source_name": "零产出源", "listing_status": "ok",
+             "listing_error": "", "fetched": 3, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "零产出"},
+            {"source_id": low, "source_name": "低准入源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 1,
+             "articles": [], "verdict": "准入率低"},
+            {"source_id": idle, "source_name": "停更源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "长期无新文"},
+        ]
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=50,
+            probe_runner=self._probe_stub(probe_rows),
+            # 探针只覆盖 low：zero/idle 没有探测记录 → 一律 unverified
+            source_probe_runner=self._source_probe_stub(
+                [
+                    {"source_id": low, "verdict": m.PROBE_VERDICT_OK, "http_status": 200,
+                     "reachable": True, "parsed_items": 9},
+                ]
+            ),
+        )
+        payload = result["source_suggestion"]["payload"]
+        self.assertEqual(payload["disable_sources"], [])
+        self.assertEqual(payload["replace_sources"], [])
+        self.assertEqual(
+            sorted(item["source_id"] for item in payload["unverified_sources"]),
+            sorted([zero, idle]),
+        )
+        for item in payload["unverified_sources"]:
+            self.assertIn("缺少探测记录", item["reason"])
+            self.assertIn("无法确认该源状态", item["reason"])
+        self.assertEqual(result["source_suggestion_status"], "rejected")
+        self.assertIn("没有可执行", result["source_suggestion"]["reason"])
 
 
 # ─────────────────── 挖词质量：去样板 / 跨域名多样性 / 导航短语（真机夹具回归） ───────────────────
