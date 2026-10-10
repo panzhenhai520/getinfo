@@ -13,6 +13,11 @@ from typing import Mapping
 
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_level1_result, validate_level2_result
 from qa_errors import QaAction, QaPublicError, classify_qa_error
+from qa_evidence import (
+    EVIDENCE_LAYER_VERSION, annotate_evidence_batch, dedupe_by_fingerprint,
+    dedupe_evidence_items, evidence_layer_enabled, evidence_object, filter_seen,
+    load_seen, record_seen,
+)
 from qa_graph_contracts import (
     QA_ROUTE_GRAPH, QA_ROUTE_GRAPH_ATTRIBUTE, QA_ROUTE_KEYWORD, QA_ROUTE_PAGE_CONTEXT,
     QA_ROUTE_POLICY_EXACT, QA_ROUTE_SEMANTIC, QA_ROUTE_WEB,
@@ -25,7 +30,7 @@ from qa_policy_evidence import filter_and_rank_policy_evidence, normalize_policy
 from qa_provider_registry import QaProviderRegistry
 from qa_question_templates import render_question_plan_status
 from qa_ragflow_client import QaRagflowResearchClient
-from qa_relevance import filter_relevant_evidence
+from qa_relevance import filter_relevant_evidence, question_terms
 from qa_reasoning import build_claim_evidence_graph
 from qa_research import QaRagflowResearchService, enrich_ragflow_evidence_from_database, insufficient_level2_result
 from qa_synthesis import QaFinalSynthesizer, fallback_final_answer
@@ -112,31 +117,12 @@ def _default_semantic_search(question: str, *, allowed_ids: set, limit: int):
 
 
 def _dedupe_evidence(items: list[dict], limit: int) -> list[dict]:
-    result, refs, urls, article_ids, fingerprints = [], set(), set(), set(), set()
-    for item in items:
-        ref = str(item.get("evidence_ref") or "")
-        url = str(item.get("source_url") or "")
-        article_id = item.get("article_id")
-        fingerprint_text = " ".join(str(item.get(key) or "") for key in ("title", "content_excerpt", "excerpt", "content"))
-        fingerprint = hashlib.sha256(" ".join(fingerprint_text.casefold().split())[:600].encode("utf-8")).hexdigest()[:24] if fingerprint_text.strip() else ""
-        if (
-            ref in refs
-            or (article_id and article_id in article_ids)
-            or (url and url in urls)
-            or (fingerprint and fingerprint in fingerprints)
-        ):
-            continue
-        refs.add(ref)
-        if url:
-            urls.add(url)
-        if article_id:
-            article_ids.add(article_id)
-        if fingerprint:
-            fingerprints.add(fingerprint)
-        result.append(item)
-        if len(result) >= limit:
-            break
-    return result
+    """既有去重口径：evidence_ref / article_id / source_url / 内容指纹，四者任一撞上即重复。
+
+    阶段 02 起实现集中在 `qa_evidence.dedupe_evidence_items`（单一事实源，含指纹算法），
+    这里只做委托——行为与改造前逐字一致，调用点一个都没动。
+    """
+    return dedupe_evidence_items(items, limit)
 
 
 _RAG_RELEVANCE_STOP_TERMS = {
@@ -403,6 +389,75 @@ def _load_session_constraints(store, run_meta: Mapping) -> dict:
             owner_user_id=owner, session_id=session_id, industry_pack_id=pack_id) or {})
     except Exception:
         return {}
+
+
+def _evidence_scope(run_meta: Mapping) -> dict:
+    """阶段 02（P02-03）证据 seen 集合的作用域：用户 + 会话 + 行业包。
+
+    与 `_session_scope` 同一口径，但**不设"会话为空就不记录"的门槛**：会话为空时记录在
+    空会话作用域里，照样互相隔离，不会串到别人的会话上。
+    """
+    owner, session_id, pack_id = _session_scope(run_meta)
+    return {"owner_user_id": owner, "session_id": session_id, "industry_pack_id": pack_id}
+
+
+def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapping | None,
+                          run_meta: Mapping, store, round_index: int = 0,
+                          corpus_version: str = "") -> tuple[list[dict], dict]:
+    """阶段 02（P02-01…P02-04）主接线：证据层标注 + seen 登记 + 跨轮/跨 run 去重。
+
+    只加不改：
+      · 标注结果全部落在 `metadata.evidence_layer`（`EVIDENCE_SCHEMA` 放行 metadata），
+        证据条目的顶层键集一个字不变，冻结契约指纹不受影响；
+      · 去重默认只丢"上一轮被闸门拒掉的来源"（QA_EVIDENCE_SEEN_DEDUPE=rejected），
+        不会把上一轮用过的有用来源从本轮证据包里拿掉；
+      · 顺序是"先查后记"：先读本轮**之前**的 seen 身份，再做过滤，最后才登记本轮结果，
+        否则本轮的登记会把自己过滤掉（mode=all 时尤其致命）；
+      · 任何异常都原样返回证据 + 审计里写明原因——证据层绝不能把问答打断。
+
+    返回 (证据, 审计)。
+    """
+    audit = {"evidence_layer": "skipped", "reason": "", "annotated": 0, "seen_dropped": 0,
+             "dedupe_dropped": 0, "recorded": 0, "scope": _evidence_scope(run_meta)}
+    if not evidence_layer_enabled():
+        audit["reason"] = "QA_EVIDENCE_LAYER_ENABLED=0"
+        return list(evidence), audit
+    try:
+        run_id = str(run_meta.get("id") or "")
+        scope = audit["scope"]
+        rejected_items = [item for item in (rejected or []) if isinstance(item, Mapping)]
+        reviewed = annotate_evidence_batch(
+            evidence, terms=question_terms(question, plan), run_id=run_id,
+            stage="level1_retrieval", round_index=round_index, corpus_version=corpus_version)
+        reviewed, fingerprint_audit = dedupe_by_fingerprint(reviewed)
+        seen_before = load_seen(store, scope=scope, items=[*reviewed, *rejected_items])
+        kept, seen_audit = filter_seen(reviewed, seen_before)
+        # 因"重复"被跳过的：登记成中性 seen（它们既没进证据包，也不是这一轮被闸门拒的）
+        dropped_keys = {str(entry.get("source_fingerprint") or "")
+                        for entry in seen_audit.get("dropped") or []}
+        skipped = [item for item in reviewed
+                   if str(evidence_object(item).get("source_fingerprint") or "") in dropped_keys]
+        recorded = record_seen(
+            store, scope=scope, accepted=kept, rejected=rejected_items, witnessed=skipped,
+            run_id=run_id, round_index=round_index,
+        )
+        audit.update({
+            "evidence_layer": EVIDENCE_LAYER_VERSION,
+            "annotated": len(reviewed),
+            "seen_dropped": int(seen_audit.get("dropped_count") or 0),
+            "dedupe_dropped": int(fingerprint_audit.get("dropped_count") or 0),
+            "recorded": int(recorded.get("recorded") or 0),
+            "seen_mode": str(seen_audit.get("mode") or ""),
+            "record_error": str(recorded.get("error") or ""),
+        })
+        if not kept:
+            # 去重把证据清空了：宁可退回原证据（只加了标注），也不给用户一个空证据包
+            audit["reason"] = "seen_dedupe_emptied_evidence_fallback"
+            return reviewed, audit
+        return kept, audit
+    except Exception as exc:  # noqa: BLE001 —— 证据层绝不打断问答
+        audit["reason"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return list(evidence), audit
 
 
 def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping) -> int:
@@ -1110,6 +1165,7 @@ def build_qa_stage_handlers(
     def level1_retrieval(context):
         request_payload = context["request"]
         retrieval_plan = context["outputs"]["plan"]
+        run_meta = context.get("run") or {}
         emit_stage_event = context.get("_emit_stage_event")
         if not retrieval_plan.get("needs_local_articles"):
             return {
@@ -1224,8 +1280,22 @@ def build_qa_stage_handlers(
             plan=retrieval_plan,
             limit=cap,
         )
+        # ── 阶段 02（P02-01…P02-04）：证据层标注 + seen 登记 + 跨轮/跨 run 去重 ──
+        # `raw_evidence` 是被闸门筛掉前的候选全集，交给证据层当"被拒身份"登记；
+        # 去重默认只丢上一轮被拒的来源，证据包不会被无谓削薄（详见 _apply_evidence_layer）。
+        evidence, evidence_audit = _apply_evidence_layer(
+            evidence,
+            rejected=raw_evidence,
+            question=_planned_question(context),
+            plan=retrieval_plan,
+            run_meta=run_meta,
+            store=store,
+            corpus_version=kb_version,
+        )
         stats = dict(local.get("stats") or {})
         stats.update({"web_adopted": len(external.get("evidence") or []), "adopted": len(evidence)})
+        stats["evidence_layer"] = {key: evidence_audit.get(key) for key in (
+            "evidence_layer", "annotated", "seen_dropped", "dedupe_dropped", "recorded", "reason")}
         if policy_audit.get("policy_filter") == "applied":
             stats["policy_source_roles"] = policy_audit.get("source_roles") or {}
             stats["policy_noise_excluded"] = len(policy_audit.get("excluded_policy_noise") or [])

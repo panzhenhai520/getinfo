@@ -15,12 +15,18 @@
 （等价替换：值一个字都不改）。后续阶段（05 执行图、11 Skill、15 审计）从这里取常量，
 避免各处字符串漂移。
 
-边界：本文件是纯常量 + schema，**不含业务逻辑**，不被任何写路径依赖。
+Phase 02（证据层）在这里追加 `Evidence Object / Source / Span / Entity / Relation` 五个
+schema 与证据状态枚举；**既有取值与既有 schema 一个字不改**，`qa_contracts.EVIDENCE_SCHEMA`
+（`additionalProperties: False` 的历史冻结契约）更是完全不碰——证据层新字段一律走它放行的
+`metadata` 对象。
+
+边界：本文件是纯常量 + schema（外加一个不参与链路的自校验函数），**不含业务逻辑**，
+不被任何写路径依赖；证据层的构造/指纹/去重逻辑在 `qa_evidence.py`。
 """
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Mapping, Tuple
 
 # ── 版本 ──────────────────────────────────────────────────────────────────────
 GRAPH_CONTRACT_VERSION = "graph-contract-v1"
@@ -90,6 +96,50 @@ QA_STOP_REASONS: Tuple[str, ...] = (
 """多跳循环的停止原因。本仓库现状：预算耗尽会写 `status='skipped_budget'`，
 "无缺失链接"会自然收束——对应 `BUDGET_EXHAUSTED` 与 `ANSWERABLE`；
 `MAX_DEPTH`/`NO_GAIN`/`UNRESOLVABLE_CONTRADICTION` 待阶段 07 补齐。"""
+
+# ── 证据层（Phase 02 · Evidence Object / Source / Span / Entity / Relation）────
+# 通用包 01_V2_ARCHITECTURE §9 的 Evidence Object 契约：
+#   "Chunk 可以很长，但真正进入 Evidence Graph 的应该是支持某个 Claim 的最小证据 Span"。
+# 本仓库现状（Phase 01 对齐盘点结论）：证据条目里**没有** quote_span、没有 entities/
+# relations，且判定字段叫 `relationship`（supports/contradicts/qualifies/context）。
+# 这里的取值口径是：
+#   · `relationship` **一个字不改**（既有契约 EVIDENCE_SCHEMA 与 qa_reasoning 都在用）；
+#   · `status` 是它的规范化派生值（通用包用 SUPPORTED 这一套大写枚举），两者并存，
+#     证据层与四图都读 `status`，旧调用方继续读 `relationship`。
+EVIDENCE_LAYER_VERSION = "qa-evidence-v1"
+"""证据层版本；与 `GRAPH_CONTRACT_VERSION`、`qa_schema.QA_SCHEMA_VERSION` 是三件事
+（分别是"证据对象契约""图结构契约""库表结构版本"），不要混用。"""
+
+EVIDENCE_STATUS_SUPPORTED = "SUPPORTED"
+EVIDENCE_STATUS_REFUTED = "REFUTED"
+EVIDENCE_STATUS_QUALIFIED = "QUALIFIED"
+EVIDENCE_STATUS_CONTEXT = "CONTEXT"
+EVIDENCE_STATUS_UNVERIFIED = "UNVERIFIED"
+EVIDENCE_STATUSES: Tuple[str, ...] = (
+    EVIDENCE_STATUS_SUPPORTED, EVIDENCE_STATUS_REFUTED, EVIDENCE_STATUS_QUALIFIED,
+    EVIDENCE_STATUS_CONTEXT, EVIDENCE_STATUS_UNVERIFIED,
+)
+"""证据对 Claim 的判定状态。`UNVERIFIED` = 尚未判定（旧数据 relationship 为空的缺省），
+**不等于** Phase 03 的 verifier 结论——本阶段只做"关系→状态"的规范化映射。"""
+
+EVIDENCE_STATUS_BY_RELATIONSHIP = {
+    "supports": EVIDENCE_STATUS_SUPPORTED,
+    "contradicts": EVIDENCE_STATUS_REFUTED,
+    "qualifies": EVIDENCE_STATUS_QUALIFIED,
+    "context": EVIDENCE_STATUS_CONTEXT,
+}
+"""既有 `relationship` 取值 → 规范化 `status`；查不到（含空串/None）落 UNVERIFIED。"""
+
+EVIDENCE_SPAN_SOURCES: Tuple[str, ...] = ("query_terms", "matched_keywords", "anchor", "lead", "whole")
+"""最小 span 的定位方式（可解释性用）：命中问题实词 / 命中关键词 / 政策锚点 /
+都没有就取开头一段 / 整条短于上限本身就是最小 span。"""
+
+EVIDENCE_SEEN_STATUSES: Tuple[str, ...] = ("seen", "confirmed", "rejected")
+"""证据 `seen` 集合的三种身份（MASTER_RULES 第 14 条：被拒证据仍属于 seen）。
+
+· `confirmed` = 通过检索层闸门、进入本轮证据包（**不是** verifier 级确认，那属 Phase 03）；
+· `rejected` = 被闸门拒掉（相关性/政策/材料噪声），必须留身份，避免下一轮重复捞同一批垃圾；
+· `seen` = 见过但尚未分类（保留值，给"只登记去重、不表态"的调用方用）。"""
 
 # ── 审计事件类型（等价取自 qa_orchestrator 的字面量）─────────────────────────
 QA_AUDIT_EVENT_TYPES: Tuple[str, ...] = (
@@ -182,33 +232,149 @@ EXECUTION_NODE_SCHEMA = {
     "additionalProperties": True,
 }
 
+# ── 证据层 schema（Phase 02 · P02-01）────────────────────────────────────────
+# 口径与上面的图 schema 一致："必需字段严格 + 不禁止额外字段"。证据对象本身是
+# `metadata.evidence_layer` 的载荷（见 qa_evidence.annotate_evidence），不进
+# `qa_contracts.EVIDENCE_SCHEMA`——那个契约是 `additionalProperties: False` 的历史冻结
+# 指纹（P00-02），放宽或收紧都造成过生产回归，**本阶段一个字都不动它**。
+
+EVIDENCE_SPAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 0},
+        "quote": {"type": "string"},
+        "source": {"type": "string", "enum": list(EVIDENCE_SPAN_SOURCES)},
+        "chars": {"type": "integer", "minimum": 0},
+    },
+    "required": ["start", "end", "quote"],
+    "additionalProperties": True,
+}
+"""最小证据 span：`content_excerpt[start:end] == quote`（偏移相对证据自身的 content_excerpt）。"""
+
+EVIDENCE_SOURCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "source_id": {"type": "string"},          # 稳定来源标识（article:<id> / doc:.. / edge:.. / web:..）
+        "source_type": {"type": "string"},
+        "source_url": {"type": "string"},
+        "article_id": {"type": ["integer", "null"]},
+        "document_id": {"type": "string"},
+        "chunk_id": {"type": "string"},
+        "authority_level": {"type": ["integer", "null"]},
+        "published_at": {"type": "string"},
+    },
+    "required": ["source_id", "source_type"],
+    "additionalProperties": True,
+}
+"""Source：证据可回溯到的来源（Evidence → Source / Chunk / Span 链条的第一环）。"""
+
+EVIDENCE_ENTITY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "entity_key": {"type": "string"},         # 与 kg_builder._node_key 同口径
+        "label": {"type": "string"},
+        "entity_type": {"type": "string", "enum": list(KG_NODE_TYPES) + ["keyword"]},
+        # 值的出处（不做新 NER，只把既有 metadata / 图谱边里已有的实体显式化）
+        "origin": {"type": "string"},
+    },
+    "required": ["entity_key"],
+    "additionalProperties": True,
+}
+
+EVIDENCE_RELATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "src_key": {"type": "string"},
+        "dst_key": {"type": "string"},
+        "relation_kind": {"type": "string", "enum": list(KG_RELATION_KINDS)},
+        "attr_key": {"type": "string"},
+        "attr_value": {"type": "string"},
+        "valid_from": {"type": "string"},
+        "valid_to": {"type": "string"},
+        "evidence_ref": {"type": "string"},
+    },
+    "required": ["src_key", "dst_key", "relation_kind"],
+    "additionalProperties": True,
+}
+"""证据里表达的关系。目前只有图谱边证据能给出（事件边/属性边），文章证据一律为空——
+宁可空着，也不把"共现"编成"因果"（01_V2_ARCHITECTURE §10 Verifier 第 8 条）。"""
+
+EVIDENCE_OBJECT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "layer_version": {"type": "string"},
+        "evidence_ref": {"type": "string"},
+        "status": {"type": "string", "enum": list(EVIDENCE_STATUSES)},
+        "relationship": {"type": "string"},               # 既有字段的镜像（不改既有语义）
+        "span": EVIDENCE_SPAN_SCHEMA,
+        "source": EVIDENCE_SOURCE_SCHEMA,
+        "entities": {"type": "array", "items": EVIDENCE_ENTITY_SCHEMA},
+        "relations": {"type": "array", "items": EVIDENCE_RELATION_SCHEMA},
+        "fingerprint": {"type": "string"},                # span 级身份（P02-04）
+        "source_fingerprint": {"type": "string"},         # 来源级身份（同一篇文章/同一 chunk）
+        "provenance": {"type": "object"},                 # P02-02
+    },
+    "required": ["evidence_ref", "status", "span", "fingerprint", "source"],
+    "additionalProperties": True,
+}
+"""Evidence Object（Phase 02）：`metadata.evidence_layer` 的载荷契约。"""
+
 
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
-    return ("图谱契约 %s：节点类型 %d / 边关系 %d / 检索通道 %d / 失败策略 %d / 停止原因 %d"
-            % (GRAPH_CONTRACT_VERSION, len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
-               len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS)))
+    return ("图谱契约 %s / 证据层 %s：节点类型 %d / 边关系 %d / 检索通道 %d / 失败策略 %d / "
+            "停止原因 %d / 证据状态 %d"
+            % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, len(KG_NODE_TYPES),
+               len(KG_RELATION_KINDS), len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES),
+               len(QA_STOP_REASONS), len(EVIDENCE_STATUSES)))
+
+
+def _check_node(schema: dict, payload: Mapping, path: str) -> str:
+    """递归查一个对象：required / enum / 嵌套 object / 数组元素。返回空串表示通过。"""
+    for key in schema.get("required") or []:
+        if key not in payload or payload.get(key) in (None, ""):
+            return "缺少必需字段：%s%s" % (path, key)
+    for key, spec in (schema.get("properties") or {}).items():
+        if key not in payload or not isinstance(spec, Mapping):
+            continue
+        value = payload.get(key)
+        enum = spec.get("enum")
+        if enum and value not in enum:
+            return "字段 %s%s 取值 %r 不在枚举内" % (path, key, value)
+        if spec.get("type") == "object" and isinstance(value, Mapping):
+            failure = _check_node(spec, value, "%s%s." % (path, key))
+            if failure:
+                return failure
+        if spec.get("type") == "array" and isinstance(value, (list, tuple)):
+            item_schema = spec.get("items")
+            if isinstance(item_schema, Mapping):
+                for index, item in enumerate(value):
+                    if isinstance(item, Mapping):
+                        failure = _check_node(item_schema, item, "%s%s[%d]." % (path, key, index))
+                        if failure:
+                            return failure
+    return ""
 
 
 def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
-    """极简自校验（不引入 jsonschema 依赖）：只查 required 与几个 enum 字段。
+    """极简自校验（不引入 jsonschema 依赖）：查 required 与枚举，并递归到嵌套对象/数组。
 
     返回 (是否通过, 说明)。用于守门测试与运维自检；**不参与检索/生成链路**。
+    Phase 02 起支持嵌套（span/source/entities/relations），对既有五个 schema 行为不变
+    （它们没有嵌套对象字段）。
     """
     schemas = {
         "kg_node": KG_NODE_SCHEMA, "kg_edge": KG_EDGE_SCHEMA,
         "claim_evidence_edge": CLAIM_EVIDENCE_EDGE_SCHEMA,
         "search_trace": SEARCH_TRACE_SCHEMA, "execution_node": EXECUTION_NODE_SCHEMA,
+        "evidence_span": EVIDENCE_SPAN_SCHEMA, "evidence_source": EVIDENCE_SOURCE_SCHEMA,
+        "evidence_entity": EVIDENCE_ENTITY_SCHEMA, "evidence_relation": EVIDENCE_RELATION_SCHEMA,
+        "evidence_object": EVIDENCE_OBJECT_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:
         return False, "未知 schema：%s" % schema_name
     payload = payload if isinstance(payload, dict) else {}
-    for key in schema.get("required") or []:
-        if key not in payload or payload.get(key) in (None, ""):
-            return False, "缺少必需字段：%s" % key
-    for key, spec in (schema.get("properties") or {}).items():
-        enum = spec.get("enum")
-        if enum and key in payload and payload.get(key) not in enum:
-            return False, "字段 %s 取值 %r 不在枚举内" % (key, payload.get(key))
-    return True, "ok"
+    failure = _check_node(schema, payload, "")
+    return (False, failure) if failure else (True, "ok")

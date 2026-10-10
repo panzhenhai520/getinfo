@@ -815,6 +815,172 @@ class QaStore:
             finally:
                 cursor.close()
 
+    def record_seen_evidence(self, *, owner_user_id: str, session_id: str, industry_pack_id: str,
+                             records: list, run_id: str = "", round_index: int = 0) -> dict:
+        """Phase 02（P02-03）：登记本轮"见过的证据身份"（含被闸门拒掉的）。
+
+        为什么必须按 (owner_user_id, session_id, industry_pack_id) 落库：
+        单次 run 的内存 seen 集合一结束就没了，而"下一轮别再捞同一批垃圾"是跨轮/跨 run 的
+        需求（MASTER_RULES 第 14 条）。这三个键一起构成作用域，**任何一个不同都不共享**，
+        避免 A 会话的拒收把 B 会话的证据也误伤掉。
+
+        同 (作用域, source_fingerprint) 覆盖更新，语义：
+          · status 一旦被 confirmed 过就保持 confirmed（它曾进过证据包，不能因为后来被拒就丢身份）；
+          · seen_count / rejected_count 累加，first_* 保留首见信息；
+          · round_index 记录最近一次见证的轮次。
+        异常一律吞掉并回 {..., "error": ...}：留痕/去重绝不能拖累问答。
+        """
+        summary = {"recorded": 0, "confirmed": 0, "rejected": 0, "skipped": 0, "error": ""}
+        try:
+            self.ensure_schema()
+            now = _now()
+            rows = []
+            for record in records or []:
+                if not isinstance(record, Mapping):
+                    continue
+                key = str(record.get("source_fingerprint") or "")
+                if not key:
+                    summary["skipped"] += 1
+                    continue
+                status = str(record.get("status") or "seen")
+                if status not in ("seen", "confirmed", "rejected"):
+                    status = "seen"
+                rows.append({
+                    "owner_user_id": str(owner_user_id or ""), "session_id": str(session_id or ""),
+                    "industry_pack_id": str(industry_pack_id or ""), "key": key,
+                    "span": str(record.get("span_fingerprint") or ""),
+                    "ref": str(record.get("evidence_ref") or ""),
+                    "source_type": str(record.get("source_type") or ""),
+                    "status": status, "run_id": str(run_id or ""),
+                    "round_index": int(round_index or 0),
+                    "payload": _json({"status": status, "evidence_ref": str(record.get("evidence_ref") or "")}),
+                    "now": now,
+                })
+            if not rows:
+                return summary
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows:
+                        cursor.execute(
+                            """
+                            INSERT INTO qa_evidence_seen(
+                                owner_user_id,session_id,industry_pack_id,source_fingerprint,
+                                span_fingerprint,evidence_ref,source_type,status,seen_count,
+                                rejected_count,first_run_id,last_run_id,round_index,payload_json,
+                                first_seen_at,last_seen_at
+                            ) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)
+                            ON CONFLICT(owner_user_id,session_id,industry_pack_id,source_fingerprint)
+                            DO UPDATE SET
+                                span_fingerprint=excluded.span_fingerprint,
+                                evidence_ref=excluded.evidence_ref,
+                                source_type=excluded.source_type,
+                                status=CASE
+                                    WHEN qa_evidence_seen.status='confirmed' OR excluded.status='confirmed'
+                                    THEN 'confirmed' ELSE excluded.status END,
+                                seen_count=qa_evidence_seen.seen_count+1,
+                                rejected_count=qa_evidence_seen.rejected_count
+                                    + CASE WHEN excluded.status='rejected' THEN 1 ELSE 0 END,
+                                last_run_id=excluded.last_run_id,
+                                round_index=excluded.round_index,
+                                payload_json=excluded.payload_json,
+                                last_seen_at=excluded.last_seen_at
+                            """,
+                            (
+                                row["owner_user_id"], row["session_id"], row["industry_pack_id"],
+                                row["key"], row["span"], row["ref"], row["source_type"],
+                                row["status"], 1 if row["status"] == "rejected" else 0,
+                                row["run_id"], row["run_id"], row["round_index"], row["payload"],
+                                row["now"], row["now"],
+                            ),
+                        )
+                        summary["recorded"] += 1
+                        if row["status"] == "confirmed":
+                            summary["confirmed"] += 1
+                        elif row["status"] == "rejected":
+                            summary["rejected"] += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+            return summary
+        except Exception as exc:  # noqa: BLE001
+            summary["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+            return summary
+
+    def seen_evidence(self, *, owner_user_id: str, session_id: str, industry_pack_id: str,
+                      source_fingerprints=(), statuses=()) -> dict:
+        """Phase 02（P02-03）：按作用域取"之前见过的身份" → {source_fingerprint: status}。
+
+        三个作用域键**精确匹配**（含空串），不做跨会话合并——这是刻意的：
+        "同一篇文章在别的会话里被拒过"不构成在本会话里丢弃它的理由。
+        """
+        keys = [str(item) for item in source_fingerprints or [] if str(item or "")]
+        if not keys:
+            return {}
+        self.ensure_schema()
+        where = ["owner_user_id=?", "session_id=?", "industry_pack_id=?"]
+        params = [str(owner_user_id or ""), str(session_id or ""), str(industry_pack_id or "")]
+        placeholders = ",".join("?" for _ in keys)
+        where.append("source_fingerprint IN (%s)" % placeholders)
+        params.extend(keys)
+        allowed = [str(item) for item in statuses or [] if str(item or "")]
+        if allowed:
+            where.append("status IN (%s)" % ",".join("?" for _ in allowed))
+            params.extend(allowed)
+        with self.database.lock:
+            cursor = self.database.connection.cursor()
+            try:
+                cursor.execute(
+                    "SELECT source_fingerprint, status FROM qa_evidence_seen WHERE "
+                    + " AND ".join(where), tuple(params),
+                )
+                return {str(row["source_fingerprint"]): str(row["status"]) for row in cursor.fetchall()}
+            except Exception:
+                return {}
+            finally:
+                cursor.close()
+
+    def forget_seen_evidence(self, *, owner_user_id: str = "", session_id: str = "",
+                             industry_pack_id: str = "", source_fingerprints=(),
+                             all_scopes: bool = False) -> int:
+        """删除 seen 身份：给回滚/污染撤销用（返回删除行数）。
+
+        `all_scopes=True` 才允许不带任何作用域键地清空——正常调用必须给出至少一个作用域键，
+        否则容易出现"一次误调用把全局去重记忆清掉"的事故。
+        """
+        keys = [str(item) for item in source_fingerprints or [] if str(item or "")]
+        where, params = [], []
+        if owner_user_id:
+            where.append("owner_user_id=?")
+            params.append(str(owner_user_id))
+        if session_id:
+            where.append("session_id=?")
+            params.append(str(session_id))
+        if industry_pack_id:
+            where.append("industry_pack_id=?")
+            params.append(str(industry_pack_id))
+        if keys:
+            where.append("source_fingerprint IN (%s)" % ",".join("?" for _ in keys))
+            params.extend(keys)
+        if not where and not all_scopes:
+            return 0
+        self.ensure_schema()
+        with self.database.lock:
+            cursor = self.database.connection.cursor()
+            try:
+                cursor.execute(
+                    "DELETE FROM qa_evidence_seen"
+                    + (" WHERE " + " AND ".join(where) if where else ""), tuple(params),
+                )
+                deleted = int(cursor.rowcount or 0)
+                self.database.connection.commit()
+                return deleted
+            finally:
+                cursor.close()
+
     def persist_reasoning_graph(self, run_id: str, graph: Mapping) -> None:
         self.ensure_schema()
         now = _now()

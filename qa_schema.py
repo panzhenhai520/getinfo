@@ -13,7 +13,15 @@ import hashlib
 #     accepted / rejected / new_claims / resolved_gap）；
 #   · qa_stage_runs 补 node-run 载体（node_id / node_kind / parent_node_id）与 round_index。
 # 老库升级一律 ADD COLUMN + DEFAULT（见 QA_ADDED_COLUMNS_V6），既有列语义一个字不改。
-QA_SCHEMA_VERSION = "unified-qa-schema-v6"
+#
+# v6 → v7（graph-rag-v2 通用包 Phase 02 · P02-03）：
+#   · 新增 **一张表** qa_evidence_seen（证据 seen/confirmed/rejected 身份，按
+#     owner_user_id / session_id / industry_pack_id 作用域隔离，跨轮 + 跨 run 去重）；
+#   · **没有新增列**：新表走 `CREATE TABLE IF NOT EXISTS`，老库执行 ensure_qa_tables 时
+#     自动补建，不需要 ADD COLUMN，也就不存在"老库有列新库没有"的漂移风险。
+#   · 回滚：`DROP TABLE qa_evidence_seen`（外加把本常量改回 v6）即可，既有表一字不动；
+#     代码侧还有 QA_EVIDENCE_LAYER_ENABLED=0 一键回到 Phase 01 行为。
+QA_SCHEMA_VERSION = "unified-qa-schema-v7"
 
 QA_TABLE_DDL = (
     """
@@ -357,6 +365,28 @@ QA_TABLE_DDL = (
         updated_at TEXT NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS qa_evidence_seen (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_user_id TEXT NOT NULL DEFAULT '',
+        session_id TEXT NOT NULL DEFAULT '',
+        industry_pack_id TEXT NOT NULL DEFAULT '',
+        source_fingerprint TEXT NOT NULL,
+        span_fingerprint TEXT NOT NULL DEFAULT '',
+        evidence_ref TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'seen',
+        seen_count INTEGER NOT NULL DEFAULT 0,
+        rejected_count INTEGER NOT NULL DEFAULT 0,
+        first_run_id TEXT NOT NULL DEFAULT '',
+        last_run_id TEXT NOT NULL DEFAULT '',
+        round_index INTEGER NOT NULL DEFAULT 0,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        first_seen_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        UNIQUE(owner_user_id, session_id, industry_pack_id, source_fingerprint)
+    )
+    """,
 )
 
 QA_INDEX_DDL = (
@@ -382,6 +412,9 @@ QA_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_qa_attr_unit ON qa_attribution_units(run_id, order_index)",
     "CREATE INDEX IF NOT EXISTS idx_qa_attr_link ON qa_attribution_links(run_id, unit_id)",
     "CREATE INDEX IF NOT EXISTS idx_qa_token_influence ON qa_token_influence(run_id, unit_id)",
+    # Phase 02（P02-03）：证据 seen 集合按 (用户, 会话, 行业包) 作用域查，别让它全表扫。
+    "CREATE INDEX IF NOT EXISTS idx_qa_evidence_seen_scope"
+    " ON qa_evidence_seen(owner_user_id, session_id, industry_pack_id, status)",
 )
 
 QA_REQUIRED_TABLES = frozenset(
@@ -409,6 +442,7 @@ QA_REQUIRED_TABLES = frozenset(
         "qa_attribution_runs",
         "qa_reasoning_traces",
         "qa_session_constraints",
+        "qa_evidence_seen",
     }
 )
 

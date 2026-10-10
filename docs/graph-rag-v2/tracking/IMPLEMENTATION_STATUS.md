@@ -12,10 +12,10 @@
 |P01-02|ResearchSession/SearchTrace| PASS | qa_reasoning_traces 补齐 gap_id/route/results/accepted/rejected/new_claims/resolved_gap；qa_storage.record_reasoning_trace 新增 7 个可选 kwarg（旧签名兼容）；qa_pipeline._record 回填 route/计数（回执与返回结构一字未变）；trace_id==run_id 的语义已在 qa_orchestrator 注释写明；tests/test_qa_phase01_schema.py 覆盖 | 2026-10-09 |
 |P01-03|版本字段 corpus/retrieval/prompt/model| PASS | qa_runs 新增 corpus_version/model_version/prompt_version/config_hash（TEXT DEFAULT ''，ADD COLUMN 可回滚）；create_run 写入四元组；真跑值 corpus_version=ba768b331fd86cec803be04e、prompt_version=qa-research-notes-v3+qa-adjudication-v1、config_hash=c75da38ad7bbfa98；model_version 已由 qa_gateway 传入草稿角色 model_id（此前恒空的缺口已补） | 2026-10-09 |
 |P01-04|idempotency/trace/round/node-run| PASS | 幂等保持（qa_storage.py:121 ON CONFLICT 回读既有 run）；node-run 载体落地：qa_stage_runs 新增 node_id/node_kind/parent_node_id + round_index，node_id 不传时自动等于 stage（现有调用点零改动）、显式 node_id 不会被状态更新打回；新建索引 idx_qa_stage_runs_node；tests/test_qa_phase01_schema.py 12 例 | 2026-10-09 |
-|P02-01|Claim/Entity/Evidence/Source/Span schema|NOT_STARTED|||
-|P02-02|provenance|NOT_STARTED|||
-|P02-03|seen 与 confirmed|NOT_STARTED|||
-|P02-04|fingerprint/去重|NOT_STARTED|||
+|P02-01|Claim/Entity/Evidence/Source/Span schema| PASS | qa_graph_contracts.py 追加 Evidence Object/Source/Span/Entity/Relation 五个 schema + 证据状态五值枚举（`status` 由既有 `relationship` 派生，既有字段一字不改）；**EVIDENCE_SCHEMA 冻结指纹 370301331c02c738 与 `additionalProperties: False` 未动**（新字段全部走 `metadata.evidence_layer`）；`validate()` 升级为可递归查嵌套（缺 `span.quote`/`entities[0].entity_key` 都能拦，既有五 schema 行为不变）；tests/test_qa_phase02_evidence.py 43 例 | 2026-10-09 |
+|P02-02|provenance| PASS | qa_evidence.py 新增 `source_identity`/`evidence_provenance`：run/stage/route/检索方式/round/corpus_version/retrieved_at + source(article/doc/chunk/edge/web) + chunk_id + 最小 span 偏移，形成"证据→来源→chunk→span"闭环；实测 `content[start:end] == quote`、ragflow 证据 `source_id=chunk:<doc>#<chunk>`；tests/test_qa_phase02_evidence.py 覆盖 | 2026-10-09 |
+|P02-03|seen 与 confirmed| PASS | 新表 `qa_evidence_seen`（qa_schema v6→v7，**只加表不加列**，老库靠 CREATE TABLE IF NOT EXISTS 自动补建、可 DROP 回滚）；QaStore 新增 `record_seen_evidence`/`seen_evidence`/`forget_seen_evidence`，作用域= (owner_user_id, session_id, industry_pack_id) **精确匹配**；被拒证据留身份（旧实现只留计数）且 confirmed 不被后续 rejected 覆盖；qa_pipeline 在 level1 闸门后登记 accepted(confirmed)+rejected+witnessed(seen)；tests/test_qa_phase02_seen.py 20 例 | 2026-10-09 |
+|P02-04|fingerprint/去重| PASS | qa_evidence.py 提供三种指纹（`source_fingerprint` 来源级=跨轮去重主键、`evidence_fingerprint` span 级=证据对象身份、`content_fingerprint` 内容级=既有口径）与两级去重（`dedupe_evidence_items` 集中既有规则、`dedupe_by_fingerprint` span 级）；`qa_pipeline._dedupe_evidence` 改为委托（行为逐字不变）；跨轮去重默认只丢"上一轮被拒来源"（QA_EVIDENCE_SEEN_DEDUPE=rejected，可 off/all），**证据被清空时退回原证据**；tests/test_qa_phase02_pipeline.py 11 例（含真跑 level1_retrieval 阶段函数） | 2026-10-09 |
 |P03-01|relevance/reranker|NOT_STARTED|||
 |P03-02|entailment/NLI|NOT_STARTED|||
 |P03-03|entity/time/negation/source verifier|NOT_STARTED|||

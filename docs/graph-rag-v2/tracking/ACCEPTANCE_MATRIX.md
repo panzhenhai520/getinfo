@@ -15,7 +15,22 @@
 |P01-03|版本四元组落库|同上|`qa_runs` 具备 `corpus_version/model_version/prompt_version/config_hash` 且 `create_run` 写入|**12 passed**；真跑落库 `corpus_version=ba768b331fd86cec803be04e`、`prompt_version=qa-research-notes-v3+qa-adjudication-v1`、`config_hash=c75da38ad7bbfa98`（同配置稳定）；`model_version` 已由 `qa_gateway` 注入草稿角色 model_id|PASS|`qa_schema.py`；`qa_storage.py`|
 |P01-04|idempotency / round / node-run|同上|既有幂等保持；`qa_stage_runs` 具备 `node_id/node_kind/parent_node_id`，`node_id` 默认 == stage|**12 passed**；`node_id=='level1_retrieval'`、`node_kind=='execution'`；显式 node_id 不被后续状态更新覆盖|PASS|`qa_schema.py`；`qa_storage.py`|
 |P01-09|枚举集中化（F-9）|`python -m pytest tests/test_qa_graph_contracts.py -q`|检索通道/失败策略/停止原因/审计事件类型单一事实源，契约层再导出一致|12 passed（含再导出与阶段角色覆盖断言）|PASS|`qa_contracts.py`；`qa_graph_contracts.py`|
+|P02-01|Claim/Entity/Evidence/Source/Span schema|`python -m pytest tests/test_qa_phase02_evidence.py -q`|Evidence Object / Source / Span / Entity / Relation 五个 schema 可校验；`EVIDENCE_SCHEMA` 冻结指纹与 `additionalProperties: False` 一字不动|**43 passed**；`evidence_object` 校验含**嵌套**（缺 `span.quote`/`entities[0].entity_key`/越界 `status` 全部被拦）；既有五个 schema 行为不变；证据条目标注后**顶层键集不变**且仍过 `validate_level1_result`|PASS|`qa_graph_contracts.py`；`qa_evidence.py`；`tests/test_qa_phase02_evidence.py`|
+|P02-02|provenance|同上|每条证据可回溯 run/stage/route/检索方式/时间 + source/chunk/span 链条|**43 passed**；`provenance.source.source_id == layer.source.source_id`、`content[span.start:span.end] == span.quote`、`route` 缺省回落 `retrieval_method`、ragflow 证据的 `source_id=chunk:<doc>#<chunk>`|PASS|`qa_evidence.py`（`source_identity`/`evidence_provenance`）|
+|P02-03|seen 与 confirmed|`python -m pytest tests/test_qa_phase02_seen.py tests/test_qa_phase02_pipeline.py -q`|被拒证据留身份；作用域按 (owner,session,pack) 隔离；confirmed 不被后续 rejected 覆盖|**20 + 11 passed**；旧实现"只留计数不留身份"已修（`qa_evidence_seen` 落 `rejected` + `rejected_count`）；三轴各换一个值都读不到串味身份；重复登记是覆盖（`seen_count` 累加、行数仍为 1）；`forget` 无作用域键时拒绝全局清空|PASS|`qa_schema.py`（v7 新表）；`qa_storage.py`；`tests/test_qa_phase02_seen.py`|
+|P02-04|fingerprint/去重|同上 + `-k "qa or retrieval or evidence or contract or schema"`|来源级指纹跨轮稳定；跨轮/跨 run 不再重复捞同一批垃圾；去重口径集中到单一事实源|**11 passed**；正文被截短后 `source_fingerprint` 不变（同来源）、不同段落 `fingerprint` 不同；第二轮把上一轮 `rejected` 的来源挡在证据包外（`seen_dropped=1`），上一轮用过的有用来源仍保留（只加 `repeat` 标记）；`dedupe_evidence_items` 与改造前四条去重键逐条一致|PASS|`qa_evidence.py`；`qa_pipeline.py`（`_apply_evidence_layer`）；`tests/test_qa_phase02_pipeline.py`|
 
 **说明**
 - P00-03/P00-04 的 Quality 一项（unsupported claim rate / entailment）按通用包规划属**阶段 03 Verifier**，Phase 00 只登记缺口，故 P00-04 记 `PARTIAL` 并注明原因。
 - 本表的"实际"列全部来自**真跑输出**；未跑完的写 `PENDING`，绝不预填 PASS。
+- **P02-01…P02-04 的边界声明（避免谎报 PASS）**：
+  - 证据层目前**只接在 level1 证据链**（`qa_pipeline._apply_evidence_layer`，检索闸门之后）；
+    level2（RAGFlow）与多跳各跳的候选集**尚未**经过证据层标注与登记，属 Phase 03/04 的接线范围；
+  - `status` 只做"既有 `relationship` → 规范化枚举"的映射，**不是** verifier 结论；
+    entailment/relevance 打分属 Phase 03（P03-01/P03-02），本阶段不实现；
+  - 证据层确实**没有**跑过端到端真问答（不调 LLM、不连真库），全部验收都在隔离临时 sqlite 上完成。
+- **P02 回归证据（真跑输出）**：`python -m pytest tests/test_qa_phase02_evidence.py tests/test_qa_phase02_seen.py tests/test_qa_phase02_pipeline.py -q -p no:cacheprovider` → **74 passed**；
+  `python -m pytest tests -q -k "qa or retrieval or evidence or contract or schema"` → **466 passed, 1239 deselected**；
+  `python -m pytest tests -q` 全量 → **1704 passed, 1 skipped, 0 failed**（Phase 00 冻结的 0 失败基线保持）。
+  七个契约 schema 指纹复算仍为 EVIDENCE 370301331c02c738 / CLAIM 06fcdb02441248b2 / CONFLICT aabd3259b07f9a3e /
+  LEVEL1 7e864764429db111 / LEVEL2 a0484f894e7bc9d6 / FINAL_ANSWER 4d1efa54ca1cbc1a / QA_EVENT 59358bfa88a6c6af。
