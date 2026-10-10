@@ -1,0 +1,762 @@
+{
+ "benchmark": {
+  "benchmark_format": "object",
+  "benchmark_generated_at": "2026-10-08T23:48:58Z",
+  "benchmark_questions_file": "config/qa_acceptance_questions.json",
+  "benchmark_version": "qa-acceptance-v1",
+  "corpus_snapshot_id": "pending:first-run",
+  "pack_filter": ""
+ },
+ "comparison": {
+  "baseline": {
+   "avg_evidence": 6.86,
+   "avg_ms": 548,
+   "benchmark_format": "object",
+   "benchmark_generated_at": "2026-10-08T23:48:58Z",
+   "benchmark_questions_file": "config/qa_acceptance_questions.json",
+   "benchmark_version": "qa-acceptance-v1",
+   "by_kind": {
+    "event": {
+     "graph": 2,
+     "grounded": 2,
+     "hit": 2,
+     "questions": 2,
+     "traceable": 2
+    },
+    "time_window": {
+     "graph": 0,
+     "grounded": 2,
+     "hit": 5,
+     "questions": 5,
+     "traceable": 5
+    }
+   },
+   "citation_evidence_matched": 36,
+   "citation_evidence_total": 48,
+   "citation_precision": 0.75,
+   "citation_precision_note": "弱标注口径：分子=含 ≥1 个期待词的采纳证据条数，分母=采纳证据总条数（只统计带 expect_terms 的题目，未被标注的题目不计入分母）；分母为 0 → null",
+   "citation_questions_labeled": 7,
+   "citation_questions_matched": 4,
+   "citation_recall": 0.5714,
+   "citation_recall_note": "弱标注口径：分子=至少一条采纳证据含期待词的题目数，分母=带 expect_terms 的题目数（题级粗细口径）；分母为 0 → null",
+   "corpus_snapshot_id": "pending:first-run",
+   "cost": {
+    "degraded": false,
+    "note": "按 run 聚合 qa_stage_runs.token_usage_json 的库内累计值（验收本身不调用 LLM，故这不是本次检索的花费）；runs_counted=有 token 记录的 run 数，stage_rows=扫到的 stage 行数；before/after 用两次留档的 tokens_total 相减",
+    "runs_counted": 2,
+    "source": "qa_stage_runs.token_usage_json",
+    "stage_rows": 915,
+    "stage_rows_with_tokens": 4,
+    "tokens_in": 20232,
+    "tokens_out": 2912,
+    "tokens_total": 23144
+   },
+   "errors": 0,
+   "graph_rate": 0.2857,
+   "grounded_rate": 0.5714,
+   "hit_rate": 1.0,
+   "k": 12,
+   "pack_filter": "",
+   "questions": 7,
+   "recall_at_k": 0.5714,
+   "recall_at_k_labeled_questions": 7,
+   "recall_at_k_note": "弱标注口径：K=本次评估实际使用的 --limit（每题最多采纳证据条数上限）；分子=采纳证据里命中的期待词数（expect_terms 去重），分母=全部弱标注期待词数（只统计带 expect_terms 的题目）；分母为 0 → null（不输出 0 充数）",
+   "recall_at_k_terms": 7,
+   "recall_at_k_terms_hit": 4,
+   "traceable_rate": 1.0
+  },
+  "baseline_metrics": {
+   "runs": 0
+  },
+  "delta": {
+   "avg_ms": -245.0,
+   "citation_precision": -0.0769,
+   "citation_recall": 0.0,
+   "errors": 0.0,
+   "grounded_rate": 0.0,
+   "hit_rate": 0.0,
+   "recall_at_k": 0.0,
+   "traceable_rate": 0.0
+  },
+  "evidence_total": {
+   "baseline": 48,
+   "delta": 4,
+   "fleet": 52
+  },
+  "fleet": {
+   "avg_evidence": 7.43,
+   "avg_ms": 303,
+   "benchmark_format": "object",
+   "benchmark_generated_at": "2026-10-08T23:48:58Z",
+   "benchmark_questions_file": "config/qa_acceptance_questions.json",
+   "benchmark_version": "qa-acceptance-v1",
+   "by_kind": {
+    "event": {
+     "graph": 2,
+     "grounded": 2,
+     "hit": 2,
+     "questions": 2,
+     "traceable": 2
+    },
+    "time_window": {
+     "graph": 0,
+     "grounded": 2,
+     "hit": 5,
+     "questions": 5,
+     "traceable": 5
+    }
+   },
+   "citation_evidence_matched": 35,
+   "citation_evidence_total": 52,
+   "citation_precision": 0.6731,
+   "citation_precision_note": "弱标注口径：分子=含 ≥1 个期待词的采纳证据条数，分母=采纳证据总条数（只统计带 expect_terms 的题目，未被标注的题目不计入分母）；分母为 0 → null",
+   "citation_questions_labeled": 7,
+   "citation_questions_matched": 4,
+   "citation_recall": 0.5714,
+   "citation_recall_note": "弱标注口径：分子=至少一条采纳证据含期待词的题目数，分母=带 expect_terms 的题目数（题级粗细口径）；分母为 0 → null",
+   "corpus_snapshot_id": "pending:first-run",
+   "cost": {
+    "degraded": false,
+    "note": "按 run 聚合 qa_stage_runs.token_usage_json 的库内累计值（验收本身不调用 LLM，故这不是本次检索的花费）；runs_counted=有 token 记录的 run 数，stage_rows=扫到的 stage 行数；before/after 用两次留档的 tokens_total 相减",
+    "runs_counted": 2,
+    "source": "qa_stage_runs.token_usage_json",
+    "stage_rows": 915,
+    "stage_rows_with_tokens": 4,
+    "tokens_in": 20232,
+    "tokens_out": 2912,
+    "tokens_total": 23144
+   },
+   "errors": 0,
+   "graph_rate": 0.2857,
+   "grounded_rate": 0.5714,
+   "hit_rate": 1.0,
+   "k": 12,
+   "pack_filter": "",
+   "questions": 7,
+   "recall_at_k": 0.5714,
+   "recall_at_k_labeled_questions": 7,
+   "recall_at_k_note": "弱标注口径：K=本次评估实际使用的 --limit（每题最多采纳证据条数上限）；分子=采纳证据里命中的期待词数（expect_terms 去重），分母=全部弱标注期待词数（只统计带 expect_terms 的题目）；分母为 0 → null（不输出 0 充数）",
+   "recall_at_k_terms": 7,
+   "recall_at_k_terms_hit": 4,
+   "traceable_rate": 1.0
+  },
+  "fleet_metrics": {
+   "degraded_per_run": 0.0,
+   "degraded_total": 0,
+   "hunter_ms_sum_total": 3285,
+   "hunter_statuses": {
+    "empty": 13,
+    "ok": 22
+   },
+   "parallelism_gain_ms_total": 1928,
+   "partial_runs": 0,
+   "pool_loads": 7,
+   "reason_codes": {
+    "bm25:no_bm25_match": 1,
+    "graph:graph_no_hit": 5,
+    "structured:no_structured_hit": 7
+   },
+   "runs": 7,
+   "wall_ms_total": 1357
+  }
+ },
+ "generated_at_utc": "2026-10-10T16:48:18Z",
+ "limit": 12,
+ "questions": 7,
+ "report_version": "qa-hunter-fleet-acceptance-v1",
+ "rows": {
+  "baseline": [
+   {
+    "citation_hit": true,
+    "cited_matched": 12,
+    "cited_total": 12,
+    "evidence": 12,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 4,
+    "graph_attribute": 0,
+    "graph_event": 4,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 10,
+     "enabled": true,
+     "event": 4,
+     "filtered_by_validity": 0,
+     "note": "",
+     "slot_cap": 4,
+     "used": 4,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "e1",
+    "industry_pack_id": "automotive_industry",
+    "kind": "event",
+    "ms": 2578,
+    "question": "比亚迪最近有什么动态？",
+    "terms": [
+     "比亚迪"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 8,
+     "label": "最近 = 近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": true,
+    "cited_matched": 12,
+    "cited_total": 12,
+    "evidence": 12,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 4,
+    "graph_attribute": 0,
+    "graph_event": 4,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 8,
+     "enabled": true,
+     "event": 4,
+     "filtered_by_validity": 0,
+     "note": "",
+     "slot_cap": 4,
+     "used": 4,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "e2",
+    "industry_pack_id": "automotive_industry",
+    "kind": "event",
+    "ms": 250,
+    "question": "蔚来最近有什么动态？",
+    "terms": [
+     "蔚来"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 8,
+     "label": "最近 = 近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": true,
+    "cited_matched": 11,
+    "cited_total": 12,
+    "evidence": 12,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "slot_cap": 4,
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "t8",
+    "industry_pack_id": "automotive_industry",
+    "kind": "time_window",
+    "ms": 266,
+    "question": "智能驾驶最近 90 天有什么新动态？",
+    "terms": [
+     "智能驾驶"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 12,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": true,
+    "cited_matched": 1,
+    "cited_total": 4,
+    "evidence": 4,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "slot_cap": 4,
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "t9",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 250,
+    "question": "家族办公室最近 90 天有什么新动态？",
+    "terms": [
+     "家族办公室"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 4,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": false,
+    "cited_matched": 0,
+    "cited_total": 3,
+    "evidence": 3,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 0,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "slot_cap": 4,
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": false,
+    "hit": true,
+    "id": "t10",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 186,
+    "question": "政策最近 90 天有什么新动态？",
+    "terms": [
+     "政策"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 3,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": false,
+    "cited_matched": 0,
+    "cited_total": 3,
+    "evidence": 3,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 0,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "slot_cap": 4,
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": false,
+    "hit": true,
+    "id": "t11",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 156,
+    "question": "报告最近 90 天有什么新动态？",
+    "terms": [
+     "报告"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 3,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": false,
+    "cited_matched": 0,
+    "cited_total": 2,
+    "evidence": 2,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 0,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "slot_cap": 4,
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": false,
+    "hit": true,
+    "id": "t12",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 156,
+    "question": "治理最近 90 天有什么新动态？",
+    "terms": [
+     "治理"
+    ],
+    "time_window": {
+     "expanded": false,
+     "has_time": true,
+     "in_window_adopted": 2,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   }
+  ],
+  "fleet": [
+   {
+    "citation_hit": true,
+    "cited_matched": 12,
+    "cited_total": 12,
+    "evidence": 12,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 4,
+    "graph_attribute": 0,
+    "graph_event": 4,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 10,
+     "enabled": true,
+     "event": 4,
+     "filtered_by_validity": 0,
+     "note": "",
+     "used": 4,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "e1",
+    "industry_pack_id": "automotive_industry",
+    "kind": "event",
+    "ms": 327,
+    "question": "比亚迪最近有什么动态？",
+    "terms": [
+     "比亚迪"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 12,
+     "label": "最近 = 近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": true,
+    "cited_matched": 12,
+    "cited_total": 12,
+    "evidence": 12,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 3,
+    "graph_attribute": 0,
+    "graph_event": 3,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 8,
+     "enabled": true,
+     "event": 4,
+     "filtered_by_validity": 0,
+     "note": "",
+     "used": 4,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "e2",
+    "industry_pack_id": "automotive_industry",
+    "kind": "event",
+    "ms": 375,
+    "question": "蔚来最近有什么动态？",
+    "terms": [
+     "蔚来"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 12,
+     "label": "最近 = 近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": true,
+    "cited_matched": 10,
+    "cited_total": 12,
+    "evidence": 12,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "t8",
+    "industry_pack_id": "automotive_industry",
+    "kind": "time_window",
+    "ms": 655,
+    "question": "智能驾驶最近 90 天有什么新动态？",
+    "terms": [
+     "智能驾驶"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 12,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": true,
+    "cited_matched": 1,
+    "cited_total": 4,
+    "evidence": 4,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 1,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": true,
+    "hit": true,
+    "id": "t9",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 202,
+    "question": "家族办公室最近 90 天有什么新动态？",
+    "terms": [
+     "家族办公室"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 4,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": false,
+    "cited_matched": 0,
+    "cited_total": 4,
+    "evidence": 4,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 0,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": false,
+    "hit": true,
+    "id": "t10",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 234,
+    "question": "政策最近 90 天有什么新动态？",
+    "terms": [
+     "政策"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 4,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": false,
+    "cited_matched": 0,
+    "cited_total": 4,
+    "evidence": 4,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 0,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": false,
+    "hit": true,
+    "id": "t11",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 203,
+    "question": "报告最近 90 天有什么新动态？",
+    "terms": [
+     "报告"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 4,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   },
+   {
+    "citation_hit": false,
+    "cited_matched": 0,
+    "cited_total": 4,
+    "evidence": 4,
+    "expect_terms_count": 1,
+    "expect_terms_hit": 0,
+    "graph": 0,
+    "graph_attribute": 0,
+    "graph_event": 0,
+    "graph_receipt": {
+     "attribute": 0,
+     "edges": 0,
+     "enabled": true,
+     "event": 0,
+     "filtered_by_validity": 0,
+     "note": "图中没有命中该主体的可用边（图谱覆盖率还低）",
+     "used": 0,
+     "weights": {
+      "attribute": 0.55,
+      "event": 1.0
+     }
+    },
+    "grounded": false,
+    "hit": true,
+    "id": "t12",
+    "industry_pack_id": "family_office",
+    "kind": "time_window",
+    "ms": 125,
+    "question": "治理最近 90 天有什么新动态？",
+    "terms": [
+     "治理"
+    ],
+    "time_window": {
+     "has_time": true,
+     "in_window_adopted": 4,
+     "label": "近 90 天（2026-07-12 起）"
+    },
+    "traceable": true,
+    "traceable_ratio": 1.0
+   }
+  ]
+ },
+ "snapshot": "baseline/qa-hunter-corpus-snapshot.json"
+}

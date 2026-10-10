@@ -45,6 +45,17 @@
 |P03-05|MASTER_RULES 第 11 条落地（claim 级核验）|`python -m pytest tests/test_qa_phase03_pipeline.py -q`|模型自评的 claim 状态必须被规则核验覆盖；结论级统计进生成端|`conflict_review` 阶段真跑：claim `verification_status` 按"结论→引用证据"逐对核验重写并落 `qa_claims`；模型自评 `confirmed` + 不支持证据 → 库内降为 unverified（有 DB 级断言）；无证据 → `insufficient_evidence`；悬空引用 → `claim_evidence_missing`；`unsupported_claim_rate` 进阶段事件与生成端问题（有闭包级断言）|PASS|`qa_verifier.py`（`verify_claim_graph`）；`qa_pipeline.py`（`conflict_review`/`synthesis`/`_verification_prompt_blocks`）|
 |P03-R1|Phase 02 契约不回归|`python -m pytest tests/test_qa_phase02_*.py tests/test_qa_logic_validation.py -q`|evidence_layer 回执键集逐字不变；关掉核验回到 Phase 02 结构|**105 passed**；核验回执走**兄弟键 `stats["verification"]`**（不动 Phase 02 冻结的六键回执）；`record_seen` 新增可选 `extra_rejected`（原 `rejected=[...]` 调用点一字不动，Phase 02 的源码级守门用例继续有效）；`QA_VERIFIER_ENABLED=0` 时阶段返回结构与 Phase 02 逐字相同|PASS|`qa_pipeline.py`；`qa_evidence.py`|
 |P03-R2|冻结契约指纹复算|`python -m pytest tests/test_qa_phase03_contracts.py -q`|七个契约指纹与 P00-02 一致；`EVIDENCE_SCHEMA` 仍 `additionalProperties: False`|**13 passed**；七指纹复算 EVIDENCE 370301331c02c738 / CLAIM 06fcdb02441248b2 / CONFLICT aabd3259b07f9a3e / LEVEL1 7e864764429db111 / LEVEL2 a0484f894e7bc9d6 / FINAL_ANSWER 4d1efa54ca1cbc1a / QA_EVENT 59358bfa88a6c6af（与 Phase 00 逐字相同）；核验结论只落在 `metadata.evidence_layer.verification`（可选字段），核验过的证据照样过 `validate_level1_result`|PASS|`tests/test_qa_phase03_contracts.py`；`qa_graph_contracts.py`|
+|P04-01|BM25 Hunter 可单跑/可降级/可复算|`python -m pytest tests/test_qa_phase04_hunters.py -q`|排序可手算复算；时间闸门生效；空查询与异常都有干净失败路径|**30 passed**；手算对照 `idf=ln(1+(N-df+0.5)/(df+0.5))` 逐项相等；不含查询词的文档被等价剪枝；`2026年1月` 问题把 10 月文章挡在窗外；空查询 → `empty/no_query_terms`；**泛词回归**：只含「限时权益/最近」的促销文不得盖过含「蔚来」的文章（idf 必须用全池 df，实测这是踩过的坑）|PASS|`qa_hunters.py`（`BM25Hunter`/`bm25_scores`/`bm25_query_tokens`）；`tests/test_qa_phase04_hunters.py`|
+|P04-02|Semantic Hunter 只吃库内向量、零端点|`python -m pytest tests/test_qa_phase04_hunters.py -q` + 快照真跑|无向量时降级；语义近似（词面不命中）文章能被召回并计数；源码零端点调用|**30 passed**（含 5 例语义专测）；快照 240 条 1024 维向量 → 语义通道 **7/7 取到证据**，`semantic_only` 在题内最高 5 条；`no_vectors`/`no_lexical_seed`/loader 抛错三条降级路径各有用例；AST 断言不 import 网络库、源码零 `http(s)://` 与 `embedding_client`/`_embed_question` 痕迹|PASS|`qa_hunters.py`（`SemanticHunter`/`load_article_vectors`）；`tests/test_qa_phase04_hunters.py`；DECISION_LOG D-018|
+|P04-03|Graph Hunter adapter 复用既有图通道|同上（真链路用例）|适配器只转发不重写；图库不可用 → DEGRADE|**30 passed**；注入 `graph_runner` 断言 `plan/pack/limit=min(4,limit//3)/builder` 原样转发；真链路（事件/属性 → `KnowledgeGraphBuilder` 建图 → 取回图证据）1 例；快照回放里比亚迪/蔚来两题取到 **4 / 3 条**图证据、可回溯 100%|PASS|`qa_hunters.py`（`GraphHunter`）；`tests/test_qa_phase04_hunters.py`|
+|P04-04|Structured/DB adapter（政策表 + 元数据闸门 + 外部源注入点）|同上|政策登记表命中走既有通道；没给过滤条件不产证据；单源失败不影响其它源|**30 passed**；政策行真数据用例命中 `article:<id>`；`min_authority=60` 时闸门挡住全部行（有反例）；注入一个抛错的 provider + 一个正常 provider → 正常源照常出货、失败只记 `stats.providers[].error`；快照里 0 条政策登记行 → 7/7 `empty`（如实无命中）|PASS|`qa_hunters.py`（`StructuredHunter`/`normalize_structured_filters`）；`tests/test_qa_phase04_hunters.py`|
+|P04-05|Query Expansion 只产词不产证据|同上|`evidence` 恒为空；词源可追溯；别名/繁体/图谱邻居都要用上|**30 passed**；`evidence == []` 有专门断言；`MIIT`/`人形機器人` 出现在词表（既有词表复用）；图谱邻居标 `source=graph_neighbor`；图查询抛错仍能出词（只少一个来源）|PASS|`qa_hunters.py`（`QueryExpansionHunter`）；`tests/test_qa_phase04_hunters.py`|
+|P04-06|fan-out/timeout/retry/fallback/预算/部分结果|`python -m pytest tests/test_qa_phase04_fleet.py -q`|并发有界；超时先重试再降级；兜底标记；预算耗尽返回部分结果；失败隔离|**22 passed**；3×0.25s 并发墙钟 < 串行和（`parallelism_gain_ms` 可测）；`max_workers=1` 时确实串行；超时 `attempts=2` 且真的重跑（`calls==2`）；首次失败第二次成功；预算 0.25s → `partial=true`/`BUDGET_EXHAUSTED`/快通道证据保留、慢通道记 `budget_exhausted`；一个通道抛错不影响其它通道|PASS|`qa_hunter_fleet.py`；`tests/test_qa_phase04_fleet.py`|
+|P04-07|管线接线（默认关，打开即走舰队）|`python -m pytest tests/test_qa_phase04_pipeline.py -q`|默认关时阶段返回键集/stats 键集逐字不变；打开时走舰队且回执走兄弟键；舰队抛错回落既有检索|**8 passed**；默认关：阶段 10 个返回键与 Phase 02 口径逐字一致、`stats` 无 `hunter_fleet`；`QA_HUNTER_FLEET=1`：5 个 Hunter 全部出现在回执里、`stats["evidence_layer"]` 六键不变；注入抛错舰队 → `stats["hunter_fleet"]["fallback"]=="ArticleRetriever.retrieve"` 且证据包照常；多跳后续跳仍由既有 retriever 执行（有断言）|PASS|`qa_pipeline.py`（`_local_retrieval`/`_build_hunter_fleet`/`_hunter_fleet_enabled`、`level1_retrieval`）；`tests/test_qa_phase04_pipeline.py`|
+|P04-08|单通道 vs 舰队 真跑对比（A 机只读快照回放）|`python tools/qa_phase04_corpus_export.py ... --out baseline/qa-hunter-corpus-snapshot.json` → `python tools/qa_hunter_fleet_acceptance.py --snapshot ... --out baseline/qa-hunter-fleet-acceptance.json --history data/qa_hunter_history.jsonl`|命中/可回溯/接地/Recall@K/引用 P·R/耗时/降级次数两侧可比|真跑（A 机只读快照：2 个行业包 239 篇 / 262 条分类 / 238 事件 / 240 属性 / **240 条 1024 维真向量**；冻结 benchmark 中命中该语料的 7 题，limit=12）：hit/traceable/grounded/recall@12/citation_recall **两侧完全相同**（100%/100%/57.1%/57.1%/57.1%）；**avg_ms 548 → 303（−245ms）**；证据合计 48 → 52；舰队 0 降级、0 部分结果、并行增益 1928ms、候选池 7 次加载；**citation_precision 75.0% → 67.3%（−7.7pp，见下方"已知取舍"第 1 条）**|PASS（引用精确率差异已解释）|`baseline/qa-hunter-corpus-snapshot.json`；`baseline/qa-hunter-fleet-acceptance.json`；`data/qa_hunter_history.jsonl`；`tools/qa_hunter_fleet_acceptance.py`；`tools/qa_phase04_corpus_export.py`|
+|P04-09|验收工具自测（快照回放可复算）|`python -m pytest tests/test_qa_phase04_acceptance_tool.py -q`|快照→临时 sqlite 往返、逐题明细键集与既有口径一致、compare 出两侧与 Δ|**5 passed**；向量 base64 解码后原样入库（2 条）；逐题明细含 `qa_retrieval_acceptance.evaluate` 的全部键（复用同一 `summarize` 口径）；`compare` 报出 baseline/fleet/Δ/fleet_metrics；`build_db_from_snapshot` 断言 `backend=='sqlite'` 且库路径=临时文件（拒绝写主库）|PASS|`tools/qa_hunter_fleet_acceptance.py`；`tests/test_qa_phase04_acceptance_tool.py`|
+|P04-R1|Phase 02/03 契约与行为不回归|`python -m pytest tests/test_qa_phase02_*.py tests/test_qa_phase03_*.py tests/test_qa_logic_validation.py -q`|冻结回执键集不变；关掉舰队回到旧路径|**全部通过**（随全量 1984 passed）；`stats["evidence_layer"]` 六键与 `stats["verification"]` 兄弟键均未被舰队触碰（有用例）；`QA_HUNTER_FLEET` 不设时 `level1_retrieval` 与接线前逐字相同|PASS|`tests/test_qa_phase04_pipeline.py`；`tests/test_qa_phase02_*.py`|
+|P04-R2|冻结契约指纹复算 + 通道枚举不动|`python -m pytest tests/test_qa_phase04_contracts.py -q`|七指纹与 P00-02 一致；`QA_RETRIEVAL_ROUTES` 仍 7 个取值；库表零迁移|**18 passed**；七指纹复算与 Phase 00 逐字相同、`EVIDENCE_SCHEMA.additionalProperties` 仍 False；`QA_RETRIEVAL_ROUTES` 与 `SEARCH_TRACE_SCHEMA.route` 取值域逐字未变（Hunter 身份走新命名空间 `QA_HUNTER_IDS`）；`QA_SCHEMA_VERSION` 仍 v7、无新表/新列；`QA_HUNTER_FLEET` 默认 false|PASS|`tests/test_qa_phase04_contracts.py`；`qa_graph_contracts.py`；DECISION_LOG D-017|
 
 **Phase 03 说明（边界与未满足项，宁写 PARTIAL 不谎报）**
 - **P03-01…P03-04 全部记 PASS**，但下面这些**明确不算通过**的项要一起看：
@@ -77,3 +88,53 @@
   `unsupported_claim_rate=0.5`，缓存 12 条 73–219ms → 1.8–4.2ms（40–68x）。
   报告留档 `baseline/qa-verifier-acceptance.json`、历史行 `data/qa_verifier_history.jsonl`。
 
+
+**Phase 04 说明（边界、取舍与未满足项，宁写 PARTIAL 不谎报）**
+- **P04-01…P04-09 记 PASS**，但下面这些**明确不算通过**的项要一起看：
+  1. **引用精确率（citation_precision）在真跑对比里下降 7.7pp（75.0% → 67.3%）**，必须一起读：
+     · 逐题看，**7 题里 6 题的"含期待词条数"两侧完全相同**（t8 少 1 条）；差额几乎全部来自
+       t10/t11/t12 三题——那三题的 `expect_terms` 是「政策/报告/治理」这类**泛词**，
+       两侧都**一条都匹配不上**（grounded=False），而舰队在这三题各返 4 条、基线各返 3/3/2 条，
+       分母变大 → 精确率被摊薄。**这不是"舰队找错了证据"，而是"舰队在无可匹配标注的题上召回更多"**。
+     · 反过来说，这条指标本身是"含期待词的采纳证据 / 采纳证据"，对"召回更多"是惩罚性的；
+       要更公平的对比应改用 nDCG/证据召回这类同时看分子分母的指标（Phase 17 的范围）。
+     · 报告里两侧的原始分子/分母都在（`rows.baseline` / `rows.fleet` 的 `cited_total`/`cited_matched`），
+       可直接复算，不做任何粉饰。
+  2. **语义通道不是"真语义"**：本轮不许调 embedding 端点（GPU 推理机与语音机器人共用、已停用），
+     查询向量是**离线质心**（词面种子文章的向量加权平均）。它的能力边界是"召回与命中文章语义相近、
+     用词不同的文章"，**召回不了与查询毫无词面交集的文章**——早期"只取最新 60 篇"的快照上就出现过
+     `semantic:no_lexical_seed`（4/7 题）。真语义要等嵌入服务解禁或换离线编码器（DECISION_LOG D-018）。
+  3. **快照是抽样 + 正文截断**：A 机只读导出的快照只含 2 个行业包各 120 篇（共 239 篇）、
+     正文截到 1000 字（`--content-chars`），向量是完整 1024 维。因此：
+     · 真跑指标只代表"这两个包、这批题、这段语料"，**不能外推成全库水平**；
+     · 正文截断会低估"引用精确率"（期待词可能出现在被截掉的后半段），两侧同受影响。
+  4. **"舰队在管线里跑了"只到 `level1_retrieval` 首跳**：多跳的后续跳、level2（RAGFlow）仍走既有
+     retriever（有用例钉着）。舰队要接管全链路得等 Phase 05 的 Planner/Execution Graph（D-017 的边界）。
+  5. **`QA_HUNTER_FLEET` 默认关**：生产默认行为**逐字不变**（零回归有用例），
+     舰队的真跑证据来自验收工具与快照回放，**不等于"生产已经在跑舰队"**。
+  6. **结构化通道的元数据闸门是"显式条件才生效"**：`plan["structured_filters"]` 没给条件时它不产证据
+     （刻意的，避免变成第二遍关键词检索）。本仓库目前没有别处填这个字段，所以它现在的实际贡献主要来自
+     "政策登记表精确命中"；外部业务库（EMR/HIS/LIS/PACS 类）只有注入点与失败语义，**没有接任何真实外部库**。
+  7. **没有做的事**（越界检查）：不写 SearchTrace 表（Phase 05）、不做 Gap-driven 循环（Phase 07）、
+     不做 Context Pack（Phase 08）、不动库表结构、不动任何模型/嵌入端点、不部署。
+- **Phase 04 回归证据（真跑输出）**：
+  `python -m pytest tests/test_qa_phase04_hunters.py -q -p no:cacheprovider` → **30 passed**；
+  `python -m pytest tests/test_qa_phase04_fleet.py -q` → **22 passed**；
+  `python -m pytest tests/test_qa_phase04_pipeline.py -q` → **8 passed**；
+  `python -m pytest tests/test_qa_phase04_contracts.py -q` → **18 passed**；
+  `python -m pytest tests/test_qa_phase04_acceptance_tool.py -q` → **5 passed**（五份合计 **86 passed**，
+  且以 `-W error::pytest.PytestUnhandledThreadExceptionWarning` 复跑仍 86 passed → 舰队线程没有留下未处理异常）；
+  `python -m pytest tests -q -k "qa or retrieval or evidence or contract or schema"` → **667 passed, 1318 deselected**；
+  `python -m pytest tests -q`（全量）→ **1984 passed, 1 skipped, 0 failed**（Phase 00 冻结的 0 失败基线保持；
+  收集数 1897 → 1984，含本阶段新增 87 例；另：`-k` 过滤集从 581 → 667）。
+- **A 机只读真机验证（本次实际执行的命令与结果）**：
+  · 只读探测（`timeout 20 docker exec collectinfo-postgres psql -U postgres -d collectinfo -A -t -c
+    "SET statement_timeout='8s'; SET default_transaction_read_only=on; ..."`）：
+    `articles=8544 / active=7652 / intel_article_embeddings=10644 / classifications=12803 / kg_edges=1321`；
+  · 语料快照（`python tools/qa_phase04_corpus_export.py --pack family_office --pack automotive_industry
+    --per-pack 120 --content-chars 1000`，每条远端命令都用 `timeout` 包住、查询都带 LIMIT）：
+    family_office 120 篇 + automotive_industry 120 篇 → 239 篇文章 / 262 分类 / 238 事件 / 240 属性 /
+    240 条 1024 维真向量，落盘 `baseline/qa-hunter-corpus-snapshot.json`（2.40MB）；
+  · 本地离线回放（`python tools/qa_hunter_fleet_acceptance.py --snapshot baseline/qa-hunter-corpus-snapshot.json
+    --out baseline/qa-hunter-fleet-acceptance.json --history data/qa_hunter_history.jsonl`）：见 P04-08 那一行。
+    **所有远端命令都是短命只读**（无写语句、无部署、无驻留进程）。

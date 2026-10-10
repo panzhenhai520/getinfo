@@ -356,14 +356,96 @@ EVIDENCE_OBJECT_SCHEMA = {
 }
 """Evidence Object（Phase 02）：`metadata.evidence_layer` 的载荷契约。"""
 
+# ── 检索舰队（Phase 04 · P04-01…P04-06）─────────────────────────────────────
+# 通用包 01_V2_ARCHITECTURE §8 把 Retrieval Fleet 拆成若干 Hunter；本仓库既有
+# `ArticleRetriever` 已内含 keyword / semantic / graph / policy_exact / page_context / web
+# 多通道，Phase 04 只把**通道**提成统一 Hunter 接口 + 并行风扇，不另写一套检索。
+#
+# `QA_HUNTER_IDS` 是**新命名空间**（Hunter 身份），与 `QA_RETRIEVAL_ROUTES`（通道）分离：
+#   · 每个 Hunter 结果同时带 `hunter_id`（谁跑的）与 `route`（既有通道枚举里的值），
+#     SearchTrace 的 route 字段继续只吃既有 7 个取值 → **不动 P01-01 的通道枚举**；
+#   · `structured` 在本仓库的落地形态是"结构化业务表查询"（政策登记表 + 文章元数据列），
+#     其 route 记 `policy_exact`（该值的既有语义就是"按结构化元数据精确命中"）。
+HUNTER_CONTRACT_VERSION = "qa-hunter-v1"
+"""Hunter 结果契约版本；与 `GRAPH_CONTRACT_VERSION`/`EVIDENCE_LAYER_VERSION` 是三件事。"""
+
+HUNTER_BM25 = "bm25"
+HUNTER_SEMANTIC = "semantic"
+HUNTER_GRAPH = "graph"
+HUNTER_STRUCTURED = "structured"
+HUNTER_QUERY_EXPANSION = "query_expansion"
+QA_HUNTER_IDS: Tuple[str, ...] = (
+    HUNTER_BM25, HUNTER_SEMANTIC, HUNTER_GRAPH, HUNTER_STRUCTURED, HUNTER_QUERY_EXPANSION,
+)
+"""Hunter 身份枚举（§8.1 BM25 / §8.2 Semantic / §8.3 Graph / §8.5 Query Expansion /
+§8.6 Structured；§8.4 Metadata 的口径并入 `structured`——见 qa_hunters 的模块说明）。"""
+
+QA_HUNTER_ROUTE_BY_ID = {
+    HUNTER_BM25: QA_ROUTE_KEYWORD,
+    HUNTER_SEMANTIC: QA_ROUTE_SEMANTIC,
+    HUNTER_GRAPH: QA_ROUTE_GRAPH,
+    HUNTER_STRUCTURED: QA_ROUTE_POLICY_EXACT,
+    HUNTER_QUERY_EXPANSION: "",
+}
+"""Hunter → SearchTrace 通道（沿用既有 7 个取值；Query Expansion 不产证据、不占通道）。"""
+
+HUNTER_STATUSES: Tuple[str, ...] = (
+    "ok", "empty", "degraded", "timeout", "error", "skipped",
+)
+"""单次 Hunter 调用的结局：成功有证据 / 成功但空 / 降级（含无向量、无种子这类可解释回退）/
+超时 / 抛错 / 未执行（预算或依赖不允许）。"""
+
+HUNTER_RESULT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "hunter_id": {"type": "string", "enum": list(QA_HUNTER_IDS)},
+        "contract_version": {"type": "string"},
+        "route": {"type": "string", "enum": list(QA_RETRIEVAL_ROUTES) + [""]},
+        "status": {"type": "string", "enum": list(HUNTER_STATUSES)},
+        "ok": {"type": "boolean"},
+        "degraded": {"type": "boolean"},
+        "timed_out": {"type": "boolean"},
+        "reason_code": {"type": "string"},
+        "failure_policy": {"type": "string", "enum": list(QA_FAILURE_POLICIES)},
+        "attempts": {"type": "integer", "minimum": 0},
+        "latency_ms": {"type": "integer", "minimum": 0},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "queries": {"type": "array", "items": {"type": "string"}},
+        "terms": {"type": "array", "items": {"type": "object"}},
+        "stats": {"type": "object"},
+        "error": {"type": "string"},
+        "fallback_from": {"type": "string"},
+    },
+    "required": ["hunter_id", "status", "attempts", "latency_ms", "evidence"],
+    "additionalProperties": True,
+}
+"""单 Hunter 结果契约。`status` 归一到 `HUNTER_STATUSES`；`evidence` 一律存在（可为空数组）；
+Query Expansion 的产出走 `queries`/`terms`（**不允许**产证据——§8.5 明确它只负责生成词）。"""
+
+HUNTER_FLEET_RESULT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "contract_version": {"type": "string"},
+        "hunters": {"type": "array", "items": HUNTER_RESULT_SCHEMA},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "partial": {"type": "boolean"},
+        "stop_reason": {"type": "string", "enum": list(QA_STOP_REASONS) + [""]},
+        "stats": {"type": "object"},
+    },
+    "required": ["contract_version", "hunters", "evidence", "stats"],
+    "additionalProperties": True,
+}
+"""舰队扇入结果：`partial=true` 表示"总预算内只等到部分 Hunter"（部分结果回退，不阻塞）。"""
+
 
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
-    return ("图谱契约 %s / 证据层 %s：节点类型 %d / 边关系 %d / 检索通道 %d / 失败策略 %d / "
-            "停止原因 %d / 证据状态 %d"
-            % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, len(KG_NODE_TYPES),
-               len(KG_RELATION_KINDS), len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES),
-               len(QA_STOP_REASONS), len(EVIDENCE_STATUSES)))
+    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s：节点类型 %d / 边关系 %d / 检索通道 %d / "
+            "失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d"
+            % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
+               len(KG_NODE_TYPES), len(KG_RELATION_KINDS), len(QA_RETRIEVAL_ROUTES),
+               len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS), len(EVIDENCE_STATUSES),
+               len(QA_HUNTER_IDS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -408,6 +490,9 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "evidence_entity": EVIDENCE_ENTITY_SCHEMA, "evidence_relation": EVIDENCE_RELATION_SCHEMA,
         "evidence_object": EVIDENCE_OBJECT_SCHEMA,
         "evidence_verification": EVIDENCE_VERIFICATION_SCHEMA,
+        # Phase 04（P04-01…P04-06）
+        "hunter_result": HUNTER_RESULT_SCHEMA,
+        "hunter_fleet_result": HUNTER_FLEET_RESULT_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

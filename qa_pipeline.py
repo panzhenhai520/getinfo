@@ -1332,6 +1332,50 @@ def _local_corpus_version(database, pack_id: str) -> str:
         return "unknown"
 
 
+def _build_hunter_fleet(database, article_retriever):
+    """阶段 04（P04-06）：按需构造默认舰队（五个 Hunter 全部接既有组件，见 qa_hunters）。
+
+    只读、零模型调用：语义通道吃库内既有向量，绝不请求 embedding 端点。
+    """
+    from qa_hunter_fleet import build_default_fleet
+
+    return build_default_fleet(database=database, retriever=article_retriever)
+
+
+def _hunter_fleet_enabled() -> bool:
+    """`QA_HUNTER_FLEET` 开关（默认关）。每次都重新读环境变量，便于测试与灰度切换。"""
+    try:
+        from qa_hunter_fleet import fleet_enabled
+
+        return bool(fleet_enabled())
+    except Exception:
+        return False
+
+
+def _local_retrieval(article_retriever, fleet, plan: Mapping, *, industry_pack_id: str,
+                     page_context, limit: int) -> tuple:
+    """level1 首跳检索：默认走既有 `ArticleRetriever.retrieve()`；舰队打开时走并行风扇。
+
+    返回 `(结果, 舰队回执)`。舰队是**并列的新入口**，不是替换：
+      · `QA_HUNTER_FLEET` 默认关 → 逐字回到旧路径（零行为变化）；
+      · 打开时舰队任何异常都**回落**到既有检索，并把原因写进回执——
+        一个通道挂了不许把整条检索拖成失败（§2.7 Failure Isolation）。
+    """
+    if fleet is None:
+        return article_retriever.retrieve(
+            plan, industry_pack_id=industry_pack_id, page_context=page_context, limit=limit), {}
+    try:
+        result = fleet.retrieve(plan, industry_pack_id=industry_pack_id,
+                                page_context=page_context, limit=limit)
+        return result, dict((result.get("stats") or {}).get("hunter_fleet") or {})
+    except Exception as exc:
+        receipt = {"error": "%s: %s" % (type(exc).__name__, str(exc)[:200]),
+                   "fallback": "ArticleRetriever.retrieve",
+                   "note": "舰队失败已回落到既有检索路径（证据包不受影响）"}
+        return article_retriever.retrieve(
+            plan, industry_pack_id=industry_pack_id, page_context=page_context, limit=limit), receipt
+
+
 def build_qa_stage_handlers(
     *,
     database=None,
@@ -1346,6 +1390,7 @@ def build_qa_stage_handlers(
     store=None,
     feature_flags=None,
     resilience=None,
+    hunter_fleet=None,
 ) -> dict:
     if database is None:
         from sqlite_database import sqlite_db
@@ -1361,6 +1406,9 @@ def build_qa_stage_handlers(
     final_synthesizer = final_synthesizer or QaFinalSynthesizer()
     feature_flags = feature_flags or QaFeatureFlags(database)
     resilience = resilience or QaPersistentResilience(database)
+    # 阶段 04（P04-06）：舰队**每个 handler 集只装配一次**（Hunter 内的分词缓存与候选池
+    # 才能跨问题复用）。`ready=False` 表示还没按开关决定要不要建。
+    _fleet_state = {"fleet": hunter_fleet, "ready": hunter_fleet is not None}
 
     if ragflow_client_factory is None:
         def ragflow_client_factory(policy):
@@ -1555,7 +1603,21 @@ def build_qa_stage_handlers(
                     "stats": dict(cached.get("stats") or {}),
                 })
             return cached
-        local = article_retriever.retrieve(
+        # ── 阶段 04（P04-06）：首跳检索 = 既有 retriever 或并行舰队（默认关，见 _local_retrieval）──
+        _fleet = _fleet_state["fleet"]
+        if not _fleet_state["ready"]:
+            _fleet_state["ready"] = True
+            if _hunter_fleet_enabled():
+                try:
+                    _fleet = _fleet_state["fleet"] = _build_hunter_fleet(database, article_retriever)
+                except Exception as exc:  # 舰队装配失败也不能影响检索
+                    _fleet = _fleet_state["fleet"] = None
+                    if callable(emit_stage_event):
+                        emit_stage_event("stage_progress", {
+                            "message": "并行检索舰队不可用，已使用常规检索：%s"
+                                       % str(exc)[:120]})
+        local, fleet_receipt = _local_retrieval(
+            article_retriever, _fleet,
             {**dict(retrieval_plan), "question": _planned_question(context)},
             industry_pack_id=pack_id,
             page_context=request_payload.get("page_context") or {},
@@ -1654,6 +1716,9 @@ def build_qa_stage_handlers(
         )
         stats = dict(local.get("stats") or {})
         stats.update({"web_adopted": len(external.get("evidence") or []), "adopted": len(evidence)})
+        if fleet_receipt:
+            # 阶段 04（P04-06）：舰队回执放**兄弟键**（Phase 02 的 evidence_layer 键集是冻结的）
+            stats["hunter_fleet"] = dict(fleet_receipt)
         # 阶段 02（缺口 1）：多跳每一跳的回执并入同一条统计（回执键集不变）
         _merge_evidence_audits(evidence_audit, hop_evidence_audit)
         stats["evidence_layer"] = _evidence_layer_receipt(evidence_audit)
