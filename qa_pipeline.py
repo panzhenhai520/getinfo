@@ -840,7 +840,8 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                    pack_id: str, limit: int, emit_stage_event=None,
                    trace_recorder=None, round_index: int = 0, store=None,
                    run_meta: Mapping | None = None, question: str = "",
-                   corpus_version: str = "", hop_audit: dict | None = None):
+                   corpus_version: str = "", hop_audit: dict | None = None,
+                   budget_seconds: float | None = None):
     """按 DAG 顺序执行多跳检索，返回 (合并后的 local, 每跳回执)。
 
     预算与跳数是**双重硬约束**：跳数上限 `QA_MAX_HOPS`，墙钟上限
@@ -862,6 +863,9 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
         return first_local, []
 
     budget = float(getattr(config, "QA_MULTI_HOP_BUDGET_SECONDS", 25) or 25)
+    if budget_seconds is not None and float(budget_seconds) > 0:
+        # 阶段 05（P05-05）：预算可由执行图给出（图关着时是 None → 逐字保持既有行为）
+        budget = float(budget_seconds)
     started = _time.monotonic()
     merged_evidence = list(first_local.get("evidence") or [])
     seen_refs = {str(item.get("evidence_ref") or "") for item in merged_evidence}
@@ -1352,6 +1356,129 @@ def _hunter_fleet_enabled() -> bool:
         return False
 
 
+def _execution_graph_enabled() -> bool:
+    """`QA_EXECUTION_GRAPH` 开关（默认关）：打开才建执行图并记节点预算（阶段 05）。"""
+    try:
+        from qa_execution_graph import graph_enabled
+
+        return bool(graph_enabled())
+    except Exception:
+        return False
+
+
+def _execution_graph_node_runs_enabled() -> bool:
+    """`QA_EXECUTION_GRAPH_NODE_RUNS`（默认关）：打开才把节点写进 `qa_stage_runs` 的 node 列。"""
+    try:
+        from qa_execution_graph import node_runs_enabled
+
+        return bool(node_runs_enabled())
+    except Exception:
+        return False
+
+
+# 多跳每跳回执的 status → 执行图节点状态（既有取值 → 契约取值，不新造语义）
+_HOP_STATUS_TO_NODE = {
+    "ok": "ok", "empty": "empty", "error": "error",
+    "skipped_budget": "budget_exhausted", "single_hop": "ok",
+}
+
+
+def _graph_node_id(graph, hop_id: str) -> str:
+    """执行图里"第 N 跳"由哪个节点产出（舰队打开时首跳是 merge 节点）。"""
+    try:
+        from qa_execution_graph import hop_node_id
+
+        return hop_node_id(graph, hop_id)
+    except Exception:
+        return ""
+
+
+def _graph_ledger_record_verification(ledger, graph, audit: Mapping) -> None:
+    """核验 / 重排两个节点的账本回填（数据来自既有证据层回执，不另算一遍）。"""
+    try:
+        path = str((graph or {}).get("path") or "")
+        annotated = int((audit or {}).get("annotated") or 0)
+        ledger.record("%s.verify" % path, status="ok" if annotated else "empty",
+                      detail="证据层标注 + 核验判定", evidence=annotated)
+        verification = (audit or {}).get("verification") or {}
+        reordered = int(verification.get("reordered") or 0)
+        ledger.record("%s.rerank" % path, status="ok" if annotated else "empty",
+                      detail="按核验分重排（reordered=%d）" % reordered, evidence=reordered)
+    except Exception:
+        return
+
+
+def _build_run_graph(retrieval_plan: Mapping, *, pack_id: str, policy_resolver,
+                     feature_flags, run_meta: Mapping, question: str, mode,
+                     total_seconds=None):
+    """阶段 05：建执行图 + 运行账本（任何异常都收敛成"没有图"，绝不影响检索）。
+
+    复用链：`retrieval_plan.decomposition`（既有 DAG）→ `qa_execution_graph.build_execution_graph`
+    → 图里带上 §2.2 的 Node 契约、失败策略五值、并行组与预算；返回 `(graph, ledger, receipt)`。
+    """
+    try:
+        from qa_execution_graph import ExecutionLedger, build_execution_graph, graph_receipt
+
+        policy = None
+        try:
+            policy = policy_resolver.resolve(pack_id) if policy_resolver is not None else None
+        except Exception:
+            policy = None
+        level2_enabled: bool | None = None
+        try:
+            snapshot = (feature_flags.snapshot() or {}) if feature_flags is not None else {}
+            if "level2_enabled" in snapshot:
+                level2_enabled = bool(snapshot.get("level2_enabled"))
+            elif (run_meta or {}).get("level2_enabled") is not None:
+                level2_enabled = bool((run_meta or {}).get("level2_enabled"))
+        except Exception:
+            level2_enabled = None
+        graph = build_execution_graph(
+            question, plan=retrieval_plan, mode=str(mode or "standard"), policy=policy,
+            level2_enabled=True if level2_enabled is None else bool(level2_enabled),
+            run_id=str((run_meta or {}).get("id") or ""), total_seconds=total_seconds)
+        ledger = ExecutionLedger(graph)
+        return graph, ledger, graph_receipt(graph, ledger=ledger)
+    except Exception as exc:
+        return None, None, {
+            "error": "%s: %s" % (type(exc).__name__, str(exc)[:200]),
+            "fallback": "无执行图（既有行为不变）",
+        }
+
+
+def _ledger_record_retrieval(ledger, graph, local: Mapping) -> None:
+    """把首跳检索的结果记进账本（节点 id 由执行图给出，舰队打开时是 merge 节点）。"""
+    try:
+        from qa_execution_graph import hop_node_id
+
+        node_id = hop_node_id(graph, "h1")
+        evidence = len(local.get("evidence") or [])
+        ledger.record(node_id, status="ok" if evidence else "empty",
+                      detail="首跳检索（既有 retriever 或舰队扇入）", evidence=evidence)
+    except Exception:
+        return
+
+
+def _ledger_record_hops(ledger, graph, receipts) -> None:
+    """把 `_run_multi_hop` 的每跳回执记进账本（第 1 跳已记过，跳过）。"""
+    try:
+        from qa_execution_graph import hop_node_id
+    except Exception:
+        return
+    for item in receipts or []:
+        hop_id = str(item.get("hop_id") or "")
+        if hop_id in ("", "h1"):
+            continue
+        node_id = hop_node_id(graph, hop_id)
+        status = _HOP_STATUS_TO_NODE.get(str(item.get("status") or ""), "ok")
+        try:
+            ledger.record(node_id, status=status, latency_ms=int(item.get("latency_ms") or 0),
+                          detail=str(item.get("reason") or item.get("purpose") or "")[:160],
+                          evidence=int(item.get("evidence") or 0))
+        except Exception:
+            continue
+
+
 def _local_retrieval(article_retriever, fleet, plan: Mapping, *, industry_pack_id: str,
                      page_context, limit: int) -> tuple:
     """level1 首跳检索：默认走既有 `ArticleRetriever.retrieve()`；舰队打开时走并行风扇。
@@ -1616,6 +1743,19 @@ def build_qa_stage_handlers(
                         emit_stage_event("stage_progress", {
                             "message": "并行检索舰队不可用，已使用常规检索：%s"
                                        % str(exc)[:120]})
+        # ── 阶段 05（P05-01…P05-05）：执行图 + 运行账本（`QA_EXECUTION_GRAPH` 默认关）──
+        # 关掉时这一段是空操作：既不建图、也不改任何返回键（零行为变化）。
+        execution_graph = None
+        graph_ledger = None
+        graph_receipt: dict = {}
+        if _execution_graph_enabled():
+            execution_graph, graph_ledger, graph_receipt = _build_run_graph(
+                retrieval_plan, pack_id=pack_id, policy_resolver=policy_resolver,
+                feature_flags=feature_flags, run_meta=run_meta,
+                question=_planned_question(context), mode=request_payload.get("mode"),
+                total_seconds=_env_int("QA_EXECUTION_GRAPH_BUDGET_SECONDS", 0, 0, 100000) or None)
+        if graph_ledger is not None:
+            graph_ledger.begin(_graph_node_id(execution_graph, "h1"))
         local, fleet_receipt = _local_retrieval(
             article_retriever, _fleet,
             {**dict(retrieval_plan), "question": _planned_question(context)},
@@ -1623,6 +1763,8 @@ def build_qa_stage_handlers(
             page_context=request_payload.get("page_context") or {},
             limit=_evidence_limit(retrieval_plan, request_payload.get("mode")),
         )
+        if graph_ledger is not None:
+            _ledger_record_retrieval(graph_ledger, execution_graph, local)
         # ── 多跳执行（阶段 9）──
         # 只对确有逻辑结构的问题生效（分解器给出的 DAG + 每跳 depends_on）；
         # 上一跳定位到的实体作为下一跳的过滤条件；受预算与跳数双重约束，
@@ -1673,6 +1815,9 @@ def build_qa_stage_handlers(
                 trace_recorder=_trace_recorder, store=store, run_meta=run_meta,
                 question=_planned_question(context), corpus_version=kb_version,
                 hop_audit=hop_evidence_audit,
+                # 阶段 05：图打开时用图给出的多跳预算（缺省 None → 既有 config 值，零变化）
+                budget_seconds=(float((execution_graph.get("budget") or {}).get("hop_budget_seconds"))
+                                if execution_graph else None),
             )
         elif multi_hop_plan.get("hops"):
             hop_receipts = [{
@@ -1680,6 +1825,9 @@ def build_qa_stage_handlers(
                 "depends_on": [], "evidence": len(local.get("evidence") or []),
                 "status": "single_hop", "carry_terms": [],
             }]
+        if graph_ledger is not None:
+            # 每跳回执 → 账本（超预算跳在 `_run_multi_hop` 里已经是 skipped_budget）
+            _ledger_record_hops(graph_ledger, execution_graph, hop_receipts)
         external = web_search.search(
             retrieval_plan.get("queries") or [],
             enabled=bool(retrieval_plan.get("needs_web")),
@@ -1714,6 +1862,9 @@ def build_qa_stage_handlers(
             store=store,
             corpus_version=kb_version,
         )
+        if graph_ledger is not None:
+            # §2.6：核验/重排跑在证据层里 —— 结果回填账本（核验了多少条、重排了多少条）
+            _graph_ledger_record_verification(graph_ledger, execution_graph, evidence_audit)
         stats = dict(local.get("stats") or {})
         stats.update({"web_adopted": len(external.get("evidence") or []), "adopted": len(evidence)})
         if fleet_receipt:
@@ -1731,6 +1882,27 @@ def build_qa_stage_handlers(
             stats["policy_noise_excluded"] = len(policy_audit.get("excluded_policy_noise") or [])
         if material_audit.get("material_cleaning") == "applied":
             stats["material_noise_excluded"] = len(material_audit.get("excluded_material_noise") or [])
+        if graph_receipt:
+            # 阶段 05：执行图回执放**兄弟键**（evidence_layer 六键与 verification 兄弟键都不动）；
+            # 打开 `QA_EXECUTION_GRAPH_NODE_RUNS` 时顺带把节点落进 qa_stage_runs 的 node 列。
+            if graph_ledger is not None:
+                # 回执必须在**节点跑完之后**重算一次：建图那一刻的账本是空的
+                try:
+                    from qa_execution_graph import graph_receipt as _receipt
+
+                    graph_receipt = _receipt(execution_graph, ledger=graph_ledger)
+                except Exception:
+                    pass
+            if graph_ledger is not None and _execution_graph_node_runs_enabled() and store is not None:
+                try:
+                    from qa_execution_graph import record_node_runs
+
+                    graph_receipt = {**graph_receipt, "node_runs": record_node_runs(
+                        store, str(run_meta.get("id") or ""), execution_graph, ledger=graph_ledger)}
+                except Exception as exc:
+                    graph_receipt = {**graph_receipt, "node_runs": {
+                        "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}}
+            stats["execution_graph"] = graph_receipt
         if callable(emit_stage_event):
             emit_stage_event("stage_progress", {
                 "message": f"已筛出 {len(evidence)} 条候选证据，正在按权威性和相关性排序。",

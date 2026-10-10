@@ -27,6 +27,14 @@ Phase 03（核验层）在这里追加 `EVIDENCE_VERIFICATION_SCHEMA`（核验�
 边界：本文件是纯常量 + schema（外加一个不参与链路的自校验函数），**不含业务逻辑**，
 不被任何写路径依赖；证据层的构造/指纹/去重逻辑在 `qa_evidence.py`，
 核验逻辑在 `qa_verifier.py`。
+
+Phase 05（研究规划与执行图）在这里追加 `QUERY_INTENTS`/`QA_PATHS`/`EXECUTION_NODE_KINDS`/
+`MODEL_TIERS` 等取值，并把 §2.2 的 Node 契约全字段（purpose/input_schema/output_schema/
+timeout/retry/model_tier/allowed_tools/validation/failure_policy）作为**可选字段**挂到
+`EXECUTION_NODE_SCHEMA` 上，另加 `EXECUTION_GRAPH_SCHEMA`/`SUB_QUESTION_SCHEMA`/
+`PLAN_CLAIM_SCHEMA`。既有取值与既有 schema 的 required/枚举一个字不改（Phase 01 的
+`validate("execution_node", {"node_id": "plan"})` 继续成立）；规划/建图逻辑在
+`qa_query_interpreter.py` 与 `qa_execution_graph.py`。
 """
 
 from __future__ import annotations
@@ -101,6 +109,77 @@ QA_STOP_REASONS: Tuple[str, ...] = (
 """多跳循环的停止原因。本仓库现状：预算耗尽会写 `status='skipped_budget'`，
 "无缺失链接"会自然收束——对应 `BUDGET_EXHAUSTED` 与 `ANSWERABLE`；
 `MAX_DEPTH`/`NO_GAIN`/`UNRESOLVABLE_CONTRADICTION` 待阶段 07 补齐。"""
+
+# ── 研究规划与执行图（Phase 05 · P05-01…P05-05）────────────────────────────
+# 通用包 01_V2_ARCHITECTURE §6（Query Interpreter）/ §7（Research Planner）/
+# §18（Fast/Standard/Deep）/ §2.2（Node Contract）/ §28（Failure Policy）。
+# 本段只**新增**取值与 schema：既有取值（通道/失败策略/停止原因/Hunter）一个字不动。
+QUERY_INTERPRETER_VERSION = "qa-query-interpreter-v1"
+"""Query Interpreter 版本；换规则=换版本（与 GRAPH/EVIDENCE/HUNTER 三个版本是三件事）。"""
+
+# §6 的问题结构分类（9 个取值，逐字取自规格书）
+QUERY_SIMPLE_FACT = "SIMPLE_FACT"
+QUERY_MULTI_ENTITY = "MULTI_ENTITY"
+QUERY_COMPARISON = "COMPARISON"
+QUERY_TEMPORAL = "TEMPORAL"
+QUERY_CAUSAL = "CAUSAL"
+QUERY_MECHANISM = "MECHANISM"
+QUERY_DIAGNOSTIC = "DIAGNOSTIC"
+QUERY_MULTI_HOP = "MULTI_HOP"
+QUERY_SYNTHESIS = "SYNTHESIS"
+QUERY_INTENTS: Tuple[str, ...] = (
+    QUERY_SIMPLE_FACT, QUERY_MULTI_ENTITY, QUERY_COMPARISON, QUERY_TEMPORAL,
+    QUERY_CAUSAL, QUERY_MECHANISM, QUERY_DIAGNOSTIC, QUERY_MULTI_HOP, QUERY_SYNTHESIS,
+)
+"""问题结构分类（§6）。本仓库落地口径：**复用** `qa_planner._CATEGORY_RULES` 的既有类别，
+再按"是不是多实体/比较/冲突"派生到这里（映射规则见 `qa_query_interpreter.intent_of`），
+不另写一套分类器。"""
+
+QUERY_COMPLEXITY_SIMPLE = "simple"
+QUERY_COMPLEXITY_STANDARD = "standard"
+QUERY_COMPLEXITY_DEEP = "deep"
+QUERY_COMPLEXITIES: Tuple[str, ...] = (
+    QUERY_COMPLEXITY_SIMPLE, QUERY_COMPLEXITY_STANDARD, QUERY_COMPLEXITY_DEEP,
+)
+"""复杂度三档（§6：`complexity = simple` 直接进 Fast Path）。"""
+
+QA_ANSWER_TYPES: Tuple[str, ...] = (
+    "no_answer", "fact", "comparison", "timeline", "causal_explanation",
+    "diagnostic", "evidence_synthesis",
+)
+"""期望答案形态。`no_answer` = 不需要检索（闲聊/自指类问题），直接快路径回话。"""
+
+QA_PATH_FAST = "fast"
+QA_PATH_STANDARD = "standard"
+QA_PATH_DEEP = "deep"
+QA_PATHS: Tuple[str, ...] = (QA_PATH_FAST, QA_PATH_STANDARD, QA_PATH_DEEP)
+"""三条执行路径（§18）。取值与既有 `mode` 一致（fast/standard/deep），不新造命名。"""
+
+EXECUTION_GRAPH_VERSION = "qa-execution-graph-v1"
+"""执行图契约版本（§3.1 Execution Graph：谁执行/能否并行/何时汇合/失败怎么办/何时停）。"""
+
+EXECUTION_NODE_KINDS: Tuple[str, ...] = (
+    "plan", "retrieve", "rerank", "merge", "verify", "evidence_graph",
+    "gap_loop", "contradiction", "answer", "final_verify",
+)
+"""节点种类：与 §18 的三条路径逐段对应，且能映射到既有编排阶段（见 qa_execution_graph）。"""
+
+NODE_STATUSES: Tuple[str, ...] = (
+    "pending", "ok", "empty", "skipped", "degraded", "error", "timeout",
+    "budget_exhausted", "deferred",
+)
+"""节点结局。`deferred` = 属于后续 Phase、本阶段**明确不执行**（不许假装跑过）；
+`budget_exhausted` = 总预算不够、被计划裁掉；`skipped` = 前置条件不满足。"""
+
+MODEL_TIERS: Tuple[str, ...] = ("none", "rule", "small", "medium", "strong")
+"""模型分层（§29）。本轮硬约束**不许调模型**：所有实际执行的节点都是 `none`/`rule`；
+`small`/`medium`/`strong` 只用于**声明**（后续阶段真正接入时按声明取模型）。"""
+
+PLAN_NODE_KINDS: Tuple[str, ...] = ("sub_question", "claim", "evidence_requirement")
+"""P05-02 的规划产物类型：子问题 / Claim / 证据要求（§7 的四件事里 dependency 走边表达）。"""
+
+PLAN_CLAIM_ROLES: Tuple[str, ...] = ("answer", "cause", "mechanism", "link", "counter")
+"""Claim 角色：待回答命题 / 原因 / 机制 / 传导连接 / 反证与替代解释（§7 的 H1–H5 抽象）。"""
 
 # ── 证据层（Phase 02 · Evidence Object / Source / Span / Entity / Relation）────
 # 通用包 01_V2_ARCHITECTURE §9 的 Evidence Object 契约：
@@ -226,6 +305,19 @@ SEARCH_TRACE_SCHEMA = {
     "additionalProperties": True,
 }
 
+# ── 信号（Node 的输入/输出契约引用）───────────────────────────────────────
+SIGNAL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},                       # 契约名（如 qa.research_plan / qa.search_trace）
+        "fields": {"type": "array", "items": {"type": "string"}},   # 该契约承载的字段名（可读性用）
+    },
+    "required": ["name"],
+    "additionalProperties": True,
+}
+"""Edge 也是数据契约（§2.3）：节点声明"我输出什么结构、下游需要什么结构"，
+这里用 `{name, fields}` 表达对契约的引用，不复制契约实体（避免两处定义漂移）。"""
+
 EXECUTION_NODE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -234,10 +326,142 @@ EXECUTION_NODE_SCHEMA = {
         "parent_node_id": {"type": "string"},
         "failure_policy": {"type": "string", "enum": list(QA_FAILURE_POLICIES)},
         "stop_reason": {"type": "string", "enum": list(QA_STOP_REASONS) + [""]},
+        # ── Phase 05（P05-05）：§2.2 的 Node 契约全字段（全部可选，既有调用方零改动）──
+        "purpose": {"type": "string"},
+        "input_schema": SIGNAL_SCHEMA,
+        "output_schema": SIGNAL_SCHEMA,
+        "timeout": {"type": "number", "minimum": 0},       # 秒（单次尝试）
+        "retry": {"type": "integer", "minimum": 0},        # 重试次数（§28 `RETRY 1`）
+        "model_tier": {"type": "string", "enum": list(MODEL_TIERS)},
+        "allowed_tools": {"type": "array", "items": {"type": "string"}},
+        "validation": {"type": "array", "items": {"type": "string"}},
+        "status": {"type": "string", "enum": list(NODE_STATUSES)},
+        "path": {"type": "string", "enum": list(QA_PATHS) + [""]},
+        "parallel_group": {"type": "string"},
+        "depends_on": {"type": "array", "items": {"type": "string"}},
+        "barrier": {"type": "boolean"},
+        "implemented": {"type": "boolean"},
+        "deferred_to": {"type": "string"},
     },
     "required": ["node_id"],
     "additionalProperties": True,
 }
+"""执行图节点（Phase 01 建骨架、Phase 05 补全 §2.2 的 Node 契约字段）。
+`required` 仍只有 `node_id`：Phase 01 的调用方与用例一字不改；
+Phase 05 建图时产出的节点会带上全部契约字段，并由 `validate("execution_node")` 逐字段校验。"""
+
+# ── Phase 05：执行图 / 规划产物（P05-02…P05-05）────────────────────────────
+SUB_QUESTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "sub_question_id": {"type": "string"},
+        "plan_node_kind": {"type": "string", "enum": ["sub_question"]},
+        "question": {"type": "string"},
+        "purpose": {"type": "string"},
+        "depends_on": {"type": "array", "items": {"type": "string"}},
+        "carry": {"type": "array", "items": {"type": "string"}},
+        "hop_index": {"type": "integer", "minimum": 0},
+        "parallel_group": {"type": "string"},
+        "required_evidence_types": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["sub_question_id", "question"],
+    "additionalProperties": True,
+}
+"""子问题（§7）：由 `qa_query_decompose.decompose()` 的 hop 一对一映射而来
+（`sub_question_id = "sq:" + hop.id`），**不新建分解器**。"""
+
+PLAN_CLAIM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "claim_id": {"type": "string"},
+        "plan_node_kind": {"type": "string", "enum": ["claim"]},
+        "statement": {"type": "string"},
+        "role": {"type": "string", "enum": list(PLAN_CLAIM_ROLES)},
+        "sub_question_id": {"type": "string"},
+        "required_evidence_types": {"type": "array", "items": {"type": "string"}},
+        "parallel_group": {"type": "string"},
+        "plan_only": {"type": "boolean"},     # True = 本轮不检索，交给 Phase 06/07/13
+    },
+    "required": ["claim_id", "statement", "role"],
+    "additionalProperties": True,
+}
+"""规划期 Claim（§7 的"问题拆成 SubQuestion/Claim/Evidence Requirement"）。
+**注意**：这里只是"要证实/证伪什么"的声明，不是结论，也不是证据；
+判定仍必须由 Phase 03 的 `qa_verifier` 基于真实证据给出（MASTER_RULES 第 11 条）。"""
+
+EVIDENCE_REQUIREMENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "requirement_id": {"type": "string"},
+        "plan_node_kind": {"type": "string", "enum": ["evidence_requirement"]},
+        "sub_question_id": {"type": "string"},
+        # 取值复用 qa_planner._retrieval_strategy 的 source 口径（官方原文/官方解读/
+        # 专业材料/跳链/裁决），不另造证据类型学。
+        "evidence_type": {"type": "string"},
+        "rationale": {"type": "string"},
+        "satisfied_by": {"type": "string"},   # 哪个节点负责满足它（Phase 05 只声明）
+    },
+    "required": ["requirement_id", "evidence_type"],
+    "additionalProperties": True,
+}
+"""证据要求（§7 "Evidence Requirement"）。本轮只声明"需要哪类证据、由哪个节点满足"，
+真实满足度判定属 Phase 06/07。"""
+
+QUERY_INTERPRETATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "interpreter_version": {"type": "string"},
+        "backend": {"type": "string"},
+        "backend_source": {"type": "string"},
+        "fallback": {"type": "object"},
+        "question": {"type": "string"},
+        "intent": {"type": "string", "enum": list(QUERY_INTENTS)},
+        "entities": {"type": "array", "items": {"type": "string"}},
+        "time_scope": {"type": "object"},
+        "constraints": {"type": "array", "items": {"type": "object"}},
+        "required_claims": {"type": "array", "items": PLAN_CLAIM_SCHEMA},
+        "freshness_required": {"type": "boolean"},
+        "answer_type": {"type": "string", "enum": list(QA_ANSWER_TYPES)},
+        "complexity": {"type": "string", "enum": list(QUERY_COMPLEXITIES)},
+        "category": {"type": "object"},
+        "relationship": {"type": "string"},
+        "question_count": {"type": "integer", "minimum": 0},
+        "needs_retrieval": {"type": "boolean"},
+        "high_risk_policy": {"type": "boolean"},
+        "axes": {"type": "array", "items": {"type": "string"}},
+        "reuse": {"type": "object"},
+    },
+    "required": ["interpreter_version", "question", "intent", "complexity", "answer_type",
+                 "required_claims"],
+    "additionalProperties": True,
+}
+"""Query Interpreter 输出（§6 的字段 + 可追溯的复用说明）。
+`backend_source` = `rules` 或 `registered:<name>`；`fallback.used=True` 表示注册的后端
+不可用/返回非法，已**保守回落**到规则后端（绝不会因为后端坏掉就不给规划）。"""
+
+EXECUTION_GRAPH_SCHEMA = {    "type": "object",
+    "properties": {
+        "contract_version": {"type": "string"},
+        "graph_version": {"type": "string"},
+        "run_id": {"type": "string"},
+        "question": {"type": "string"},
+        "path": {"type": "string", "enum": list(QA_PATHS)},
+        "path_source": {"type": "string"},
+        "intent": {"type": "string", "enum": list(QUERY_INTENTS)},
+        "complexity": {"type": "string", "enum": list(QUERY_COMPLEXITIES)},
+        "nodes": {"type": "array", "items": EXECUTION_NODE_SCHEMA},
+        "edges": {"type": "array", "items": {"type": "object"}},
+        "parallel_groups": {"type": "array", "items": {"type": "object"}},
+        "budget": {"type": "object"},
+        "stop_reason": {"type": "string", "enum": list(QA_STOP_REASONS) + [""]},
+        "stop_reasons": {"type": "array", "items": {"type": "object"}},
+    },
+    "required": ["contract_version", "path", "nodes", "edges", "parallel_groups", "budget"],
+    "additionalProperties": True,
+}
+"""执行图（§3.1）。`stop_reason` 取既有五值枚举（Phase 01 冻结），
+本阶段只可能产出 {ANSWERABLE, BUDGET_EXHAUSTED, MAX_DEPTH}——另两值属 Phase 07 的缺口闭环。"""
+
 
 # ── 证据层 schema（Phase 02 · P02-01）────────────────────────────────────────
 # 口径与上面的图 schema 一致："必需字段严格 + 不禁止额外字段"。证据对象本身是
@@ -440,12 +664,15 @@ HUNTER_FLEET_RESULT_SCHEMA = {
 
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
-    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s：节点类型 %d / 边关系 %d / 检索通道 %d / "
-            "失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d"
+    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s：节点类型 %d / 边关系 %d / "
+            "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
+            "问题意图 %d / 执行节点类型 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
-               len(KG_NODE_TYPES), len(KG_RELATION_KINDS), len(QA_RETRIEVAL_ROUTES),
-               len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS), len(EVIDENCE_STATUSES),
-               len(QA_HUNTER_IDS)))
+               EXECUTION_GRAPH_VERSION,
+               len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
+               len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
+               len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
+               len(QUERY_INTENTS), len(EXECUTION_NODE_KINDS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -493,6 +720,13 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         # Phase 04（P04-01…P04-06）
         "hunter_result": HUNTER_RESULT_SCHEMA,
         "hunter_fleet_result": HUNTER_FLEET_RESULT_SCHEMA,
+        # Phase 05（P05-01…P05-05）
+        "execution_graph": EXECUTION_GRAPH_SCHEMA,
+        "sub_question": SUB_QUESTION_SCHEMA,
+        "plan_claim": PLAN_CLAIM_SCHEMA,
+        "evidence_requirement": EVIDENCE_REQUIREMENT_SCHEMA,
+        "query_interpretation": QUERY_INTERPRETATION_SCHEMA,
+        "signal": SIGNAL_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

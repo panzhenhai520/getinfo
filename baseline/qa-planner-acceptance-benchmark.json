@@ -1,0 +1,2382 @@
+{
+ "benchmark": {
+  "benchmark_version": "qa-acceptance-v1",
+  "corpus_snapshot_id": "pending:first-run",
+  "corpus_snapshot_id_note": "占位：首次 --save-history 留档时写入真实语料快照 id（tools/qa_retrieval_acceptance.py 的 _snapshot_id()：快照内容 sha256 前 16 位，前缀 corpus:）；在此之前它只是 pending，不代表语料已绑定，也不得据此宣称 benchmark 已冻结到具体语料。",
+  "generated_at": "2026-10-08T23:48:58Z"
+ },
+ "comparison": {
+  "baseline": {
+   "deep": {
+    "hops_total": 12,
+    "nodes_total": 0,
+    "parallel_groups_total": 0,
+    "per_node_budget_total": 0,
+    "stage_budget_seconds_avg": 313.0,
+    "views": [
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     }
+    ]
+   },
+   "fast": {
+    "hops_total": 12,
+    "nodes_total": 0,
+    "parallel_groups_total": 0,
+    "per_node_budget_total": 0,
+    "stage_budget_seconds_avg": 148.0,
+    "views": [
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 148.0,
+      "stop_reason": ""
+     }
+    ]
+   },
+   "standard": {
+    "hops_total": 12,
+    "nodes_total": 0,
+    "parallel_groups_total": 0,
+    "per_node_budget_total": 0,
+    "stage_budget_seconds_avg": 313.0,
+    "views": [
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     },
+     {
+      "hops": 1,
+      "is_multi_hop": false,
+      "max_hops": 3,
+      "nodes": 0,
+      "parallel_groups": 0,
+      "pattern": "single",
+      "per_node_budget": 0,
+      "stage_budget_seconds": 313.0,
+      "stop_reason": ""
+     }
+    ]
+   }
+  },
+  "delta": {
+   "deep": {
+    "budget_total_seconds_avg": 0.0,
+    "cut_nodes_total": 0,
+    "enforced_nodes_total": 96,
+    "hops_total": 0,
+    "nodes_total": 228,
+    "parallel_groups_multi_total": 48,
+    "per_node_budget_total": 0
+   },
+   "fast": {
+    "budget_total_seconds_avg": 0.0,
+    "cut_nodes_total": 0,
+    "enforced_nodes_total": 84,
+    "hops_total": 0,
+    "nodes_total": 156,
+    "parallel_groups_multi_total": 12,
+    "per_node_budget_total": 0
+   },
+   "standard": {
+    "budget_total_seconds_avg": 0.0,
+    "cut_nodes_total": 0,
+    "enforced_nodes_total": 96,
+    "hops_total": 0,
+    "nodes_total": 192,
+    "parallel_groups_multi_total": 12,
+    "per_node_budget_total": 0
+   }
+  },
+  "graph": {
+   "deep": {
+    "avg_nodes": 19.0,
+    "barriers_total": 36,
+    "budget_estimated_seconds_avg": 291.0,
+    "budget_total_seconds_avg": 313.0,
+    "claims_total": 24,
+    "complexity_distribution": {
+     "deep": 1,
+     "simple": 11
+    },
+    "contract_ok": true,
+    "cut_nodes_total": 0,
+    "deferred_total": 36,
+    "dependencies_total": 0,
+    "enforced_nodes_total": 96,
+    "hops_avg": 1.0,
+    "hops_total": 12,
+    "intent_distribution": {
+     "SIMPLE_FACT": 11,
+     "SYNTHESIS": 1
+    },
+    "nodes_total": 228,
+    "parallel_groups_multi_total": 48,
+    "parallel_groups_total": 144,
+    "questions": 12,
+    "runnable_total": 192,
+    "stop_reason_distribution": {
+     "ANSWERABLE": 12
+    }
+   },
+   "fast": {
+    "avg_nodes": 13.0,
+    "barriers_total": 24,
+    "budget_estimated_seconds_avg": 129.0,
+    "budget_total_seconds_avg": 148.0,
+    "claims_total": 24,
+    "complexity_distribution": {
+     "deep": 1,
+     "simple": 11
+    },
+    "contract_ok": true,
+    "cut_nodes_total": 0,
+    "deferred_total": 0,
+    "dependencies_total": 0,
+    "enforced_nodes_total": 84,
+    "hops_avg": 1.0,
+    "hops_total": 12,
+    "intent_distribution": {
+     "SIMPLE_FACT": 11,
+     "SYNTHESIS": 1
+    },
+    "nodes_total": 156,
+    "parallel_groups_multi_total": 12,
+    "parallel_groups_total": 108,
+    "questions": 12,
+    "runnable_total": 156,
+    "stop_reason_distribution": {
+     "ANSWERABLE": 12
+    }
+   },
+   "standard": {
+    "avg_nodes": 16.0,
+    "barriers_total": 36,
+    "budget_estimated_seconds_avg": 291.0,
+    "budget_total_seconds_avg": 313.0,
+    "claims_total": 24,
+    "complexity_distribution": {
+     "deep": 1,
+     "simple": 11
+    },
+    "contract_ok": true,
+    "cut_nodes_total": 0,
+    "deferred_total": 0,
+    "dependencies_total": 0,
+    "enforced_nodes_total": 96,
+    "hops_avg": 1.0,
+    "hops_total": 12,
+    "intent_distribution": {
+     "SIMPLE_FACT": 11,
+     "SYNTHESIS": 1
+    },
+    "nodes_total": 192,
+    "parallel_groups_multi_total": 12,
+    "parallel_groups_total": 144,
+    "questions": 12,
+    "runnable_total": 192,
+    "stop_reason_distribution": {
+     "ANSWERABLE": 12
+    }
+   }
+  }
+ },
+ "flags": {
+  "QA_EXECUTION_GRAPH": "",
+  "QA_EXECUTION_GRAPH_NODE_RUNS": ""
+ },
+ "generated_at_utc": "2026-10-10T17:50:38Z",
+ "hunters": [
+  "structured",
+  "graph",
+  "bm25",
+  "semantic",
+  "query_expansion"
+ ],
+ "interpreter": "Query Interpreter qa-query-interpreter-v1（规则实现，零模型调用）：意图 9 值 / 复杂度 simple/standard/deep / 已注册后端 无（只有内置 rules）",
+ "planner": "Research Planner / Execution Graph qa-execution-graph-v1：路径 fast/standard/deep / 节点种类 10 / 现算总预算 fast=148s、standard=313s、deep=403s",
+ "policy": {
+  "deep_max_hops": 2,
+  "max_queries_per_hop": 5,
+  "research_timeout_seconds": 90,
+  "standard_max_hops": 1
+ },
+ "questions": 12,
+ "questions_file": "config\\qa_acceptance_questions.json",
+ "questions_fingerprint": "ff4398de42314db3",
+ "report_version": "qa-planner-acceptance-v1",
+ "rows": [
+  {
+   "id": "e1",
+   "industry_pack_id": "automotive_industry",
+   "kind": "event",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "72fdc4505eaf9c37",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "f82292a8669be1c0",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "bc22e18fce450416",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "比亚迪最近有什么动态？"
+  },
+  {
+   "id": "e2",
+   "industry_pack_id": "automotive_industry",
+   "kind": "event",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "761f4c2272a5cfb7",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "63644a67c9cbc13d",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "216ebb00b948090b",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "蔚来最近有什么动态？"
+  },
+  {
+   "id": "a3",
+   "industry_pack_id": "ai_news",
+   "kind": "attribute",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "fe204c337b037ef7",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "8dc106987007b08c",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "906613700e32b520",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "2027年发布的模型的模型定位是什么？"
+  },
+  {
+   "id": "a4",
+   "industry_pack_id": "ai_news",
+   "kind": "attribute",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "2f14cf97a725e53b",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "f3a5329663f69a87",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "49a31496f662bb91",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "低延迟模型的应用场景是什么？"
+  },
+  {
+   "id": "a5",
+   "industry_pack_id": "ai_news",
+   "kind": "attribute",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "11ea38055352499a",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "e3bbdf7934c70ba8",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "ad44f199ae39f8df",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "高精度模型的应用场景是什么？"
+  },
+  {
+   "id": "a6",
+   "industry_pack_id": "ai_news",
+   "kind": "attribute",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "4821a011147bf1ca",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "3bce0ac606cc8dfe",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "dbc8903d8468aebc",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "最近生产的模型的模型定位是什么？"
+  },
+  {
+   "id": "t7",
+   "industry_pack_id": "education_news",
+   "kind": "time_window",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "89e8bf24b1160c04",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "56a43813f36ab8c0",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "90f788ee212a30cc",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "模型最近 90 天有什么新动态？"
+  },
+  {
+   "id": "t8",
+   "industry_pack_id": "automotive_industry",
+   "kind": "time_window",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "83cbccb30857f7bd",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "d4cc6251543aedc7",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "cddcb0ca0daed83e",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "智能驾驶最近 90 天有什么新动态？"
+  },
+  {
+   "id": "t9",
+   "industry_pack_id": "family_office",
+   "kind": "time_window",
+   "paths": {
+    "deep": {
+     "answer_type": "evidence_synthesis",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "deep",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "4998132493a21342",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SYNTHESIS",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "evidence_synthesis",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "deep",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "1eaf2a57c22a7530",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SYNTHESIS",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "evidence_synthesis",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "deep",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "3ce4e076f38bbbe4",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SYNTHESIS",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "家族办公室最近 90 天有什么新动态？"
+  },
+  {
+   "id": "t10",
+   "industry_pack_id": "family_office",
+   "kind": "time_window",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "cc99b1fe3f939caf",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "1094deb5ad432d44",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "9c940765b2ecb8bf",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "政策最近 90 天有什么新动态？"
+  },
+  {
+   "id": "t11",
+   "industry_pack_id": "family_office",
+   "kind": "time_window",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "fe843da172ae648b",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "d3dbaf28977fc0b6",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "0559da389aa942e4",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "报告最近 90 天有什么新动态？"
+  },
+  {
+   "id": "t12",
+   "industry_pack_id": "family_office",
+   "kind": "time_window",
+   "paths": {
+    "deep": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [
+      "deep.evidence_graph",
+      "deep.gap_loop",
+      "deep.final_verify"
+     ],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "5b31f21733ce2e45",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 3,
+      "enforced": 8,
+      "parallel": 11,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 19
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 4,
+     "path": "deep",
+     "path_source": "mode=deep（既有 FULL_STAGES + 舰队）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "fast": {
+     "answer_type": "fact",
+     "barriers": 2,
+     "budget_allocated_seconds": 161.0,
+     "budget_enforced_nodes": 7,
+     "budget_estimated_seconds": 129.0,
+     "budget_total_seconds": 148.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "818373f016fed06a",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 2,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 7,
+      "parallel": 5,
+      "runnable": 13,
+      "skipped": 0,
+      "total": 13
+     },
+     "parallel_groups": 9,
+     "parallel_groups_multi": 1,
+     "path": "fast",
+     "path_source": "mode=fast（既有 FAST_STAGES）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    },
+    "standard": {
+     "answer_type": "fact",
+     "barriers": 3,
+     "budget_allocated_seconds": 323.0,
+     "budget_enforced_nodes": 8,
+     "budget_estimated_seconds": 291.0,
+     "budget_total_seconds": 313.0,
+     "claims": 2,
+     "claims_plan_only": 1,
+     "complexity": "simple",
+     "contract_note": "",
+     "contract_ok": true,
+     "cut_nodes": [],
+     "deferred_nodes": [],
+     "dependencies": 0,
+     "evidence_requirements": 1,
+     "failure_policies": [
+      "DEGRADE",
+      "FAIL_FAST",
+      "FALLBACK",
+      "RETRY"
+     ],
+     "graph_fingerprint": "c3dcb224deef0636",
+     "hops": 1,
+     "infeasible": false,
+     "intent": "SIMPLE_FACT",
+     "node_counts": {
+      "barriers": 3,
+      "budget_exhausted": 0,
+      "deferred": 0,
+      "enforced": 8,
+      "parallel": 5,
+      "runnable": 16,
+      "skipped": 0,
+      "total": 16
+     },
+     "parallel_groups": 12,
+     "parallel_groups_multi": 1,
+     "path": "standard",
+     "path_source": "mode=standard；complexity=simple → 建议走 Fast Path（§6，见 suggested_path）",
+     "stop_reason": "ANSWERABLE",
+     "stop_reasons": [
+      "ANSWERABLE"
+     ],
+     "sub_questions": 1
+    }
+   },
+   "question": "治理最近 90 天有什么新动态？"
+  }
+ ]
+}

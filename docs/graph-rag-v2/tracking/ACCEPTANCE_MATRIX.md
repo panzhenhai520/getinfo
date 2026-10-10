@@ -56,6 +56,15 @@
 |P04-09|验收工具自测（快照回放可复算）|`python -m pytest tests/test_qa_phase04_acceptance_tool.py -q`|快照→临时 sqlite 往返、逐题明细键集与既有口径一致、compare 出两侧与 Δ|**5 passed**；向量 base64 解码后原样入库（2 条）；逐题明细含 `qa_retrieval_acceptance.evaluate` 的全部键（复用同一 `summarize` 口径）；`compare` 报出 baseline/fleet/Δ/fleet_metrics；`build_db_from_snapshot` 断言 `backend=='sqlite'` 且库路径=临时文件（拒绝写主库）|PASS|`tools/qa_hunter_fleet_acceptance.py`；`tests/test_qa_phase04_acceptance_tool.py`|
 |P04-R1|Phase 02/03 契约与行为不回归|`python -m pytest tests/test_qa_phase02_*.py tests/test_qa_phase03_*.py tests/test_qa_logic_validation.py -q`|冻结回执键集不变；关掉舰队回到旧路径|**全部通过**（随全量 1984 passed）；`stats["evidence_layer"]` 六键与 `stats["verification"]` 兄弟键均未被舰队触碰（有用例）；`QA_HUNTER_FLEET` 不设时 `level1_retrieval` 与接线前逐字相同|PASS|`tests/test_qa_phase04_pipeline.py`；`tests/test_qa_phase02_*.py`|
 |P04-R2|冻结契约指纹复算 + 通道枚举不动|`python -m pytest tests/test_qa_phase04_contracts.py -q`|七指纹与 P00-02 一致；`QA_RETRIEVAL_ROUTES` 仍 7 个取值；库表零迁移|**18 passed**；七指纹复算与 Phase 00 逐字相同、`EVIDENCE_SCHEMA.additionalProperties` 仍 False；`QA_RETRIEVAL_ROUTES` 与 `SEARCH_TRACE_SCHEMA.route` 取值域逐字未变（Hunter 身份走新命名空间 `QA_HUNTER_IDS`）；`QA_SCHEMA_VERSION` 仍 v7、无新表/新列；`QA_HUNTER_FLEET` 默认 false|PASS|`tests/test_qa_phase04_contracts.py`；`qa_graph_contracts.py`；DECISION_LOG D-017|
+|P05-01|Query Interpreter（规则实现 + 可插拔）|`python -m pytest tests/test_qa_phase05_interpreter.py -q`|§6 的 9 值意图全部可命中；复杂度依据可复算；未注册/抛错/非法载荷三条失败路径都回落 rules|**23 passed**；9 个意图逐条有真实命中样例（`MULTI_ENTITY`/`DIAGNOSTIC` 用显式入参钉口径）；`complexity_reasons` 非空且对得上（多跳类别/比较冲突/≥3 实体问句→deep；单问句+简单类别+≤60 字→simple；超 60 字降回 standard 有反例）；反证 claim 恒 `plan_only=True`；三条失败路径都得到 `backend_source=rules` + `fallback.used=True` + 中文原因；AST 断言不 import 网络库、源码零 `http(s)`/模型客户端痕迹；内置后端只有 rules（LLM 版本只留注入点）|PASS|`qa_query_interpreter.py`；`tests/test_qa_phase05_interpreter.py`；DECISION_LOG D-019|
+|P05-02|Subquestion/Claim decomposition|`python -m pytest tests/test_qa_phase05_plan.py -q`|复用既有分解器；四件产物齐全；有计划里的 decomposition 不许重新分解|**15 passed**；`mock.patch(eg.decompose, side_effect=AssertionError)` 证明"有计划 hops 时一次都不再调 decompose"；无 decomposition 时才现算并写 `qa_query_decompose.decompose`；`sub_question`/`plan_claim`/`evidence_requirement` 三个 schema 逐个校验通过；证据要求与 `qa_planner._retrieval_strategy` 的 source 逐项相等；依赖边带 `carries`+`schema`；环/自环/指向更晚的跳由 `validate_dag` 拦（有用例）|PASS|`qa_execution_graph.py`（`build_research_plan`）；`tests/test_qa_phase05_plan.py`|
+|P05-03|dependency/parallel groups|`python -m pytest tests/test_qa_phase05_plan.py tests/test_qa_phase05_paths.py -q`|组内两两无依赖；无依赖不产生边；只有真正汇合才是 barrier|**15 + 19 passed**；`fan` 用例：3 个独立子问题同组且 `parallel=True`、第 4 个汇合点 `barrier=True`/`size=1`；`dependencies == []`（无依赖就不写边，§2.1）；"计划→检索"是真实依赖（`retrieve.depends_on == ["…interpret"]`）；舰队场景 5 个 Hunter 同组并行、`merge` 为 barrier 且依赖全部 Hunter|PASS|`qa_execution_graph.py`（`parallel_groups`/`_levels`/`_mark_barriers`）；`tests/test_qa_phase05_paths.py`|
+|P05-04|Fast/Standard/Deep 三路径|`python -m pytest tests/test_qa_phase05_paths.py -q`|§18 三条链；图上有用节点必须在 `stage_plan` 链上；每节点带契约全字段与失败策略五值|**19 passed**；`spec_chain` 与 §18 逐字相同；`stage_chain` 与 `QaOrchestrator.stage_plan` 相等（fast=FAST_STAGES/standard=FULL_STAGES）；level2 关闭时三段 `skipped`；deep 的 3 个占位节点 `implemented=False`+`deferred_to=P06/P07/P13`+`timeout=0`；五路径失败策略取值 {FAIL_FAST,RETRY,SKIP,FALLBACK,DEGRADE} 有真实落点且 `DEGRADABLE_STAGES`→DEGRADE；Hunter 节点的超时/重试取自舰队既有旋钮（改成 2.5s/3 次会跟着变）|PASS|`qa_execution_graph.py`；`tests/test_qa_phase05_paths.py`；DECISION_LOG D-019|
+|P05-05|budget / Execution Graph|`python -m pytest tests/test_qa_phase05_budget.py -q`|三档总预算 + 每节点预算可复算；超预算可观测地停并写既有五值停止原因；节点行落 Phase 01 的列|**23 passed**；`path_budget` 与阶段预算之和相等（deep 的深研段用 `qa_policy.research_timeout_seconds=90`）；`QA_GRAPH_BUDGET_FAST_SECONDS=12` 覆盖生效；紧预算（deep 240s / 100s）分别得到"裁可选节点"与"`infeasible=True`"两条真实路径，停止原因全部落在既有五值内且**永不产出 NO_GAIN/UNRESOLVABLE_CONTRADICTION**；假时钟账本：超预算后 `should_run()`→False、`over_budget=True`、`stop_reason=BUDGET_EXHAUSTED`；`record_node_runs` 在隔离临时 sqlite（断言 `backend=='sqlite'`）写出 `node:<id>` 行、`node_kind` 分别 plan/retrieve/merge、`round_index` 落库、坏 store 只记 failed 不抛|PASS|`qa_execution_graph.py`（`path_budget`/`apply_budget`/`ExecutionLedger`/`record_node_runs`）；`qa_pipeline.py`；`tests/test_qa_phase05_budget.py`；DECISION_LOG D-020/D-021|
+|P05-06|管线接线（默认关，打开即出图 + 节点落库）|`python -m pytest tests/test_qa_phase05_pipeline.py -q`|默认关时阶段返回键集/stats 键集逐字不变；打开时回执走兄弟键；建图失败不影响证据|**10 passed**；默认关：10 个返回键与 Phase 02 口径逐字一致、`stats` 无 `execution_graph`；打开：`stats["execution_graph"]` 带 path/node_counts/budget/stop_reason/runtime（检索/核验/重排/每跳都记上），`stats["evidence_layer"]` 六键不变；`QA_EXECUTION_GRAPH_NODE_RUNS=1` 时 `qa_stage_runs` 出现 `node:standard.retrieve`（`node_kind=retrieve`）等行；图的 `hop_budget_seconds` 真的传进 `_run_multi_hop`（mock 断言）；建图抛错 → 回执带 error+fallback 且证据包照常；policy 读不到也照样出图|PASS|`qa_pipeline.py`（`_build_run_graph`/`_ledger_*`/`level1_retrieval`/`_run_multi_hop(budget_seconds=)`）；`tests/test_qa_phase05_pipeline.py`|
+|P05-07|真机只读验收：真实问题三档规划输出|`python _tmp_phase05_real_questions.py --limit 15`（A 机只读）+ `python tools/qa_phase05_planner_acceptance.py --questions _tmp_phase05_real_questions.json --out baseline/qa-planner-acceptance.json --history data/qa_planner_history.jsonl`|给出真实问题在 fast/standard/deep 下的节点数/跳数/预算/停止原因|**13 条真实问题**（去重后；来自 A 机 `qa_runs.question_text`，只读 + LIMIT 15）：节点均值 fast **8.31** / standard **11.31** / deep **14.31**（deep 含 3 个占位）；跳合计 17（"DRG对医院的影响和对患者的影响分别有哪些？"与"DRG对医院行业的影响有哪些？对患者的影响有哪些？"各 3 跳）；Claim 30、依赖边 4、barrier 15；预算均值 fast 148s / standard=deep 313s（关键路径估算 132s / 294s）；停止原因三档全 `ANSWERABLE`；**对照**：舰队打开时（benchmark 12 题）节点均值 fast 13.0 / standard 16.0 / deep 19.0、多节点并行组 12/12/48；**把 `QA_GRAPH_BUDGET_{STANDARD,DEEP}_SECONDS` 压到 120s** → 13/13 题变 `BUDGET_EXHAUSTED`、裁掉 43 个可选节点、估算 130s > 120s 且如实标 `infeasible`。报告留档 `baseline/qa-planner-acceptance.json`（另有 `-benchmark.json` 含舰队对照），历史行 `data/qa_planner_history.jsonl`|PASS|`baseline/qa-planner-acceptance.json`；`baseline/qa-planner-acceptance-benchmark.json`；`data/qa_planner_history.jsonl`；`tools/qa_phase05_planner_acceptance.py`；`_tmp_phase05_real_questions.json`|
+|P05-R1|Phase 02/03/04 不回归|`python -m pytest tests -q -k "phase05"` + `python -m pytest tests/test_qa_phase04_pipeline.py tests/test_qa_phase02_pipeline.py tests/test_qa_stage_contract.py -q`|关掉开关回到旧路径；冻结回执键集不变|**107 + 24 passed**；`QA_EXECUTION_GRAPH` 不设时 `level1_retrieval` 返回键集/`stats` 键集与接线前逐字一致（有专门用例）；`stats["evidence_layer"]` 六键与 `stats["verification"]` 未被触碰；`_run_multi_hop` 新增的 `budget_seconds` 缺省 None → 逐字回到 `config.QA_MULTI_HOP_BUDGET_SECONDS`；**全量 2091 passed / 1 skipped / 0 failed**（1984+107，零回归、零删除/跳过用例）|PASS|`tests/test_qa_phase05_pipeline.py`；`tests/test_qa_phase04_pipeline.py`|
+|P05-R2|冻结契约指纹复算 + 枚举不动|`python -m pytest tests/test_qa_phase05_contracts.py -q`|七指纹与 P00-02 一致；Phase 01 的三个枚举与 `EXECUTION_NODE_SCHEMA.required` 不动；库表零迁移|**17 passed**；七指纹复算与 Phase 00 逐字相同、`EVIDENCE_SCHEMA.additionalProperties` 仍 False；`QA_RETRIEVAL_ROUTES`（7）/`QA_FAILURE_POLICIES`（5）/`QA_STOP_REASONS`（5）逐字未变；`EXECUTION_NODE_SCHEMA.required == ["node_id"]`（Phase 01 调用方零改动）；`QA_SCHEMA_VERSION` 仍 v7、`QA_ADDED_COLUMNS_V6` 仍 15 条、无新表；两个新开关默认关；新 schema 能拦缺字段/越界枚举（含嵌套 `input_schema.name`）|PASS|`tests/test_qa_phase05_contracts.py`；`qa_graph_contracts.py`；DECISION_LOG D-020/D-021|
 
 **Phase 03 说明（边界与未满足项，宁写 PARTIAL 不谎报）**
 - **P03-01…P03-04 全部记 PASS**，但下面这些**明确不算通过**的项要一起看：
@@ -138,3 +147,62 @@
   · 本地离线回放（`python tools/qa_hunter_fleet_acceptance.py --snapshot baseline/qa-hunter-corpus-snapshot.json
     --out baseline/qa-hunter-fleet-acceptance.json --history data/qa_hunter_history.jsonl`）：见 P04-08 那一行。
     **所有远端命令都是短命只读**（无写语句、无部署、无驻留进程）。
+
+**Phase 05 说明（边界、取舍与未满足项，宁写 PARTIAL 不谎报）**
+- **P05-01…P05-07 记 PASS**，但下面这些**明确不算通过**的项要一起看：
+  1. **Query Interpreter 是规则实现，不是"问题理解"**：没有 LLM 就没有"把自然语言问题改写成规范命题"
+     这一步（硬约束禁止调模型/嵌入端点）。因此：
+     · `entities` **不做新 NER**，只透传规划器用行业包词表匹配到的实体（没有 `plan` 入参时就是空数组）；
+     · `required_claims.statement` 是**待证命题声明**（role/证据要求绑定是真的、可机器消费），
+       不是"重写后的命题"；`register_query_interpreter("llm", fn)` 是给后续留的注入点，
+       **本轮没有实现、也没有调用**（`registered_interpreters() == []` 有守门用例）。
+  2. **§6 的 "complexity=simple → 直接进入 Fast Path" 落地为建议而不是隐式改档**（D-019）：
+     `path` 严格等于 `mode`（本仓库实际跑哪条阶段链由 `mode` + level2 开关决定），
+     §6 的结论进 `suggested_path`。理由：若 Planner 隐式改档，执行图会与实际阶段链不一致
+     （图上写 fast、运行期跑 FULL_STAGES）——**图不许撒谎**。代价：调用方要自己决定是否采纳建议。
+  3. **`timeout` 是"上限"，不是"一定会被强杀"**：只有 `budget_enforced=True` 的节点今天有真闸门
+     （舰队单 Hunter 超时/重试、多跳墙钟预算、`level1_draft` 首 token 与 synthesis 的阶段预算）；
+     其余节点标 `budget_enforced=False` 并写明"仅记账"。**没有**给每个节点装硬性 kill（会改变既有行为）。
+  4. **预算裁剪只发生在计划期**：运行期真正的停止仍由既有机制执行（`_run_multi_hop` 超预算写
+     `status=skipped_budget`、舰队预算耗尽返回部分结果）。Phase 05 做的是"把这件事提前算出来并写
+     `stop_reason`"，它**没有**把 `QA_MULTI_HOP_BUDGET_SECONDS` / 阶段预算换成自己的数
+     （缺省 `budget_seconds=None` → 逐字回到既有 config）。
+  5. **`NO_GAIN` / `UNRESOLVABLE_CONTRADICTION` 两个停止原因本阶段产不出来**（属 Phase 07 的缺口闭环），
+     有守门用例断言三档只会产出 {ANSWERABLE, BUDGET_EXHAUSTED, MAX_DEPTH}；`MAX_DEPTH` 还需
+     "放宽跳数上限会长出更多跳"的真截断证明（否则不报），避免把正常多跳误报成截断。
+  6. **deep 链里的 P06/P07/P13 三段是占位节点**（`status=deferred`/`implemented=False`/`timeout=0`）：
+     它们只让 deep 链与 §18 对得上，**不参与预算、不执行、也不假装跑过**；既有的 `conflict_review`
+     是真节点（今天就在跑），P06 会把它升级为 Evidence Graph 级矛盾检测。
+  7. **节点行落库是可选副作用**：`QA_EXECUTION_GRAPH_NODE_RUNS` 默认关；打开后节点行以
+     `stage="node:<node_id>"` 出现（既有阶段行唯一键是 `(run_id, stage, attempt)`，用真阶段名会让
+     多个节点互相覆盖——见 D-021）。这些行会进 `QaMetricsService` 的 stage 分桶统计，属预期副作用。
+  8. **真机验证仍是"只读取数 + 本地离线规划"**：Phase 05 代码**没有部署到 A 机**（不部署是硬约束）。
+     成立的是"13 条真实生产问题的规划输出由本代码算出"；**不成立**的是"规划器在生产链路里跑过"。
+     另外真实问题的三档停止原因默认全是 ANSWERABLE（默认预算装得下），紧预算是**人为压出来**的
+     对照实验，不代表生产配置。
+- **Phase 05 回归证据（真跑输出）**：
+  `python -m pytest tests -q -k "phase05" -p no:cacheprovider` → **107 passed, 1985 deselected**
+  （interpreter 23 / plan 15 / paths 19 / budget 23 / pipeline 10 / contracts 17；
+  注意 Windows 下 `tests/test_qa_phase05_*.py` 这个通配由 shell 展开，PowerShell 里请用
+  `-k "phase05"` 或显式列出六个文件）；
+  `python -m pytest tests/test_qa_phase05_pipeline.py tests/test_qa_phase05_budget.py -q -W
+  error::pytest.PytestUnhandledThreadExceptionWarning` → **33 passed**（没有留下未处理线程异常）；
+  `python -m pytest tests -q -k "qa or plan or retrieval or evidence or contract or schema"` →
+  **793 passed, 1299 deselected**（Phase 04 同口径为 667 passed / 1318 deselected）；
+  `python -m pytest tests -q`（全量）→ **2091 passed, 1 skipped, 0 failed**（Phase 00 冻结的
+  "0 failed" 基线保持；收集数 1984 → 2091，正是本阶段新增的 107 例，**没有改动任何既有用例**）。
+- **A 机只读真机验证（本次实际执行的命令与结果）**：
+  · 只读探活与计数（`timeout 15 docker ps --format '{{.Names}}'`、`timeout 20 docker exec
+    collectinfo-postgres psql -U postgres -d collectinfo -A -t -c "SET statement_timeout='8s';
+    SET default_transaction_read_only=on; …"`）：容器 `collectinfo-web/-worker/-qa-worker/-intel-worker/
+    -postgres/-redis` 在线；`qa_runs=15 / articles=8544 / active=7652`；
+  · 真实问题（`python _tmp_phase05_real_questions.py --limit 15 --out _tmp_phase05_real_questions.json`）：
+    取 `qa_runs.question_text`（近 15 条去重后 13 条，`ORDER BY created_at DESC LIMIT 15`）→
+    落盘含 `source.access=readonly` 说明；
+  · 本地离线规划（`python tools/qa_phase05_planner_acceptance.py --questions
+    _tmp_phase05_real_questions.json --out baseline/qa-planner-acceptance.json --history
+    data/qa_planner_history.jsonl`）：见 P05-07 那一行；
+  · 复核无驻留进程（`timeout 15 docker exec collectinfo-web ps -eo pid,etimes,comm,args`）：
+    只有容器自身的 gunicorn（已运行 4692s）与我那一条 `ps`，**无残留**。
+    **所有远端命令都是短命只读**（`SET default_transaction_read_only=on` + `timeout` 包住 + 显式 LIMIT；
+    无写语句、无部署、无驻留进程）。
