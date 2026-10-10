@@ -38,7 +38,11 @@ DEFAULT_BATCH_SIZE = 16
 # 2026-10-07：服务端 llama-server 已重启为 --batch-size 2048 --ubatch-size 2048，
 # 实测 600/1200/1800/3000 字符（约 340/677/1014/1690 token）全部返回 200，
 # 因此默认上限从 480 提到 1500（bge-m3 原生支持 8192 token，留出余量又不越过 2048 的物理批）。
-DEFAULT_MAX_INPUT_TOKENS = 1500
+# 2026-10-10 标定复核（真实中文样本，实测 token/字 ≈ 0.72 —— 比早先按 0.62 的估算偏高）：
+#   2000 字 → 1443 token ✅；2400 字 → 1731 ✅；2600 字 → 1875 ✅；3000 字 → 2163 ❌ HTTP 500。
+# 于是把默认上限提到 1800：配合 2400 字的字符上限（≈1731 token）可多嵌入 20% 正文，
+# 又对服务端 2048 留出 ~15% 余量（中文密度因文本而异，余量不能吃光）。
+DEFAULT_MAX_INPUT_TOKENS = 1800
 
 _CJK_RE = re.compile(r"[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]")
 _LATIN_WORD_RE = re.compile(r"[A-Za-z0-9]+")
