@@ -1,0 +1,2893 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""【主题文章入库情况评估】评估引擎：评估 + 候选挖掘 + 影子自测 + 抓取探针 + 建议暂存。
+
+流程（DECISION_LOG D-009，硬规矩）：
+    评估 assess → 挖候选 mine → 影子重跑自测 shadow → 真抓一遍 crawl_probe
+    → 双达标才 stage(status="verified")，否则 stage(status="rejected"，并写清原因)
+    → 人工同意 → 调用方走 industry_pack_activation 发布激活 → record_after_apply 回填复测
+
+本模块自身的硬约束（请勿放宽）：
+* **纯 CPU、纯规则**：判定只调用 ``intel_classifier.classify_article``（规则链路），
+  绝不调用 LLM / 向量模型 / 任何模型端点，也不碰 GPU。
+* **不改生产配置**：影子自测只在 ``copy.deepcopy`` 出来的内存副本上合并候选词；
+  ``config/industry_packs/*.json`` 与「已发布存储」都不落笔。发布激活必须由调用方
+  显式走 ``industry_pack_activation.IndustryPackActivationService``（本模块不代劳）。
+* **返回只含 JSON 可序列化类型**（dict/list/str/int/float/bool/None）。
+* 达标阈值是模块常量，**不接受调用方覆盖**（防止为了好看把门槛放宽）。
+"""
+
+from __future__ import annotations
+
+import contextlib
+import copy
+import json
+import re
+import time
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+
+from industry_packs import (
+    IndustryPackLoader,
+    industry_anchor_keywords,
+    industry_pack_loader,
+    normalize_intel_text,
+    unique_normalized_keywords,
+)
+from intel_classifier import classify_article, match_fixed_topics
+from intel_contracts import DEFAULT_INDUSTRY_PACK_ID, utc_text
+from intel_database import ARTICLE_TIME_SQL, IntelRepository, intel_repository
+
+MODULE_VERSION = "1.0.0"
+
+# ─────────────────────────── 达标阈值（硬规矩，勿放宽） ───────────────────────────
+# 影子重跑自测（正样本 = 本包被判 other 的文章；负样本 = 其它包已准入的文章）：
+#   * 准入率提升 ≥ 15 个百分点：低于这个量级说明候选词对真实语料几乎没起作用，
+#     放上【改进】页只会浪费人工审核（实测投资包 89.7% 落 other，十几点的提升才叫"改进"）。
+#   * 误准入率上升 ≤ 2 个百分点：放宽门禁必然带进噪声，2 个点是"可接受的代价上限"，
+#     超过就说明候选词判别力不够（宁可拒绝）。
+#   * 改后准入率 ≥ 30%：只看增量会被"0% → 16%"这种小基数提升骗过；30% 是"这个包真的能用"
+#     的最低线（否则大部分文章仍落 other，评审没有意义）。
+MIN_ADMIT_RATE_GAIN_PCT = 15.0
+MAX_FALSE_POSITIVE_GAIN_PCT = 2.0
+MIN_ADMIT_RATE_AFTER_PCT = 30.0
+
+# 抓文章实测（crawl_probe）阈值：
+#   * 至少 3 篇成功解析的新文章才算"取得样本"；0 篇一律 rejected（抓取失败 ≠ 准入率 0）。
+#   * 新文章准入率提升 ≥ 5 个百分点：样本量小，阈值比影子自测低，但只要没提升就不放行。
+MIN_CRAWL_PROBE_ARTICLES = 3
+MIN_CRAWL_PROBE_GAIN_PCT = 5.0
+CRAWL_PROBE_MAX_SOURCES = 5
+CRAWL_PROBE_PER_SOURCE = 3
+CRAWL_PROBE_TIMEOUT_SECONDS = 90
+# 单篇文章正文少于该字数视为"解析失败"（计入 parse_failed，绝不当作"准入率 0"）。
+PROBE_MIN_CONTENT_CHARS = 80
+
+# ─────────────────────────── 候选词挖掘口径 ───────────────────────────
+DEFAULT_TOP_N = 20
+DEFAULT_SAMPLE_LIMIT = 500
+# 判别力过滤（候选词质量的关键）：
+#   本包出现率 = 命中该词的「本包 other 文章」数 / 本包 other 文章总数
+#   对照出现率 = 命中该词的「其它包已准入文章」数 / 对照文章总数
+#   比值 = (本包出现率 + ε) / (对照出现率 + ε)，ε=0.01 防止除零、也防止"只出现 1 次的
+#   噪声词"因分母为 0 被捧成无穷大。
+#   保留条件（三条全满足）：比值 ≥ 3、对照出现率 ≤ 10%、本包命中文章数 ≥ 3。
+#   含义：该词必须"显著属于本包、几乎不属于别人"，否则加进关键词表只会把别行业文章拉进来。
+DISCRIMINATION_MIN_RATIO = 3.0
+DISCRIMINATION_MAX_PEER_RATE = 0.10
+DISCRIMINATION_MIN_DOCS = 3
+RATIO_EPS = 0.01
+# 词形门槛：中文词 ≥2 字、纯 ASCII 词 ≥3 字母（剔除单字、纯数字、年份、标点）。
+MIN_TOKEN_LEN = 2
+MIN_ASCII_TOKEN_LEN = 3
+# 标题命中说明该词是文章主题（而非正文顺带提及）：排序时给标题命中加权。
+TITLE_HIT_BONUS = 2.0
+MAX_RATIO_FOR_SCORE = 20.0
+# 模板噪声降权（**不剔除**，只降排序）：实测本机语料里同一信源的榜单/申报类文章会重复同一句
+# 标题模板（例："… | 申报2026第八届金辑奖最佳技术实践应用奖"），于是"申报第八届""金辑"这类
+# 模板片段能同时满足判别力与文档数门槛，却完全不是行业词。判定口径：命中该词的文档**只来自
+# 1 个域名**且**≥80% 的命中文档标题里都有它**（真行业词很少在单一域名下被当标题模板反复套用）。
+# 处理方式：排序分 ×0.5（rank_score），并在候选对象上打 template_suspect 标记；
+# 判别力过滤与达标判定都不受影响（最终仍由影子自测 + 抓文章实测 + 人工审核把关）。
+TEMPLATE_TITLE_RATIO = 0.8
+TEMPLATE_SUSPECT_PENALTY = 0.5
+# 站点级模板噪声降权（同样只降排序、不剔除）：页脚/导航/免责声明常被正文抽取带进来
+# （实测本机语料出现"产业使命/产品工程/价值全球/万家"这类同一站点的页脚词组）。判定口径：
+# 命中该词的文档**只来自 1 个域名**且**在其它包判 other 的本包语料里出现率 ≥50%**——
+# 本包 other 恰恰是"没进本行"的文章，一个词覆盖其中一半又只来自单一站点，多半是站点模板而非行业词。
+BOILERPLATE_PACK_RATE = 0.5
+BOILERPLATE_SUSPECT_PENALTY = 0.5
+MAX_EXAMPLES = 3
+TITLE_LIMIT = 120
+# 语料截断：分类链路本身按 20 万字符截断，本模块为控制内存/带宽按 2 万字符截断
+# （候选词几乎都出现在标题与前 2 万字符里；该上限同时写进返回值的 recomputable 里）。
+SAMPLE_CONTENT_CHARS = 20000
+PEER_SAMPLE_MIN = 200
+
+# ─────────────────────────── 信源 verdict 阈值 ───────────────────────────
+# 零产出：该信源为本包贡献 0 篇入库文章；
+# 准入率低：入库 ≥2 篇且准入率 < 20%（<2 篇样本太小，不轻易判"低"）；
+# 长期无新文：最近一篇文章距今 > 30 天（比默认 1440 分钟轮询周期宽 30 倍，排除偶发停更）；
+# 有效：其余。
+SOURCE_VERDICT_LOW_ADMIT_PCT = 20.0
+SOURCE_VERDICT_MIN_ARTICLES = 2
+SOURCE_VERDICT_IDLE_DAYS = 30
+
+# 其它包对照样本量下限：判别力过滤需要足够大的"别人家语料"做分母。
+NEGATIVE_SAMPLE_DEFAULT = 300
+
+SUGGESTION_KINDS = ("keyword", "source")
+# pending 只是表级默认值；写接口只允许下面四种。
+SUGGESTION_STATUSES = ("pending", "verified", "rejected", "applied", "failed")
+# 外部（API/UI）可设置的终态：**不允许外部把建议置为 verified**。
+# verified 只能由自测判定产生（stage_suggestion 收到 verified 时会按当前阈值复算，
+# 且要求 metrics 带有下面这个"自测来源标记"——只有 run_self_test_and_stage 会写它）。
+EXTERNAL_STATUSES = ("rejected", "applied", "failed")
+SELF_TEST_SOURCE = "run_self_test_and_stage"
+# 生成新版本时写进审计的 actor（便于在行业包生命周期事件里认出"这是改进建议落地的版本"）。
+PREPARE_ACTOR = "intel_pack_improvement"
+
+# 信源类建议规则（为什么这么定）：
+#   零产出     → 建议停用（启用中却长期 0 篇产出，白占抓取槽位）；
+#   长期无新文 → 建议替换（历史有产出但已停更，需要人工找替代源）；
+#   准入率低   → 保留观察：产出正常，落 other 是**关键词覆盖**问题，应随关键词改进解决，
+#                把它当成"坏信源"停掉会误伤真实产出；
+#   有效       → 保留。
+# 安全边界：零产出但**本次探针抓取失败**时只标记 unverified_sources（"无法确认该源状态"），
+# 绝不进停用建议——抓不到不等于没产出。
+SOURCE_VERDICT_DISABLE = "零产出"
+SOURCE_VERDICT_REPLACE = "长期无新文"
+SOURCE_VERDICT_KEEP = "准入率低"
+
+# 版本号递增（发布改进版本时用）：形如 X.Y.Z 则补丁位 +1，否则追加 ".1"。
+_PACK_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+
+# 机构名启发式（决定候选词进 core_keywords 还是 entity_keywords）：
+# 命中机构/组织后缀的词按"包实体"合并进 candidate_gate.entity_keywords（那里放机构名，
+# 不进 fixed_topics）；其余按"行业概念词"合并进 core_keywords。分类不影响门禁效果
+# （两者都会被 industry_anchor_keywords() 当成证明行业归属的词），只影响可读性。
+_ENTITY_SUFFIX_RE = re.compile(
+    r"(协会|学会|委员会|基金管理|基金|集团|公司|银行|交易所|研究院|研究所|大学|学院|"
+    r"总局|监管局|管理局|监督管理|证券|保险|信托|事务所|联盟|商会|基金会|理事会|"
+    r"管委会|办公室|中心|总局|部|局|厅|署)"
+)
+
+# 停用词：中文虚词/新闻套话 + 英文功能词。领域泛词（投资/市场/公司…）不在此列——
+# 它们靠"判别力过滤"被对照语料自然淘汰，比硬编码停用词表更可靠。
+_STOPWORDS = frozenset(
+    """
+    的 了 和 与 及 或 在 是 为 对 从 到 由 等 中 上 下 前 后 内 外 之 其 该 此 这 那 这些 那些 这个 那个
+    我们 你们 他们 她们 它们 自己 本报 记者 报道 消息 编辑 来源 声明 版权 转载 点击 更多 阅读 原文
+    详情 时间 日期 附件 下载 打印 关闭 返回 首页 上一页 下一页 网站 页面 浏览器 客户端 微信 微博
+    公众号 扫码 关注 分享 评论 邮箱 电话 地址 关于我们 联系我们 免责声明 版权所有
+    本文 本站 本网 详见 链接 网址 责任编辑 责编 摘要 导语 编者按
+    表示 认为 指出 介绍 称 说 显示 发布 进行 实现 相关 有关 方面 情况 问题 工作 主要 重要 包括 以及
+    但是 因为 所以 如果 可以 需要 已经 正在 同时 此外 另外 目前 今年 去年 明年 今日 昨日 明天 本
+    日报 每日 最新 全部 更多 一 二 三 四 五 六 七 八 九 十 个 条 项 万 亿 千 百 元 年 月 日 时 分 秒
+    记者 通讯 员 综合 报道 网 站 新闻 资讯 动态 观点 分析 解读 观察 独家 专题 直播 视频 图片 图集
+    the and for with from that this these those are was were has have had not but you your our their its
+    news report reports said says will would can could should about after before more most other some such
+    just only also than then them there here when where which while who whom why how all any both each few
+    www com cn net org http https htm html shtml php aspx jsp jpg jpeg png gif svg pdf amp nbsp href src
+    utm div span script style json xml api
+    """.split()
+)
+
+# 正文里常残留的采集痕迹：URL（含 www.）与域名/文件名片段。不止会影响可读性——
+# 实测本机语料里"本文https://auto.gasgoo.com/xxx.shtml"这类残句会切出 auto/gasgoo/shtml/本文https
+# 这些"本包独有"的假候选词（其它包的对照语料里当然没有），所以必须在切词前先剥掉 URL。
+_URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.I)
+# 词形：中文/ASCII 混合的"词"，允许中间的连字符/加号（如 "Pre-IPO"、"C++"），
+# **不允许点号**——点号基本只出现在域名/文件名/版本号里。
+_TOKEN_SHAPE_RE = re.compile(r"^[0-9A-Za-z\u4e00-\u9fff][0-9A-Za-z\u4e00-\u9fff\-\+_%]*$")
+# 年份/日期/数量类噪声（"2026年""3月""12日""5亿"）。
+_NOISE_TOKEN_RE = re.compile(r"^[0-9]+(\.[0-9]+)?[年月日时分秒个条项万元亿千百%]*$")
+
+
+# ─────────────────────────── 依赖注入（测试/多租户隔离用） ───────────────────────────
+_repository: IntelRepository = intel_repository
+_pack_loader: IndustryPackLoader = industry_pack_loader
+
+
+def use_database(database) -> None:
+    """把模块绑定的数据库换成指定实例（测试隔离用）。
+
+    ``database`` 可以是 ``SQLiteDatabase`` 实例，也可以是 ``IntelRepository``。
+    """
+    global _repository
+    _repository = database if isinstance(database, IntelRepository) else IntelRepository(database)
+
+
+def use_pack_loader(loader) -> None:
+    """把模块绑定的行业包加载器换成指定实例（测试隔离用；需提供 ``load(pack_id)``）。"""
+    global _pack_loader
+    _pack_loader = loader
+
+
+# ─────────────────────────── 基础小工具 ───────────────────────────
+def _lock_of(db):
+    return getattr(db, "lock", None) or contextlib.nullcontext()
+
+
+def _as_int(value, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(value, default: Optional[float] = None) -> Optional[float]:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _pct(numerator: int, denominator: int) -> Optional[float]:
+    """百分比（0~100，保留 4 位）。分母为 0 时返回 None（让 UI 渲染成 null，而不是假的 0）。"""
+    if not denominator:
+        return None
+    return round(100.0 * float(numerator) / float(denominator), 4)
+
+
+def _median(values: Sequence[float]) -> Optional[float]:
+    ordered = sorted(float(item) for item in values if item is not None)
+    if not ordered:
+        return None
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return round(ordered[middle], 4)
+    return round((ordered[middle - 1] + ordered[middle]) / 2.0, 4)
+
+
+def _truncate(text, limit: int = TITLE_LIMIT) -> str:
+    value = " ".join(str(text or "").split())
+    return value[:limit]
+
+
+def _json_dumps(value) -> str:
+    """JSON 序列化兜底：任何意外类型都降级成字符串，绝不因序列化失败丢记录。"""
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=False, default=str)
+    except (TypeError, ValueError):
+        return json.dumps({"serialization_error": str(value)[:200]}, ensure_ascii=False)
+
+
+def _json_loads(value, default):
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        parsed = json.loads(value or "")
+    except (TypeError, ValueError):
+        return default
+    return parsed if isinstance(parsed, type(default)) else default
+
+
+def _parse_dt(value) -> Optional[datetime]:
+    """解析 DB 里的时间文本（SQLite 存字符串、PG 可能给 datetime）。"""
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    raw = str(value or "").strip()
+    if not raw or raw.lower() in ("none", "null"):
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        for shape in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"):
+            try:
+                parsed = datetime.strptime(raw[:19] if "%H" in shape else raw[:10], shape)
+                break
+            except ValueError:
+                continue
+        else:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+# ─────────────────────────── 分词 ───────────────────────────
+_JIEBA_STATE: Dict[str, object] = {"tried": False, "module": None}
+
+
+def _jieba():
+    """惰性加载 jieba（仓库既有依赖，bertopic_topic_service / qa_retrieval 都在用）。
+
+    不可用时返回 None，由 ``_tokenize`` 退化为"中文 n-gram + ASCII 单词"，
+    保证不新增依赖也能跑（只是候选词质量略差）。
+    """
+    if not _JIEBA_STATE["tried"]:
+        _JIEBA_STATE["tried"] = True
+        try:
+            import jieba  # type: ignore
+
+            try:
+                jieba.setLogLevel(60)  # 关掉 "Building prefix dict" 之类的日志
+            except Exception:
+                pass
+            _JIEBA_STATE["module"] = jieba
+        except Exception:
+            _JIEBA_STATE["module"] = None
+    return _JIEBA_STATE["module"]
+
+
+def _tokenizer_name() -> str:
+    """实际生效的分词器（jieba 装了但没有 lcut/cut 时，实际走的是 n-gram 兜底）。"""
+    jieba = _jieba()
+    if jieba is not None and (
+        getattr(jieba, "lcut", None) or getattr(jieba, "cut", None)
+    ):
+        return "jieba"
+    return "ngram_fallback"
+
+
+def _is_valid_token(token: str) -> bool:
+    token = str(token or "").strip()
+    if not token or token in _STOPWORDS:
+        return False
+    if _NOISE_TOKEN_RE.match(token):
+        return False
+    if not _TOKEN_SHAPE_RE.match(token):
+        return False
+    cjk = sum(1 for char in token if "\u4e00" <= char <= "\u9fff")
+    if cjk:
+        return token not in _STOPWORDS and len(token) >= MIN_TOKEN_LEN
+    return len(token) >= MIN_ASCII_TOKEN_LEN
+
+
+def _tokenize(text: str) -> List[str]:
+    """切词：jieba 优先；无 jieba 时用"中文 2/3-gram + ASCII 单词"兜底。
+
+    额外产出"相邻词二元短语"（如 私募+股权 → 私募股权），
+    领域短语往往不在通用词典里，靠这一步补回来。
+    """
+    normalized = _URL_RE.sub(" ", normalize_intel_text(text))
+    if not normalized:
+        return []
+    jieba = _jieba()
+    tokens: List[str] = []
+    if jieba is not None:
+        # 部分环境里的 jieba 版本没有 lcut（本机 0.34 就只有 cut），逐个探测，
+        # 拿不到分词器才退化为 n-gram。
+        cutter = getattr(jieba, "lcut", None) or getattr(jieba, "cut", None)
+        if cutter is not None:
+            try:
+                tokens = [str(item).strip() for item in cutter(normalized)]
+            except Exception:
+                tokens = []
+    if not tokens:
+        tokens = []
+        for run in re.findall(r"[\u4e00-\u9fff]+|[0-9A-Za-z][0-9A-Za-z\.\-\+_]*", normalized):
+            if re.match(r"^[0-9A-Za-z]", run):
+                tokens.append(run)
+                continue
+            if len(run) <= 3:
+                tokens.append(run)
+            for size in (2, 3):
+                tokens.extend(run[index:index + size] for index in range(len(run) - size + 1))
+    tokens = [item for item in tokens if _is_valid_token(item)]
+    phrases = []
+    for index in range(len(tokens) - 1):
+        left, right = tokens[index], tokens[index + 1]
+        if len(left) >= 2 and len(right) >= 2:
+            merged = f"{left}{right}"
+            if _is_valid_token(merged):
+                phrases.append(merged)
+    return tokens + phrases
+
+
+# ─────────────────────────── 命中口径 ───────────────────────────
+try:  # 复用分类器的命中口径（ASCII 词走单词边界、中文走子串），保证统计与判定链路一致
+    from intel_classifier import _keyword_occurrences as _classifier_occurrences
+except Exception:  # pragma: no cover - 分类器改名时的兜底
+    def _classifier_occurrences(text: str, keyword: str) -> int:
+        return str(text or "").count(str(keyword or ""))
+
+
+def _keyword_hits(text: str, keyword: str) -> int:
+    return _classifier_occurrences(text or "", keyword or "")
+
+
+def _keyword_present(text: str, keyword: str) -> bool:
+    return _keyword_hits(text, keyword) > 0
+
+
+def _doc_text(row: Dict) -> str:
+    """把一篇文章拼成与 classify_article 一致的判定文本（标题×2 + 采集关键词 + 正文）。"""
+    title = str((row or {}).get("title") or "")
+    matched = str((row or {}).get("matched_keywords") or "")
+    content = str((row or {}).get("content") or "")[:SAMPLE_CONTENT_CHARS]
+    return normalize_intel_text(f"{title}\n{title}\n{matched}\n{content}")
+
+
+def _article_from_row(row: Dict) -> Dict:
+    """DB 行 → classify_article 需要的文章 dict（字段名与生产 get_article 对齐）。"""
+    article_id = _as_int((row or {}).get("article_id"))
+    return {
+        "id": article_id,
+        "article_id": article_id,
+        "title": str((row or {}).get("title") or ""),
+        "content": str((row or {}).get("content") or ""),
+        "matched_keywords": (row or {}).get("matched_keywords") or "",
+        "url": str((row or {}).get("url") or ""),
+        "domain": str((row or {}).get("domain") or ""),
+        "publish_date": (row or {}).get("publish_date"),
+        "first_crawled": (row or {}).get("first_crawled"),
+        "created_at": (row or {}).get("created_at"),
+    }
+
+
+def _is_admitted(result: Dict) -> bool:
+    """「准入」口径：规则链路给出真实分类（trend/event）。
+
+    为什么不用 ``result["admitted"]``：``classify_article`` 只在"通用行业过滤器前置拦截"
+    分支把 admitted 置 False，其它分支恒为 True——它表示"这条结论可用"，不表示"文章入库"。
+    而「主题文章入库情况评估」关心的正是"落没落 other"，所以用 final_category 判定。
+    """
+    return str((result or {}).get("final_category") or "") in ("trend", "event")
+
+
+# ─────────────────────────── 数据库访问 ───────────────────────────
+def _ensure_schema() -> None:
+    """幂等建表：老仓库走 IntelRepository._ensure()（内含 ensure_intel_core_tables），
+    它失败时再单独跑一次本模块的建表，避免"主库迁移没跑到"导致整个功能不可用。"""
+    db = _repository.db
+    try:
+        db._ensure_connection()
+    except Exception:
+        pass
+    try:
+        _repository._ensure()
+    except Exception as exc:  # pragma: no cover - 取决于部署环境
+        print(f"⚠️ intel 仓储 schema 检查失败（继续尝试单表建表）: {str(exc)[:200]}")
+    try:
+        from intel_schema import ensure_intel_pack_improvement_tables
+
+        with _lock_of(db):
+            cursor = db.connection.cursor()
+            try:
+                ensure_intel_pack_improvement_tables(cursor)
+                db.connection.commit()
+            finally:
+                cursor.close()
+    except Exception as exc:  # pragma: no cover
+        print(f"⚠️ intel_pack_improvements 建表失败: {str(exc)[:200]}")
+
+
+def _query(sql: str, params: Sequence = ()) -> List[Dict]:
+    db = _repository.db
+    try:
+        db._ensure_connection()
+    except Exception:
+        pass
+    with _lock_of(db):
+        cursor = db.connection.cursor()
+        try:
+            cursor.execute(sql, tuple(params))
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            cursor.close()
+
+
+def _execute(sql: str, params: Sequence = ()) -> int:
+    db = _repository.db
+    try:
+        db._ensure_connection()
+    except Exception:
+        pass
+    with _lock_of(db):
+        cursor = db.connection.cursor()
+        try:
+            cursor.execute(sql, tuple(params))
+            try:
+                db.connection.commit()
+            except Exception:
+                pass
+            return _as_int(getattr(cursor, "lastrowid", 0))
+        finally:
+            cursor.close()
+
+
+def _load_pack(pack_id: str) -> Dict:
+    value = str(pack_id or "").strip() or DEFAULT_INDUSTRY_PACK_ID
+    pack = _pack_loader.load(value)
+    if not isinstance(pack, dict) or not pack.get("id"):
+        raise ValueError(f"industry pack not found: {value}")
+    return pack
+
+
+def _effective_pack_ids(pack_id: str) -> List[str]:
+    """本包 + 依赖包（信源/语料归属口径与扫描链路一致）。"""
+    try:
+        return [pack["id"] for pack in _pack_loader.effective_pack_set(pack_id)]
+    except Exception:
+        return [str(pack_id)]
+
+
+_ARTICLE_COLUMNS = """
+    a.id AS article_id, a.url, a.domain, a.title, a.publish_date, a.first_crawled, a.created_at,
+    a.matched_keywords, substr(COALESCE(a.content, ''), 1, {cap}) AS content
+""".strip()
+
+
+def _classification_select(cap: int = SAMPLE_CONTENT_CHARS) -> str:
+    return f"""
+        SELECT c.article_id AS article_id, c.industry_pack_id, c.final_category, c.rule_category,
+               c.rule_reason, c.final_reason, c.score_details_json, c.matched_keywords_json,
+               {_ARTICLE_COLUMNS.format(cap=int(cap))}
+        FROM article_intel_classifications c
+        JOIN articles a ON a.id = c.article_id
+    """.strip()
+
+
+def _load_pack_articles(
+    pack_id: str,
+    *,
+    category: str = "",
+    limit: int = DEFAULT_SAMPLE_LIMIT,
+) -> List[Dict]:
+    """按"最近优先"取本包的已分类文章（可只取 other）。"""
+    conditions = ["a.status = 'active'", "c.industry_pack_id = ?"]
+    params: List = [pack_id]
+    if category:
+        conditions.append("c.final_category = ?")
+        params.append(category)
+    params.append(max(1, _as_int(limit, DEFAULT_SAMPLE_LIMIT)))
+    sql = f"""
+        {_classification_select()}
+        WHERE {' AND '.join(conditions)}
+        ORDER BY datetime({ARTICLE_TIME_SQL}) DESC, c.article_id DESC
+        LIMIT ?
+    """
+    return _query(sql, params)
+
+
+def _load_peer_admitted_articles(pack_id: str, *, limit: int) -> List[Dict]:
+    sql = f"""
+        {_classification_select()}
+        WHERE a.status = 'active'
+          AND c.industry_pack_id <> ?
+          AND c.final_category IN ('trend', 'event')
+        ORDER BY c.article_id DESC
+        LIMIT ?
+    """
+    return _query(sql, [str(pack_id), max(1, _as_int(limit, NEGATIVE_SAMPLE_DEFAULT))])
+
+
+def _pack_category_counts() -> Dict[str, Dict[str, int]]:
+    sql = """
+        SELECT c.industry_pack_id AS pack_id,
+               COUNT(*) AS total,
+               SUM(CASE WHEN c.final_category = 'trend' THEN 1 ELSE 0 END) AS trend_count,
+               SUM(CASE WHEN c.final_category = 'event' THEN 1 ELSE 0 END) AS event_count,
+               SUM(CASE WHEN c.final_category = 'other' THEN 1 ELSE 0 END) AS other_count
+        FROM article_intel_classifications c
+        JOIN articles a ON a.id = c.article_id
+        WHERE a.status = 'active'
+        GROUP BY c.industry_pack_id
+    """
+    result: Dict[str, Dict[str, int]] = {}
+    for row in _query(sql):
+        result[str(row["pack_id"])] = {
+            "trend": _as_int(row.get("trend_count")),
+            "event": _as_int(row.get("event_count")),
+            "other": _as_int(row.get("other_count")),
+            "total": _as_int(row.get("total")),
+        }
+    return result
+
+
+def _source_verdict(article_count: int, admitted_count: int, last_article_at) -> str:
+    if article_count <= 0:
+        return "零产出"
+    if article_count >= SOURCE_VERDICT_MIN_ARTICLES and (
+        (admitted_count / float(article_count)) * 100.0 < SOURCE_VERDICT_LOW_ADMIT_PCT
+    ):
+        return "准入率低"
+    reference = _parse_dt(last_article_at)
+    if reference is not None and reference < datetime.now(timezone.utc) - timedelta(
+        days=SOURCE_VERDICT_IDLE_DAYS
+    ):
+        return "长期无新文"
+    return "有效"
+
+
+def _source_stats(pack_id: str, *, limit: int = 0) -> List[Dict]:
+    """本包（含依赖包）已启用信源的产出统计。
+
+    文章↔信源的关联沿用仓库既有口径：articles ← intel_candidates.article_id，
+    信源 ← intel_candidate_observations.source_id（与 list_classified_articles 一致）。
+    """
+    pack_ids = _effective_pack_ids(pack_id)
+    placeholders = ",".join("?" for _ in pack_ids)
+    limit_sql = ""
+    params: List = [str(pack_id), *pack_ids]
+    if limit:
+        limit_sql = "LIMIT ?"
+        params.append(max(1, _as_int(limit)))
+    sql = f"""
+        SELECT s.id AS source_id, s.source_name, s.source_url, s.source_type,
+               s.authority_level, s.metadata_json,
+               COUNT(DISTINCT a.id) AS article_count,
+               COUNT(DISTINCT CASE WHEN c.final_category IN ('trend', 'event') THEN a.id END)
+                   AS admitted_count,
+               MAX(CASE WHEN a.id IS NOT NULL THEN datetime({ARTICLE_TIME_SQL}) END)
+                   AS last_article_at
+        FROM intel_sources s
+        JOIN intel_source_industries si ON si.source_id = s.id AND si.is_active = 1
+        LEFT JOIN intel_candidate_observations o ON o.source_id = s.id
+        LEFT JOIN intel_candidates ic ON ic.id = o.candidate_id
+        LEFT JOIN articles a ON a.id = ic.article_id AND a.status = 'active'
+        LEFT JOIN article_intel_classifications c
+               ON c.article_id = a.id AND c.industry_pack_id = ?
+        WHERE s.is_enabled = 1 AND si.industry_pack_id IN ({placeholders})
+        GROUP BY s.id, s.source_name, s.source_url, s.source_type, s.authority_level,
+                 s.metadata_json
+        ORDER BY article_count DESC, s.id
+        {limit_sql}
+    """
+    rows = []
+    for row in _query(sql, params):
+        article_count = _as_int(row.get("article_count"))
+        admitted_count = _as_int(row.get("admitted_count"))
+        rows.append(
+            {
+                "source_id": _as_int(row.get("source_id")),
+                "source_name": str(row.get("source_name") or ""),
+                "source_url": str(row.get("source_url") or ""),
+                "source_type": str(row.get("source_type") or "website"),
+                "authority_level": _as_int(row.get("authority_level")),
+                "metadata": _json_loads(row.get("metadata_json"), {}),
+                "article_count": article_count,
+                "admitted_count": admitted_count,
+                "admitted_pct": _pct(admitted_count, article_count) or 0.0,
+                "last_article_at": str(row.get("last_article_at") or ""),
+                "verdict": _source_verdict(
+                    article_count, admitted_count, row.get("last_article_at")
+                ),
+            }
+        )
+    return rows
+
+
+# ─────────────────────────── 失败原因归类 ───────────────────────────
+# 口径：只看 rule_reason / final_reason + score_details（都是 classify_article 的原生产出），
+# 不引入任何新判定。顺序即优先级：先判"被前置过滤器拦下"，再判负向词/锚点/分数/信号。
+GATE_FAILURE_LABELS = {
+    "industry_filter": "未命中行业核心词/包实体（通用行业过滤器前置拦截）",
+    "no_anchor": "未命中行业包锚点词（anchor/core/expanded 全未命中）",
+    "negative_keyword": "命中负向词，相关性被扣至阈值以下",
+    "below_min_score": "相关性分数低于 minimum_relevance_score",
+    "no_signal": "命中锚点但未命中趋势/事件信号",
+    "unknown": "其它/无判定依据",
+}
+# 哪些失败原因"靠补关键词候选就能解决"（供 UI 提示；不参与达标判定）。
+GATE_FAILURE_FIXABLE = {
+    "industry_filter": True,
+    "no_anchor": True,
+    "negative_keyword": True,
+    "below_min_score": True,
+    "no_signal": False,
+    "unknown": False,
+}
+
+
+def _gate_failure_key(row: Dict) -> str:
+    reason = str(row.get("rule_reason") or row.get("final_reason") or "")
+    details = _json_loads(row.get("score_details_json"), {})
+    hits = details.get("hits") if isinstance(details.get("hits"), dict) else {}
+    anchors = hits.get("anchor") or []
+    negative = hits.get("negative") or []
+    score = _as_float(details.get("relevance_score"), 0.0) or 0.0
+    minimum = _as_float(details.get("minimum_relevance_score"), 0.0) or 0.0
+    signal = str(details.get("rule_signal") or "")
+    if "通用行业过滤器" in reason or details.get("admitted") is False:
+        return "industry_filter"
+    if negative:
+        return "negative_keyword"
+    if not anchors:
+        return "no_anchor"
+    if score < minimum:
+        return "below_min_score"
+    if signal in ("no_signal", "temporal_fallback", ""):
+        return "no_signal"
+    return "unknown"
+
+
+def _gate_failure_buckets(rows: Sequence[Dict]) -> Dict:
+    counts: Dict[str, int] = {key: 0 for key in GATE_FAILURE_LABELS}
+    examples: Dict[str, List[Dict]] = {key: [] for key in GATE_FAILURE_LABELS}
+    for row in rows:
+        key = _gate_failure_key(row)
+        counts[key] = counts.get(key, 0) + 1
+        if len(examples.get(key, [])) < MAX_EXAMPLES:
+            examples.setdefault(key, []).append(
+                {
+                    "article_id": _as_int(row.get("article_id")),
+                    "title": _truncate(row.get("title")),
+                    "reason": _truncate(row.get("rule_reason") or row.get("final_reason"), 160),
+                }
+            )
+    others = len(rows)
+    buckets = []
+    for key, label in GATE_FAILURE_LABELS.items():
+        buckets.append(
+            {
+                "key": key,
+                "label": label,
+                "count": counts.get(key, 0),
+                "pct": _pct(counts.get(key, 0), others),
+                "fixable_by_keywords": GATE_FAILURE_FIXABLE.get(key, False),
+                "examples": examples.get(key, []),
+            }
+        )
+    buckets.sort(key=lambda item: (-item["count"], item["key"]))
+    return {
+        "total": others,
+        "counts": {key: counts.get(key, 0) for key in GATE_FAILURE_LABELS},
+        "buckets": buckets,
+    }
+
+
+# ─────────────────────────── 候选词（合并进内存副本） ───────────────────────────
+def _normalize_candidate_input(candidates) -> Dict[str, List[str]]:
+    """把各种入参形态归一成 ``{"core_keywords": [...], "entity_keywords": [...], "anchors": [...]}``。
+
+    接受：None / 字符串列表 / 候选对象列表 ``{"term":...}`` / assess·mine 的返回 dict
+    （带 ``candidates`` 子对象或不带）/ 只给 ``{"keywords": [...]}``（视为锚点+核心词都加）。
+    """
+    buckets = {"core_keywords": [], "entity_keywords": [], "anchors": []}
+
+    def _collect(values) -> List[str]:
+        terms = []
+        if isinstance(values, (str, dict)):
+            values = [values]
+        for item in values or []:
+            if isinstance(item, dict):
+                term = item.get("term") or item.get("keyword") or item.get("value")
+            else:
+                term = item
+            term = str(term or "").strip()
+            if term:
+                terms.append(term)
+        return terms
+
+    source = candidates
+    if isinstance(source, dict):
+        if isinstance(source.get("candidates"), dict):
+            source = source["candidates"]
+        if isinstance(source, dict):
+            for key in buckets:
+                buckets[key] = _collect(source.get(key))
+            if not any(buckets.values()) and source.get("keywords"):
+                shared = _collect(source.get("keywords"))
+                buckets["core_keywords"] = list(shared)
+                buckets["anchors"] = list(shared)
+    else:
+        buckets["core_keywords"] = _collect(source)
+        buckets["anchors"] = _collect(source)
+    return buckets
+
+
+def _has_candidates(buckets: Dict[str, List[str]]) -> bool:
+    return any(buckets.get(key) for key in ("core_keywords", "entity_keywords", "anchors"))
+
+
+def _merge_candidates_into_pack(pack: Dict, buckets: Dict[str, List[str]]) -> Dict:
+    """在**内存副本**上合并候选词（原配置一字不动）。
+
+    合并规则（与 ``industry_anchor_keywords`` 的真实取值逻辑对齐，否则"改前/改后"会一模一样）：
+      * ``candidate_gate.anchor_keywords`` 非空 → 门禁只认 anchors + entity_keywords，
+        因此候选锚点必须合并进 ``anchor_keywords``（合并进 core 对门禁毫无作用）；
+      * 该字段为空/不存在 → 门禁回退 ``core_keywords + expanded_keywords``，
+        候选锚点改并进 ``core_keywords``；
+      * ``entity_keywords`` 一律合并进 ``candidate_gate.entity_keywords``。
+    全部走 ``unique_normalized_keywords``（按归一化去重、保留原有词与原顺序）。
+    """
+    merged = copy.deepcopy(pack)
+    core_new = list(buckets.get("core_keywords") or [])
+    entity_new = list(buckets.get("entity_keywords") or [])
+    anchor_new = list(buckets.get("anchors") or [])
+    gate = merged.get("candidate_gate")
+    gate = dict(gate) if isinstance(gate, dict) else {}
+    if gate.get("anchor_keywords"):
+        gate["anchor_keywords"] = unique_normalized_keywords(
+            list(gate.get("anchor_keywords") or []) + anchor_new
+        )
+    else:
+        core_new = core_new + anchor_new
+    if entity_new:
+        gate["entity_keywords"] = unique_normalized_keywords(
+            list(gate.get("entity_keywords") or []) + entity_new
+        )
+    if gate:
+        merged["candidate_gate"] = gate
+    merged["core_keywords"] = unique_normalized_keywords(
+        list(merged.get("core_keywords") or []) + core_new
+    )
+    return merged
+
+
+def _existing_terms(pack: Dict) -> set:
+    """包内已有词表（归一化），用于剔除"不是新候选"的词。"""
+    values: List[str] = []
+    for field in (
+        "core_keywords",
+        "expanded_keywords",
+        "trend_keywords",
+        "event_keywords",
+        "negative_keywords",
+        "brands",
+    ):
+        values.extend(str(item) for item in (pack.get(field) or []))
+    gate = pack.get("candidate_gate") if isinstance(pack.get("candidate_gate"), dict) else {}
+    values.extend(str(item) for item in (gate.get("anchor_keywords") or []))
+    values.extend(str(item) for item in (gate.get("entity_keywords") or []))
+    for topic in pack.get("fixed_topics") or []:
+        values.extend(str(item) for item in (topic.get("keywords") or []))
+    return {normalize_intel_text(item) for item in values if str(item or "").strip()}
+
+
+def _candidate_object(term: str, stat: Dict, *, entity: bool) -> Dict:
+    return {
+        "term": term,
+        "hits": int(stat.get("hits") or 0),
+        "examples": list(stat.get("examples") or [])[:MAX_EXAMPLES],
+        "score": float(stat.get("score") or 0.0),
+        "rank_score": float(stat.get("rank_score") or stat.get("score") or 0.0),
+        "pack_rate": float(stat.get("pack_rate") or 0.0),
+        "peer_rate": float(stat.get("peer_rate") or 0.0),
+        "ratio": float(stat.get("ratio") or 0.0),
+        "title_hits": int(stat.get("title_hits") or 0),
+        "domains": int(stat.get("domains") or 0),
+        "template_suspect": bool(stat.get("template_suspect")),
+        "boilerplate_suspect": bool(stat.get("boilerplate_suspect")),
+        "bucket": "entity_keywords" if entity else "core_keywords",
+    }
+
+
+# ─────────────────────────── 交付物 1.2：候选词挖掘 ───────────────────────────
+def mine_keyword_candidates(
+    pack_id: str,
+    *,
+    top_n: int = DEFAULT_TOP_N,
+    sample_limit: int = DEFAULT_SAMPLE_LIMIT,
+    _pack_docs: Optional[List[Dict]] = None,
+    _peer_docs: Optional[List[Dict]] = None,
+) -> Dict:
+    """从**本包被判 other 的文章**里挖候选词（这些是"本该属于本包却没进来"的语料）。
+
+    判别力过滤（质量关键，口径见文件头常量注释）：
+        比值 = (本包出现率 + ε) / (其它包已准入语料出现率 + ε) ≥ 3
+        且 对照出现率 ≤ 10%、且本包命中文档数 ≥ 3。
+
+    ``_pack_docs`` / ``_peer_docs`` 是内部复用参数（assess_pack 已经查过一次语料，
+    避免重复拉库）；外部调用不用传。
+    """
+    pack = _load_pack(pack_id)
+    limit = max(1, _as_int(sample_limit, DEFAULT_SAMPLE_LIMIT))
+    top_n = max(1, _as_int(top_n, DEFAULT_TOP_N))
+    warnings: List[str] = []
+
+    pack_docs = _pack_docs
+    if pack_docs is None:
+        pack_docs = _load_pack_articles(pack_id, category="other", limit=limit)
+    peer_docs = _peer_docs
+    if peer_docs is None:
+        peer_docs = _load_peer_admitted_articles(
+            pack_id, limit=max(PEER_SAMPLE_MIN, limit)
+        )
+    if not peer_docs:
+        warnings.append(
+            "库内没有其它包的已准入文章作为对照语料，判别力过滤已退化（只看词频与文档数）"
+        )
+
+    def _index(rows: Sequence[Dict]) -> Tuple[List[set], List[set], List[str]]:
+        body_sets: List[set] = []
+        title_sets: List[set] = []
+        titles: List[str] = []
+        for row in rows:
+            body_sets.append(set(_tokenize(_doc_text(row))))
+            title_sets.append(set(_tokenize(str(row.get("title") or ""))))
+            titles.append(_truncate(row.get("title")))
+        return body_sets, title_sets, titles
+
+    pack_token_sets, pack_title_sets, pack_titles = _index(pack_docs)
+    peer_token_sets, _peer_title_sets, _peer_titles = _index(peer_docs)
+
+    stats: Dict[str, Dict] = {}
+    for index, tokens in enumerate(pack_token_sets):
+        title_tokens = pack_title_sets[index]
+        for token in tokens:
+            item = stats.setdefault(token, {"hits": 0, "title_hits": 0, "docs": []})
+            item["hits"] += 1
+            item["docs"].append(index)
+            if token in title_tokens:
+                item["title_hits"] += 1
+
+    peer_doc_freq = Counter()
+    for tokens in peer_token_sets:
+        for token in tokens:
+            peer_doc_freq[token] += 1
+
+    existing = _existing_terms(pack)
+    selected: List[Tuple[str, Dict]] = []
+    excluded: List[Dict] = []
+    pack_total = len(pack_docs)
+    peer_total = len(peer_docs)
+    for token, item in stats.items():
+        if not _is_valid_token(token):
+            continue
+        if token in existing:
+            excluded.append({"term": token, "hits": item["hits"], "reason": "已存在于该包现有词表"})
+            continue
+        if item["hits"] < DISCRIMINATION_MIN_DOCS:
+            excluded.append(
+                {
+                    "term": token,
+                    "hits": item["hits"],
+                    "reason": f"本包 other 语料命中文档数 < {DISCRIMINATION_MIN_DOCS}",
+                }
+            )
+            continue
+        pack_rate = item["hits"] / float(pack_total) if pack_total else 0.0
+        peer_hits = peer_doc_freq.get(token, 0)
+        peer_rate = peer_hits / float(peer_total) if peer_total else 0.0
+        ratio = (pack_rate + RATIO_EPS) / (peer_rate + RATIO_EPS)
+        if peer_rate > DISCRIMINATION_MAX_PEER_RATE:
+            excluded.append(
+                {
+                    "term": token,
+                    "hits": item["hits"],
+                    "reason": (
+                        f"对照出现率 {round(peer_rate * 100, 2)}% > "
+                        f"{DISCRIMINATION_MAX_PEER_RATE * 100:.0f}%（在其它包语料里也常见）"
+                    ),
+                }
+            )
+            continue
+        if ratio < DISCRIMINATION_MIN_RATIO:
+            excluded.append(
+                {
+                    "term": token,
+                    "hits": item["hits"],
+                    "reason": (
+                        f"判别力不足：比值 {round(ratio, 2)} < {DISCRIMINATION_MIN_RATIO}"
+                    ),
+                }
+            )
+            continue
+        title_docs = [
+            index for index in item["docs"] if token in pack_title_sets[index]
+        ]
+        examples: List[str] = [pack_titles[index] for index in title_docs[:MAX_EXAMPLES]]
+        for index in item["docs"]:
+            if len(examples) >= MAX_EXAMPLES:
+                break
+            if pack_titles[index] not in examples:
+                examples.append(pack_titles[index])
+        score = round(
+            (item["hits"] + TITLE_HIT_BONUS * item["title_hits"])
+            * min(ratio, MAX_RATIO_FOR_SCORE),
+            4,
+        )
+        hit_domains = {
+            str(pack_docs[index].get("domain") or "") for index in item["docs"]
+        }
+        title_ratio = item["title_hits"] / float(item["hits"]) if item["hits"] else 0.0
+        template_suspect = len(hit_domains) <= 1 and title_ratio >= TEMPLATE_TITLE_RATIO
+        boilerplate_suspect = len(hit_domains) <= 1 and pack_rate >= BOILERPLATE_PACK_RATE
+        rank_factor = 1.0
+        if template_suspect:
+            rank_factor *= TEMPLATE_SUSPECT_PENALTY
+        if boilerplate_suspect:
+            rank_factor *= BOILERPLATE_SUSPECT_PENALTY
+        selected.append(
+            (
+                token,
+                {
+                    "hits": item["hits"],
+                    "title_hits": item["title_hits"],
+                    "pack_rate": round(pack_rate, 6),
+                    "peer_rate": round(peer_rate, 6),
+                    "peer_hits": peer_hits,
+                    "ratio": round(ratio, 4),
+                    "score": score,
+                    "rank_score": round(score * rank_factor, 4),
+                    "domains": len(hit_domains),
+                    "template_suspect": template_suspect,
+                    "boilerplate_suspect": boilerplate_suspect,
+                    "examples": examples[:MAX_EXAMPLES],
+                    "title_docs": len(title_docs),
+                },
+            )
+        )
+
+    # 排序按 rank_score（= score × 模板/站点模板噪声降权），避免"金辑/申报第八届/产业使命"
+    # 这类模板片段把真正的行业词挤出 top_n。
+    selected.sort(key=lambda item: (-item[1]["rank_score"], -item[1]["hits"], item[0]))
+    selected = selected[:top_n]
+    excluded.sort(key=lambda item: (-item["hits"], item["term"]))
+    suspect_count = sum(1 for _token, stat in selected if stat["template_suspect"])
+    boilerplate_count = sum(1 for _token, stat in selected if stat["boilerplate_suspect"])
+    if suspect_count:
+        warnings.append(
+            f"{suspect_count} 个候选词命中「单域名 + 标题模板」特征（疑似榜单/申报类模板词），"
+            f"已按 {TEMPLATE_SUSPECT_PENALTY} 系数降权并标记 template_suspect，请人工复核后再采纳"
+        )
+    if boilerplate_count:
+        warnings.append(
+            f"{boilerplate_count} 个候选词命中「单域名 + 本包 other 出现率 ≥{BOILERPLATE_PACK_RATE:.0%}」"
+            f"特征（疑似站点页脚/导航模板词），已按 {BOILERPLATE_SUSPECT_PENALTY} 系数降权并标记"
+            "boilerplate_suspect，请人工复核后再采纳"
+        )
+
+    core_objects: List[Dict] = []
+    entity_objects: List[Dict] = []
+    anchor_objects: List[Dict] = []
+    for token, stat in selected:
+        entity = bool(_ENTITY_SUFFIX_RE.search(token)) and len(token) >= 4
+        obj = _candidate_object(token, stat, entity=entity)
+        anchor_objects.append(obj)
+        (entity_objects if entity else core_objects).append(obj)
+
+    return {
+        "pack_id": str(pack_id),
+        "generated_at": utc_text(),
+        "top_n": top_n,
+        "sample_limit": limit,
+        "pack_other_docs": pack_total,
+        "peer_admitted_docs": peer_total,
+        "discrimination": {
+            "min_ratio": DISCRIMINATION_MIN_RATIO,
+            "max_peer_rate": DISCRIMINATION_MAX_PEER_RATE,
+            "min_pack_docs": DISCRIMINATION_MIN_DOCS,
+            "epsilon": RATIO_EPS,
+            "peer_sampled": bool(peer_docs),
+            "template_title_ratio": TEMPLATE_TITLE_RATIO,
+            "template_penalty": TEMPLATE_SUSPECT_PENALTY,
+            "boilerplate_pack_rate": BOILERPLATE_PACK_RATE,
+            "boilerplate_penalty": BOILERPLATE_SUSPECT_PENALTY,
+        },
+        "template_suspect_count": suspect_count,
+        "boilerplate_suspect_count": boilerplate_count,
+        # 面向 UI 的候选对象（term/hits/examples）；anchors 是"可当门禁锚点"的全集
+        # （core ∪ entity，按分值排序），合并时按 _merge_candidates_into_pack 的规则落位。
+        "candidates": {
+            "core_keywords": core_objects,
+            "entity_keywords": entity_objects,
+            "anchors": anchor_objects,
+        },
+        "keywords": [item[0] for item in selected],
+        "excluded": excluded[: max(20, top_n * 5)],
+        "excluded_count": len(excluded),
+        "warnings": warnings,
+        "recomputable": {
+            "pack_other_article_ids": [_as_int(row.get("article_id")) for row in pack_docs],
+            "peer_article_ids": [_as_int(row.get("article_id")) for row in peer_docs],
+            "content_chars_cap": SAMPLE_CONTENT_CHARS,
+            "tokenizer": _tokenizer_name(),
+        },
+    }
+
+
+# ─────────────────────────── 交付物 1.1：评估 ───────────────────────────
+def assess_pack(pack_id: str, *, sample_limit: int = DEFAULT_SAMPLE_LIMIT) -> Dict:
+    """评估一个行业包的主题文章入库情况（纯读，不改任何配置）。
+
+    返回关键字段：
+        ``articles``        本包 active 已分类文章数（全量口径，不受 sample 影响）
+        ``categories``      trend/event/other 全量计数
+        ``other_pct``       other 占比（%，无文章时为 0.0）
+        ``peer_other_pct``  同库其它包 other 占比的中位数（无对照包时为 None）
+        ``gate_failures``   样本内 other 文章的失败原因归类
+        ``sources``         每个信源的产出与 verdict
+        ``candidates``      从真实语料挖出的候选词（含命中数与示例标题）
+        ``sample``          本次采样的口径（供复算）
+    """
+    pack = _load_pack(pack_id)
+    limit = max(1, _as_int(sample_limit, DEFAULT_SAMPLE_LIMIT))
+    counts = _pack_category_counts()
+    mine = counts.get(str(pack_id)) or {"trend": 0, "event": 0, "other": 0, "total": 0}
+    total = int(mine["total"])
+    other = int(mine["other"])
+    other_pct = round(100.0 * other / total, 4) if total else 0.0
+
+    peer_values = []
+    for pid, item in counts.items():
+        if pid == str(pack_id):
+            continue
+        if int(item["total"]) <= 0:
+            continue
+        peer_values.append(100.0 * int(item["other"]) / int(item["total"]))
+
+    sample_rows = _load_pack_articles(pack_id, limit=limit)
+    other_rows = [row for row in sample_rows if str(row.get("final_category")) == "other"]
+    gate_failures = _gate_failure_buckets(other_rows)
+
+    peer_docs = _load_peer_admitted_articles(pack_id, limit=max(PEER_SAMPLE_MIN, limit))
+    mining = mine_keyword_candidates(
+        pack_id,
+        top_n=DEFAULT_TOP_N,
+        sample_limit=limit,
+        _pack_docs=other_rows,
+        _peer_docs=peer_docs,
+    )
+
+    sources = [
+        {
+            "source_id": row["source_id"],
+            "source_name": row["source_name"],
+            "source_url": row["source_url"],
+            "article_count": row["article_count"],
+            "admitted_count": row["admitted_count"],
+            "admitted_pct": row["admitted_pct"],
+            "last_article_at": row["last_article_at"],
+            "verdict": row["verdict"],
+        }
+        for row in _source_stats(pack_id)
+    ]
+    verdict_counts = Counter(row["verdict"] for row in sources)
+
+    return {
+        "pack_id": str(pack_id),
+        "pack_version": str(pack.get("pack_version") or ""),
+        "pack_name": str(pack.get("name") or ""),
+        "assessed_at": utc_text(),
+        "articles": total,
+        "categories": {"trend": int(mine["trend"]), "event": int(mine["event"]), "other": other},
+        "other_pct": other_pct,
+        "peer_other_pct": _median(peer_values),
+        "peer_pack_count": len(peer_values),
+        "peer_other_pct_detail": {
+            pid: round(100.0 * int(item["other"]) / int(item["total"]), 4)
+            for pid, item in counts.items()
+            if pid != str(pack_id) and int(item["total"]) > 0
+        },
+        "gate_failures": gate_failures,
+        "sources": sources,
+        "source_verdict_counts": dict(verdict_counts),
+        "candidates": mining["candidates"],
+        "candidate_keywords": mining["keywords"],
+        "candidate_evidence": {
+            "discrimination": mining["discrimination"],
+            "excluded": mining["excluded"][:20],
+            "excluded_count": mining["excluded_count"],
+            "template_suspect_count": mining.get("template_suspect_count", 0),
+            "boilerplate_suspect_count": mining.get("boilerplate_suspect_count", 0),
+            "warnings": mining["warnings"],
+        },
+        "sample": {
+            "sample_limit": limit,
+            "sampled_articles": len(sample_rows),
+            "sampled_other_articles": len(other_rows),
+            "other_article_ids": [_as_int(row.get("article_id")) for row in other_rows],
+            "peer_article_ids": [_as_int(row.get("article_id")) for row in peer_docs],
+            "content_chars_cap": SAMPLE_CONTENT_CHARS,
+        },
+        "thresholds": {
+            "min_admit_rate_gain_pct": MIN_ADMIT_RATE_GAIN_PCT,
+            "max_false_positive_gain_pct": MAX_FALSE_POSITIVE_GAIN_PCT,
+            "min_admit_rate_after_pct": MIN_ADMIT_RATE_AFTER_PCT,
+            "min_crawl_probe_gain_pct": MIN_CRAWL_PROBE_GAIN_PCT,
+            "min_crawl_probe_articles": MIN_CRAWL_PROBE_ARTICLES,
+        },
+    }
+
+
+# ─────────────────────────── 交付物 1.3：影子自测 ───────────────────────────
+def shadow_test(
+    pack_id: str,
+    candidates,
+    *,
+    sample_limit: int = 400,
+    negative_sample: int = NEGATIVE_SAMPLE_DEFAULT,
+) -> Dict:
+    """影子重跑：把候选词合并进**内存副本**后，对正/负样本各跑一遍改前 vs 改后。
+
+    正样本 = 本包被判 other 的文章；负样本 = 其它包已准入（trend/event）的文章。
+    "改前"= 当前**已发布配置**重跑（不是 DB 里的历史结论），这是影子自测的正确基线。
+    所有比率都是百分比（0~100）；样本为空时返回 None，绝不返回假的 0。
+
+    返回的四个核心指标：
+        ``admit_rate_before/after``   正样本准入率
+        ``topic_assoc_before/after``  正样本"能命中固定主题关键词"的比例（match_fixed_topics 口径）
+        ``false_positive_before/after`` 负样本被误准入的比例
+        ``delta_other_pct``          正样本 other 占比的下降幅度（百分点）
+    另有 ``topic_tagged_before/after``：分类结果里真正挂上主题标签的比例（经门禁，反映真实效果）。
+    注意 ``topic_assoc`` 用 match_fixed_topics 直接算，而候选词只改 core/锚点/实体词，
+    **不动 fixed_topics**，所以改前改后通常相同——这是正确行为，不是"没生效"。
+    """
+    pack = _load_pack(pack_id)
+    buckets = _normalize_candidate_input(candidates)
+    merged = _merge_candidates_into_pack(pack, buckets)
+    positive_rows = _load_pack_articles(pack_id, category="other", limit=sample_limit)
+    negative_rows = _load_peer_admitted_articles(
+        pack_id, limit=max(1, _as_int(negative_sample, NEGATIVE_SAMPLE_DEFAULT))
+    )
+
+    pos_before_admit = pos_after_admit = 0
+    pos_before_topic = pos_after_topic = 0
+    pos_before_tagged = pos_after_tagged = 0
+    newly_admitted: List[Dict] = []
+    lost_admitted: List[Dict] = []
+    for row in positive_rows:
+        article = _article_from_row(row)
+        before = classify_article(article, pack)
+        after = classify_article(article, merged)
+        admit_before, admit_after = _is_admitted(before), _is_admitted(after)
+        pos_before_admit += 1 if admit_before else 0
+        pos_after_admit += 1 if admit_after else 0
+        pos_before_topic += 1 if match_fixed_topics(article, pack) else 0
+        pos_after_topic += 1 if match_fixed_topics(article, merged) else 0
+        pos_before_tagged += 1 if (before.get("topic_keys") or []) else 0
+        pos_after_tagged += 1 if (after.get("topic_keys") or []) else 0
+        if admit_after and not admit_before:
+            newly_admitted.append(_example(article, after))
+        elif admit_before and not admit_after:
+            lost_admitted.append(_example(article, after))
+
+    neg_before_admit = neg_after_admit = 0
+    new_false_positives: List[Dict] = []
+    for row in negative_rows:
+        article = _article_from_row(row)
+        before = classify_article(article, pack)
+        after = classify_article(article, merged)
+        admit_before, admit_after = _is_admitted(before), _is_admitted(after)
+        neg_before_admit += 1 if admit_before else 0
+        neg_after_admit += 1 if admit_after else 0
+        if admit_after and not admit_before:
+            new_false_positives.append(_example(article, after))
+
+    positive_total = len(positive_rows)
+    negative_total = len(negative_rows)
+    admit_before = _pct(pos_before_admit, positive_total)
+    admit_after = _pct(pos_after_admit, positive_total)
+    fp_before = _pct(neg_before_admit, negative_total)
+    fp_after = _pct(neg_after_admit, negative_total)
+    other_before = None if admit_before is None else round(100.0 - admit_before, 4)
+    other_after = None if admit_after is None else round(100.0 - admit_after, 4)
+
+    def _delta(after_value, before_value):
+        if after_value is None or before_value is None:
+            return None
+        return round(after_value - before_value, 4)
+
+    return {
+        "pack_id": str(pack_id),
+        "pack_version": str(pack.get("pack_version") or ""),
+        "tested_at": utc_text(),
+        "positive_sample": positive_total,
+        "negative_sample": negative_total,
+        "admit_rate_before": admit_before,
+        "admit_rate_after": admit_after,
+        "delta_admit_rate": _delta(admit_after, admit_before),
+        "topic_assoc_before": _pct(pos_before_topic, positive_total),
+        "topic_assoc_after": _pct(pos_after_topic, positive_total),
+        "topic_tagged_before": _pct(pos_before_tagged, positive_total),
+        "topic_tagged_after": _pct(pos_after_tagged, positive_total),
+        "false_positive_before": fp_before,
+        "false_positive_after": fp_after,
+        "delta_false_positive": _delta(fp_after, fp_before),
+        "other_pct_before": other_before,
+        "other_pct_after": other_after,
+        "delta_other_pct": _delta(other_after, other_before),
+        # UI 契约：before / after 两个子对象（缺值一律 None，键必须存在）
+        "before": {
+            "admit_rate": admit_before,
+            "false_positive": fp_before,
+            "topic_assoc": _pct(pos_before_topic, positive_total),
+            "other_pct": other_before,
+        },
+        "after": {
+            "admit_rate": admit_after,
+            "false_positive": fp_after,
+            "topic_assoc": _pct(pos_after_topic, positive_total),
+            "other_pct": other_after,
+        },
+        "delta": {
+            "admit_rate": _delta(admit_after, admit_before),
+            "false_positive": _delta(fp_after, fp_before),
+            "topic_assoc": _delta(
+                _pct(pos_after_topic, positive_total), _pct(pos_before_topic, positive_total)
+            ),
+            "other_pct": _delta(other_after, other_before),
+        },
+        "candidates_applied": {key: list(value) for key, value in buckets.items()},
+        "examples": {
+            "newly_admitted": newly_admitted[:10],
+            "new_false_positives": new_false_positives[:10],
+            "lost_admitted": lost_admitted[:10],
+        },
+        "recomputable": {
+            "positive_article_ids": [_as_int(row.get("article_id")) for row in positive_rows],
+            "negative_article_ids": [_as_int(row.get("article_id")) for row in negative_rows],
+            "pack_version": str(pack.get("pack_version") or ""),
+            "content_chars_cap": SAMPLE_CONTENT_CHARS,
+            "merged_keyword_counts": {
+                "core_keywords": len(merged.get("core_keywords") or []),
+                "anchor_keywords": len(
+                    (merged.get("candidate_gate") or {}).get("anchor_keywords") or []
+                ),
+                "entity_keywords": len(
+                    (merged.get("candidate_gate") or {}).get("entity_keywords") or []
+                ),
+            },
+        },
+    }
+
+
+def _example(article: Dict, result: Dict) -> Dict:
+    return {
+        "article_id": _as_int(article.get("article_id") or article.get("id")),
+        "title": _truncate(article.get("title")),
+        "category": str(result.get("final_category") or ""),
+        "matched_keywords": [
+            _truncate(item, 40) for item in (result.get("matched_keywords") or [])[:8]
+        ],
+    }
+
+
+# ─────────────────────────── 达标判定 ───────────────────────────
+def _shadow_verdict(shadow: Dict) -> Dict:
+    """影子自测是否达标（阈值全部来自模块常量）。"""
+    before = shadow.get("before") or {}
+    after = shadow.get("after") or {}
+    checks: List[Dict] = []
+    reasons: List[str] = []
+    admit_before = _as_float(before.get("admit_rate"))
+    admit_after = _as_float(after.get("admit_rate"))
+    fp_before = _as_float(before.get("false_positive"))
+    fp_after = _as_float(after.get("false_positive"))
+
+    if admit_before is None or admit_after is None:
+        checks.append(
+            {
+                "key": "shadow_sample",
+                "passed": False,
+                "value": None,
+                "threshold": MIN_ADMIT_RATE_GAIN_PCT,
+                "note": "本包没有 other 正样本，影子自测无数据",
+            }
+        )
+        reasons.append("影子自测无正样本（本包没有 other 文章），无法验证")
+    else:
+        gain = round(admit_after - admit_before, 4)
+        checks.append(
+            {
+                "key": "admit_rate_gain",
+                "passed": gain >= MIN_ADMIT_RATE_GAIN_PCT,
+                "value": gain,
+                "threshold": MIN_ADMIT_RATE_GAIN_PCT,
+                "note": f"准入率 {admit_before}% → {admit_after}%",
+            }
+        )
+        if gain < MIN_ADMIT_RATE_GAIN_PCT:
+            reasons.append(
+                f"准入率仅提升 {gain} 个百分点 < 阈值 {MIN_ADMIT_RATE_GAIN_PCT}"
+            )
+        checks.append(
+            {
+                "key": "admit_rate_after",
+                "passed": admit_after >= MIN_ADMIT_RATE_AFTER_PCT,
+                "value": admit_after,
+                "threshold": MIN_ADMIT_RATE_AFTER_PCT,
+                "note": "改后准入率下限",
+            }
+        )
+        if admit_after < MIN_ADMIT_RATE_AFTER_PCT:
+            reasons.append(
+                f"改后准入率 {admit_after}% < 下限 {MIN_ADMIT_RATE_AFTER_PCT}%"
+            )
+    if fp_before is None or fp_after is None:
+        checks.append(
+            {
+                "key": "false_positive",
+                "passed": False,
+                "value": None,
+                "threshold": MAX_FALSE_POSITIVE_GAIN_PCT,
+                "note": "没有其它包的已准入文章作负样本，误准入无法验证",
+            }
+        )
+        reasons.append("影子自测无负样本（其它包没有已准入文章），误准入无法验证")
+    else:
+        fp_gain = round(fp_after - fp_before, 4)
+        checks.append(
+            {
+                "key": "false_positive",
+                "passed": fp_gain <= MAX_FALSE_POSITIVE_GAIN_PCT,
+                "value": fp_gain,
+                "threshold": MAX_FALSE_POSITIVE_GAIN_PCT,
+                "note": f"误准入 {fp_before}% → {fp_after}%",
+            }
+        )
+        if fp_gain > MAX_FALSE_POSITIVE_GAIN_PCT:
+            reasons.append(
+                f"误准入率上升 {fp_gain} 个百分点 > 上限 {MAX_FALSE_POSITIVE_GAIN_PCT}"
+            )
+    return {"passed": not reasons, "reason": "；".join(reasons), "checks": checks}
+
+
+def _crawl_probe_verdict(probe) -> Dict:
+    """抓文章实测是否达标。抓不到样本（0 篇解析成功）一律不达标。"""
+    if not isinstance(probe, dict):
+        return {
+            "passed": False,
+            "reason": "缺少抓文章测试结果",
+            "checks": [],
+            "sample_available": False,
+        }
+    parsed = _as_int(probe.get("parsed_total"))
+    before = _as_float(probe.get("new_article_admit_rate_before"))
+    after = _as_float(probe.get("new_article_admit_rate_after"))
+    checks: List[Dict] = []
+    if parsed <= 0:
+        return {
+            "passed": False,
+            "reason": "抓文章测试未取得样本，无法验证（抓取失败不计为 0% 准入率）",
+            "checks": [
+                {
+                    "key": "crawl_probe_sample",
+                    "passed": False,
+                    "value": 0,
+                    "threshold": MIN_CRAWL_PROBE_ARTICLES,
+                    "note": "成功解析的新文章数",
+                }
+            ],
+            "sample_available": False,
+        }
+    checks.append(
+        {
+            "key": "crawl_probe_sample",
+            "passed": parsed >= MIN_CRAWL_PROBE_ARTICLES,
+            "value": parsed,
+            "threshold": MIN_CRAWL_PROBE_ARTICLES,
+            "note": "成功解析的新文章数",
+        }
+    )
+    if before is None or after is None:
+        return {
+            "passed": False,
+            "reason": "抓文章测试缺少准入率指标",
+            "checks": checks,
+            "sample_available": True,
+        }
+    gain = round(after - before, 4)
+    # 已经 100% 准入的源没有改进空间：这种边界只需"不变差"。
+    if before >= 99.999:
+        passed = after >= before - 1e-9
+        note = "改前已全部准入，只需不变差"
+    else:
+        passed = gain >= MIN_CRAWL_PROBE_GAIN_PCT
+        note = f"新文章准入率 {before}% → {after}%"
+    checks.append(
+        {
+            "key": "crawl_probe_gain",
+            "passed": passed,
+            "value": gain,
+            "threshold": MIN_CRAWL_PROBE_GAIN_PCT,
+            "note": note,
+        }
+    )
+    reason = ""
+    if not passed:
+        reason = (
+            f"抓文章实测准入率仅提升 {gain} 个百分点 < 阈值 {MIN_CRAWL_PROBE_GAIN_PCT}"
+            if gain < MIN_CRAWL_PROBE_GAIN_PCT
+            else "抓文章实测准入率下降"
+        )
+    if parsed < MIN_CRAWL_PROBE_ARTICLES:
+        reason = (
+            f"抓文章测试样本不足（成功解析 {parsed} 篇 < {MIN_CRAWL_PROBE_ARTICLES} 篇）"
+        )
+    return {
+        "passed": passed and parsed >= MIN_CRAWL_PROBE_ARTICLES,
+        "reason": reason,
+        "checks": checks,
+        "sample_available": True,
+    }
+
+
+def _evaluate_self_test(shadow: Dict, probe) -> Dict:
+    """双达标：影子重跑指标 + 抓文章实测指标**都要过**才算 verified。"""
+    shadow_verdict = _shadow_verdict(shadow)
+    probe_verdict = _crawl_probe_verdict(probe)
+    reasons = []
+    if not shadow_verdict["passed"]:
+        reasons.append(f"影子自测未达标：{shadow_verdict['reason']}")
+    if not probe_verdict["passed"]:
+        reasons.append(f"抓文章实测未达标：{probe_verdict['reason']}")
+    passed = not reasons
+    if passed:
+        passed_text = (
+            f"影子自测达标（准入率 {shadow.get('admit_rate_before')}% → "
+            f"{shadow.get('admit_rate_after')}%，误准入 {shadow.get('false_positive_before')}% → "
+            f"{shadow.get('false_positive_after')}%）"
+        )
+        probe_text = (
+            f"抓文章实测达标（成功解析 {_as_int((probe or {}).get('parsed_total'))} 篇，"
+            f"准入率 {(probe or {}).get('new_article_admit_rate_before')}% → "
+            f"{(probe or {}).get('new_article_admit_rate_after')}%）"
+            if isinstance(probe, dict)
+            else "抓文章实测达标"
+        )
+        reason = f"{passed_text}；{probe_text}"
+    else:
+        reason = "；".join(reasons)
+    return {
+        "passed": passed,
+        "reason": reason,
+        "shadow": shadow_verdict,
+        "crawl_probe": probe_verdict,
+    }
+
+
+# ─────────────────────────── 交付物 1.7：抓文章实测探针 ───────────────────────────
+def _probe_rank(row: Dict) -> int:
+    """探针选源优先级：准入率低(0) → 零产出(1) → 长期无新文(2) → 有效(3)。"""
+    return {"准入率低": 0, "零产出": 1, "长期无新文": 2}.get(str(row.get("verdict")), 3)
+
+
+def _probe_select_sources(pack_id: str, limit: int) -> List[Dict]:
+    """挑最多 limit 个已启用信源：优先"准入率低/零产出"（改进要解决的就是它们）。
+
+    偏好非浏览器信源：探针只走 HTTP，不启 Playwright（缺 chromium 也不会整体失败）。
+    """
+    rows = _source_stats(pack_id)
+    rows.sort(
+        key=lambda row: (
+            _probe_rank(row),
+            1 if (row.get("metadata") or {}).get("browser_fetch_enabled") else 0,
+            -_as_int(row.get("authority_level")),
+            _as_int(row.get("source_id")),
+        )
+    )
+    return rows[: max(1, _as_int(limit, CRAWL_PROBE_MAX_SOURCES))]
+
+
+def _probe_request_timeout(timeout_seconds: float) -> Tuple[float, float]:
+    budget = max(3.0, float(timeout_seconds or CRAWL_PROBE_TIMEOUT_SECONDS))
+    return (min(10.0, budget), min(20.0, budget))
+
+
+def _probe_fetch_listing(
+    source: Dict, *, limit: int, timeout_seconds: float
+) -> Tuple[List[Dict], str]:
+    """真实抓一次信源列表（RSS 或列表页），返回 (items, error_text)。
+
+    复用仓库既有解析：``rss_feed_contract.parse_rss_feed`` 与
+    ``intel_light_scanner.ListPageScanner.scan_html``；只走 HTTP，不启浏览器。
+    """
+    from intel_http import SafeHTTPClient
+    from intel_light_scanner import USER_AGENT, ListPageScanner
+
+    metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
+    rss_url = str(metadata.get("rss_url") or "").strip()
+    is_rss = str(source.get("source_type") or "") == "rss" or bool(rss_url)
+    url = rss_url or str(source.get("source_url") or "").strip()
+    if not url:
+        return [], "信源没有可抓取的 URL"
+    client = SafeHTTPClient()
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": (
+            "application/rss+xml, application/xml, text/xml"
+            if is_rss
+            else "text/html,application/xhtml+xml"
+        ),
+    }
+    response = client.get(url, headers=headers, timeout=_probe_request_timeout(timeout_seconds))
+    if is_rss:
+        from rss_feed_contract import parse_rss_feed
+
+        return parse_rss_feed(response, limit=max(1, _as_int(limit, 1))), ""
+    include_pattern = str(metadata.get("link_include_pattern") or "").strip() or None
+    scanner = ListPageScanner(http_client=client)
+    items = scanner.scan_html(
+        response.url,
+        response.content,
+        limit=max(1, _as_int(limit, 1)),
+        include_pattern=include_pattern,
+    )
+    return items, ""
+
+
+def _probe_extract_text(html: str, url: str) -> str:
+    """正文抽取：trafilatura（若装了）优先，否则用 BeautifulSoup 取最长候选块。"""
+    text = ""
+    try:
+        import trafilatura  # type: ignore
+
+        text = trafilatura.extract(html, include_comments=False, include_tables=False) or ""
+    except Exception:
+        text = ""
+    text = " ".join(str(text or "").split())
+    if len(text) >= PROBE_MIN_CONTENT_CHARS:
+        return text[:SAMPLE_CONTENT_CHARS]
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup(["script", "style", "noscript", "nav", "footer", "header", "aside", "form"]):
+            tag.decompose()
+        best = ""
+        for selector in (
+            "article",
+            "main",
+            "[role=main]",
+            ".article-content",
+            ".post-content",
+            ".content",
+            "#content",
+        ):
+            for node in soup.select(selector):
+                candidate = " ".join(node.get_text(" ", strip=True).split())
+                if len(candidate) > len(best):
+                    best = candidate
+        if len(best) < len(text):
+            best = text
+        if not best:
+            body = soup.body or soup
+            best = " ".join(body.get_text(" ", strip=True).split())
+        return best[:SAMPLE_CONTENT_CHARS]
+    except Exception:
+        return text[:SAMPLE_CONTENT_CHARS]
+
+
+def _probe_extract_title(html: str) -> str:
+    try:
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(html, "html.parser")
+        node = soup.find("meta", property="og:title") or soup.find("title")
+        if node is None:
+            return ""
+        return _truncate(node.get("content") if node.name == "meta" else node.get_text(" ", strip=True))
+    except Exception:
+        return ""
+
+
+def _probe_fetch_content(item: Dict, *, timeout_seconds: float) -> Tuple[Optional[Dict], str]:
+    """抓一篇新文章的正文，返回 (article, error_text)。正文太短算解析失败。"""
+    from intel_http import SafeHTTPClient
+    from intel_light_scanner import USER_AGENT
+
+    url = str((item or {}).get("url") or "").strip()
+    if not url:
+        return None, "条目缺少 URL"
+    client = SafeHTTPClient()
+    response = client.get(
+        url,
+        headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"},
+        timeout=_probe_request_timeout(timeout_seconds),
+    )
+    html = response.text
+    content = _probe_extract_text(html, url)
+    title = _truncate(item.get("title")) or _probe_extract_title(html)
+    if len(content) < PROBE_MIN_CONTENT_CHARS:
+        return None, f"正文过短（{len(content)} 字 < {PROBE_MIN_CONTENT_CHARS}）"
+    return {
+        "title": title,
+        "content": content,
+        "matched_keywords": "",
+        "url": url,
+        "publish_date": str(item.get("published_at") or ""),
+    }, ""
+
+
+def crawl_probe(
+    pack_id: str,
+    *,
+    per_source: int = CRAWL_PROBE_PER_SOURCE,
+    timeout_seconds: float = CRAWL_PROBE_TIMEOUT_SECONDS,
+    max_sources: int = CRAWL_PROBE_MAX_SOURCES,
+    candidates=None,
+    source_picker=None,
+    listing_fetcher=None,
+    content_fetcher=None,
+) -> Dict:
+    """真跑一遍抓文章测试：抓新文章 → 改前/改后各分类一次（纯网络 + CPU，不调模型）。
+
+    * ``timeout_seconds`` 是**总预算**：每步开始前检查剩余预算，单次请求超时取
+      ``min(剩余预算, 20s)``。阻塞中的 socket 无法中断，实际耗时可能略超预算。
+    * 抓取/解析失败一律写进 ``errors`` 与 ``parse_failed``，**绝不记成"准入率 0"**。
+    * 一个源都没解析出文章时 ``parsed_total == 0``、比率为 None，由调用方判为"无样本"。
+    * 默认选源 = 本包已启用信源里"准入率低/零产出"优先（见 ``_probe_select_sources``）。
+    """
+    started = time.monotonic()
+    budget = max(3.0, float(timeout_seconds or CRAWL_PROBE_TIMEOUT_SECONDS))
+    deadline = started + budget
+    pack = _load_pack(pack_id)
+    buckets = _normalize_candidate_input(candidates)
+    merged = _merge_candidates_into_pack(pack, buckets) if _has_candidates(buckets) else pack
+
+    picker = source_picker or _probe_select_sources
+    try:
+        selected = list(picker(pack_id, max(1, _as_int(max_sources, CRAWL_PROBE_MAX_SOURCES))) or [])
+    except Exception as exc:
+        selected = []
+        select_error = str(exc)[:200]
+    else:
+        select_error = ""
+
+    errors: List[Dict] = []
+    if select_error:
+        errors.append({"source_id": None, "stage": "select_sources", "error": select_error})
+    sources_out: List[Dict] = []
+    fetched_total = parsed_total = parse_failed_total = 0
+    for source in selected:
+        source_id = _as_int(source.get("source_id"))
+        source_out = {
+            "source_id": source_id,
+            "source_name": str(source.get("source_name") or ""),
+            "source_url": str(source.get("source_url") or ""),
+            "verdict": str(source.get("verdict") or ""),
+            "listing_status": "ok",
+            "listing_error": "",
+            "fetched": 0,
+            "parsed": 0,
+            "parse_failed": 0,
+            "articles": [],
+            "admit_rate_before": None,
+            "admit_rate_after": None,
+        }
+        sources_out.append(source_out)
+        if time.monotonic() >= deadline:
+            source_out["listing_status"] = "skipped"
+            source_out["listing_error"] = "探针总预算已用尽"
+            errors.append(
+                {"source_id": source_id, "stage": "budget", "error": "探针总预算已用尽"}
+            )
+            continue
+        try:
+            listing, listing_error = (listing_fetcher or _probe_fetch_listing)(
+                source,
+                limit=max(1, _as_int(per_source, CRAWL_PROBE_PER_SOURCE)),
+                timeout_seconds=deadline - time.monotonic(),
+            )
+        except Exception as exc:
+            listing, listing_error = [], _probe_error_text(exc)
+        if listing_error:
+            source_out["listing_status"] = "failed"
+            source_out["listing_error"] = listing_error
+            errors.append(
+                {"source_id": source_id, "stage": "listing", "error": listing_error}
+            )
+            continue
+        entries = list(listing or [])[: max(1, _as_int(per_source, CRAWL_PROBE_PER_SOURCE))]
+        source_out["fetched"] = len(entries)
+        fetched_total += len(entries)
+        before_admit = after_admit = 0
+        for entry in entries:
+            if time.monotonic() >= deadline:
+                errors.append(
+                    {
+                        "source_id": source_id,
+                        "stage": "budget",
+                        "error": "正文抓取阶段总预算已用尽，剩余条目未抓",
+                    }
+                )
+                break
+            try:
+                article, content_error = (content_fetcher or _probe_fetch_content)(
+                    entry, timeout_seconds=deadline - time.monotonic()
+                )
+            except Exception as exc:
+                article, content_error = None, _probe_error_text(exc)
+            if content_error or not article:
+                source_out["parse_failed"] += 1
+                parse_failed_total += 1
+                errors.append(
+                    {
+                        "source_id": source_id,
+                        "stage": "content",
+                        "url": str(entry.get("url") or ""),
+                        "error": content_error or "正文抓取失败",
+                    }
+                )
+                continue
+            source_out["parsed"] += 1
+            parsed_total += 1
+            result_before = classify_article(article, pack)
+            result_after = classify_article(article, merged)
+            admit_before = _is_admitted(result_before)
+            admit_after = _is_admitted(result_after)
+            before_admit += 1 if admit_before else 0
+            after_admit += 1 if admit_after else 0
+            source_out["articles"].append(
+                {
+                    "url": str(article.get("url") or ""),
+                    "title": _truncate(article.get("title")),
+                    "category_before": str(result_before.get("final_category") or ""),
+                    "category_after": str(result_after.get("final_category") or ""),
+                    "admit_before": admit_before,
+                    "admit_after": admit_after,
+                    # anchors_* 才是"让文章过门禁的词"：classify_article 的 matched_keywords
+                    # 只收 core/expanded/trend/event/negative，不含锚点，直接看它会漏掉真正原因。
+                    "anchors_before": list(
+                        ((result_before.get("score_details") or {}).get("hits") or {}).get("anchor") or []
+                    ),
+                    "anchors_after": list(
+                        ((result_after.get("score_details") or {}).get("hits") or {}).get("anchor") or []
+                    ),
+                    "matched_keywords_before": [
+                        _truncate(term, 40)
+                        for term in (result_before.get("matched_keywords") or [])[:8]
+                    ],
+                    "matched_keywords_after": [
+                        _truncate(term, 40)
+                        for term in (result_after.get("matched_keywords") or [])[:8]
+                    ],
+                }
+            )
+        if source_out["parsed"]:
+            source_out["admit_rate_before"] = _pct(before_admit, source_out["parsed"])
+            source_out["admit_rate_after"] = _pct(after_admit, source_out["parsed"])
+
+    admit_before_total = sum(
+        1 for source in sources_out for item in source["articles"] if item["admit_before"]
+    )
+    admit_after_total = sum(
+        1 for source in sources_out for item in source["articles"] if item["admit_after"]
+    )
+    return {
+        "pack_id": str(pack_id),
+        "pack_version": str(pack.get("pack_version") or ""),
+        "probed_at": utc_text(),
+        "per_source": _as_int(per_source, CRAWL_PROBE_PER_SOURCE),
+        "timeout_seconds": budget,
+        "max_sources": _as_int(max_sources, CRAWL_PROBE_MAX_SOURCES),
+        "duration_seconds": round(time.monotonic() - started, 3),
+        "sources_selected": [
+            {
+                "source_id": _as_int(source.get("source_id")),
+                "source_name": str(source.get("source_name") or ""),
+                "source_url": str(source.get("source_url") or ""),
+                "verdict": str(source.get("verdict") or ""),
+            }
+            for source in selected
+        ],
+        "sources": sources_out,
+        "sources_probed": len(sources_out),
+        "sources_succeeded": sum(1 for source in sources_out if source["parsed"] > 0),
+        "fetched_total": fetched_total,
+        "parsed_total": parsed_total,
+        "parse_failed_total": parse_failed_total,
+        "new_article_admit_rate_before": _pct(admit_before_total, parsed_total),
+        "new_article_admit_rate_after": _pct(admit_after_total, parsed_total),
+        "new_articles": [
+            item for source in sources_out for item in source["articles"]
+        ],
+        "sample_available": parsed_total > 0,
+        "errors": errors,
+        "candidates_applied": {key: list(value) for key, value in buckets.items()},
+    }
+
+
+def _probe_error_text(exc: Exception) -> str:
+    try:
+        from intel_http import sanitize_external_error
+
+        return _truncate(sanitize_external_error(exc), 300)
+    except Exception:
+        return _truncate(f"{type(exc).__name__}: {exc}", 300)
+
+
+# ─────────────────────────── 交付物 1.4~1.6：建议暂存与闭环 ───────────────────────────
+_METRIC_KEYS = ("admit_rate", "false_positive", "topic_assoc", "other_pct")
+
+
+def _normalize_metrics(metrics) -> Dict:
+    """把指标归一成 UI 契约：``before``/``after`` 两个子对象 + ``crawl_probe``，键必须存在。
+
+    拿不到的值写 None（不写 0，避免把"没测"伪装成"测出来是 0"）。
+    """
+    source = dict(metrics) if isinstance(metrics, dict) else {}
+    result = dict(source)
+
+    def _block(name: str) -> Dict:
+        raw = source.get(name) if isinstance(source.get(name), dict) else {}
+        block = {}
+        for key in _METRIC_KEYS:
+            flat = source.get(f"{key}_{name}")
+            value = _as_float(raw.get(key))
+            if value is None:
+                value = _as_float(flat)
+            block[key] = value
+        return block
+
+    before, after = _block("before"), _block("after")
+    result["before"] = before
+    result["after"] = after
+    delta = source.get("delta") if isinstance(source.get("delta"), dict) else {}
+    result["delta"] = {
+        key: (
+            _as_float(delta.get(key))
+            if delta.get(key) is not None
+            else (
+                round(after[key] - before[key], 4)
+                if after.get(key) is not None and before.get(key) is not None
+                else None
+            )
+        )
+        for key in _METRIC_KEYS
+    }
+    result["crawl_probe"] = (
+        source.get("crawl_probe") if isinstance(source.get("crawl_probe"), dict) else None
+    )
+    result.setdefault("thresholds", {
+        "min_admit_rate_gain_pct": MIN_ADMIT_RATE_GAIN_PCT,
+        "max_false_positive_gain_pct": MAX_FALSE_POSITIVE_GAIN_PCT,
+        "min_admit_rate_after_pct": MIN_ADMIT_RATE_AFTER_PCT,
+        "min_crawl_probe_gain_pct": MIN_CRAWL_PROBE_GAIN_PCT,
+        "min_crawl_probe_articles": MIN_CRAWL_PROBE_ARTICLES,
+    })
+    return result
+
+
+def _normalize_payload(kind: str, payload) -> Dict:
+    """payload 归一：keyword 建议的 ``candidates`` 三个桶必须都是候选对象列表。"""
+    result = dict(payload) if isinstance(payload, dict) else {"value": payload}
+    if str(kind) == "keyword":
+        raw = result.get("candidates") if isinstance(result.get("candidates"), dict) else result
+        buckets = {}
+        for key in ("core_keywords", "entity_keywords", "anchors"):
+            values = raw.get(key) if isinstance(raw, dict) else None
+            if isinstance(values, (str, dict)):
+                values = [values]
+            items = []
+            for item in values or []:
+                if isinstance(item, dict):
+                    term = item.get("term") or item.get("keyword") or item.get("value")
+                    items.append(
+                        {
+                            "term": str(term or "").strip(),
+                            "hits": _as_int(item.get("hits")) if item.get("hits") is not None else None,
+                            "examples": [
+                                _truncate(example)
+                                for example in (item.get("examples") or [])[:MAX_EXAMPLES]
+                            ],
+                        }
+                    )
+                else:
+                    items.append(
+                        {"term": str(item or "").strip(), "hits": None, "examples": []}
+                    )
+            buckets[key] = [item for item in items if item["term"]]
+        result["candidates"] = buckets
+    return result
+
+
+def _verified_justified(kind: str, metrics: Dict) -> Tuple[bool, str]:
+    """复算"自测达标"结论：不接受外部传入的"通过"标志，一律按当前阈值重算。
+
+    两道闸门：
+      1. metrics 必须带 ``self_test`` 来源标记（只有 ``run_self_test_and_stage`` 会写）；
+      2. 关键词建议：影子重跑 + 抓文章实测都按**当前**阈值复算通过；
+         信源建议：必须存在可执行项（可停用/可替换的信源 ≥1）。
+    """
+    gaps: List[str] = []
+    marker = metrics.get("self_test") if isinstance(metrics.get("self_test"), dict) else {}
+    if marker.get("source") != SELF_TEST_SOURCE or not marker.get("passed"):
+        gaps.append("缺少自测来源标记（verified 只能由自测判定产生，不接受外部传入的通过标志）")
+    if str(kind) == "source":
+        evidence = (
+            metrics.get("source_evidence")
+            if isinstance(metrics.get("source_evidence"), dict)
+            else {}
+        )
+        if _as_int(evidence.get("actionable_count")) < 1:
+            gaps.append("信源类建议没有可执行项（既无零产出可停用源、也无停更可替换源）")
+        return (not gaps), "；".join(gaps)
+
+    before, after = metrics.get("before") or {}, metrics.get("after") or {}
+    admit_before = _as_float(before.get("admit_rate"))
+    admit_after = _as_float(after.get("admit_rate"))
+    if admit_before is None or admit_after is None:
+        gaps.append("缺少影子自测准入率指标")
+    else:
+        gain = round(admit_after - admit_before, 4)
+        if gain < MIN_ADMIT_RATE_GAIN_PCT:
+            gaps.append(f"准入率提升 {gain} 个百分点 < {MIN_ADMIT_RATE_GAIN_PCT}")
+        if admit_after < MIN_ADMIT_RATE_AFTER_PCT:
+            gaps.append(f"改后准入率 {admit_after}% < {MIN_ADMIT_RATE_AFTER_PCT}%")
+    fp_before = _as_float(before.get("false_positive"))
+    fp_after = _as_float(after.get("false_positive"))
+    if fp_before is None or fp_after is None:
+        gaps.append("缺少误准入指标")
+    elif round(fp_after - fp_before, 4) > MAX_FALSE_POSITIVE_GAIN_PCT:
+        gaps.append(
+            f"误准入率上升 {round(fp_after - fp_before, 4)} 个百分点 > {MAX_FALSE_POSITIVE_GAIN_PCT}"
+        )
+    probe_verdict = _crawl_probe_verdict(metrics.get("crawl_probe"))
+    if not probe_verdict["passed"]:
+        gaps.append(f"抓文章实测未达标：{probe_verdict['reason']}")
+    if gaps:
+        return False, "；".join(gaps)
+    return True, ""
+
+
+def _serialize_suggestion(row: Dict) -> Dict:
+    suggestion_id = _as_int(row.get("id"))
+    pack_id = str(row.get("industry_pack_id") or "")
+    return {
+        "suggestion_id": suggestion_id,
+        "id": suggestion_id,
+        "industry_pack_id": pack_id,
+        "pack_id": pack_id,
+        "kind": str(row.get("kind") or ""),
+        "status": str(row.get("status") or ""),
+        "reason": str(row.get("reason") or ""),
+        "payload": _json_loads(row.get("payload_json"), {}),
+        "metrics": _json_loads(row.get("metrics_json"), {}),
+        "evidence": _json_loads(row.get("evidence_json"), {}),
+        "created_at": str(row.get("created_at") or ""),
+        "updated_at": str(row.get("updated_at") or ""),
+        "applied_at": str(row.get("applied_at") or "") or None,
+        "activation_id": str(row.get("activation_id") or ""),
+        "after_apply": _json_loads(row.get("after_apply_json"), {}),
+    }
+
+
+_METRIC_SLIM_KEYS = (
+    "source_id",
+    "source_name",
+    "fetched",
+    "parse_failed",
+    "parsed",
+    "listing_status",
+    "listing_error",
+    "admit_rate_before",
+    "admit_rate_after",
+)
+
+
+def _slim_probe(probe) -> Optional[Dict]:
+    """抓取明细留给 metrics 里一份精简版（正文/条目明细放 evidence，避免 metrics 过大）。"""
+    if not isinstance(probe, dict):
+        return None
+    return {
+        "pack_id": str(probe.get("pack_id") or ""),
+        "probed_at": str(probe.get("probed_at") or ""),
+        "duration_seconds": _as_float(probe.get("duration_seconds")),
+        "parsed_total": _as_int(probe.get("parsed_total")),
+        "fetched_total": _as_int(probe.get("fetched_total")),
+        "parse_failed_total": _as_int(probe.get("parse_failed_total")),
+        "sources_succeeded": _as_int(probe.get("sources_succeeded")),
+        "sample_available": bool(probe.get("sample_available")),
+        "new_article_admit_rate_before": _as_float(probe.get("new_article_admit_rate_before")),
+        "new_article_admit_rate_after": _as_float(probe.get("new_article_admit_rate_after")),
+        "sources": [
+            {key: source.get(key) for key in _METRIC_SLIM_KEYS}
+            for source in (probe.get("sources") or [])
+        ],
+        "errors": list(probe.get("errors") or []),
+    }
+
+
+def stage_suggestion(
+    pack_id: str,
+    kind: str,
+    payload,
+    metrics,
+    *,
+    status: str,
+    evidence=None,
+    reason: str = "",
+) -> Dict:
+    """把一条改进建议写进 ``intel_pack_improvements``（自测达标的才允许 verified）。
+
+    ``status`` 只接受 ``verified/rejected/applied/failed``；收到 ``verified`` 时**不接受**
+    调用方的"通过"标志——按当前阈值复算 ``metrics``，复算不过一律降级为 ``rejected``
+    并把差距写进 ``reason``（防止把没自测的建议放上【改进】页）。
+    """
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status not in ("verified", "rejected", "applied", "failed"):
+        raise ValueError(
+            f"status 只允许 verified/rejected/applied/failed，收到: {status!r}"
+        )
+    normalized_kind = str(kind or "").strip().lower()
+    if normalized_kind not in SUGGESTION_KINDS:
+        raise ValueError(f"kind 只允许 {SUGGESTION_KINDS}，收到: {kind!r}")
+    pack_id = str(pack_id or "").strip()
+    if not pack_id:
+        raise ValueError("pack_id 不能为空")
+    _load_pack(pack_id)  # 包不存在直接失败，避免留下无法处理的孤儿建议
+
+    normalized_metrics = _normalize_metrics(metrics)
+    normalized_payload = _normalize_payload(normalized_kind, payload)
+    normalized_evidence = evidence if isinstance(evidence, dict) else {}
+    final_reason = str(reason or "").strip()
+    if normalized_status == "verified":
+        justified, gaps = _verified_justified(normalized_kind, normalized_metrics)
+        if not justified:
+            normalized_status = "rejected"
+            final_reason = (
+                f"{final_reason}；判定为 verified 但按当前阈值复算未达标：{gaps}"
+            ).lstrip("；")
+
+    _ensure_schema()
+    suggestion_id = _execute(
+        """
+        INSERT INTO intel_pack_improvements
+            (industry_pack_id, kind, payload_json, metrics_json, evidence_json,
+             status, reason, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            pack_id,
+            normalized_kind,
+            _json_dumps(normalized_payload),
+            _json_dumps(normalized_metrics),
+            _json_dumps(normalized_evidence),
+            normalized_status,
+            final_reason,
+            utc_text(),
+            utc_text(),
+        ),
+    )
+    return get_suggestion(suggestion_id) or {
+        "suggestion_id": suggestion_id,
+        "industry_pack_id": pack_id,
+        "kind": normalized_kind,
+        "payload": normalized_payload,
+        "metrics": normalized_metrics,
+        "evidence": normalized_evidence,
+        "status": normalized_status,
+        "reason": final_reason,
+    }
+
+
+def list_suggestions(pack_id: str, *, status: str = "") -> List[Dict]:
+    """列出某包的建议（默认全部；``status`` 可过滤，未知状态报错而不是静默返回空）。"""
+    pack_id = str(pack_id or "").strip()
+    if not pack_id:
+        raise ValueError("pack_id 不能为空")
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status in ("all", "*"):
+        normalized_status = ""
+    if normalized_status and normalized_status not in SUGGESTION_STATUSES:
+        raise ValueError(
+            f"status 只允许 {SUGGESTION_STATUSES} 之一（或空），收到: {status!r}"
+        )
+    _ensure_schema()
+    conditions = ["industry_pack_id = ?"]
+    params: List = [pack_id]
+    if normalized_status:
+        conditions.append("status = ?")
+        params.append(normalized_status)
+    rows = _query(
+        f"""
+        SELECT * FROM intel_pack_improvements
+        WHERE {' AND '.join(conditions)}
+        ORDER BY created_at DESC, id DESC
+        """,
+        params,
+    )
+    return [_serialize_suggestion(row) for row in rows]
+
+
+def get_suggestion(suggestion_id) -> Optional[Dict]:
+    """取一条建议（不存在返回 None）。"""
+    _ensure_schema()
+    rows = _query(
+        "SELECT * FROM intel_pack_improvements WHERE id = ?",
+        (_as_int(suggestion_id),),
+    )
+    return _serialize_suggestion(rows[0]) if rows else None
+
+
+def _touch_suggestion(suggestion_id, sql: str, params: Sequence) -> Dict:
+    _execute(sql, (*params, _as_int(suggestion_id)))
+    record = get_suggestion(suggestion_id)
+    if record is None:
+        raise ValueError(f"suggestion not found: {suggestion_id}")
+    return record
+
+
+def mark_applied(suggestion_id, *, activation_result=None) -> Dict:
+    """人工同意并已发布激活 → 置 ``applied``，记录 activation_id 与激活结果。
+
+    注意：本模块**不**执行激活。调用方必须先跑
+    ``industry_pack_activation.IndustryPackActivationService.activate(...)``，
+    再把它的返回传进来。
+    """
+    result = activation_result if isinstance(activation_result, dict) else {}
+    activation_id = str(
+        result.get("activation_id") or result.get("id") or result.get("activationId") or ""
+    )
+    record = get_suggestion(suggestion_id)
+    if record is None:
+        raise ValueError(f"suggestion not found: {suggestion_id}")
+    after_apply = dict(record.get("after_apply") or {})
+    after_apply["activation_result"] = result
+    now = utc_text()
+    return _touch_suggestion(
+        suggestion_id,
+        """
+        UPDATE intel_pack_improvements
+        SET status = 'applied', applied_at = ?, updated_at = ?, activation_id = ?,
+            after_apply_json = ?
+        WHERE id = ?
+        """,
+        (now, now, activation_id, _json_dumps(after_apply)),
+    )
+
+
+def mark_rejected(suggestion_id, *, reason: str = "") -> Dict:
+    """人工拒绝（或不采纳）→ 置 ``rejected`` 并写清原因。
+
+    只允许写 rejected/applied/failed 三种终态里的 rejected；
+    **不允许**通过本接口把建议置为 verified（verified 只能由自测判定产生）。
+    """
+    record = get_suggestion(suggestion_id)
+    if record is None:
+        raise ValueError(f"suggestion not found: {suggestion_id}")
+    reason_text = str(reason or "").strip() or "人工拒绝"
+    if record.get("status") == "applied":
+        reason_text = f"{reason_text}（该建议已 applied，拒绝状态仅作留痕）"
+    return _touch_suggestion(
+        suggestion_id,
+        """
+        UPDATE intel_pack_improvements
+        SET status = 'rejected', reason = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (reason_text, utc_text()),
+    )
+
+
+def record_after_apply(suggestion_id, metrics) -> Dict:
+    """回填"发布激活后再跑一次真实抓取+分类复测"的结果（不改 status）。"""
+    record = get_suggestion(suggestion_id)
+    if record is None:
+        raise ValueError(f"suggestion not found: {suggestion_id}")
+    after_apply = dict(record.get("after_apply") or {})
+    after_apply["after_apply"] = _normalize_metrics(metrics)
+    after_apply["recorded_at"] = utc_text()
+    return _touch_suggestion(
+        suggestion_id,
+        """
+        UPDATE intel_pack_improvements
+        SET after_apply_json = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (_json_dumps(after_apply), utc_text()),
+    )
+
+
+# ─────────────────────────── 生成新版本（发布链路） ───────────────────────────
+def _bump_pack_version(value) -> str:
+    raw = str(value or "").strip()
+    match = _PACK_VERSION_RE.match(raw)
+    if match:
+        return f"{match.group(1)}.{match.group(2)}.{int(match.group(3)) + 1}"
+    return f"{raw}.1" if raw else "1.0.1"
+
+
+def _manifest_signature(manifest) -> str:
+    """草稿/已发布 manifest 的比较指纹（用于识别"有没有人工未发布的改动"）。"""
+    if not isinstance(manifest, dict):
+        return ""
+    return json.dumps(manifest, ensure_ascii=False, sort_keys=True, default=str)
+
+
+def _merged_terms_summary(before: Dict, after: Dict) -> Dict:
+    """候选词合并前后各词表的增量与总量（returned 给 API/UI 做变更预览）。"""
+    before_gate = before.get("candidate_gate") if isinstance(before.get("candidate_gate"), dict) else {}
+    after_gate = after.get("candidate_gate") if isinstance(after.get("candidate_gate"), dict) else {}
+    summary = {}
+    for field, old_values, new_values in (
+        ("core_keywords", before.get("core_keywords"), after.get("core_keywords")),
+        ("anchor_keywords", before_gate.get("anchor_keywords"), after_gate.get("anchor_keywords")),
+        ("entity_keywords", before_gate.get("entity_keywords"), after_gate.get("entity_keywords")),
+    ):
+        old_list = [str(item) for item in (old_values or [])]
+        new_list = [str(item) for item in (new_values or [])]
+        summary[field] = {
+            "added": [item for item in new_list if item not in old_list],
+            "total_before": len(old_list),
+            "total_after": len(new_list),
+        }
+    return summary
+
+
+def _default_admin_service():
+    """复用仓库既有的行业包 admin 服务（草稿 → 保存 → 发布），不自己写版本表 SQL。
+
+    优先用当前模块绑定的数据库/加载器装配（保证与 ``use_database`` 注入的库一致），
+    装不起来时才退到 ``intel_api`` 里已装配好的单例。
+    """
+    try:
+        from industry_pack_admin import IndustryPackAdminService, IndustryPackVersionStore
+
+        return IndustryPackAdminService(
+            IndustryPackVersionStore(_repository.db), _pack_loader
+        )
+    except Exception:
+        from intel_api import industry_pack_admin_service
+
+        return industry_pack_admin_service
+
+
+def _default_activation_service():
+    """激活服务（这里只用它的只读 ``preview`` 取 plan_sha256，绝不调用 activate）。"""
+    from industry_pack_activation import IndustryPackActivationService
+    from industry_pack_admin import IndustryPackVersionStore
+
+    return IndustryPackActivationService(
+        _repository.db,
+        version_store=IndustryPackVersionStore(_repository.db),
+        repository=_repository,
+    )
+
+
+def _attach_preview(result: Dict, pack_id: str, preview_service=None, *, target_version_id=None) -> Dict:
+    """把激活服务的**只读** preview 结果附到返回值上（拿 plan_sha256 供两阶段确认）。
+
+    preview 不可用时写 ``preview_error``（键一定存在），绝不静默假装成功。
+    """
+    result.setdefault("preview_error", None)
+    try:
+        service = preview_service or _default_activation_service()
+        preview = service.preview(
+            pack_id,
+            target_version_id=target_version_id or result.get("target_version_id"),
+        )
+        result["plan_sha256"] = str(preview.get("plan_sha256") or "") or None
+        result["source_summary"] = {
+            "changed": False,
+            "source_counts": preview.get("source_counts"),
+            "source_plan_sha256": str(preview.get("source_plan_sha256") or ""),
+            "note": "关键词类建议不改 default_sources；信源对账计划取自激活服务 preview",
+        }
+    except Exception as exc:
+        result["preview_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        result.setdefault(
+            "source_summary",
+            {
+                "changed": False,
+                "source_counts": None,
+                "source_plan_sha256": "",
+                "note": "preview 不可用，未能取得信源对账计划",
+            },
+        )
+    return result
+
+
+def prepare_pack_version(
+    pack_id: str,
+    suggestion_id,
+    *,
+    admin_service=None,
+    preview_service=None,
+    actor: str = PREPARE_ACTOR,
+) -> Dict:
+    """把一条 **verified** 的关键词建议落成一个**新版本**（草稿→保存→发布），返回目标版本 id。
+
+    为什么需要它：【同意并发布】如果只调 activation，激活的是**线上那一版旧配置**——
+    界面显示"发布成功"但候选词根本没生效（等于空操作）。所以人工同意后必须先由本函数
+    生成包含候选词的新版本，API 层再拿 ``target_version_id`` 去
+    ``activation.preview(pack_id, target_version_id=...)`` → ``activate(...)``。
+
+    安全边界（硬）：
+      * 只接受 ``status="verified"`` 的建议——未通过自测的候选**绝不**写进版本；
+      * 只处理 ``kind="keyword"``；信源类建议涉及 default_sources 增删，必须人工在行业包
+        管理页调整（本函数不会替人改信源）；
+      * 若该包存在**未发布的草稿**（可能是人工编辑），拒绝覆盖并报错；
+      * 已发布版本里已包含这些候选词时走幂等分支（复用原版本，不重复发布）；
+      * admin 服务不可用时返回 ``{"error": ...}``，绝不静默降级成"激活旧版本"。
+
+    只读副作用说明：函数内部会调用 activation 的 ``preview``（纯读，不写库）取 plan_sha256。
+    """
+    normalized_id = str(pack_id or "").strip()
+    result: Dict = {
+        "pack_id": normalized_id,
+        "suggestion_id": _as_int(suggestion_id),
+        "target_version_id": None,
+        "pack_version": "",
+        "plan_sha256": None,
+        "merged_terms": {},
+        "source_summary": {},
+        "already_prepared": False,
+        "preview_error": None,
+        "error": None,
+    }
+    record = get_suggestion(suggestion_id)
+    if record is None:
+        result["error"] = f"改进建议不存在：{suggestion_id}"
+        return result
+    result["suggestion_id"] = int(record["suggestion_id"])
+    if str(record.get("status")) != "verified":
+        result["error"] = (
+            f"只接受 status=verified 的建议（当前 {record.get('status')}）："
+            "未通过自测的候选词不允许写进行业包版本"
+        )
+        return result
+    if str(record.get("kind")) != "keyword":
+        result["error"] = (
+            f"只支持 keyword 类建议（当前 {record.get('kind')}）：信源类建议需要在行业包管理页"
+            "人工调整 default_sources 后自行发布"
+        )
+        return result
+    buckets = _normalize_candidate_input((record.get("payload") or {}).get("candidates"))
+    if not _has_candidates(buckets):
+        result["error"] = "建议 payload 里没有候选词，无法生成新版本"
+        return result
+
+    published_pack = _load_pack(normalized_id)
+    merged = _merge_candidates_into_pack(published_pack, buckets)
+    merged_terms = _merged_terms_summary(published_pack, merged)
+    result["merged_terms"] = merged_terms
+    added_total = sum(len(item["added"]) for item in merged_terms.values())
+
+    try:
+        service = admin_service or _default_admin_service()
+    except Exception as exc:
+        result["error"] = (
+            f"行业包 admin 服务不可用（{type(exc).__name__}: {str(exc)[:160]}），"
+            "无法生成新版本；请检查 industry_pack_admin 装配"
+        )
+        return result
+
+    try:
+        latest = service.store.latest_published(normalized_id)
+    except Exception as exc:
+        result["error"] = f"读取已发布版本失败：{type(exc).__name__}: {str(exc)[:160]}"
+        return result
+
+    if added_total == 0 and latest:
+        # 幂等：已发布版本里已经有这些候选词（重复点击【同意并发布】）→ 复用原版本
+        result["target_version_id"] = int(latest["id"])
+        result["pack_version"] = str((latest.get("manifest") or {}).get("pack_version") or "")
+        result["already_prepared"] = True
+        return _attach_preview(
+            result, normalized_id, preview_service, target_version_id=int(latest["id"])
+        )
+
+    try:
+        draft = service.get_or_create_draft(normalized_id, actor=actor)
+    except Exception as exc:
+        result["error"] = f"创建/读取行业包草稿失败：{type(exc).__name__}: {str(exc)[:160]}"
+        return result
+    if latest and _manifest_signature(draft.get("manifest")) != _manifest_signature(
+        latest.get("manifest")
+    ):
+        result["error"] = (
+            "该行业包已有未发布的草稿内容（可能来自人工编辑），为避免覆盖已拒绝本次生成；"
+            "请先在行业包管理页发布或丢弃草稿后重试"
+        )
+        return result
+
+    base_version_text = str(
+        ((latest or {}).get("manifest") or {}).get("pack_version")
+        or published_pack.get("pack_version")
+        or ""
+    )
+    merged["pack_version"] = _bump_pack_version(base_version_text)
+    try:
+        saved = service.save_draft(
+            normalized_id, merged, expected_revision=int(draft["revision"]), actor=actor
+        )
+        version = service.publish_draft(
+            normalized_id, expected_revision=int(saved["revision"]), actor=actor
+        )
+    except Exception as exc:
+        result["error"] = f"生成新版本失败：{type(exc).__name__}: {str(exc)[:200]}"
+        return result
+
+    result["target_version_id"] = int(version["id"])
+    result["pack_version"] = str(
+        version.get("pack_version") or merged.get("pack_version") or ""
+    )
+    return _attach_preview(
+        result, normalized_id, preview_service, target_version_id=int(version["id"])
+    )
+
+
+# ─────────────────────────── 信源类建议 ───────────────────────────
+def _build_source_suggestion(assessment: Dict, probe) -> Dict:
+    """按信源 verdict + 抓文章探针实测，生成信源类改进建议（payload/metrics/evidence）。
+
+    自测口径（与关键词建议不同）：不做影子重跑（信源调整不影响规则判定），
+    但**必须**带上探针的逐源 fetched/parse_failed/errors；且只有"存在可执行项"
+    （可停用或可替换的信源 ≥1 个）才算达标。
+    """
+    sources = list(assessment.get("sources") or [])
+    probe_sources = {}
+    for row in (probe or {}).get("sources") or []:
+        probe_sources[_as_int(row.get("source_id"))] = row
+    probe_errors = {}
+    for item in (probe or {}).get("errors") or []:
+        probe_errors.setdefault(_as_int(item.get("source_id")), []).append(
+            {
+                "stage": str(item.get("stage") or ""),
+                "error": str(item.get("error") or "")[:300],
+            }
+        )
+
+    disable: List[Dict] = []
+    replace: List[Dict] = []
+    keep: List[Dict] = []
+    unverified: List[Dict] = []
+    for row in sources:
+        source_id = _as_int(row.get("source_id"))
+        probe_row = probe_sources.get(source_id) or {}
+        listing_status = str(probe_row.get("listing_status") or ("not_probed" if not probe_row else ""))
+        item = {
+            "source_id": source_id,
+            "source_name": str(row.get("source_name") or ""),
+            "source_url": str(row.get("source_url") or ""),
+            "verdict": str(row.get("verdict") or ""),
+            "article_count": _as_int(row.get("article_count")),
+            "admitted_count": _as_int(row.get("admitted_count")),
+            "admitted_pct": _as_float(row.get("admitted_pct")),
+            "last_article_at": str(row.get("last_article_at") or ""),
+            "probe_status": listing_status or "not_probed",
+            "fetched": _as_int(probe_row.get("fetched")),
+            "parse_failed": _as_int(probe_row.get("parse_failed")),
+            "errors": probe_errors.get(source_id, []),
+            "reason": "",
+        }
+        fetch_failed = listing_status == "failed"
+        if item["verdict"] == SOURCE_VERDICT_DISABLE:
+            if fetch_failed:
+                item["reason"] = (
+                    f"启用中但历史产出 0 篇；本次探针抓取失败（{item['probe_status']}），"
+                    "无法确认该源状态，因此不建议停用，需人工复核"
+                )
+                unverified.append(item)
+            else:
+                probed = (
+                    f"，本次探针可访问并取到 {item['fetched']} 条列表"
+                    if item["probe_status"] == "ok"
+                    else "，本次探针未覆盖该源"
+                )
+                item["reason"] = (
+                    f"启用中但历史入库产出 0 篇{probed}；建议停用或替换为可产出信源"
+                )
+                disable.append(item)
+        elif item["verdict"] == SOURCE_VERDICT_REPLACE:
+            item["reason"] = (
+                f"最近一篇 {item['last_article_at'] or '未知'}，已超过 "
+                f"{SOURCE_VERDICT_IDLE_DAYS} 天无新文；建议替换或人工确认站点是否改版"
+            )
+            replace.append(item)
+        elif item["verdict"] == SOURCE_VERDICT_KEEP:
+            item["reason"] = (
+                f"产出正常（{item['article_count']} 篇）但准入率仅 {item['admitted_pct']}%；"
+                "属关键词覆盖不足，建议随关键词改进观察，不要当坏源停用"
+            )
+            keep.append(item)
+        else:
+            item["reason"] = "产出与准入率正常，保持启用"
+            keep.append(item)
+
+    actionable = len(disable) + len(replace)
+    passed = actionable >= 1
+    if passed:
+        reason = (
+            f"信源体检：建议停用 {len(disable)} 个零产出源、替换 {len(replace)} 个停更源、"
+            f"保留 {len(keep)} 个正常源"
+        )
+        if unverified:
+            reason += (
+                f"；另有 {len(unverified)} 个源本次抓取失败，无法确认该源状态"
+                "（已单列 unverified_sources，未纳入停用建议）"
+            )
+    else:
+        reason = "信源体检：没有可执行的信源调整项（无零产出/停更源），不生成可发布的信源建议"
+        if unverified:
+            reason += f"；{len(unverified)} 个源本次抓取失败，无法确认该源状态"
+
+    probe_parsed = _as_int((probe or {}).get("parsed_total"))
+    probe_failed = _as_int((probe or {}).get("parse_failed_total"))
+    payload = {
+        "disable_sources": disable,
+        "replace_sources": replace,
+        "add_sources": [],
+        "keep_sources": keep,
+        "unverified_sources": unverified,
+        "notes": [
+            "add_sources 需要人工提供具体 URL（引擎不臆造信源地址）",
+            f"抓文章探针：解析成功 {probe_parsed} 篇、解析失败 {probe_failed} 篇",
+        ],
+    }
+    other_pct = _as_float(assessment.get("other_pct"))
+    before_admit = None if other_pct is None else round(100.0 - other_pct, 4)
+    evidence = {
+        "source_verdict_counts": assessment.get("source_verdict_counts"),
+        "actionable_count": actionable,
+        "unverified_count": len(unverified),
+        "disable_source_ids": [item["source_id"] for item in disable],
+        "replace_source_ids": [item["source_id"] for item in replace],
+        "probe_errors": (probe or {}).get("errors") or [],
+    }
+    metrics = _normalize_metrics(
+        {
+            # 整包口径：改前 = 当前准入率（100 - other%）；改后只能等真实复测回填 → null
+            "before": {
+                "admit_rate": before_admit,
+                "other_pct": other_pct,
+                "false_positive": None,
+                "topic_assoc": None,
+            },
+            "after": {
+                "admit_rate": None,
+                "other_pct": None,
+                "false_positive": None,
+                "topic_assoc": None,
+            },
+            "crawl_probe": _slim_probe(probe),
+            "source_evidence": evidence,
+            # 信源类建议不跑影子/抓文章双达标，用自己的证据口径 + 来源标记
+            "self_test": {
+                "source": SELF_TEST_SOURCE,
+                "kind": "source",
+                "pack_id": str(assessment.get("pack_id") or ""),
+                "ran_at": utc_text(),
+                "passed": bool(passed),
+                "reason": reason,
+            },
+        }
+    )
+    return {
+        "payload": payload,
+        "metrics": metrics,
+        "evidence": evidence,
+        "passed": passed,
+        "reason": reason,
+    }
+
+
+# ─────────────────────────── 交付物 1.8：串起来跑 ───────────────────────────
+def run_self_test_and_stage(
+    pack_id: str,
+    *,
+    sample_limit: int = 400,
+    top_n: int = DEFAULT_TOP_N,
+    probe_runner=None,
+    per_source: int = CRAWL_PROBE_PER_SOURCE,
+    probe_timeout_seconds: float = CRAWL_PROBE_TIMEOUT_SECONDS,
+    probe_max_sources: int = CRAWL_PROBE_MAX_SOURCES,
+) -> Dict:
+    """评估 → 挖候选 → 影子自测 → 抓文章实测 → **双达标才 verified**，否则 rejected。
+
+    ``probe_runner`` 需满足
+    ``(pack_id, candidates, *, per_source, timeout_seconds, max_sources) -> dict`` 签名，
+    默认用 ``crawl_probe``（真联网）；测试传入桩函数即可完全离线。
+    """
+    pack = _load_pack(pack_id)
+    assessment = assess_pack(pack_id, sample_limit=sample_limit)
+    candidates = assessment.get("candidates") or {
+        "core_keywords": [],
+        "entity_keywords": [],
+        "anchors": [],
+    }
+    candidate_terms = list(assessment.get("candidate_keywords") or [])
+
+    # 抓文章实测：即使没有关键词候选也要跑——信源类建议需要它的逐源 fetched/parse_failed/errors。
+    runner = probe_runner or crawl_probe
+    shadow: Optional[Dict] = None
+    try:
+        probe = runner(
+            pack_id,
+            candidates,
+            per_source=per_source,
+            timeout_seconds=probe_timeout_seconds,
+            max_sources=probe_max_sources,
+        )
+    except Exception as exc:
+        probe = {
+            "pack_id": str(pack_id),
+            "probed_at": utc_text(),
+            "sources": [],
+            "parsed_total": 0,
+            "fetched_total": 0,
+            "parse_failed_total": 0,
+            "new_article_admit_rate_before": None,
+            "new_article_admit_rate_after": None,
+            "sample_available": False,
+            "errors": [{"stage": "probe_runner", "error": _probe_error_text(exc)}],
+        }
+    if not isinstance(probe, dict):
+        probe = {"pack_id": str(pack_id), "sources": [], "parsed_total": 0, "errors": []}
+
+    if not candidate_terms:
+        metrics = _normalize_metrics(
+            {
+                "before": {},
+                "after": {},
+                "crawl_probe": _slim_probe(probe),
+                "shadow_test": None,
+            }
+        )
+        reason = (
+            "未挖到可用候选词（判别力过滤后为空）：本包 other 语料不足或候选词与其它包语料无区分度，"
+            "无法生成关键词改进建议"
+        )
+        record = stage_suggestion(
+            pack_id,
+            "keyword",
+            {"candidates": candidates, "pack_version": assessment.get("pack_version")},
+            metrics,
+            status="rejected",
+            evidence={"assessment": _assessment_summary(assessment), "crawl_probe": probe},
+            reason=reason,
+        )
+        result = _self_test_result(record, assessment, None, probe, reason)
+        return _stage_source_suggestion(result, pack_id, assessment, probe)
+
+    shadow = shadow_test(pack_id, candidates, sample_limit=sample_limit)
+    verdict = _evaluate_self_test(shadow, probe)
+    metrics = _normalize_metrics(
+        {
+            "before": shadow.get("before"),
+            "after": shadow.get("after"),
+            "delta": shadow.get("delta"),
+            "shadow_test": shadow,
+            "crawl_probe": _slim_probe(probe),
+            "checks": {
+                "shadow": verdict["shadow"]["checks"],
+                "crawl_probe": verdict["crawl_probe"]["checks"],
+            },
+            # 自测来源标记：stage_suggestion 只在"复算通过 + 带这个标记"时才接受 verified。
+            "self_test": {
+                "source": SELF_TEST_SOURCE,
+                "kind": "keyword",
+                "pack_id": str(pack_id),
+                "ran_at": utc_text(),
+                "passed": bool(verdict["passed"]),
+                "reason": verdict["reason"],
+            },
+        }
+    )
+    evidence = {
+        "assessment": _assessment_summary(assessment),
+        "candidates": candidates,
+        "gate_failures": assessment.get("gate_failures"),
+        "sources": (assessment.get("sources") or [])[:20],
+        "shadow_examples": (shadow or {}).get("examples"),
+        "recomputable": (shadow or {}).get("recomputable"),
+        "crawl_probe": probe,
+    }
+    record = stage_suggestion(
+        pack_id,
+        "keyword",
+        {
+            "candidates": candidates,
+            "pack_version": assessment.get("pack_version"),
+            "merge_targets": ["core_keywords", "candidate_gate.entity_keywords", "candidate_gate.anchor_keywords"],
+            "candidate_terms": candidate_terms,
+        },
+        metrics,
+        status="verified" if verdict["passed"] else "rejected",
+        evidence=evidence,
+        reason=verdict["reason"],
+    )
+    result = _self_test_result(record, assessment, shadow, probe, verdict["reason"], verdict)
+    return _stage_source_suggestion(result, pack_id, assessment, probe)
+
+
+def _stage_source_suggestion(
+    result: Dict, pack_id: str, assessment: Dict, probe
+) -> Dict:
+    """同时落一条信源类建议（【改进】页的"信源类建议"区块靠它出数据）。"""
+    built = _build_source_suggestion(assessment, probe)
+    try:
+        record = stage_suggestion(
+            pack_id,
+            "source",
+            built["payload"],
+            built["metrics"],
+            status="verified" if built["passed"] else "rejected",
+            evidence=built["evidence"],
+            reason=built["reason"],
+        )
+    except Exception as exc:  # 信源建议失败不能拖垮关键词建议的结论
+        result["source_suggestion_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+        result["source_suggestion"] = None
+        result["source_suggestion_id"] = None
+        return result
+    result["source_suggestion"] = record
+    result["source_suggestion_id"] = record.get("suggestion_id")
+    result["source_suggestion_status"] = record.get("status")
+    return result
+
+
+def _assessment_summary(assessment: Dict) -> Dict:
+    return {
+        "pack_id": assessment.get("pack_id"),
+        "pack_version": assessment.get("pack_version"),
+        "assessed_at": assessment.get("assessed_at"),
+        "articles": assessment.get("articles"),
+        "categories": assessment.get("categories"),
+        "other_pct": assessment.get("other_pct"),
+        "peer_other_pct": assessment.get("peer_other_pct"),
+        "peer_pack_count": assessment.get("peer_pack_count"),
+        "source_verdict_counts": assessment.get("source_verdict_counts"),
+        "gate_failures": {
+            "total": (assessment.get("gate_failures") or {}).get("total"),
+            "counts": (assessment.get("gate_failures") or {}).get("counts"),
+        },
+        "sample": assessment.get("sample"),
+    }
+
+
+def _self_test_result(
+    record: Dict,
+    assessment: Dict,
+    shadow: Optional[Dict],
+    probe: Optional[Dict],
+    reason: str,
+    verdict: Optional[Dict] = None,
+) -> Dict:
+    return {
+        "pack_id": record.get("industry_pack_id"),
+        "ran_at": utc_text(),
+        "status": record.get("status"),
+        "suggestion_id": record.get("suggestion_id"),
+        "reason": reason,
+        "checks": {
+            "shadow": (verdict or {}).get("shadow"),
+            "crawl_probe": (verdict or {}).get("crawl_probe"),
+        },
+        "assessment": _assessment_summary(assessment),
+        "shadow_test": {
+            "admit_rate_before": (shadow or {}).get("admit_rate_before"),
+            "admit_rate_after": (shadow or {}).get("admit_rate_after"),
+            "false_positive_before": (shadow or {}).get("false_positive_before"),
+            "false_positive_after": (shadow or {}).get("false_positive_after"),
+            "topic_assoc_before": (shadow or {}).get("topic_assoc_before"),
+            "topic_assoc_after": (shadow or {}).get("topic_assoc_after"),
+            "delta_other_pct": (shadow or {}).get("delta_other_pct"),
+            "positive_sample": (shadow or {}).get("positive_sample"),
+            "negative_sample": (shadow or {}).get("negative_sample"),
+        }
+        if shadow
+        else None,
+        "crawl_probe": _slim_probe(probe) if probe else None,
+        "metrics": record.get("metrics"),
+        "suggestion": record,
+    }
+
+
+# ─────────────────────────── 只读聚合（供 API/UI 直接展示） ───────────────────────────
+def improvement_overview(pack_id: str, *, sample_limit: int = DEFAULT_SAMPLE_LIMIT) -> Dict:
+    """评估卡 + 建议列表一次取回（不改任何配置，纯读）。"""
+    return {
+        "assessment": assess_pack(pack_id, sample_limit=sample_limit),
+        "suggestions": list_suggestions(pack_id),
+    }
+
+
+__all__ = [
+    "assess_pack",
+    "mine_keyword_candidates",
+    "shadow_test",
+    "crawl_probe",
+    "stage_suggestion",
+    "list_suggestions",
+    "get_suggestion",
+    "mark_applied",
+    "mark_rejected",
+    "record_after_apply",
+    "prepare_pack_version",
+    "run_self_test_and_stage",
+    "improvement_overview",
+    "use_database",
+    "use_pack_loader",
+    "MIN_ADMIT_RATE_GAIN_PCT",
+    "MAX_FALSE_POSITIVE_GAIN_PCT",
+    "MIN_ADMIT_RATE_AFTER_PCT",
+    "MIN_CRAWL_PROBE_GAIN_PCT",
+    "MIN_CRAWL_PROBE_ARTICLES",
+    "DISCRIMINATION_MIN_RATIO",
+    "SUGGESTION_KINDS",
+    "SUGGESTION_STATUSES",
+    "SELF_TEST_SOURCE",
+]

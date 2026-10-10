@@ -1330,6 +1330,7 @@ def ensure_intel_candidate_tables(cursor) -> None:
         ensure_pack_attention_tables,
         ensure_intel_evidence_tables,
         ensure_user_gate_tables,
+        ensure_intel_pack_improvement_tables,
     ):
         try:
             _fn(cursor)
@@ -1619,4 +1620,58 @@ def ensure_intel_evidence_tables(cursor) -> None:
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_intel_evidence_articles_article "
         "ON intel_evidence_group_articles(article_id, evidence_group_id)"
+    )
+
+
+def ensure_intel_pack_improvement_tables(cursor) -> None:
+    """行业包【改进】建议暂存（DECISION_LOG D-009）。
+
+    为什么要一张表 + 一个 state 字段：改进流程是**多步且必须留痕**的——
+    评估 → 生成候选 → 影子重跑自测 → 达标才显示在【改进】页 → 人工同意 → 发布激活
+    → 再跑一次真实抓取+分类复测。每一步的结论（指标、证据、达标与否、激活结果、复测结果）
+    都要能回看，否则"这条建议当初凭什么被判定为可上线"就无从追溯。
+
+    * ``status``：pending（表级默认，写接口不使用）/ verified（自测达标，可给人工审核）/
+      rejected（未达标或人工拒绝）/ applied（已发布激活）/ failed（激活或复测失败）。
+    * ``payload_json``：候选词或候选信源（关键词建议形如
+      ``{"candidates": {"core_keywords": [{"term","hits","examples"}], ...}}``）。
+    * ``metrics_json``：``{"before": {...}, "after": {...}, "crawl_probe": {...}}``；
+      拿不到的指标写 null（不写 0），UI 按存在性渲染。
+    * ``evidence_json``：评估摘要、候选词判别力证据、失败原因归类、示例标题、可复算的样本 id。
+    * ``after_apply_json``：激活结果 + 发布后的真实复测指标。
+
+    变更可回滚性：**只新增表与索引，不改任何既有表**；回滚 = DROP TABLE
+    intel_pack_improvements（及其索引），不影响其它功能。
+    """
+    cursor.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS intel_pack_improvements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            industry_pack_id TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('keyword', 'source')),
+            payload_json TEXT NOT NULL DEFAULT '{{}}',
+            metrics_json TEXT NOT NULL DEFAULT '{{}}',
+            evidence_json TEXT NOT NULL DEFAULT '{{}}',
+            status TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'verified', 'rejected', 'applied', 'failed')),
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            updated_at TEXT NOT NULL DEFAULT {UTC_NOW_SQL},
+            applied_at TEXT,
+            activation_id TEXT NOT NULL DEFAULT '',
+            after_apply_json TEXT NOT NULL DEFAULT '{{}}'
+        )
+        """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_pack_improvements_pack "
+        "ON intel_pack_improvements(industry_pack_id, status, created_at DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_pack_improvements_status "
+        "ON intel_pack_improvements(status, created_at DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_intel_pack_improvements_activation "
+        "ON intel_pack_improvements(activation_id)"
     )

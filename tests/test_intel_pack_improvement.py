@@ -1,0 +1,1396 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""intel_pack_improvement 单元测试。
+
+隔离性：每个用例自建临时 sqlite（``SQLiteDatabase(temp)``），把模块的数据库/行业包加载器
+都换成测试夹具，**不连真库、不联网、不调模型、不碰 GPU**；抓文章探针一律打桩。
+"""
+
+import copy
+import json
+import os
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+# 必须在 import config 之前把主库切到临时 SQLite（与 tests/conftest.py 同款做法，但这里也写一遍：
+# 本机 .env 是 DATABASE_TYPE=postgres，若直接 python tests/xxx.py 跑（没有 conftest），
+# 用例会连**共享 PostgreSQL 主库**并真的写进去。SQLITE_BACKUP_PATH 的优先级高于 DATABASE_PATH，
+# 两个键都要指向临时库才算真正隔离。
+_BOOTSTRAP_DIR = tempfile.mkdtemp(prefix="intel-improvement-tests-")
+_BOOTSTRAP_DB = os.path.join(_BOOTSTRAP_DIR, "bootstrap.sqlite3")
+os.environ["DATABASE_TYPE"] = "sqlite"
+os.environ["DATABASE_PATH"] = _BOOTSTRAP_DB
+os.environ["SQLITE_BACKUP_PATH"] = _BOOTSTRAP_DB
+os.environ["INTEL_LLM_ENABLED"] = "false"
+
+import intel_pack_improvement as m
+from intel_database import IntelRepository
+from sqlite_database import SQLiteDatabase
+
+ORIGINAL_LOADER = m._pack_loader
+ORIGINAL_REPOSITORY = m._repository
+SEED_PACK_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "config",
+    "industry_packs",
+    "family_office.json",
+)
+
+
+def _date(days_ago: int = 0) -> str:
+    return (datetime.now(timezone.utc) - timedelta(days=days_ago)).date().isoformat()
+
+
+def _classification_tail(**overrides) -> dict:
+    payload = {
+        "pack_version": "1.0.0",
+        "classifier_version": "rule-v1",
+        "content_hash": "hash",
+        "rule_category": "other",
+        "final_category": "other",
+        "rule_reason": "核心相关性低于行业包阈值",
+        "score_details": {},
+        "matched_keywords": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _demo_pack() -> dict:
+    """演示包：有 candidate_gate.anchor_keywords（走"锚点词表"分支）。"""
+    return {
+        "id": "demo_pack",
+        "name": "演示包",
+        "schema_version": 1,
+        "pack_version": "1.0.0",
+        "enabled": True,
+        "default_market": "CN",
+        "timezone": "Asia/Hong_Kong",
+        "core_keywords": ["演示核心词"],
+        "expanded_keywords": [],
+        "trend_keywords": ["演示趋势词"],
+        "event_keywords": ["演示事件词"],
+        "negative_keywords": ["演示负向词"],
+        "classification": {
+            "core_weight": 3,
+            "expanded_weight": 1,
+            "trend_weight": 2,
+            "event_weight": 2,
+            "negative_weight": -3,
+            "minimum_relevance_score": 2,
+            "llm_confidence_threshold": 0.65,
+            "tie_break_order": ["trend", "event", "other"],
+            "recent_today_window_days": 5,
+            "recent_trend_window_days": 21,
+        },
+        "serpapi_queries": [],
+        "default_sources": [],
+        "fixed_topics": [
+            {"key": "pilot", "name": "中试线", "keywords": ["中试线"]},
+        ],
+        "candidate_gate": {"anchor_keywords": ["演示锚点词"], "entity_keywords": []},
+    }
+
+
+def _gate_free_pack() -> dict:
+    """无 candidate_gate 锚点的包：门禁回退 core_keywords + expanded_keywords。"""
+    pack = _demo_pack()
+    pack["id"] = "gate_free_pack"
+    pack["name"] = "无门禁锚点包"
+    pack["core_keywords"] = ["演示核心词"]
+    pack.pop("candidate_gate", None)
+    return pack
+
+
+def _peer_pack() -> dict:
+    pack = _demo_pack()
+    pack["id"] = "peer_pack"
+    pack["name"] = "对照包"
+    pack["candidate_gate"] = {"anchor_keywords": ["对照锚点词"], "entity_keywords": []}
+    pack["fixed_topics"] = []
+    return pack
+
+
+class _FakeLoader:
+    """行业包加载器替身：返回深拷贝（生产配置一个字节都不会被改到）。
+
+    另外补齐 admin 服务需要的 ``has_seed_pack`` / ``clear_cache``，
+    这样 ``prepare_pack_version`` 能走真实的"草稿→保存→发布"链路（写临时库）。
+
+    关键保真点：给了 ``database`` 时，``load()`` **优先读已发布存储**（与生产
+    ``IndustryPackLoader`` 的行为一致）——否则"发布后候选词是否真的进了生效配置"
+    这条最关键的断言就测不出来。
+    """
+
+    def __init__(self, packs, database=None):
+        self.packs = copy.deepcopy(packs)
+        self.database = database
+
+    def _published_manifest(self, pack_id):
+        if self.database is None:
+            return None
+        try:
+            from industry_pack_admin import IndustryPackVersionStore
+
+            record = IndustryPackVersionStore(self.database).latest_published(pack_id)
+        except Exception:
+            return None
+        if not record:
+            return None
+        return copy.deepcopy(record.get("manifest") or {})
+
+    def load(self, pack_id, *, enabled_only=True, use_published=True, **_kwargs):
+        key = str(pack_id or "")
+        if key not in self.packs:
+            raise ValueError(f"industry pack not found: {key}")
+        if use_published:
+            published = self._published_manifest(key)
+            if published:
+                return published
+        return copy.deepcopy(self.packs[key])
+
+    def effective_pack_set(self, pack_id, **_kwargs):
+        return [self.load(pack_id)]
+
+    def has_seed_pack(self, pack_id) -> bool:
+        return str(pack_id or "") in self.packs
+
+    def clear_cache(self, pack_id: str = "") -> None:
+        return None
+
+    def snapshot(self) -> str:
+        return json.dumps(self.packs, sort_keys=True, ensure_ascii=False)
+
+
+# 演示语料：P1~P3 含候选词"固态电池"（3 篇 ≥ 判别力文档数门槛）与"并购"（对照语料里也有）；
+# P4 刻意与它们几乎不共享任何实词，改后必须仍然是 other。
+_DEMO_ARTICLES = [
+    {
+        "title": "固态电池中试线投产",
+        "content": (
+            "固态电池中试线在东部园区投产，首批样品已交付两家整车客户，量产节拍稳步爬坡，"
+            "并带动上下游并购热度。演示趋势词同步观察。2026年该产线计划扩产。"
+        ),
+        "category": "other",
+    },
+    {
+        "title": "固态电池获海外批量订单",
+        "content": (
+            "该企业拿下海外批量订单，履约周期覆盖明年全年，产线良率较上季度提升明显，"
+            "并购团队亦在接洽。演示趋势词相关进展持续跟踪。2026年交付节奏不变。"
+        ),
+        "category": "other",
+    },
+    {
+        "title": "固态电池技术评审通过",
+        "content": (
+            "行业协会组织专家评审，认为该路线工程化可行，建议加快落地验证节奏，"
+            "并购与合资安排同步推进。演示趋势词维持一致口径。2026年完成评审收口。"
+        ),
+        "category": "other",
+    },
+    {
+        "title": "产线良率提升明显",
+        "content": "车间良率提升源于刀具更换流程优化，与前述材料路线并无关联。",
+        "category": "other",
+    },
+]
+
+_PEER_ARTICLES = [
+    {
+        "title": "精细化工资产并购完成交割",
+        "content": "并购标的为一家精细化工企业，交割流程已全部走完。",
+        "category": "trend",
+    },
+    {
+        "title": "并购基金完成新一轮募集",
+        "content": "并购基金募集规模超出预期，投资人结构保持稳定。",
+        "category": "trend",
+    },
+    {
+        "title": "并购重组审核口径更新",
+        "content": "并购重组审核口径有所更新，申报材料要求同步细化。",
+        "category": "trend",
+    },
+]
+
+
+class IntelPackImprovementTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db = SQLiteDatabase(os.path.join(self.temp_dir.name, "improvement.sqlite3"))
+        self.assertTrue(self.db.connect())
+        # 隔离哨兵：万一环境把它指向了 PostgreSQL 主库，立刻失败而不是往真库写测试数据
+        self.assertEqual(
+            getattr(self.db, "backend", "sqlite"),
+            "sqlite",
+            "测试必须跑在隔离的临时 SQLite 上（检查 DATABASE_TYPE/SQLITE_BACKUP_PATH）",
+        )
+        self.assertTrue(self.db.create_tables())
+        self.repo = IntelRepository(self.db)
+        m.use_database(self.db)
+        self.loader = _FakeLoader(
+            {
+                "demo_pack": _demo_pack(),
+                "gate_free_pack": _gate_free_pack(),
+                "peer_pack": _peer_pack(),
+            },
+            database=self.db,
+        )
+        m.use_pack_loader(self.loader)
+
+    def tearDown(self):
+        m.use_pack_loader(ORIGINAL_LOADER)
+        m.use_database(ORIGINAL_REPOSITORY)
+        self.db.disconnect()
+        self.temp_dir.cleanup()
+
+    # ── 夹具 ──
+    def _insert_article(self, title, content, url, publish_date=None):
+        cursor = self.db.connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO articles (url, title, content, domain, publish_date, status,
+                                      matched_keywords, first_crawled, created_at)
+                VALUES (?, ?, ?, 'example.com', ?, 'active', '', ?, ?)
+                """,
+                (
+                    url,
+                    title,
+                    content,
+                    publish_date or _date(0),
+                    _date(0) + " 00:00:00",
+                    _date(0) + " 00:00:00",
+                ),
+            )
+            return int(cursor.lastrowid)
+        finally:
+            cursor.close()
+
+    def _insert_classification(self, article_id, pack_id, **overrides):
+        payload = _classification_tail(**overrides)
+        details = payload["score_details"]
+        cursor = self.db.connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO article_intel_classifications
+                    (article_id, industry_pack_id, industry_pack_version, classifier_version,
+                     article_content_hash, rule_category, final_category, rule_reason,
+                     final_reason, score_details_json, matched_keywords_json, classified_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    article_id,
+                    pack_id,
+                    payload["pack_version"],
+                    payload["classifier_version"],
+                    payload["content_hash"],
+                    payload["rule_category"],
+                    payload["final_category"],
+                    payload["rule_reason"],
+                    payload["rule_reason"],
+                    json.dumps(details, ensure_ascii=False),
+                    json.dumps(payload["matched_keywords"], ensure_ascii=False),
+                    _date(0) + "T00:00:00Z",
+                ),
+            )
+        finally:
+            cursor.close()
+
+    def _seed_demo_scenario(self):
+        ids = {}
+        for index, item in enumerate(_DEMO_ARTICLES, start=1):
+            article_id = self._insert_article(
+                item["title"],
+                item["content"],
+                f"https://demo.example.com/{index}",
+                publish_date=_date(index),
+            )
+            self._insert_classification(
+                article_id, "demo_pack", final_category=item["category"]
+            )
+            ids[item["title"]] = article_id
+        peer_ids = []
+        for index, item in enumerate(_PEER_ARTICLES, start=1):
+            article_id = self._insert_article(
+                item["title"],
+                item["content"],
+                f"https://peer.example.com/{index}",
+                publish_date=_date(index),
+            )
+            self._insert_classification(
+                article_id, "peer_pack", final_category=item["category"]
+            )
+            peer_ids.append(article_id)
+        return ids, peer_ids
+
+    def _insert_source(self, pack_id, name, url, metadata=None, authority=3):
+        cursor = self.db.connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO intel_sources
+                    (canonical_source_url, source_url, source_name, source_type,
+                     authority_level, metadata_json)
+                VALUES (?, ?, ?, 'rss', ?, ?)
+                """,
+                (url, url, name, authority, json.dumps(metadata or {}, ensure_ascii=False)),
+            )
+            source_id = int(cursor.lastrowid)
+            cursor.execute(
+                """
+                INSERT INTO intel_source_industries
+                    (source_id, industry_pack_id, is_active, ownership_type)
+                VALUES (?, ?, 1, 'pack_owned')
+                """,
+                (source_id, pack_id),
+            )
+            return source_id
+        finally:
+            cursor.close()
+
+    def _link_article_to_source(self, article_id, source_id):
+        cursor = self.db.connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO intel_candidates (canonical_url, original_url, title, article_id)
+                VALUES (?, ?, '', ?)
+                """,
+                (f"https://linked.example.com/{article_id}", f"https://linked.example.com/{article_id}", article_id),
+            )
+            candidate_id = int(cursor.lastrowid)
+            cursor.execute(
+                """
+                INSERT INTO intel_candidate_observations
+                    (candidate_id, source_id, observation_type, observation_key, raw_url)
+                VALUES (?, ?, 'rss', ?, ?)
+                """,
+                (
+                    candidate_id,
+                    source_id,
+                    f"obs-{candidate_id}",
+                    f"https://linked.example.com/{article_id}",
+                ),
+            )
+        finally:
+            cursor.close()
+
+    # ── 表结构 ──
+    def test_schema_table_exists_and_only_adds_new_objects(self):
+        tables = {
+            row[0]
+            for row in self.db.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        self.assertIn("intel_pack_improvements", tables)
+        indexes = {
+            row[0]
+            for row in self.db.connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            )
+        }
+        self.assertIn("idx_intel_pack_improvements_pack", indexes)
+        self.assertIn("idx_intel_pack_improvements_status", indexes)
+        columns = [
+            row[1]
+            for row in self.db.connection.execute(
+                "PRAGMA table_info(intel_pack_improvements)"
+            )
+        ]
+        for expected in (
+            "id",
+            "industry_pack_id",
+            "kind",
+            "payload_json",
+            "metrics_json",
+            "evidence_json",
+            "status",
+            "reason",
+            "created_at",
+            "applied_at",
+            "activation_id",
+            "after_apply_json",
+        ):
+            self.assertIn(expected, columns)
+        # 可回滚：只新增表，DROP 掉即可（不影响既有表）
+        self.db.connection.execute("DROP TABLE intel_pack_improvements")
+        self.db.connection.execute(
+            "SELECT COUNT(*) FROM article_intel_classifications"
+        )
+
+    # ── 评估 ──
+    def test_assess_pack_reports_other_pct_gate_failures_and_peer_median(self):
+        reason_map = {
+            "industry_filter": (
+                "通用行业过滤器：未命中行业核心词或行业包实体，不予准入",
+                {"admitted": False, "hits": {}},
+            ),
+            "negative_keyword": (
+                "核心相关性低于行业包阈值",
+                {
+                    "hits": {"anchor": ["演示锚点词"], "negative": ["演示负向词"]},
+                    "relevance_score": -3.0,
+                    "minimum_relevance_score": 2.0,
+                    "rule_signal": "below_threshold",
+                },
+            ),
+            "no_anchor": (
+                "核心相关性低于行业包阈值",
+                {"hits": {"anchor": []}, "relevance_score": 0.0,
+                 "minimum_relevance_score": 2.0, "rule_signal": "below_threshold"},
+            ),
+            "below_min_score": (
+                "核心相关性低于行业包阈值",
+                {"hits": {"anchor": ["演示锚点词"]}, "relevance_score": 1.0,
+                 "minimum_relevance_score": 2.0, "rule_signal": "below_threshold"},
+            ),
+            "no_signal": (
+                "文章与行业相关，但未命中明确趋势或事件信号",
+                {"hits": {"anchor": ["演示锚点词"]}, "relevance_score": 3.0,
+                 "minimum_relevance_score": 2.0, "rule_signal": "no_signal"},
+            ),
+        }
+        for index, (key, (reason, details)) in enumerate(reason_map.items(), start=1):
+            article_id = self._insert_article(
+                f"其余文章{index}",
+                f"该段文字用于验证失败归类{index}，不含任何行业词。",
+                f"https://bucket.example.com/{index}",
+            )
+            self._insert_classification(
+                article_id,
+                "demo_pack",
+                final_category="other",
+                rule_reason=reason,
+                score_details=details,
+            )
+        trend_id = self._insert_article(
+            "演示趋势词相关综述", "本条命中演示趋势词与演示锚点词。", "https://bucket.example.com/t"
+        )
+        self._insert_classification(trend_id, "demo_pack", final_category="trend")
+        event_id = self._insert_article(
+            "演示事件词相关通报", "本条命中演示事件词与演示锚点词。", "https://bucket.example.com/e"
+        )
+        self._insert_classification(event_id, "demo_pack", final_category="event")
+
+        # 对照包：demo_pack 之外的两个包，other 占比 50% 与 25% → 中位数 37.5%
+        for index in range(4):
+            article_id = self._insert_article(
+                f"对照文章{index}", f"对照正文{index}", f"https://peer.example.com/a{index}"
+            )
+            self._insert_classification(
+                article_id,
+                "peer_pack",
+                final_category="other" if index < 2 else "trend",
+            )
+        for index in range(4):
+            article_id = self._insert_article(
+                f"第三包文章{index}", f"第三包正文{index}", f"https://third.example.com/a{index}"
+            )
+            self._insert_classification(
+                article_id,
+                "gate_free_pack",
+                final_category="other" if index < 1 else "trend",
+            )
+
+        result = m.assess_pack("demo_pack", sample_limit=100)
+
+        self.assertEqual(result["pack_id"], "demo_pack")
+        self.assertEqual(result["articles"], 7)
+        self.assertEqual(result["categories"], {"trend": 1, "event": 1, "other": 5})
+        self.assertAlmostEqual(result["other_pct"], round(100.0 * 5 / 7, 4))
+        self.assertEqual(result["peer_pack_count"], 2)
+        self.assertAlmostEqual(result["peer_other_pct"], 37.5)
+        counts = result["gate_failures"]["counts"]
+        self.assertEqual(counts["industry_filter"], 1)
+        self.assertEqual(counts["negative_keyword"], 1)
+        self.assertEqual(counts["no_anchor"], 1)
+        self.assertEqual(counts["below_min_score"], 1)
+        self.assertEqual(counts["no_signal"], 1)
+        self.assertEqual(counts["unknown"], 0)
+        self.assertEqual(result["gate_failures"]["total"], 5)
+        self.assertEqual(len(result["sample"]["other_article_ids"]), 5)
+        # 候选词里不该出现包内已有词
+        self.assertNotIn("演示核心词", result["candidate_keywords"])
+        self.assertNotIn("演示趋势词", result["candidate_keywords"])
+
+    def test_assess_pack_verdicts_cover_all_four_source_states(self):
+        low_source = self._insert_source("demo_pack", "低准入信源", "https://low.example.com/rss")
+        zero_source = self._insert_source("demo_pack", "零产出信源", "https://zero.example.com/rss")
+        idle_source = self._insert_source("demo_pack", "停更信源", "https://idle.example.com/rss")
+        good_source = self._insert_source("demo_pack", "有效信源", "https://good.example.com/rss")
+
+        for index in range(2):
+            article_id = self._insert_article(
+                f"低准入文章{index}", f"低准入正文{index}", f"https://low.example.com/a{index}"
+            )
+            self._insert_classification(article_id, "demo_pack", final_category="other")
+            self._link_article_to_source(article_id, low_source)
+
+        idle_id = self._insert_article(
+            "停更文章", "停更正文", "https://idle.example.com/a1", publish_date=_date(90)
+        )
+        self._insert_classification(idle_id, "demo_pack", final_category="trend")
+        self._link_article_to_source(idle_id, idle_source)
+
+        good_ids = []
+        for index in range(2):
+            article_id = self._insert_article(
+                f"有效文章{index}", f"有效正文{index}", f"https://good.example.com/a{index}"
+            )
+            self._insert_classification(
+                article_id, "demo_pack", final_category="trend" if index == 0 else "other"
+            )
+            self._link_article_to_source(article_id, good_source)
+            good_ids.append(article_id)
+
+        result = m.assess_pack("demo_pack", sample_limit=100)
+        by_id = {row["source_id"]: row for row in result["sources"]}
+
+        self.assertEqual(by_id[low_source]["verdict"], "准入率低")
+        self.assertEqual(by_id[low_source]["article_count"], 2)
+        self.assertEqual(by_id[low_source]["admitted_count"], 0)
+        self.assertEqual(by_id[low_source]["admitted_pct"], 0.0)
+        self.assertEqual(by_id[zero_source]["verdict"], "零产出")
+        self.assertEqual(by_id[zero_source]["article_count"], 0)
+        self.assertEqual(by_id[idle_source]["verdict"], "长期无新文")
+        self.assertEqual(by_id[idle_source]["admitted_pct"], 100.0)
+        self.assertEqual(by_id[good_source]["verdict"], "有效")
+        self.assertEqual(by_id[good_source]["article_count"], 2)
+        self.assertEqual(by_id[good_source]["admitted_pct"], 50.0)
+        self.assertEqual(
+            result["source_verdict_counts"],
+            {"准入率低": 1, "零产出": 1, "长期无新文": 1, "有效": 1},
+        )
+
+    # ── 候选挖掘 ──
+    def test_mine_keyword_candidates_applies_discrimination_filter(self):
+        self._seed_demo_scenario()
+
+        result = m.mine_keyword_candidates("demo_pack", top_n=20, sample_limit=100)
+        keywords = result["keywords"]
+        excluded = {item["term"]: item["reason"] for item in result["excluded"]}
+
+        # 只在本包 other 语料出现的词 → 选中
+        self.assertIn("固态电池", keywords)
+        self.assertEqual(
+            result["candidates"]["core_keywords"][0]["hits"] >= 3,
+            True,
+        )
+        selected = {item["term"]: item for item in result["candidates"]["anchors"]}
+        self.assertIn("固态电池", selected)
+        self.assertEqual(selected["固态电池"]["hits"], 3)
+        self.assertTrue(selected["固态电池"]["examples"])
+        self.assertEqual(selected["固态电池"]["peer_rate"], 0.0)
+        # 在其它包语料里同样高频的词 → 被判别力过滤剔除
+        self.assertNotIn("并购", keywords)
+        self.assertIn("并购", excluded)
+        self.assertTrue(
+            "对照出现率" in excluded["并购"] or "判别力" in excluded["并购"],
+            excluded["并购"],
+        )
+        # 纯数字/年份类噪声不进候选（也不进排除清单）
+        self.assertNotIn("2026年", keywords)
+        self.assertNotIn("2026年", excluded)
+        self.assertEqual(result["pack_other_docs"], 4)
+        self.assertEqual(result["peer_admitted_docs"], 3)
+        self.assertTrue(result["recomputable"]["pack_other_article_ids"])
+
+    def test_merge_candidates_targets_gate_and_keeps_original_pack_untouched(self):
+        pack = _demo_pack()
+        pristine = copy.deepcopy(pack)
+        buckets = m._normalize_candidate_input(
+            {"core_keywords": ["新核心词"], "entity_keywords": ["某某协会"], "anchors": ["新锚点词"]}
+        )
+        merged = m._merge_candidates_into_pack(pack, buckets)
+
+        self.assertEqual(pack, pristine)  # 原包一字未改
+        self.assertIn("新锚点词", merged["candidate_gate"]["anchor_keywords"])
+        self.assertIn("演示锚点词", merged["candidate_gate"]["anchor_keywords"])
+        self.assertIn("某某协会", merged["candidate_gate"]["entity_keywords"])
+        self.assertIn("新核心词", merged["core_keywords"])
+        self.assertIn("演示核心词", merged["core_keywords"])
+
+        # 无 candidate_gate 的包：门禁回退 core_keywords，锚点候选必须并进 core 才生效
+        gate_free = _gate_free_pack()
+        merged_free = m._merge_candidates_into_pack(gate_free, buckets)
+        self.assertIn("新锚点词", merged_free["core_keywords"])
+        self.assertNotIn("anchor_keywords", merged_free.get("candidate_gate") or {})
+        self.assertIn("演示核心词", merged_free["core_keywords"])
+
+    # ── 影子自测 ──
+    def test_shadow_test_metrics_are_exact_on_fixed_samples(self):
+        ids, peer_ids = self._seed_demo_scenario()
+        candidates = {"core_keywords": [], "entity_keywords": [], "anchors": ["固态电池"]}
+
+        shadow = m.shadow_test("demo_pack", candidates, sample_limit=100, negative_sample=100)
+
+        self.assertEqual(shadow["positive_sample"], 4)
+        self.assertEqual(shadow["negative_sample"], 3)
+        # 改前：门禁不认"固态电池" → 4 篇全落 other；改后：3 篇拿到 trend（第 4 篇不变）
+        self.assertEqual(shadow["admit_rate_before"], 0.0)
+        self.assertEqual(shadow["admit_rate_after"], 75.0)
+        self.assertEqual(shadow["delta_admit_rate"], 75.0)
+        self.assertEqual(shadow["delta_other_pct"], -75.0)
+        self.assertEqual(shadow["other_pct_before"], 100.0)
+        self.assertEqual(shadow["other_pct_after"], 25.0)
+        # 主题命中率（match_fixed_topics 口径）：只有"固态电池中试线投产"命中"中试线"，
+        # 改前改后都用同一份 fixed_topics，所以数值相同——这是正确行为
+        self.assertEqual(shadow["topic_assoc_before"], 25.0)
+        self.assertEqual(shadow["topic_assoc_after"], 25.0)
+        # 经门禁后真正挂上主题标签的比例：改前 0%（门禁没过），改后 25%
+        self.assertEqual(shadow["topic_tagged_before"], 0.0)
+        self.assertEqual(shadow["topic_tagged_after"], 25.0)
+        # 负样本（其它包已准入）不含候选词 → 误准入 0
+        self.assertEqual(shadow["false_positive_before"], 0.0)
+        self.assertEqual(shadow["false_positive_after"], 0.0)
+        self.assertEqual(len(shadow["examples"]["newly_admitted"]), 3)
+        self.assertEqual(shadow["examples"]["new_false_positives"], [])
+        self.assertEqual(
+            sorted(shadow["recomputable"]["negative_article_ids"]), sorted(peer_ids)
+        )
+        self.assertEqual(len(shadow["recomputable"]["positive_article_ids"]), 4)
+        self.assertIn(ids["产线良率提升明显"], shadow["recomputable"]["positive_article_ids"])
+        self.assertEqual(
+            shadow["before"],
+            {"admit_rate": 0.0, "false_positive": 0.0, "topic_assoc": 25.0, "other_pct": 100.0},
+        )
+        self.assertEqual(
+            shadow["after"],
+            {"admit_rate": 75.0, "false_positive": 0.0, "topic_assoc": 25.0, "other_pct": 25.0},
+        )
+
+    def test_shadow_test_counts_false_positive_when_negative_holds_candidate(self):
+        _ids, peer_ids = self._seed_demo_scenario()
+        # 把候选词 + 趋势词塞进一条对照包文章：改后它会被误拉进本包 → 误准入 1/3
+        # （只塞候选词不够：门禁过了但没有趋势/事件信号，仍会落 other）
+        cursor = self.db.connection.cursor()
+        cursor.execute(
+            "UPDATE articles SET content = content || '固态电池与演示趋势词相关纪要。' WHERE id = ?",
+            (peer_ids[0],),
+        )
+        cursor.close()
+
+        shadow = m.shadow_test(
+            "demo_pack",
+            {"core_keywords": [], "entity_keywords": [], "anchors": ["固态电池"]},
+            sample_limit=100,
+            negative_sample=100,
+        )
+
+        self.assertEqual(shadow["false_positive_before"], 0.0)
+        self.assertEqual(shadow["false_positive_after"], round(100.0 / 3, 4))
+        self.assertEqual(shadow["delta_false_positive"], round(100.0 / 3, 4))
+        self.assertEqual(len(shadow["examples"]["new_false_positives"]), 1)
+        self.assertEqual(
+            shadow["examples"]["new_false_positives"][0]["title"],
+            "精细化工资产并购完成交割",
+        )
+
+    # ── 抓文章探针 ──
+    def _good_probe(self, pack_id, candidates, *, per_source, timeout_seconds, max_sources):
+        return {
+            "pack_id": pack_id,
+            "probed_at": "2026-01-01T00:00:00Z",
+            "sources_selected": [
+                {"source_id": 1, "source_name": "低准入信源", "source_url": "https://x/rss", "verdict": "准入率低"}
+            ],
+            "sources": [
+                {
+                    "source_id": 1,
+                    "source_name": "低准入信源",
+                    "source_url": "https://x/rss",
+                    "verdict": "准入率低",
+                    "listing_status": "ok",
+                    "listing_error": "",
+                    "fetched": 3,
+                    "parsed": 3,
+                    "parse_failed": 0,
+                    "articles": [],
+                    "admit_rate_before": 0.0,
+                    "admit_rate_after": 66.67,
+                }
+            ],
+            "sources_probed": 1,
+            "sources_succeeded": 1,
+            "fetched_total": 3,
+            "parsed_total": 3,
+            "parse_failed_total": 0,
+            "new_article_admit_rate_before": 0.0,
+            "new_article_admit_rate_after": 66.67,
+            "new_articles": [],
+            "sample_available": True,
+            "errors": [],
+        }
+
+    def _dead_probe(self, pack_id, candidates, *, per_source, timeout_seconds, max_sources):
+        return {
+            "pack_id": pack_id,
+            "probed_at": "2026-01-01T00:00:00Z",
+            "sources_selected": [
+                {"source_id": 1, "source_name": "超时信源", "source_url": "https://x/rss", "verdict": "零产出"}
+            ],
+            "sources": [
+                {
+                    "source_id": 1,
+                    "source_name": "超时信源",
+                    "source_url": "https://x/rss",
+                    "verdict": "零产出",
+                    "listing_status": "failed",
+                    "listing_error": "ReadTimeout",
+                    "fetched": 0,
+                    "parsed": 0,
+                    "parse_failed": 0,
+                    "articles": [],
+                    "admit_rate_before": None,
+                    "admit_rate_after": None,
+                }
+            ],
+            "sources_probed": 1,
+            "sources_succeeded": 0,
+            "fetched_total": 0,
+            "parsed_total": 0,
+            "parse_failed_total": 0,
+            "new_article_admit_rate_before": None,
+            "new_article_admit_rate_after": None,
+            "new_articles": [],
+            "sample_available": False,
+            "errors": [{"source_id": 1, "stage": "listing", "error": "ReadTimeout"}],
+        }
+
+    def test_crawl_probe_marks_fetch_failures_as_errors_not_zero_admission(self):
+        self._seed_demo_scenario()
+        source = {
+            "source_id": 7,
+            "source_name": "超时信源",
+            "source_url": "https://timeout.example.com/rss",
+            "verdict": "零产出",
+            "source_type": "rss",
+            "metadata": {},
+        }
+
+        probe = m.crawl_probe(
+            "demo_pack",
+            per_source=2,
+            timeout_seconds=30,
+            source_picker=lambda pack_id, limit: [source],
+            listing_fetcher=lambda src, *, limit, timeout_seconds: (_ for _ in ()).throw(
+                TimeoutError("ReadTimeout")
+            ),
+        )
+
+        self.assertEqual(probe["sources_probed"], 1)
+        self.assertEqual(probe["parsed_total"], 0)
+        self.assertEqual(probe["parse_failed_total"], 0)
+        self.assertIsNone(probe["new_article_admit_rate_before"])
+        self.assertIsNone(probe["new_article_admit_rate_after"])
+        self.assertFalse(probe["sample_available"])
+        self.assertEqual(probe["sources"][0]["listing_status"], "failed")
+        self.assertEqual(len(probe["errors"]), 1)
+        self.assertEqual(probe["errors"][0]["stage"], "listing")
+        # 抓取失败绝不能被当成"准入率 0%"：_crawl_probe_verdict 必须判不达标
+        verdict = m._crawl_probe_verdict(probe)
+        self.assertFalse(verdict["passed"])
+        self.assertIn("未取得样本", verdict["reason"])
+
+    def test_crawl_probe_classifies_new_articles_under_before_and_after(self):
+        source = {
+            "source_id": 3,
+            "source_name": "低准入信源",
+            "source_url": "https://list.example.com/news",
+            "verdict": "准入率低",
+            "source_type": "list_page",
+            "metadata": {},
+        }
+        listing = [
+            {"url": "https://list.example.com/1", "title": "固态电池产线动态", "published_at": _date(1)},
+            {"url": "https://list.example.com/2", "title": "无关条目", "published_at": _date(1)},
+            {"url": "https://list.example.com/3", "title": "抓取失败条目", "published_at": _date(1)},
+        ]
+
+        def _content_fetcher(entry, *, timeout_seconds):
+            if entry["url"].endswith("/3"):
+                return None, "正文过短（0 字 < 80）"
+            body = "演示趋势词与固态电池相关纪要。" if entry["url"].endswith("/1") else "与主题无关的简述。"
+            return {"title": entry["title"], "content": body, "matched_keywords": "", "url": entry["url"]}, ""
+
+        probe = m.crawl_probe(
+            "demo_pack",
+            per_source=3,
+            timeout_seconds=30,
+            candidates={"core_keywords": [], "entity_keywords": [], "anchors": ["固态电池"]},
+            source_picker=lambda pack_id, limit: [source],
+            listing_fetcher=lambda src, *, limit, timeout_seconds: (listing, ""),
+            content_fetcher=_content_fetcher,
+        )
+
+        self.assertEqual(probe["fetched_total"], 3)
+        self.assertEqual(probe["parsed_total"], 2)
+        self.assertEqual(probe["parse_failed_total"], 1)
+        self.assertEqual(probe["sources_succeeded"], 1)
+        self.assertEqual(probe["new_article_admit_rate_before"], 0.0)
+        self.assertEqual(probe["new_article_admit_rate_after"], 50.0)
+        first = probe["sources"][0]["articles"][0]
+        self.assertEqual(first["category_before"], "other")
+        self.assertEqual(first["category_after"], "trend")
+        self.assertTrue(first["admit_after"])
+        # 过门禁的真正原因是锚点（matched_keywords 只收 core/expanded/trend/event/negative）
+        self.assertEqual(first["anchors_after"], ["固态电池"])
+        self.assertEqual(first["anchors_before"], [])
+        self.assertEqual(first["matched_keywords_after"], ["演示趋势词"])
+        self.assertEqual(len(probe["errors"]), 1)
+        self.assertEqual(probe["errors"][0]["stage"], "content")
+        self.assertIn("正文过短", probe["errors"][0]["error"])
+
+    # ── 串起来跑 ──
+    def test_run_self_test_and_stage_verifies_when_both_sets_pass(self):
+        self._seed_demo_scenario()
+        before_snapshot = self.loader.snapshot()
+        with open(SEED_PACK_FILE, "rb") as handle:
+            seed_before = handle.read()
+        with patch(
+            "industry_pack_activation.IndustryPackActivationService.preview",
+            side_effect=AssertionError("自测阶段不允许调用激活服务"),
+        ) as preview_mock, patch(
+            "industry_pack_activation.IndustryPackActivationService.activate",
+            side_effect=AssertionError("自测阶段不允许调用激活服务"),
+        ) as activate_mock:
+            result = m.run_self_test_and_stage(
+                "demo_pack", sample_limit=100, probe_runner=self._good_probe
+            )
+            preview_mock.assert_not_called()
+            activate_mock.assert_not_called()
+
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(result["shadow_test"]["admit_rate_before"], 0.0)
+        self.assertEqual(result["shadow_test"]["admit_rate_after"], 75.0)
+        self.assertEqual(result["crawl_probe"]["new_article_admit_rate_after"], 66.67)
+        suggestion = result["suggestion"]
+        self.assertEqual(suggestion["status"], "verified")
+        self.assertEqual(suggestion["kind"], "keyword")
+        self.assertEqual(
+            set(suggestion["payload"]["candidates"]),
+            {"core_keywords", "entity_keywords", "anchors"},
+        )
+        for bucket in suggestion["payload"]["candidates"].values():
+            for item in bucket:
+                self.assertEqual(set(item), {"term", "hits", "examples"})
+        self.assertIn("固态电池", [item["term"] for item in suggestion["payload"]["candidates"]["anchors"]])
+        metrics = suggestion["metrics"]
+        for key in ("admit_rate", "false_positive", "topic_assoc", "other_pct"):
+            self.assertIn(key, metrics["before"])
+            self.assertIn(key, metrics["after"])
+        self.assertIsNotNone(metrics["crawl_probe"])
+        self.assertEqual(metrics["crawl_probe"]["sources"][0]["source_id"], 1)
+        self.assertEqual(metrics["crawl_probe"]["sources"][0]["fetched"], 3)
+        self.assertEqual(
+            metrics["crawl_probe"]["new_article_admit_rate_before"], 0.0
+        )
+        self.assertIn("影子自测达标", suggestion["reason"])
+        self.assertIn("抓文章实测达标", suggestion["reason"])
+        # 生产配置零改动
+        self.assertEqual(self.loader.snapshot(), before_snapshot)
+        with open(SEED_PACK_FILE, "rb") as handle:
+            self.assertEqual(handle.read(), seed_before)
+        # 建议确实落库了
+        self.assertEqual(len(m.list_suggestions("demo_pack", status="verified")), 1)
+
+    def test_run_self_test_and_stage_rejects_when_threshold_raised(self):
+        self._seed_demo_scenario()
+        with patch.object(m, "MIN_ADMIT_RATE_GAIN_PCT", 99.0):
+            result = m.run_self_test_and_stage(
+                "demo_pack", sample_limit=100, probe_runner=self._good_probe
+            )
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("影子自测未达标", result["reason"])
+        self.assertEqual(result["suggestion"]["status"], "rejected")
+        self.assertEqual(m.list_suggestions("demo_pack", status="verified"), [])
+
+    def test_run_self_test_and_stage_rejects_when_crawl_probe_has_no_sample(self):
+        self._seed_demo_scenario()
+        result = m.run_self_test_and_stage(
+            "demo_pack", sample_limit=100, probe_runner=self._dead_probe
+        )
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("抓文章实测未达标", result["reason"])
+        self.assertIn("未取得样本", result["reason"])
+        # 影子自测本身是达标的，被否决的唯一原因是抓文章测试没有样本
+        self.assertEqual(result["shadow_test"]["admit_rate_after"], 75.0)
+        self.assertIsNone(result["crawl_probe"]["new_article_admit_rate_after"])
+        self.assertEqual(result["suggestion"]["status"], "rejected")
+
+    def _passing_metrics(self):
+        """一份"影子 + 抓文章双达标"的指标（供 verified 相关用例复用）。"""
+        return {
+            "before": {
+                "admit_rate": 0.0,
+                "false_positive": 0.0,
+                "topic_assoc": 0.0,
+                "other_pct": 100.0,
+            },
+            "after": {
+                "admit_rate": 75.0,
+                "false_positive": 0.0,
+                "topic_assoc": 0.0,
+                "other_pct": 25.0,
+            },
+            "crawl_probe": {
+                "parsed_total": 3,
+                "sample_available": True,
+                "new_article_admit_rate_before": 0.0,
+                "new_article_admit_rate_after": 50.0,
+                "sources": [],
+                "errors": [],
+            },
+            # 自测来源标记：只有 run_self_test_and_stage 会写，外部不得伪造 verified
+            "self_test": {
+                "source": m.SELF_TEST_SOURCE,
+                "pack_id": "demo_pack",
+                "passed": True,
+                "reason": "影子自测达标；抓文章实测达标",
+            },
+        }
+
+    def _passing_source_metrics(self):
+        """信源类建议的达标指标（口径：有可执行项 + 自测来源标记）。"""
+        return {
+            "before": {"admit_rate": 0.0, "false_positive": None, "topic_assoc": None, "other_pct": 100.0},
+            "after": {"admit_rate": None, "false_positive": None, "topic_assoc": None, "other_pct": None},
+            "crawl_probe": {
+                "parsed_total": 0,
+                "sample_available": False,
+                "new_article_admit_rate_before": None,
+                "new_article_admit_rate_after": None,
+                "sources": [],
+                "errors": [],
+            },
+            "source_evidence": {"actionable_count": 1, "unverified_count": 0},
+            "self_test": {
+                "source": m.SELF_TEST_SOURCE,
+                "kind": "source",
+                "passed": True,
+                "reason": "信源体检：建议停用 1 个零产出源",
+            },
+        }
+
+    def test_stage_suggestion_refuses_external_verified_when_metrics_fail(self):
+        passing = self._passing_metrics()
+        record = m.stage_suggestion(
+            "demo_pack",
+            "keyword",
+            {"candidates": {"core_keywords": ["固态电池"], "entity_keywords": [], "anchors": ["固态电池"]}},
+            passing,
+            status="verified",
+        )
+        self.assertEqual(record["status"], "verified")
+
+        # 没有自测来源标记（外部直接塞一份"看起来达标"的指标）→ 一律降级 rejected
+        no_marker = copy.deepcopy(passing)
+        no_marker.pop("self_test")
+        record = m.stage_suggestion(
+            "demo_pack",
+            "keyword",
+            {"candidates": {"core_keywords": ["无标记词"], "entity_keywords": [], "anchors": ["无标记词"]}},
+            no_marker,
+            status="verified",
+        )
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("缺少自测来源标记", record["reason"])
+
+        failing = copy.deepcopy(passing)
+        failing["after"]["admit_rate"] = 10.0  # 提升只有 10 个百分点
+        record = m.stage_suggestion(
+            "demo_pack",
+            "keyword",
+            {"candidates": {"core_keywords": ["假词"], "entity_keywords": [], "anchors": ["假词"]}},
+            failing,
+            status="verified",
+        )
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("复算未达标", record["reason"])
+        self.assertIn("准入率提升", record["reason"])
+
+        # 抓文章测试缺失时，哪怕影子指标很好也不允许 verified
+        no_probe = copy.deepcopy(passing)
+        no_probe["crawl_probe"] = None
+        record = m.stage_suggestion(
+            "demo_pack",
+            "keyword",
+            {"candidates": {"core_keywords": ["词"], "entity_keywords": [], "anchors": ["词"]}},
+            no_probe,
+            status="verified",
+        )
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("抓文章实测未达标", record["reason"])
+
+    def test_suggestion_round_trip_and_status_filter(self):
+        first = m.stage_suggestion(
+            "demo_pack",
+            "keyword",
+            {"candidates": {"core_keywords": ["固态电池"], "entity_keywords": [], "anchors": ["固态电池"]}},
+            {"before": {"admit_rate": 0.0}, "after": {"admit_rate": 50.0}},
+            status="rejected",
+            reason="样本不足",
+            evidence={"note": "证据"},
+        )
+        second = m.stage_suggestion(
+            "demo_pack",
+            "source",
+            {"source_id": 9, "action": "enable"},
+            self._passing_source_metrics(),
+            status="verified",
+            reason="信源体检：建议停用 1 个零产出源",
+        )
+        self.assertNotEqual(first["suggestion_id"], second["suggestion_id"])
+        # 扁平键兼容：before/after 只有 admit_rate 时，缺的指标写 None（键必须存在）
+        self.assertEqual(first["metrics"]["before"]["admit_rate"], 0.0)
+        self.assertIsNone(first["metrics"]["before"]["false_positive"])
+        self.assertIsNone(first["metrics"]["crawl_probe"])
+        self.assertEqual(first["evidence"], {"note": "证据"})
+        # source 类型的 payload 原样保留
+        self.assertEqual(second["payload"], {"source_id": 9, "action": "enable"})
+
+        self.assertEqual(len(m.list_suggestions("demo_pack")), 2)
+        self.assertEqual(len(m.list_suggestions("demo_pack", status="rejected")), 1)
+        self.assertEqual(len(m.list_suggestions("demo_pack", status="verified")), 1)
+        self.assertEqual(m.list_suggestions("demo_pack", status="applied"), [])
+        with self.assertRaises(ValueError):
+            m.list_suggestions("demo_pack", status="不存在的状态")
+
+        fetched = m.get_suggestion(first["suggestion_id"])
+        self.assertEqual(fetched["suggestion_id"], first["suggestion_id"])
+        self.assertEqual(fetched["kind"], "keyword")
+        self.assertIsNone(m.get_suggestion(999999))
+
+        applied = m.mark_applied(
+            second["suggestion_id"],
+            activation_result={"activation_id": "act-123", "target_version_id": 7},
+        )
+        self.assertEqual(applied["status"], "applied")
+        self.assertEqual(applied["activation_id"], "act-123")
+        self.assertIsNotNone(applied["applied_at"])
+        self.assertEqual(
+            applied["after_apply"]["activation_result"]["target_version_id"], 7
+        )
+
+        retested = m.record_after_apply(
+            second["suggestion_id"],
+            {"before": {"admit_rate": 0.0}, "after": {"admit_rate": 61.5}},
+        )
+        self.assertEqual(retested["status"], "applied")  # 复测回填不改状态
+        self.assertEqual(retested["after_apply"]["after_apply"]["after"]["admit_rate"], 61.5)
+        self.assertEqual(
+            retested["after_apply"]["activation_result"]["activation_id"], "act-123"
+        )
+
+        rejected = m.mark_rejected(first["suggestion_id"], reason="人工判断噪声偏多")
+        self.assertEqual(rejected["status"], "rejected")
+        self.assertEqual(rejected["reason"], "人工判断噪声偏多")
+        self.assertEqual(len(m.list_suggestions("demo_pack", status="rejected")), 1)
+        self.assertEqual(len(m.list_suggestions("demo_pack", status="applied")), 1)
+        with self.assertRaises(ValueError):
+            m.mark_rejected(999999)
+
+    def test_stage_suggestion_validates_kind_and_status(self):
+        with self.assertRaises(ValueError):
+            m.stage_suggestion("demo_pack", "unknown", {}, {}, status="verified")
+        with self.assertRaises(ValueError):
+            m.stage_suggestion("demo_pack", "keyword", {}, {}, status="pending")
+        with self.assertRaises(ValueError):
+            m.stage_suggestion("missing_pack", "keyword", {}, {}, status="rejected")
+
+    # ── 生成新版本（发布链路） ──
+    def _admin_service(self):
+        from industry_pack_admin import IndustryPackAdminService, IndustryPackVersionStore
+
+        return IndustryPackAdminService(IndustryPackVersionStore(self.db), self.loader)
+
+    def test_prepare_pack_version_publishes_new_version_with_merged_terms(self):
+        self._seed_demo_scenario()
+        result = m.run_self_test_and_stage(
+            "demo_pack", sample_limit=100, probe_runner=self._good_probe
+        )
+        suggestion_id = result["suggestion_id"]
+        self.assertEqual(result["status"], "verified")
+
+        prepared = m.prepare_pack_version(
+            "demo_pack", suggestion_id, admin_service=self._admin_service()
+        )
+
+        self.assertIsNone(prepared["error"])
+        self.assertIsInstance(prepared["target_version_id"], int)
+        self.assertEqual(prepared["pack_version"], "1.0.1")  # 版本号补丁位 +1
+        self.assertFalse(prepared["already_prepared"])
+        self.assertIn("固态电池", prepared["merged_terms"]["anchor_keywords"]["added"])
+        self.assertIn("固态电池", prepared["merged_terms"]["core_keywords"]["added"])
+        self.assertIn("plan_sha256", prepared)
+        self.assertIn("preview_error", prepared)
+        self.assertIn("source_summary", prepared)
+
+        # 真的是一个新版本（版本表里有行，且 manifest 里带上了候选词）
+        rows = list(
+            self.db.connection.execute(
+                "SELECT id, pack_version, manifest_json FROM industry_pack_versions "
+                "WHERE industry_pack_id='demo_pack' ORDER BY version_number"
+            )
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(int(rows[0][0]), prepared["target_version_id"])
+        self.assertEqual(rows[0][1], "1.0.1")
+        manifest = json.loads(rows[0][2])
+        self.assertIn("固态电池", manifest["candidate_gate"]["anchor_keywords"])
+        self.assertIn("演示锚点词", manifest["candidate_gate"]["anchor_keywords"])  # 原有词保留
+        # 草稿已消费（发布即删除草稿）
+        drafts = list(
+            self.db.connection.execute(
+                "SELECT COUNT(*) FROM industry_pack_drafts WHERE industry_pack_id='demo_pack'"
+            )
+        )
+        self.assertEqual(int(drafts[0][0]), 0)
+        # 重复调用走幂等分支：不再产生第二个版本
+        again = m.prepare_pack_version(
+            "demo_pack", suggestion_id, admin_service=self._admin_service()
+        )
+        self.assertTrue(again["already_prepared"])
+        self.assertEqual(again["target_version_id"], prepared["target_version_id"])
+        self.assertEqual(
+            int(
+                list(
+                    self.db.connection.execute(
+                        "SELECT COUNT(*) FROM industry_pack_versions "
+                        "WHERE industry_pack_id='demo_pack'"
+                    )
+                )[0][0]
+            ),
+            1,
+        )
+
+    def test_prepare_pack_version_refuses_unverified_or_non_keyword(self):
+        rejected = m.stage_suggestion(
+            "demo_pack",
+            "keyword",
+            {"candidates": {"core_keywords": ["词"], "entity_keywords": [], "anchors": ["词"]}},
+            {"before": {"admit_rate": 0.0}, "after": {"admit_rate": 10.0}},
+            status="rejected",
+            reason="未达标",
+        )
+        prepared = m.prepare_pack_version(
+            "demo_pack", rejected["suggestion_id"], admin_service=self._admin_service()
+        )
+        self.assertIn("只接受 status=verified", prepared["error"])
+        self.assertIsNone(prepared["target_version_id"])
+        self.assertEqual(
+            int(
+                list(
+                    self.db.connection.execute(
+                        "SELECT COUNT(*) FROM industry_pack_versions"
+                    )
+                )[0][0]
+            ),
+            0,
+        )
+
+        source_suggestion = m.stage_suggestion(
+            "demo_pack",
+            "source",
+            {"disable_sources": [{"source_id": 1}], "replace_sources": [], "add_sources": [], "keep_sources": []},
+            {
+                "before": {}, "after": {},
+                "source_evidence": {"actionable_count": 1},
+                "self_test": {"source": m.SELF_TEST_SOURCE, "kind": "source", "passed": True},
+            },
+            status="verified",
+            reason="信源体检",
+        )
+        self.assertEqual(source_suggestion["status"], "verified")
+        prepared = m.prepare_pack_version(
+            "demo_pack", source_suggestion["suggestion_id"], admin_service=self._admin_service()
+        )
+        self.assertIn("只支持 keyword 类建议", prepared["error"])
+
+    # ── 信源类建议 ──
+    def _probe_stub(self, source_rows, errors=None, parsed_total=0):
+        def _runner(pack_id, candidates, *, per_source, timeout_seconds, max_sources):
+            fetched = sum(int(row.get("fetched") or 0) for row in source_rows)
+            return {
+                "pack_id": pack_id,
+                "probed_at": "2026-01-01T00:00:00Z",
+                "sources_selected": [],
+                "sources": source_rows,
+                "sources_probed": len(source_rows),
+                "sources_succeeded": sum(1 for row in source_rows if int(row.get("parsed") or 0) > 0),
+                "fetched_total": fetched,
+                "parsed_total": parsed_total,
+                "parse_failed_total": 0,
+                "new_article_admit_rate_before": None,
+                "new_article_admit_rate_after": None,
+                "new_articles": [],
+                "sample_available": parsed_total > 0,
+                "errors": list(errors or []),
+            }
+
+        return _runner
+
+    def _seed_source_mix(self):
+        """一个零产出源 + 一个准入率低源 + 一个停更源（信源建议的三种输入）。"""
+        zero = self._insert_source("demo_pack", "零产出源", "https://zero.example.com/rss")
+        low = self._insert_source("demo_pack", "低准入源", "https://low.example.com/rss")
+        idle = self._insert_source("demo_pack", "停更源", "https://idle.example.com/rss")
+        for index in range(2):
+            article_id = self._insert_article(
+                f"低准入文章{index}", f"低准入正文{index}", f"https://low.example.com/a{index}"
+            )
+            self._insert_classification(article_id, "demo_pack", final_category="other")
+            self._link_article_to_source(article_id, low)
+        idle_id = self._insert_article(
+            "停更文章", "停更正文", "https://idle.example.com/a1", publish_date=_date(120)
+        )
+        self._insert_classification(idle_id, "demo_pack", final_category="trend")
+        self._link_article_to_source(idle_id, idle)
+        return zero, low, idle
+
+    def test_run_self_test_and_stage_emits_actionable_source_suggestion(self):
+        zero, low, idle = self._seed_source_mix()
+        probe_rows = [
+            {"source_id": zero, "source_name": "零产出源", "listing_status": "ok",
+             "listing_error": "", "fetched": 3, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "零产出"},
+            {"source_id": low, "source_name": "低准入源", "listing_status": "ok",
+             "listing_error": "", "fetched": 2, "parsed": 0, "parse_failed": 2,
+             "articles": [], "verdict": "准入率低"},
+            {"source_id": idle, "source_name": "停更源", "listing_status": "ok",
+             "listing_error": "", "fetched": 3, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "长期无新文"},
+        ]
+
+        result = m.run_self_test_and_stage(
+            "demo_pack", sample_limit=50, probe_runner=self._probe_stub(probe_rows)
+        )
+
+        self.assertIn("source_suggestion", result)
+        suggestion = result["source_suggestion"]
+        self.assertEqual(suggestion["kind"], "source")
+        self.assertEqual(suggestion["status"], "verified")
+        self.assertEqual(result["source_suggestion_id"], suggestion["suggestion_id"])
+        payload = suggestion["payload"]
+        self.assertEqual(
+            set(payload),
+            {"disable_sources", "replace_sources", "add_sources", "keep_sources",
+             "unverified_sources", "notes"},
+        )
+        self.assertEqual([item["source_id"] for item in payload["disable_sources"]], [zero])
+        self.assertEqual([item["source_id"] for item in payload["replace_sources"]], [idle])
+        self.assertEqual([item["source_id"] for item in payload["keep_sources"]], [low])
+        self.assertEqual(payload["unverified_sources"], [])
+        self.assertEqual(payload["add_sources"], [])
+        self.assertIn("历史入库产出 0 篇", payload["disable_sources"][0]["reason"])
+        self.assertIn("准入率仅", payload["keep_sources"][0]["reason"])
+        self.assertIn("随关键词改进观察", payload["keep_sources"][0]["reason"])
+        metrics = suggestion["metrics"]
+        # 整包口径：3 篇里 2 篇 other → other 66.6667%、准入率 33.3333%
+        self.assertEqual(metrics["before"]["other_pct"], 66.6667)
+        self.assertEqual(metrics["before"]["admit_rate"], 33.3333)
+        self.assertIsNone(metrics["after"]["admit_rate"])
+        self.assertEqual(
+            [(row["source_id"], row["fetched"], row["parse_failed"])
+             for row in metrics["crawl_probe"]["sources"]],
+            [(zero, 3, 0), (low, 2, 2), (idle, 3, 0)],
+        )
+        self.assertIn("建议停用 1 个零产出源", suggestion["reason"])
+        # 关键词侧没有候选词 → 关键词建议是 rejected，与信源建议互不影响
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("未挖到可用候选词", result["reason"])
+
+    def test_source_suggestion_marks_fetch_failure_as_unverified_not_disable(self):
+        zero, low, idle = self._seed_source_mix()
+        probe_rows = [
+            {"source_id": zero, "source_name": "零产出源", "listing_status": "failed",
+             "listing_error": "ReadTimeout", "fetched": 0, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "零产出"},
+            {"source_id": low, "source_name": "低准入源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 1,
+             "articles": [], "verdict": "准入率低"},
+            {"source_id": idle, "source_name": "停更源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 0,
+             "articles": [], "verdict": "长期无新文"},
+        ]
+        errors = [{"source_id": zero, "stage": "listing", "error": "ReadTimeout"}]
+
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=50,
+            probe_runner=self._probe_stub(probe_rows, errors=errors),
+        )
+
+        suggestion = result["source_suggestion"]
+        payload = suggestion["payload"]
+        # 抓取失败的零产出源只能进 unverified，不能进停用建议
+        self.assertEqual(payload["disable_sources"], [])
+        self.assertEqual(
+            [item["source_id"] for item in payload["unverified_sources"]], [zero]
+        )
+        self.assertIn("无法确认该源状态", payload["unverified_sources"][0]["reason"])
+        self.assertIn(
+            "抓取失败", payload["unverified_sources"][0]["reason"]
+        )
+        self.assertEqual(suggestion["metrics"]["crawl_probe"]["errors"], errors)
+        # 可执行项只剩"替换停更源"→ 仍达标；若连它都没有，就必须 rejected
+        self.assertEqual([item["source_id"] for item in payload["replace_sources"]], [idle])
+        self.assertEqual(suggestion["status"], "verified")
+
+    def test_source_suggestion_without_actionable_items_is_rejected(self):
+        _zero, low, _idle = self._seed_source_mix()
+        # 只暴露"准入率低"这个正常源（没有停更、没有零产出）→ 无可执行项
+        cursor = self.db.connection.cursor()
+        cursor.execute(
+            "UPDATE intel_sources SET source_name='停更源' WHERE source_name='停更源'"
+        )
+        cursor.close()
+        probe_rows = [
+            {"source_id": low, "source_name": "低准入源", "listing_status": "ok",
+             "listing_error": "", "fetched": 1, "parsed": 0, "parse_failed": 1,
+             "articles": [], "verdict": "准入率低"},
+        ]
+        # 把停更源的最近文章改成"今天"，让它判为有效；零产出源保持零产出 → 仍有可执行项，
+        # 因此这里直接构造一个"只有有效源"的评估结果来验证门槛。
+        assessment = {
+            "pack_id": "demo_pack",
+            "other_pct": 0.0,
+            "sources": [
+                {"source_id": low, "source_name": "低准入源", "source_url": "https://low",
+                 "verdict": "有效", "article_count": 2, "admitted_count": 1,
+                 "admitted_pct": 50.0, "last_article_at": "2026-10-01 00:00:00"},
+            ],
+            "source_verdict_counts": {"有效": 1},
+        }
+        built = m._build_source_suggestion(assessment, {"sources": probe_rows, "errors": []})
+        self.assertFalse(built["passed"])
+        self.assertIn("没有可执行的信源调整项", built["reason"])
+        record = m.stage_suggestion(
+            "demo_pack",
+            "source",
+            built["payload"],
+            built["metrics"],
+            status="verified" if built["passed"] else "rejected",
+            evidence=built["evidence"],
+            reason=built["reason"],
+        )
+        self.assertEqual(record["status"], "rejected")
+
+        # 即使外部硬塞 verified，也因为没有可执行项被降级
+        forced = copy.deepcopy(built["metrics"])
+        record = m.stage_suggestion(
+            "demo_pack", "source", built["payload"], forced, status="verified"
+        )
+        self.assertEqual(record["status"], "rejected")
+        self.assertIn("没有可执行项", record["reason"])
+
+
+if __name__ == "__main__":
+    unittest.main()
