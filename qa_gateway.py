@@ -206,6 +206,33 @@ class QaGatewayService:
         self.get_run(run_id, owner_user_id=owner_user_id)
         return self.store.events_after(run_id, after)
 
+    def evidence_graph(self, run_id: str, *, owner_user_id: str, limit: int = 20) -> dict:
+        """graph-rag-v2 Phase 06（P06-01）：读回该 run 的证据图（只读、纯规则、零外部调用）。
+
+        优先返回**当时真的跑过**的那份（`qa_stage_runs.details_json` 里阶段输出带的
+        `evidence_graph`），没有再按库表重建（`EvidenceGraphRepository.build`）——
+        两者同口径：前者是回放，后者是可复算。归属校验复用既有 `get_run`。
+        """
+        from qa_evidence_graph import EvidenceGraphRepository
+
+        self.get_run(run_id, owner_user_id=owner_user_id)
+        repository = EvidenceGraphRepository(self.store)
+        persisted = repository.load_persisted(run_id)
+        if persisted:
+            layer = dict(persisted)
+        else:
+            layer = repository.build(run_id)
+        cap = max(1, min(int(limit or 20), 200))
+        return {
+            "graph_version": str(layer.get("graph_version") or ""),
+            "run_id": str(run_id),
+            "source": "persisted" if persisted else "rebuilt",
+            "coverage": layer.get("coverage") or {},
+            "stats": layer.get("stats") or {},
+            "claims": list(layer.get("claims") or [])[:cap],
+            "contradictions": list(layer.get("contradictions") or [])[:cap],
+        }
+
     def cancel(self, run_id: str, *, owner_user_id: str) -> dict:
         run = self.get_run(run_id, owner_user_id=owner_user_id)
         changed = self.store.cancel_run(run_id, owner_user_id=owner_user_id)
@@ -435,6 +462,23 @@ def get_qa_run(run_id: str):
         owner, _pack = _identity()
         run = get_qa_gateway_service().get_run(run_id, owner_user_id=owner)
         return jsonify({"success": True, **_public_run(run)})
+    except Exception as exc:
+        return _error_response(exc)
+
+
+@qa_bp.route("/api/qa/v1/runs/<run_id>/evidence-graph", methods=["GET"])
+@qa_access_required
+def qa_run_evidence_graph(run_id: str):
+    """Phase 06（P06-01）：证据图只读 API（coverage / 关系分布 / 矛盾裁决）。
+
+    只读：不写库、不调模型、不联网；归属校验与其它 run 级接口一致。
+    """
+    try:
+        owner, _pack = _identity()
+        payload = get_qa_gateway_service().evidence_graph(
+            run_id, owner_user_id=owner,
+            limit=int(request.args.get("limit") or 20))
+        return jsonify({"success": True, "evidence_graph": payload})
     except Exception as exc:
         return _error_response(exc)
 

@@ -38,6 +38,10 @@ from qa_retrieval import ArticleRetriever, default_web_search_service
 from qa_storage import QaStore
 from qa_flags import QaFeatureFlags
 from qa_resilience import QaCircuitOpen, QaPersistentResilience
+from qa_evidence_graph import (
+    EVIDENCE_GRAPH_VERSION as EVIDENCE_GRAPH_LAYER_VERSION,
+    evidence_graph_enabled, layer_from_graph,
+)
 from qa_verifier import (
     VERIFIER_VERSION, verification_cache, verification_of, verifier_enabled,
     verify_claim_graph, verify_evidence_batch,
@@ -709,6 +713,24 @@ def _verify_claim_graph_in_place(graph: dict, *, store, question: str, run_meta:
     except Exception as exc:  # noqa: BLE001
         return {"verifier_version": VERIFIER_VERSION, "enabled": verifier_enabled(),
                 "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+
+
+def _build_evidence_graph_layer(graph: dict, *, plan: Mapping | None, run_meta: Mapping) -> dict:
+    """阶段 06（P06-01…P06-04）：把结论图升级成显式证据图 + 矛盾裁决。
+
+    **只加不改**：结果挂在 `graph["evidence_graph"]` 这个兄弟键上（Phase 02 的
+    `stats["evidence_layer"]`、Phase 03 的 `stats["verification"]` 同样做法），
+    既有的 claims/edges/conflicts 键集不动；唯一例外是**矛盾裁决**会按冻结
+    `CONFLICT_SCHEMA` 允许的三个字段（resolution/rationale/rule_version）回写
+    `graph["conflicts"]`——这正是 Phase 06 的交付内容，且不越过冻结契约。
+    关掉 `QA_EVIDENCE_GRAPH`（默认关）时本函数一次都不被调用，行为逐字回到接线前。
+    任何异常都吞掉并记账：建图绝不能因为一条坏数据把整条 run 打断。
+    """
+    try:
+        return layer_from_graph(graph, plan=plan, run_id=str(run_meta.get("id") or ""))
+    except Exception as exc:  # noqa: BLE001
+        return {"graph_version": EVIDENCE_GRAPH_LAYER_VERSION,
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
 def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping) -> int:
@@ -2377,6 +2399,13 @@ def build_qa_stage_handlers(
         # 按"结论 → 引用的证据"逐对核验后重写 verification_status（纯规则，不调模型）
         verification = _verify_claim_graph_in_place(
             graph, store=store, question=question, run_meta=context["run"])
+        # 阶段 06（P06-01…P06-04）：显式证据图 + 矛盾裁决（默认关；开启后结果挂兄弟键）
+        evidence_graph = {}
+        if evidence_graph_enabled():
+            evidence_graph = _build_evidence_graph_layer(
+                graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
+                run_meta=context["run"])
+            graph["evidence_graph"] = evidence_graph
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
             message = (f"证据图已建立：{len(graph.get('claims') or [])} 条结论、"
@@ -2390,6 +2419,9 @@ def build_qa_stage_handlers(
                 "message": message,
                 "evidence": list(graph.get("evidence") or [])[:6],
                 "verification": verification.get("stats") if isinstance(verification, Mapping) else {},
+                # 阶段 06：证据图回执（关系分布/coverage/矛盾裁决）——只在开关打开时出现
+                "evidence_graph": (evidence_graph.get("stats") or {}) if evidence_graph else {},
+                "claim_coverage": (evidence_graph.get("coverage") or {}) if evidence_graph else {},
             })
         return graph
 
@@ -2405,6 +2437,10 @@ def build_qa_stage_handlers(
             graph = build_claim_evidence_graph(level1, level2)
             _verify_claim_graph_in_place(graph, store=store, question=_question_for_synthesis(context),
                                          run_meta=run)
+            if evidence_graph_enabled():
+                # fast 路径同样补 P06 层（口径与 standard/deep 一致，只是没有 level2 计划）
+                graph["evidence_graph"] = _build_evidence_graph_layer(
+                    graph, plan=(context["outputs"].get("plan") or {}), run_meta=run)
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])

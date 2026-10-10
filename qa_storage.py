@@ -30,6 +30,14 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":"))
 
 
+def _decode_json(raw, fallback):
+    """JSON 列解码（坏值一律退回 fallback；读图路径绝不能因脏数据抛异常）。"""
+    try:
+        return json.loads(raw) if raw not in (None, "") else fallback
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return fallback
+
+
 def _row_dict(row) -> dict | None:
     if row is None:
         return None
@@ -1136,6 +1144,90 @@ class QaStore:
                 raise
             finally:
                 cursor.close()
+
+    def load_reasoning_graph(self, run_id: str) -> dict:
+        """读回结论图（graph-rag-v2 通用包 Phase 06 · P06-01 仓储读侧）。
+
+        与 `persist_reasoning_graph()` 对称：**只读、零新表、零迁移**，读四张既有表
+        （qa_claims / qa_claim_evidence / qa_conflicts / qa_evidence）的 payload 原文。
+        claim 优先取 `stage='conflict_review'`（= canonical claim 节点，由
+        `persist_reasoning_graph` 写入），该 stage 没有行时（老 run / fast 路径）
+        退回全部行，让调用方自己判断。任何异常都退化成空列表并留 `error`——
+        读图绝不能把调用方打断。
+        """
+        result = {"run_id": str(run_id), "claims": [], "edges": [], "conflicts": [],
+                  "evidence": [], "stage": "", "error": ""}
+        try:
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    cursor.execute(
+                        "SELECT count(*) FROM qa_claims WHERE run_id=? AND stage='conflict_review'",
+                        (str(run_id),))
+                    row = cursor.fetchone()
+                    has_canonical = bool(int((row[0] if row else 0) or 0))
+                    result["stage"] = "conflict_review" if has_canonical else "all"
+                    where = "run_id=? AND stage='conflict_review'" if has_canonical else "run_id=?"
+                    cursor.execute(
+                        "SELECT claim_key,stage,claim_text,claim_type,confidence,valid_from,valid_to,"
+                        "scope_json,verification_status,payload_json FROM qa_claims WHERE " + where,
+                        (str(run_id),))
+                    for item in cursor.fetchall():
+                        value = _row_dict(item) or {}
+                        result["claims"].append({
+                            "claim_key": str(value.get("claim_key") or ""),
+                            "stage": str(value.get("stage") or ""),
+                            "claim_text": str(value.get("claim_text") or ""),
+                            "claim_type": str(value.get("claim_type") or ""),
+                            "confidence": value.get("confidence"),
+                            "valid_from": value.get("valid_from"),
+                            "valid_to": value.get("valid_to"),
+                            "scope": _decode_json(value.get("scope_json"), []),
+                            "verification_status": str(value.get("verification_status") or ""),
+                            "payload": _decode_json(value.get("payload_json"), {}),
+                        })
+                    cursor.execute(
+                        "SELECT claim_key,evidence_ref,relationship,relevance_score "
+                        "FROM qa_claim_evidence WHERE run_id=?", (str(run_id),))
+                    for item in cursor.fetchall():
+                        value = _row_dict(item) or {}
+                        result["edges"].append({
+                            "claim_key": str(value.get("claim_key") or ""),
+                            "evidence_ref": str(value.get("evidence_ref") or ""),
+                            "relationship": str(value.get("relationship") or ""),
+                            "relevance_score": value.get("relevance_score"),
+                        })
+                    cursor.execute(
+                        "SELECT conflict_key,conflict_type,resolution,rationale,payload_json "
+                        "FROM qa_conflicts WHERE run_id=?", (str(run_id),))
+                    for item in cursor.fetchall():
+                        value = _row_dict(item) or {}
+                        payload = _decode_json(value.get("payload_json"), {})
+                        conflict = dict(payload) if isinstance(payload, Mapping) else {}
+                        conflict.setdefault("conflict_id", str(value.get("conflict_key") or ""))
+                        conflict.setdefault("conflict_type", str(value.get("conflict_type") or ""))
+                        conflict.setdefault("resolution", str(value.get("resolution") or ""))
+                        conflict.setdefault("rationale", str(value.get("rationale") or ""))
+                        result["conflicts"].append(conflict)
+                    cursor.execute(
+                        "SELECT evidence_ref,source_type,source_url,source_title,published_at,"
+                        "authority_level,payload_json FROM qa_evidence WHERE run_id=?", (str(run_id),))
+                    for item in cursor.fetchall():
+                        value = _row_dict(item) or {}
+                        result["evidence"].append({
+                            "evidence_ref": str(value.get("evidence_ref") or ""),
+                            "source_type": str(value.get("source_type") or ""),
+                            "source_url": str(value.get("source_url") or ""),
+                            "source_title": str(value.get("source_title") or ""),
+                            "published_at": value.get("published_at"),
+                            "authority_level": value.get("authority_level"),
+                            "payload": _decode_json(value.get("payload_json"), {}),
+                        })
+                finally:
+                    cursor.close()
+        except Exception as exc:  # noqa: BLE001  读图失败只留痕，不抛
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:160])
+        return result
 
     def prepare_retry(self, run_id: str, stage: str, *, owner_user_id: str) -> dict | None:
         """Remove only the requested stage and downstream snapshots; keep earlier evidence."""

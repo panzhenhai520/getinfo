@@ -28,9 +28,10 @@
 --------------------------------
   · **零模型调用**：所有真正执行的节点 `model_tier` 都是 `none`/`rule`；`small/medium/strong`
     只用于**声明**（§29），本轮不接任何模型（GPU 与语音机器人共用、已停用）。
-  · §18 的 deep 链里 `evidence_graph`(P06) / `gap_loop`(P07) / `final_verify`(P13) 属后续阶段：
-    本模块把它们建成 `status="deferred"`、`implemented=False`、`deferred_to="P0x"` 的**占位节点**，
-    不参与预算、也不假装跑过。既有的 `conflict_review` 阶段是**真节点**（今天就在跑）。
+  · §18 的 deep 链里 `gap_loop`(P07) / `final_verify`(P13) 属后续阶段：本模块把它们建成
+    `status="deferred"`、`implemented=False`、`deferred_to="P0x"` 的**占位节点**，不参与预算、
+    也不假装跑过；`evidence_graph`(P06) **已在 Phase 06 实现**（跑在既有 `conflict_review`
+    阶段内部，不新造运行期阶段），不再是占位。既有的 `conflict_review` 阶段一直是真节点。
   · `timeout` 是"分配预算"，不等于"一定会被强杀"：每个节点用 `budget_enforced` +
     `budget_source` 标明这笔预算今天到底由谁执行（舰队超时/多跳预算/阶段预算/仅记账）。
 """
@@ -102,6 +103,7 @@ SCHEMA_SEARCH_TRACE = "qa.search_trace"
 SCHEMA_EVIDENCE_OBJECT = "qa.evidence_object"
 SCHEMA_EVIDENCE_VERIFICATION = "qa.evidence_verification"
 SCHEMA_CLAIM_GRAPH = "qa.claim_graph"
+SCHEMA_EVIDENCE_GRAPH = "qa.evidence_graph"
 SCHEMA_RETRIEVAL_RESULT = "qa.level1_result"
 SCHEMA_LEVEL2_RESULT = "qa.level2_result"
 SCHEMA_FINAL_ANSWER = "qa.final_answer"
@@ -746,16 +748,40 @@ def _nodes_for_path(path: str, ctx: Mapping) -> list:
         budget_source="进程内契约校验（无外部调用）", budget_enforced=False))
 
     if path == QA_PATH_DEEP:
-        # ── §18 deep 链里的后续阶段：**占位节点**，本阶段不执行、不假装跑过 ──
+        # ── §18 deep 链的第 3 段：**P06 已实现**的 Evidence Graph 层 ──
+        # 诚实说明：P06 没有新造运行期阶段，它就跑在既有 `conflict_review` 阶段内部
+        # （`qa_pipeline._build_evidence_graph_layer`，建图/核验之后），所以本节点的
+        # stage 记 `conflict_review`（该阶段确实在三条链上），依赖既有 conflict_review 节点。
+        # 开关 `QA_EVIDENCE_GRAPH` **默认关**：关着的时候这一层根本不会跑，
+        # 所以节点标 `skipped`（与 level2 关闭时那三个节点同口径），不许假装已经跑过。
+        evidence_graph_status = "skipped"
+        evidence_graph_note = ("P06 已实现（qa_evidence_graph.build_layer），但 QA_EVIDENCE_GRAPH "
+                               "默认关 → 本轮不执行；打开开关即按既有 conflict_review 阶段内的规则建图")
+        evidence_graph_timeout = float(ctx.get("evidence_graph_seconds") or 2.0)
+        try:
+            import qa_evidence_graph as evidence_graph_module
+
+            if evidence_graph_module.evidence_graph_enabled():
+                evidence_graph_status = level2_status
+                evidence_graph_note = (
+                    "P06 交付：四类关系（SUPPORTS/REFUTES/DEPENDS/CONTRADICTS）+ claim coverage "
+                    "+ 矛盾裁决（理由码可复算）；嵌在既有 conflict_review 阶段内，不新增运行期阶段")
+        except Exception as exc:  # noqa: BLE001  取不到开关就按"关"处理，并写明原因
+            evidence_graph_note += "（开关读取失败：%s）" % type(exc).__name__
+            evidence_graph_timeout = 0.0
         nodes.append(_node(
-            path, "evidence_graph", node_kind="evidence_graph", stage="evidence_graph",
-            purpose="证据图构建与矛盾检测（§18 deep 的第 3 段）",
-            depends_on=["%s.verify" % path], timeout=0.0, model_tier="rule",
-            allowed_tools=["qa_evidence_graph"], validation=["evidence_object"],
-            failure_policy=QA_FAILURE_DEGRADE,
-            output_schema=_signal(SCHEMA_EVIDENCE_OBJECT, ["relations"]),
-            implemented=False, deferred_to="P06（Evidence Graph）", status="deferred",
-            notes="本阶段未实现：Phase 06 交付；占位只为让 deep 链与 §18 对得上"))
+            path, "evidence_graph", node_kind="evidence_graph", stage="conflict_review",
+            purpose="证据图构建与矛盾检测（§3.2/§15；P06 已实现，纯规则）",
+            depends_on=["%s.conflict_review" % path],
+            timeout=evidence_graph_timeout, model_tier="rule",
+            allowed_tools=["qa_evidence_graph.build_layer"],
+            validation=["evidence_graph", "claim_coverage", "contradiction_decision"],
+            failure_policy=_policy_for_stage("conflict_review", QA_FAILURE_DEGRADE),
+            input_schema=_signal(SCHEMA_CLAIM_GRAPH, ["claims", "evidence", "conflicts"]),
+            output_schema=_signal(SCHEMA_EVIDENCE_GRAPH, ["relations", "coverage"]),
+            budget_source="进程内规则建图/裁决（无外部调用；QA_EVIDENCE_GRAPH 默认关）",
+            budget_enforced=False, status=evidence_graph_status,
+            notes=evidence_graph_note))
         nodes.append(_node(
             path, "gap_loop", node_kind="gap_loop", stage="gap_loop",
             purpose="缺口驱动的再检索循环（§14 收敛与停止）",

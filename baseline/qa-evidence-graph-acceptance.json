@@ -1,0 +1,2074 @@
+{
+ "report_version": "qa-evidence-graph-acceptance-v1",
+ "generated_at_utc": "2026-10-10T19:17:51Z",
+ "graph_version": "qa-evidence-graph-v1",
+ "coverage_version": "qa-claim-coverage-v1",
+ "resolver_version": "qa-contradiction-resolver-v1",
+ "verify_replay": true,
+ "with_plan": true,
+ "snapshot": {
+  "captured_at_utc": "2026-10-10T18:25:43Z",
+  "source": {
+   "host": "117.50.211.93",
+   "container": "collectinfo-postgres",
+   "database": "collectinfo",
+   "access": "readonly (SET SESSION READ ONLY + statement_timeout=20000)",
+   "query": "qa_runs/qa_claims(conflict_review)/qa_claim_evidence/qa_conflicts/qa_evidence",
+   "snapshot_version": "qa-evidence-graph-real-sample-v1"
+  },
+  "catalog": {
+   "qa_runs": 15,
+   "qa_claims": 129,
+   "qa_claim_evidence": 57,
+   "qa_conflicts": 0,
+   "qa_evidence": 93
+  }
+ },
+ "totals": {
+  "runs": 13,
+  "before_claims": 43,
+  "before_edges": 47,
+  "before_conflicts": 0,
+  "after_claims": 43,
+  "after_edges": 51,
+  "after_contradictions": 0,
+  "after_depends_edges": 4,
+  "after_plan_claims": 30,
+  "after_plan_claims_matched": 2,
+  "after_supported_claims": 30,
+  "after_claims_with_evidence": 43,
+  "after_weight_mass": 6.5844,
+  "relation_distribution": {
+   "SUPPORTS": 30,
+   "MENTIONS": 16,
+   "REFUTES": 1
+  },
+  "before_relationship_distribution": {
+   "supports": 47
+  },
+  "reason_codes": {},
+  "contradiction_kinds": {},
+  "verification_basis": {
+   "verifier_pairs": 47
+  },
+  "edge_kind_distribution": {
+   "claim-evidence": 47,
+   "claim-claim": 4
+  },
+  "support_count_histogram": {
+   "1": 30,
+   "0": 13
+  },
+  "coverage_buckets": {
+   "(0.5,1)": 30,
+   "0": 12,
+   "refuted": 1
+  },
+  "after_claim_coverage": 0.6977,
+  "after_weighted_claim_coverage": 0.1531,
+  "after_evidence_coverage": 1.0,
+  "before_claim_coverage": null
+ },
+ "runs": [
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 1,
+    "evidence": 3,
+    "edges": 3,
+    "relationship_distribution": {
+     "supports": 3
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 1,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 9,
+    "edges": 3,
+    "relation_distribution": {
+     "MENTIONS": 3
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 3
+    },
+    "verification_basis": {
+     "verifier_pairs": 3
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 1,
+     "supported_claims": 0,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 1,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.0,
+     "weighted_claim_coverage": 0.0,
+     "claimed_claim_coverage": 0.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 0.0,
+     "support_count_histogram": {
+      "0": 1
+     },
+     "coverage_buckets": {
+      "0": 1,
+      "(0,0.5]": 0,
+      "(0.5,1)": 0,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-c1",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 1,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 3,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 1,
+     "confirmed": 0,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 1,
+     "insufficient_evidence": 0,
+     "supported_pairs": 0,
+     "refuted_pairs": 0,
+     "pairs": 3,
+     "unsupported_claim_rate": 1.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 4,
+    "evidence": 6,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 4,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 20,
+    "edges": 6,
+    "relation_distribution": {
+     "SUPPORTS": 4
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 4,
+     "claim-claim": 2
+    },
+    "verification_basis": {
+     "verifier_pairs": 4
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 4,
+     "supported_claims": 4,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 4,
+     "claims_without_evidence": 0,
+     "claim_coverage": 1.0,
+     "weighted_claim_coverage": 0.7635,
+     "claimed_claim_coverage": 1.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 3.054,
+     "support_count_histogram": {
+      "1": 4
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 4,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7539,
+       "weight": 0.7539,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7561,
+       "weight": 0.7561,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7342,
+       "weight": 0.7342,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-4",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.8098,
+       "weight": 0.8098,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 4,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 2,
+    "plan_claims": 4,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 2,
+    "valid_edges": {
+     "checked": 6,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 4,
+     "confirmed": 4,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 4,
+     "refuted_pairs": 0,
+     "pairs": 4,
+     "unsupported_claim_rate": 0.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "question": "最近一周最重要的技术进展是什么",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 2,
+    "evidence": 2,
+    "edges": 2,
+    "relationship_distribution": {
+     "supports": 2
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 2,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 8,
+    "edges": 2,
+    "relation_distribution": {
+     "SUPPORTS": 2
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 2
+    },
+    "verification_basis": {
+     "verifier_pairs": 2
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 2,
+     "supported_claims": 2,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 2,
+     "claims_without_evidence": 0,
+     "claim_coverage": 1.0,
+     "weighted_claim_coverage": 0.7407,
+     "claimed_claim_coverage": 1.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 1.4814,
+     "support_count_histogram": {
+      "1": 2
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 2,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7429,
+       "weight": 0.7429,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7385,
+       "weight": 0.7385,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 2,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 2,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 2,
+     "confirmed": 2,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 2,
+     "refuted_pairs": 0,
+     "pairs": 2,
+     "unsupported_claim_rate": 0.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "question": "帮我总结一下当前行业的主要风险",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 3,
+    "evidence": 3,
+    "edges": 3,
+    "relationship_distribution": {
+     "supports": 3
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 3,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 11,
+    "edges": 3,
+    "relation_distribution": {
+     "SUPPORTS": 3
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 3
+    },
+    "verification_basis": {
+     "verifier_pairs": 3
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 3,
+     "supported_claims": 3,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 3,
+     "claims_without_evidence": 0,
+     "claim_coverage": 1.0,
+     "weighted_claim_coverage": 0.7397,
+     "claimed_claim_coverage": 1.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 2.2191,
+     "support_count_histogram": {
+      "1": 3
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 3,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7385,
+       "weight": 0.7385,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.6708,
+       "weight": 0.6708,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.8098,
+       "weight": 0.8098,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 3,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 3,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 3,
+     "confirmed": 3,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 3,
+     "refuted_pairs": 0,
+     "pairs": 3,
+     "unsupported_claim_rate": 0.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "question": "出货量超1.9万台，占全球约77.9%的是什么",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "before": {
+    "claims": 4,
+    "evidence": 12,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 4,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 30,
+    "edges": 4,
+    "relation_distribution": {
+     "MENTIONS": 2,
+     "SUPPORTS": 2
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 4
+    },
+    "verification_basis": {
+     "verifier_pairs": 4
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 4,
+     "supported_claims": 2,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 4,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.5,
+     "weighted_claim_coverage": 0.3758,
+     "claimed_claim_coverage": 0.5,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 1.5033,
+     "support_count_histogram": {
+      "0": 2,
+      "1": 2
+     },
+     "coverage_buckets": {
+      "0": 2,
+      "(0,0.5]": 0,
+      "(0.5,1)": 2,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7472,
+       "weight": 0.7472,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7561,
+       "weight": 0.7561,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-4",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 4,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 4,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 4,
+     "confirmed": 2,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 2,
+     "insufficient_evidence": 0,
+     "supported_pairs": 2,
+     "refuted_pairs": 0,
+     "pairs": 4,
+     "unsupported_claim_rate": 0.5,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+   "mode": "standard",
+   "industry_pack_id": "healthcare_news",
+   "before": {
+    "claims": 4,
+    "evidence": 12,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 4,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 32,
+    "edges": 6,
+    "relation_distribution": {
+     "SUPPORTS": 4
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 4,
+     "claim-claim": 2
+    },
+    "verification_basis": {
+     "verifier_pairs": 4
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 4,
+     "supported_claims": 4,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 4,
+     "claims_without_evidence": 0,
+     "claim_coverage": 1.0,
+     "weighted_claim_coverage": 0.7456,
+     "claimed_claim_coverage": 1.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 2.9825,
+     "support_count_histogram": {
+      "1": 4
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 4,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7304,
+       "weight": 0.7304,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7713,
+       "weight": 0.7713,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7513,
+       "weight": 0.7513,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-4",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7295,
+       "weight": 0.7295,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 4,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 2,
+    "plan_claims": 4,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 2,
+    "valid_edges": {
+     "checked": 6,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 4,
+     "confirmed": 4,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 4,
+     "refuted_pairs": 0,
+     "pairs": 4,
+     "unsupported_claim_rate": 0.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "question": "这个行业最近最大的一笔融资是多少",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 2,
+    "evidence": 2,
+    "edges": 2,
+    "relationship_distribution": {
+     "supports": 2
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 2,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 8,
+    "edges": 2,
+    "relation_distribution": {
+     "SUPPORTS": 2
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 2
+    },
+    "verification_basis": {
+     "verifier_pairs": 2
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 2,
+     "supported_claims": 2,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 2,
+     "claims_without_evidence": 0,
+     "claim_coverage": 1.0,
+     "weighted_claim_coverage": 0.7046,
+     "claimed_claim_coverage": 1.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 1.4093,
+     "support_count_histogram": {
+      "1": 2
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 2,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.6708,
+       "weight": 0.6708,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7385,
+       "weight": 0.7385,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 2,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 2,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 2,
+     "confirmed": 2,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 2,
+     "refuted_pairs": 0,
+     "pairs": 2,
+     "unsupported_claim_rate": 0.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "question": "特斯拉无人驾驶出租车已经在运行了吗",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 2,
+    "evidence": 1,
+    "edges": 2,
+    "relationship_distribution": {
+     "supports": 2
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 2,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 6,
+    "edges": 2,
+    "relation_distribution": {
+     "MENTIONS": 1,
+     "SUPPORTS": 1
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 2
+    },
+    "verification_basis": {
+     "verifier_pairs": 2
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 2,
+     "supported_claims": 1,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 2,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.5,
+     "weighted_claim_coverage": 0.2537,
+     "claimed_claim_coverage": 0.5,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 0.5075,
+     "support_count_histogram": {
+      "0": 1,
+      "1": 1
+     },
+     "coverage_buckets": {
+      "0": 1,
+      "(0,0.5]": 0,
+      "(0.5,1)": 1,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-c1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.5075,
+       "weight": 0.5075,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-c2",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 2,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 1,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 2,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 2,
+     "confirmed": 1,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 1,
+     "insufficient_evidence": 0,
+     "supported_pairs": 1,
+     "refuted_pairs": 0,
+     "pairs": 2,
+     "unsupported_claim_rate": 0.5,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "question": "行业里排名靠前的公司最近有什么动作",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 3,
+    "evidence": 3,
+    "edges": 3,
+    "relationship_distribution": {
+     "supports": 3
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 3,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 11,
+    "edges": 3,
+    "relation_distribution": {
+     "SUPPORTS": 3
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 3
+    },
+    "verification_basis": {
+     "verifier_pairs": 3
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 3,
+     "supported_claims": 3,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 3,
+     "claims_without_evidence": 0,
+     "claim_coverage": 1.0,
+     "weighted_claim_coverage": 0.7174,
+     "claimed_claim_coverage": 1.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 2.1522,
+     "support_count_histogram": {
+      "1": 3
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 3,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7429,
+       "weight": 0.7429,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7385,
+       "weight": 0.7385,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.6708,
+       "weight": 0.6708,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 3,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 3,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 3,
+     "confirmed": 3,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 3,
+     "refuted_pairs": 0,
+     "pairs": 3,
+     "unsupported_claim_rate": 0.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "before": {
+    "claims": 4,
+    "evidence": 7,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 4,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 20,
+    "edges": 4,
+    "relation_distribution": {
+     "MENTIONS": 2,
+     "SUPPORTS": 2
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 4
+    },
+    "verification_basis": {
+     "verifier_pairs": 4
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 4,
+     "supported_claims": 2,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 4,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.5,
+     "weighted_claim_coverage": 0.3704,
+     "claimed_claim_coverage": 0.5,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 1.4816,
+     "support_count_histogram": {
+      "0": 2,
+      "1": 2
+     },
+     "coverage_buckets": {
+      "0": 2,
+      "(0,0.5]": 0,
+      "(0.5,1)": 2,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7508,
+       "weight": 0.7508,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-evidence-4",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7308,
+       "weight": 0.7308,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 4,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 4,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 4,
+     "confirmed": 2,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 2,
+     "insufficient_evidence": 0,
+     "supported_pairs": 2,
+     "refuted_pairs": 0,
+     "pairs": 4,
+     "unsupported_claim_rate": 0.5,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+   "mode": "standard",
+   "industry_pack_id": "invest_mgmt",
+   "before": {
+    "claims": 5,
+    "evidence": 15,
+    "edges": 6,
+    "relationship_distribution": {
+     "supports": 6
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 5,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 37,
+    "edges": 6,
+    "relation_distribution": {
+     "SUPPORTS": 4,
+     "MENTIONS": 2
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 6
+    },
+    "verification_basis": {
+     "verifier_pairs": 6
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 5,
+     "supported_claims": 4,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 5,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.8,
+     "weighted_claim_coverage": 0.6178,
+     "claimed_claim_coverage": 0.8,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 3.089,
+     "support_count_histogram": {
+      "0": 1,
+      "1": 4
+     },
+     "coverage_buckets": {
+      "0": 1,
+      "(0,0.5]": 0,
+      "(0.5,1)": 4,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-c1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7726,
+       "weight": 0.7726,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-c2",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.776,
+       "weight": 0.776,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-c3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7686,
+       "weight": 0.7686,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-c4",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-c5",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7718,
+       "weight": 0.7718,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 5,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 1,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 6,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 5,
+     "confirmed": 4,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 1,
+     "insufficient_evidence": 0,
+     "supported_pairs": 4,
+     "refuted_pairs": 0,
+     "pairs": 6,
+     "unsupported_claim_rate": 0.2,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "before": {
+    "claims": 5,
+    "evidence": 15,
+    "edges": 6,
+    "relationship_distribution": {
+     "supports": 6
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 5,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 37,
+    "edges": 6,
+    "relation_distribution": {
+     "MENTIONS": 6
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 6
+    },
+    "verification_basis": {
+     "verifier_pairs": 6
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 5,
+     "supported_claims": 0,
+     "qualified_claims": 0,
+     "refuted_claims": 0,
+     "claims_with_evidence": 5,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.0,
+     "weighted_claim_coverage": 0.0,
+     "claimed_claim_coverage": 0.0,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.0,
+     "verified_support_mass": 0.0,
+     "support_count_histogram": {
+      "0": 5
+     },
+     "coverage_buckets": {
+      "0": 5,
+      "(0,0.5]": 0,
+      "(0.5,1)": 0,
+      "1": 0,
+      "refuted": 0
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-c1",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-c2",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-c3",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-c4",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-c5",
+       "status": "unverified",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 5,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 6,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 5,
+     "confirmed": 0,
+     "qualified": 0,
+     "conflicted": 0,
+     "unverified": 5,
+     "insufficient_evidence": 0,
+     "supported_pairs": 0,
+     "refuted_pairs": 0,
+     "pairs": 6,
+     "unsupported_claim_rate": 1.0,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "question": "最近工信部在人形机器人领域有什么动态",
+   "mode": "standard",
+   "industry_pack_id": "automotive_industry",
+   "before": {
+    "claims": 4,
+    "evidence": 12,
+    "edges": 4,
+    "relationship_distribution": {
+     "supports": 4
+    },
+    "conflict_types": {},
+    "conflict_resolutions": {},
+    "conflicts": 0,
+    "claims_with_evidence": 4,
+    "claim_coverage": null,
+    "weighted_claim_coverage": null,
+    "relation_typed_edges": 0,
+    "contradictions": 0,
+    "reason_codes": {},
+    "coverage_note": "接线前只有小写 relationship 与旧裁决，没有 coverage / 关系类型 / 理由码"
+   },
+   "after": {
+    "graph_version": "qa-evidence-graph-v1",
+    "nodes": 30,
+    "edges": 4,
+    "relation_distribution": {
+     "SUPPORTS": 3,
+     "REFUTES": 1
+    },
+    "edge_kind_distribution": {
+     "claim-evidence": 4
+    },
+    "verification_basis": {
+     "verifier_pairs": 4
+    },
+    "coverage": {
+     "coverage_version": "qa-claim-coverage-v1",
+     "coverage_definition": "主口径 claim_coverage = 有 ≥1 条**已核验 SUPPORTS 边**（verdict=SUPPORTED 且 verification_basis ∈ {verifier_pairs, evidence_layer_verification}）的非 planned claim 数 / 非 planned claim 总数；weighted_claim_coverage = Σ_claim min(1, Σ 已核验 SUPPORTS 边强度) / 非 planned claim 总数（带证据权重的口径：单条 claim 由多条证据支持时不重复计数，强度取 §11 EvidenceScore 归一分）；claimed_claim_coverage = 把未被核验的 supports 关系（声称的支持）也算上，只作对照、不作结论；evidence_coverage = 有 ≥1 条 claim-evidence 边的 claim 数 / 总数（区分没有证据与证据不足）；refuted_claim_rate = 有 ≥1 条已核验 REFUTES 边且无已核验 SUPPORTS 边的 claim 数 / 总数。",
+     "total_claims": 4,
+     "supported_claims": 3,
+     "qualified_claims": 0,
+     "refuted_claims": 1,
+     "claims_with_evidence": 4,
+     "claims_without_evidence": 0,
+     "claim_coverage": 0.75,
+     "weighted_claim_coverage": 0.5552,
+     "claimed_claim_coverage": 0.75,
+     "claimed_support_edges": 0,
+     "evidence_coverage": 1.0,
+     "refuted_claim_rate": 0.25,
+     "verified_support_mass": 2.2208,
+     "support_count_histogram": {
+      "0": 1,
+      "1": 3
+     },
+     "coverage_buckets": {
+      "0": 0,
+      "(0,0.5]": 0,
+      "(0.5,1)": 3,
+      "1": 0,
+      "refuted": 1
+     },
+     "by_claim": [
+      {
+       "claim_id": "l1-evidence-1",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7472,
+       "weight": 0.7472,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-2",
+       "status": "conflicted",
+       "verified_supports": 0,
+       "claimed_supports": 0,
+       "verified_refutes": 1,
+       "verified_support_mass": 0,
+       "weight": 0,
+       "independent_sources": 0
+      },
+      {
+       "claim_id": "l1-evidence-3",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7302,
+       "weight": 0.7302,
+       "independent_sources": 1
+      },
+      {
+       "claim_id": "l1-evidence-4",
+       "status": "confirmed",
+       "verified_supports": 1,
+       "claimed_supports": 0,
+       "verified_refutes": 0,
+       "verified_support_mass": 0.7434,
+       "weight": 0.7434,
+       "independent_sources": 1
+      }
+     ]
+    },
+    "contradictions": 0,
+    "contradiction_kinds": {},
+    "resolution_distribution": {},
+    "reason_codes": {},
+    "status_consistency": {
+     "checked": 4,
+     "mismatches": 0,
+     "details": []
+    },
+    "depends_edges": 0,
+    "plan_claims": 2,
+    "plan_claims_matched": 0,
+    "plan_dependencies": 0,
+    "valid_edges": {
+     "checked": 4,
+     "schema_failures": 0,
+     "relation_failures": 0
+    },
+    "resolver": {
+     "name": "rule",
+     "registered": [],
+     "inline": false,
+     "version": "qa-contradiction-resolver-v1",
+     "thresholds": {
+      "authority_gap": 2,
+      "quality_ratio": 2.0,
+      "independence_gap": 2,
+      "strength_ratio": 2.0,
+      "plan_match_min": 0.34,
+      "max_edges": 2000
+     }
+    },
+    "verify_replay": true,
+    "verify_stats": {
+     "claims": 4,
+     "confirmed": 3,
+     "qualified": 0,
+     "conflicted": 1,
+     "unverified": 0,
+     "insufficient_evidence": 0,
+     "supported_pairs": 3,
+     "refuted_pairs": 1,
+     "pairs": 4,
+     "unsupported_claim_rate": 0.25,
+     "claim_without_evidence": 0
+    },
+    "verify_error": "",
+    "plan_source": "qa_execution_graph.build_research_plan(question)（老 run 未存计划，按当前 Phase 05 口径现算）"
+   }
+  }
+ ],
+ "skipped_runs": [
+  {
+   "run_id": "239ba38b18ee456f8a0d2304ec6ac342",
+   "claims": 0,
+   "edges": 3,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "2af7dd7fed684803ad0572f82d8ce042",
+   "claims": 0,
+   "edges": 2,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "4d89571a535142fcbb2249c654592323",
+   "claims": 0,
+   "edges": 2,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  },
+  {
+   "run_id": "d83ab463596747b6971ccebff3661d63",
+   "claims": 0,
+   "edges": 3,
+   "evidence": 0,
+   "reason": "没有 conflict_review 阶段的 canonical claim（结论图未建立）"
+  }
+ ],
+ "acceptance": {
+  "passed": true,
+  "checks": {
+   "edges_pass_contract": {
+    "ok": true,
+    "detail": "schema_failures=0 relation_failures=0"
+   },
+   "relations_agree_with_verifier": {
+    "ok": true,
+    "detail": "checked=43 mismatches=0"
+   },
+   "coverage_is_recomputable": {
+    "ok": true,
+    "detail": "异常 run：[]"
+   },
+   "reason_codes_are_legal": {
+    "ok": true,
+    "detail": "非法理由码 run：[]"
+   },
+   "resolution_distribution_sums_up": {
+    "ok": true,
+    "detail": "异常 run：[]"
+   },
+   "verify_replay_had_no_errors": {
+    "ok": true,
+    "detail": "复跑核验失败：[]"
+   },
+   "verify_replay_executed": {
+    "ok": true,
+    "detail": "13/13 个 run 跑了 Phase 03 核验复放"
+   }
+  }
+ }
+}

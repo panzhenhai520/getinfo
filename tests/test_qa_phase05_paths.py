@@ -11,8 +11,9 @@
      失败策略只用五值枚举，并且与 `qa_orchestrator.DEGRADABLE_STAGES` 对齐；
   4. 舰队打开时首跳是**并行扇出 + fan-in barrier**（§2.4/§2.5），Hunter 节点的超时/重试
      直接取舰队的既有旋钮；
-  5. deep 链里属于后续 Phase 的三段是 `deferred` 占位节点（`implemented=False`），
-     不参与预算、也不假装跑过。
+  5. deep 链里属于**后续** Phase 的两段（gap_loop=P07 / final_verify=P13）是 `deferred`
+     占位节点（`implemented=False`），不参与预算、也不假装跑过；
+     `evidence_graph`（P06）自 Phase 06 起已实现，跑在既有 `conflict_review` 阶段内部。
 """
 import os
 import sys
@@ -157,15 +158,36 @@ class NodeContractTests(unittest.TestCase):
             self.assertEqual(edge["schema"], by_id[edge["src"]]["output_schema"]["name"])
 
     def test_deep_path_defers_later_phase_nodes(self):
+        """Phase 06 起 `evidence_graph` 已实现（不再是占位）；仍占位的是 P07/P13 两段。"""
         graph = _graph(mode="deep")
         deferred = [node for node in graph["nodes"] if node["status"] == "deferred"]
         self.assertEqual({node["node_id"].split(".")[-1] for node in deferred},
-                         {"evidence_graph", "gap_loop", "final_verify"})
+                         {"gap_loop", "final_verify"})
         for node in deferred:
             self.assertFalse(node["implemented"])
             self.assertTrue(node["deferred_to"].startswith("P"))
             self.assertEqual(node["timeout"], 0.0, "占位节点不占预算")
-        self.assertEqual(graph["node_counts"]["deferred"], 3)
+        self.assertEqual(graph["node_counts"]["deferred"], 2)
+        # P06 的 evidence_graph 现在是**真节点**：implementation 打开、有预算、阶段在链上
+        evidence_graph = [node for node in graph["nodes"]
+                          if node["node_id"] == "deep.evidence_graph"][0]
+        self.assertTrue(evidence_graph["implemented"])
+        self.assertEqual(evidence_graph["deferred_to"], "")
+        self.assertGreater(evidence_graph["timeout"], 0.0)
+        self.assertIn(evidence_graph["stage"], set(graph["stage_chain"]))
+        self.assertEqual(evidence_graph["model_tier"], "rule", "P06 是纯规则实现")
+        # 开关默认关 → 这一层本轮真的不会跑，节点必须标 skipped（不许假装跑过）
+        self.assertEqual(evidence_graph["status"], "skipped")
+        saved = os.environ.get("QA_EVIDENCE_GRAPH")
+        os.environ["QA_EVIDENCE_GRAPH"] = "1"
+        try:
+            enabled = [node for node in _graph(mode="deep")["nodes"]
+                       if node["node_id"] == "deep.evidence_graph"][0]
+            self.assertEqual(enabled["status"], "pending", "开关打开后才进入待跑状态")
+        finally:
+            os.environ.pop("QA_EVIDENCE_GRAPH", None)
+            if saved is not None:
+                os.environ["QA_EVIDENCE_GRAPH"] = saved
         # 三条路径里只有 deep 有占位节点
         self.assertEqual(_graph(mode="standard")["node_counts"]["deferred"], 0)
         self.assertEqual(_graph(mode="fast")["node_counts"]["deferred"], 0)

@@ -206,3 +206,9 @@
     只有容器自身的 gunicorn（已运行 4692s）与我那一条 `ps`，**无残留**。
     **所有远端命令都是短命只读**（`SET default_transaction_read_only=on` + `timeout` 包住 + 显式 LIMIT；
     无写语句、无部署、无驻留进程）。
+|P06-01|证据图仓储与只读 API|`python -m pytest tests/test_qa_phase06_repository.py -q`|读写复用既有存储、零新表零迁移|**19 passed**；真机 13 run 全量重建成功；写库行数与回读 pairs 一致、写读重算关系分布逐字相同|PASS|`qa_evidence_graph.py`；`baseline/qa-evidence-graph-real-sample.json`|
+|P06-02|四类关系 + MENTIONS|`python -m pytest tests/test_qa_phase06_relations.py -q`|关系与核验结论一致、边过契约与端点矩阵|**31 passed**；真机关系分布 `{SUPPORTS:30, MENTIONS:16, REFUTES:1}` + DEPENDS 4；43 claim 复算核验状态 **0 不一致**；51 条边 0 违规|PASS|同上|
+|P06-03|claim coverage|`python -m pytest tests/test_qa_phase06_relations.py -q`|口径写死且可复算|真机 13 run：主口径 **0.6977**（30/43）、带权 0.1531、evidence_coverage 1.0；关核验复放 → 0.0|PASS|`baseline/qa-evidence-graph-acceptance.json`|
+|P06-04|矛盾检测与裁决|`python -m pytest tests/test_qa_phase06_contradiction.py -q`|两族检测 + 九理由码规则裁决、零模型、同输入同输出|**27 passed + 管线 9 例**；单调性守例通过；**真机 qa_conflicts 全库 0 行 ⇒ 真机无可检对象**，能力证据来自构造用例|PASS|同上|
+|P06-R1|Phase 05 占位升级|`python -m pytest tests -q -k phase05`|deep 的 evidence_graph 由占位改已实现且不回归|节点 `implemented=True`、stage=conflict_review、model_tier=rule；开关关时标 skipped；Phase 05 六份 **107 passed**；全量 2203 passed / 1 skipped / 0 failed|PASS|`qa_execution_graph.py`|
+|P06-R2|冻结契约不动|`python -m pytest tests/test_qa_phase06_contracts.py -q`|七指纹复算不变、枚举不扩|**18 passed**；七指纹与 P00-02 逐字相同；EVIDENCE_SCHEMA 仍 additionalProperties=False；CONFLICT_SCHEMA 字段集与取值域未动；仍 v7、无新表|PASS|同上|

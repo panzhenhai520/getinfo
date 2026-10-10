@@ -662,17 +662,243 @@ HUNTER_FLEET_RESULT_SCHEMA = {
 """舰队扇入结果：`partial=true` 表示"总预算内只等到部分 Hunter"（部分结果回退，不阻塞）。"""
 
 
+# ── 证据图与矛盾裁决（Phase 06 · P06-01…P06-04）────────────────────────────
+# 通用包 01_V2_ARCHITECTURE §3.2（Evidence Graph 节点/推荐边）、§15（Contradiction Agent：
+# "不要简单多数投票；比较来源级别/发布时间/版本/样本人群/实体一致性/定义一致性/证据独立性/
+# 是否存在更新版本；无法消解则保留 UNRESOLVED_CONTRADICTION"）、§9（只有验证过的证据进图）。
+#
+# **为什么不扩 `CLAIM_EVIDENCE_RELATIONSHIPS`**：那 4 个取值（supports/contradicts/
+# qualifies/context）是**证据条目**上 `relationship` 字段的镜像，而 `relationship` 的枚举写在
+# P00-02 冻结的 `qa_contracts.EVIDENCE_SCHEMA` 里（additionalProperties=False、指纹
+# 370301331c02c738，不许改）。若把 `depends`/`refutes` 塞进 CLAIM_EVIDENCE_RELATIONSHIPS：
+#   · `CLAIM_EVIDENCE_EDGE_SCHEMA.relationship` 会开始接受冻结证据契约**永远产不出**的取值
+#     ——两个契约互相打架（契约漂移）；
+#   · 既有 `qa_reasoning` 边与库表 `qa_claim_evidence.relationship` 也会被误读。
+# 所以 Phase 06 用**自己的**图级枚举 `EVIDENCE_GRAPH_RELATIONSHIPS`（架构 §3.2 推荐边口径，
+# 大写），并给出与冻结证据层取值的**全量映射** `EVIDENCE_GRAPH_RELATION_BY_STATUS`
+# （P06-02 的口径统一规则：核验 verdict 是唯一真源，图里的关系由它派生，二者不许打架）。
+EVIDENCE_GRAPH_VERSION = "qa-evidence-graph-v1"
+"""证据图版本；与 GRAPH/EVIDENCE/HUNTER/EXECUTION 四个版本是不同的事（知识状态图 vs 运行图）。"""
+
+EVIDENCE_GRAPH_NODE_TYPES: Tuple[str, ...] = ("claim", "evidence", "source", "contradiction")
+"""Phase 06 真正**物化**的节点类型。§3.2 还推荐 Question/SubQuestion/Entity/Gap——
+它们分别归 Phase 05（计划）、Phase 02（实体）、Phase 07（缺口），本阶段不抢后续阶段的活。"""
+
+EVIDENCE_GRAPH_NODE_PREFIX = {
+    "claim": "claim:", "evidence": "evidence:", "source": "source:",
+    "contradiction": "contradiction:",
+}
+"""节点 id 命名空间（`node_id = 前缀 + 原始 id`），避免 claim/evidence 同名撞车。"""
+
+EG_RELATION_SUPPORTS = "SUPPORTS"
+EG_RELATION_REFUTES = "REFUTES"
+EG_RELATION_DEPENDS = "DEPENDS"
+EG_RELATION_CONTRADICTS = "CONTRADICTS"
+EG_RELATION_MENTIONS = "MENTIONS"
+EVIDENCE_GRAPH_RELATIONSHIPS: Tuple[str, ...] = (
+    EG_RELATION_SUPPORTS, EG_RELATION_REFUTES, EG_RELATION_DEPENDS,
+    EG_RELATION_CONTRADICTS, EG_RELATION_MENTIONS,
+)
+"""证据图边关系（P06-02 要的四个 + `MENTIONS`）。
+
+`MENTIONS` 是**必须**存在的第五个值，不是顺手加的：冻结的证据契约里有 `context`（背景材料）
+与"未判定"（`relationship` 为空）两种证据，它们既不是支持也不是反驳；没有 `MENTIONS`
+就只能把它们错记成 `SUPPORTS`（claim coverage 会虚高）或悄悄丢边（图与证据包对不上）。
+它同时是架构 §3.2 的推荐边之一。"""
+
+EVIDENCE_GRAPH_EDGE_KINDS: Tuple[str, ...] = (
+    "claim-evidence", "claim-claim", "claim-contradiction", "evidence-contradiction",
+)
+"""边的端点类型组合（P06-01 的 typed contract）：claim-evidence = 证据对结论；
+claim-claim = 结论之间的推导/冲突；后两种 = 矛盾节点的挂载边。"""
+
+EVIDENCE_GRAPH_RELATIONS_BY_KIND = {
+    "claim-evidence": (EG_RELATION_SUPPORTS, EG_RELATION_REFUTES, EG_RELATION_MENTIONS),
+    "claim-claim": (EG_RELATION_DEPENDS, EG_RELATION_CONTRADICTS),
+    "claim-contradiction": (EG_RELATION_CONTRADICTS,),
+    "evidence-contradiction": (EG_RELATION_CONTRADICTS,),
+}
+"""关系 → 合法端点的**机器可校验**约束（防止 SUPPORTS 挂到 claim-claim 上这类漂移）。"""
+
+EVIDENCE_GRAPH_RELATION_BY_STATUS = {
+    EVIDENCE_STATUS_SUPPORTED: EG_RELATION_SUPPORTS,
+    EVIDENCE_STATUS_REFUTED: EG_RELATION_REFUTES,
+    # QUALIFIED = "带保留地支持"：关系仍是 SUPPORTS，但边标 qualified=true 且强度降档。
+    # 判 REFUTES 会直接篡改核验结论；另造 QUALIFIES 值则架构 §3.2 里没有这条推荐边。
+    EVIDENCE_STATUS_QUALIFIED: EG_RELATION_SUPPORTS,
+    # CONTEXT / UNVERIFIED 都不构成支持或反驳 → MENTIONS（由 edge.status 区分两者）。
+    EVIDENCE_STATUS_CONTEXT: EG_RELATION_MENTIONS,
+    EVIDENCE_STATUS_UNVERIFIED: EG_RELATION_MENTIONS,
+}
+"""核验 `verdict` / 证据层 `status` → 图级关系（P06-02 的唯一映射表，全量覆盖五个状态）。
+
+**这就是"图里的关系不许与核验层 verdict 打架"的落地方式**：关系不是另算的，而是从 Phase 03
+的 `verdict`（claim 级核验 `verification.pairs[].verdict`，或证据包上的
+`metadata.evidence_layer.verification.verdict`）派生；只有两者都缺失时才回落到 Phase 02 的
+`relationship → status` 映射（`EVIDENCE_STATUS_BY_RELATIONSHIP`）。"""
+
+EVIDENCE_GRAPH_QUALIFIED_STATUSES: Tuple[str, ...] = (EVIDENCE_STATUS_QUALIFIED,)
+"""映射到 SUPPORTS 但需打 `qualified=true`、强度乘折扣的状态（唯一一个非一一映射）。"""
+
+EVIDENCE_GRAPH_CONTRADICTION_KINDS: Tuple[str, ...] = ("evidence_conflict", "claim_conflict")
+"""矛盾的两族：同一结论同时有支持与反驳证据（§15 的 `E1 SUPPORTS C / E2 REFUTES C`）；
+以及两条结论互相冲突（`qa_reasoning` 已经检出、并写进 `graph["conflicts"]` 的那族）。"""
+
+CONTRADICTION_RESOLVER_VERSION = "qa-contradiction-resolver-v1"
+"""裁决规则版本：换规则=换版本；每条裁决结果都带这个版本号（可复算）。"""
+
+RESOLUTION_SCOPE_DIFFERENCE = "SCOPE_DIFFERENCE"
+RESOLUTION_NEWER_VERSION = "NEWER_VERSION_PRECEDES"
+RESOLUTION_AUTHORITY = "AUTHORITY_ADVANTAGE"
+RESOLUTION_QUALITY = "EVIDENCE_QUALITY_ADVANTAGE"
+RESOLUTION_INDEPENDENCE = "INDEPENDENCE_ADVANTAGE"
+RESOLUTION_STRENGTH = "RELATION_STRENGTH_ADVANTAGE"
+RESOLUTION_METHOD_UNDECIDED = "METHOD_DIFFERENCE_UNDECIDED"
+RESOLUTION_OPINION_UNDECIDED = "OPINION_ONLY_UNDECIDED"
+RESOLUTION_NO_DECISIVE_RULE = "NO_DECISIVE_RULE"
+CONTRADICTION_RESOLUTION_CODES: Tuple[str, ...] = (
+    RESOLUTION_SCOPE_DIFFERENCE, RESOLUTION_NEWER_VERSION, RESOLUTION_AUTHORITY,
+    RESOLUTION_QUALITY, RESOLUTION_INDEPENDENCE, RESOLUTION_STRENGTH,
+    RESOLUTION_METHOD_UNDECIDED, RESOLUTION_OPINION_UNDECIDED, RESOLUTION_NO_DECISIVE_RULE,
+)
+"""裁决理由码（§15 的八项比较逐条落成规则）：
+
+· `SCOPE_DIFFERENCE`：适用范围不同 → 两份说法都成立（resolved，各自限定范围）；
+· `NEWER_VERSION_PRECEDES`：生效时间/发布时间不同 → 新版优先，旧版留在时间线（resolved）；
+· `AUTHORITY_ADVANTAGE`：来源权威度（`qa_reasoning.authority_score` 口径）领先 ≥ 阈值；
+· `EVIDENCE_QUALITY_ADVANTAGE`：核验证据分（§11 EvidenceScore）质量领先 ≥ 比值阈值；
+· `INDEPENDENCE_ADVANTAGE`：独立来源数领先 ≥ 阈值（§15 的"证据独立性"）；
+· `RELATION_STRENGTH_ADVANTAGE`：支持/反驳强度差 ≥ 比值阈值（兜底的强弱比较）；
+· `METHOD_DIFFERENCE_UNDECIDED`：数字/口径/期限不一致 → 不许取平均（unresolved）；
+· `OPINION_ONLY_UNDECIDED`：只有解读角度差异 → unresolved；
+· `NO_DECISIVE_RULE`：条条都不满足 → unresolved，回答里必须呈现不确定性。
+前六条 = 能给出"以谁为准"的理由码，后三条 = 保留不确定性的理由码。"""
+
+CONTRADICTION_RESOLVED_CODES: Tuple[str, ...] = (
+    RESOLUTION_SCOPE_DIFFERENCE, RESOLUTION_NEWER_VERSION, RESOLUTION_AUTHORITY,
+    RESOLUTION_QUALITY, RESOLUTION_INDEPENDENCE, RESOLUTION_STRENGTH,
+)
+"""resolution=resolved 的合法理由码。"""
+
+CONTRADICTION_UNRESOLVED_CODES: Tuple[str, ...] = (
+    RESOLUTION_METHOD_UNDECIDED, RESOLUTION_OPINION_UNDECIDED, RESOLUTION_NO_DECISIVE_RULE,
+)
+"""resolution=unresolved 的合法理由码（§15：无法消解则保留，回答明确呈现不确定性）。"""
+
+EVIDENCE_GRAPH_EDGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "edge_id": {"type": "string"},
+        "kind": {"type": "string", "enum": list(EVIDENCE_GRAPH_EDGE_KINDS)},
+        "src": {"type": "string"},
+        "dst": {"type": "string"},
+        "graph_relation": {"type": "string", "enum": list(EVIDENCE_GRAPH_RELATIONSHIPS)},
+        "status": {"type": "string", "enum": list(EVIDENCE_STATUSES) + [""]},
+        "strength": {"type": "number", "minimum": 0, "maximum": 1},
+        "claim_id": {"type": "string"},
+        "evidence_ref": {"type": "string"},
+        "metadata": {"type": "object"},
+    },
+    "required": ["edge_id", "kind", "src", "dst", "graph_relation"],
+    "additionalProperties": True,
+}
+"""证据图边契约（P06-01/P06-02）：`graph_relation` 是图级关系，`status` 是它来自的核验状态。"""
+
+EVIDENCE_GRAPH_NODE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "node_id": {"type": "string"},
+        "node_type": {"type": "string", "enum": list(EVIDENCE_GRAPH_NODE_TYPES)},
+        "label": {"type": "string"},
+        "ref": {"type": "string"},
+        "metadata": {"type": "object"},
+    },
+    "required": ["node_id", "node_type"],
+    "additionalProperties": True,
+}
+"""证据图节点契约（P06-01）。"""
+
+CLAIM_COVERAGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "coverage_version": {"type": "string"},
+        "coverage_definition": {"type": "string"},
+        "total_claims": {"type": "integer", "minimum": 0},
+        "supported_claims": {"type": "integer", "minimum": 0},
+        "qualified_claims": {"type": "integer", "minimum": 0},
+        "refuted_claims": {"type": "integer", "minimum": 0},
+        "claims_with_evidence": {"type": "integer", "minimum": 0},
+        "claims_without_evidence": {"type": "integer", "minimum": 0},
+        "claim_coverage": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "weighted_claim_coverage": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "evidence_coverage": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "refuted_claim_rate": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "support_count_histogram": {"type": "object"},
+        "coverage_buckets": {"type": "object"},
+        "by_claim": {"type": "array", "items": {"type": "object"}},
+    },
+    "required": ["coverage_version", "total_claims", "supported_claims"],
+    "additionalProperties": True,
+}
+"""claim coverage 契约（P06-03）：口径逐字写在 `coverage_definition` 里，可复算。
+
+`claim_coverage` 等比率字段**不在 required 里**：空图（0 条 claim）时分母为 0，
+口径上"不适用"——用 `null` 表达，绝不用 `0.0` 冒充"覆盖率为零"。"""
+
+CONTRADICTION_DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "contradiction_id": {"type": "string"},
+        "kind": {"type": "string", "enum": list(EVIDENCE_GRAPH_CONTRADICTION_KINDS)},
+        "conflict_type": {"type": "string"},
+        "claim_ids": {"type": "array", "items": {"type": "string"}},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "resolution": {"type": "string", "enum": ["resolved", "unresolved"]},
+        "reason_code": {"type": "string", "enum": list(CONTRADICTION_RESOLUTION_CODES)},
+        "decider": {"type": "string"},
+        "rule_version": {"type": "string"},
+        "winner": {"type": "object"},
+        "inputs": {"type": "object"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["contradiction_id", "kind", "resolution", "reason_code", "rule_version"],
+    "additionalProperties": True,
+}
+"""矛盾裁决结果契约（P06-04）。`resolution` 取值域与冻结 CONFLICT_SCHEMA 完全一致
+（resolved/unresolved）——裁决细节（winner/inputs/reason_code）走这个**新契约**，
+不往冻结的 CONFLICT_SCHEMA 里塞字段。"""
+
+EVIDENCE_GRAPH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "graph_version": {"type": "string"},
+        "run_id": {"type": "string"},
+        "nodes": {"type": "array", "items": EVIDENCE_GRAPH_NODE_SCHEMA},
+        "edges": {"type": "array", "items": EVIDENCE_GRAPH_EDGE_SCHEMA},
+        "claims": {"type": "array", "items": {"type": "object"}},
+        "coverage": CLAIM_COVERAGE_SCHEMA,
+        "contradictions": {"type": "array", "items": CONTRADICTION_DECISION_SCHEMA},
+        "stats": {"type": "object"},
+    },
+    "required": ["graph_version", "nodes", "edges", "claims", "coverage", "contradictions"],
+    "additionalProperties": True,
+}
+"""证据图整体契约（P06-01 的仓储/API 返回体）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
-    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s：节点类型 %d / 边关系 %d / "
+    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s：节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
-            "问题意图 %d / 执行节点类型 %d"
+            "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
-               EXECUTION_GRAPH_VERSION,
+               EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
-               len(QUERY_INTENTS), len(EXECUTION_NODE_KINDS)))
+               len(QUERY_INTENTS), len(EXECUTION_NODE_KINDS),
+               len(EVIDENCE_GRAPH_NODE_TYPES), len(EVIDENCE_GRAPH_RELATIONSHIPS),
+               len(CONTRADICTION_RESOLUTION_CODES)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -727,6 +953,12 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "evidence_requirement": EVIDENCE_REQUIREMENT_SCHEMA,
         "query_interpretation": QUERY_INTERPRETATION_SCHEMA,
         "signal": SIGNAL_SCHEMA,
+        # Phase 06（P06-01…P06-04）
+        "evidence_graph": EVIDENCE_GRAPH_SCHEMA,
+        "evidence_graph_node": EVIDENCE_GRAPH_NODE_SCHEMA,
+        "evidence_graph_edge": EVIDENCE_GRAPH_EDGE_SCHEMA,
+        "claim_coverage": CLAIM_COVERAGE_SCHEMA,
+        "contradiction_decision": CONTRADICTION_DECISION_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:
