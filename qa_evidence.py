@@ -103,6 +103,23 @@ def seen_dedupe_mode() -> str:
     return raw if raw in _SEEN_MODES else "rejected"
 
 
+def seen_prune_enabled() -> bool:
+    """seen 表的过期清理开关（QA_EVIDENCE_SEEN_PRUNE_ENABLED）——**默认关**。
+
+    为什么默认关：`qa_evidence_seen` 是 Phase 02 才建的新表（schema v7），还没有真实写入量
+    与去重命中率的数据。先让维护入口空转、观察一段时间（多少行、多少天会被判过期、
+    清理后跨轮去重是否仍然有效），确认不会把"长时间没被复用但依然合法"的来源记忆误删，
+    再按运维节奏打开——不默认开是为了不影响生产节奏（清理本身不阻塞问答，但删错记忆
+    会让重复垃圾重新进证据包）。
+    """
+    return _env_flag("QA_EVIDENCE_SEEN_PRUNE_ENABLED", False)
+
+
+def seen_ttl_days() -> int:
+    """seen 身份的保留天数（QA_EVIDENCE_SEEN_TTL_DAYS，默认 30，钳制 1…3650）。"""
+    return _env_int("QA_EVIDENCE_SEEN_TTL_DAYS", 30, 1, 3650)
+
+
 def now_utc() -> str:
     """与 qa_storage._now 同格式的 UTC ISO8601（毫秒 + Z）。"""
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -590,6 +607,31 @@ def filter_seen(items: Iterable, seen: Mapping, *, mode: str | None = None) -> t
     }
 
 
+def prune_seen_evidence(store, *, older_than_days: int | None = None) -> dict:
+    """维护入口（Phase 02 缺口 2）：按开关与保留期清理 seen 身份，返回审计。
+
+    **默认关**（`QA_EVIDENCE_SEEN_PRUNE_ENABLED`，见 `seen_prune_enabled` 的说明）：
+    关掉时一条都不删，只回 `{"enabled": False, "deleted": 0}`——维护入口照样能安全调用。
+    开关打开时委托 store 的 `prune_seen_evidence`（按 `last_seen_at` 删过期行）；
+    任何异常都吞掉并写进 `error`：清理绝不能拖累维护作业。
+    """
+    if older_than_days is None:
+        days = seen_ttl_days()
+    else:
+        try:
+            days = max(1, int(older_than_days))
+        except (TypeError, ValueError):
+            days = seen_ttl_days()
+    if not seen_prune_enabled():
+        return {"enabled": False, "deleted": 0, "ttl_days": days}
+    try:
+        deleted = int(store.prune_seen_evidence(older_than_days=days) or 0)
+    except Exception as exc:  # noqa: BLE001
+        return {"enabled": True, "deleted": 0, "ttl_days": days,
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+    return {"enabled": True, "deleted": deleted, "ttl_days": days}
+
+
 def dedupe_evidence_items(items: Iterable, limit: int) -> list:
     """既有 `_dedupe_evidence` 的口径（集中到证据层单一事实源，行为不变）。
 
@@ -652,6 +694,7 @@ __all__ = [
     "evidence_fingerprint", "evidence_layer_enabled", "evidence_object",
     "evidence_provenance", "evidence_relations", "evidence_status", "evidence_terms",
     "filter_seen", "load_seen", "minimal_quote_span", "node_key", "now_utc",
-    "record_seen", "seen_dedupe_mode", "seen_records", "source_fingerprint",
+    "prune_seen_evidence", "record_seen", "seen_dedupe_mode", "seen_prune_enabled",
+    "seen_records", "seen_ttl_days", "source_fingerprint",
     "source_identity", "span_max_chars",
 ]

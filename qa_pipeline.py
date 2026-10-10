@@ -14,7 +14,7 @@ from typing import Mapping
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_level1_result, validate_level2_result
 from qa_errors import QaAction, QaPublicError, classify_qa_error
 from qa_evidence import (
-    EVIDENCE_LAYER_VERSION, annotate_evidence_batch, dedupe_by_fingerprint,
+    EVIDENCE_LAYER_VERSION, annotate_evidence, dedupe_by_fingerprint,
     dedupe_evidence_items, evidence_layer_enabled, evidence_object, filter_seen,
     load_seen, record_seen,
 )
@@ -401,9 +401,102 @@ def _evidence_scope(run_meta: Mapping) -> dict:
     return {"owner_user_id": owner, "session_id": session_id, "industry_pack_id": pack_id}
 
 
+def _scope_available(scope: Mapping) -> bool:
+    """作用域三元组是否可用：三个键必须至少有一个非空（全空 = 拿不到作用域）。
+
+    全空时**只标注、不登记**：不登记最多是去重记忆少一条，登记错了就是跨用户/跨会话串味。
+    """
+    return bool(str(scope.get("owner_user_id") or "")
+                or str(scope.get("session_id") or "")
+                or str(scope.get("industry_pack_id") or ""))
+
+
+def _evidence_layer_receipt(audit: Mapping) -> dict:
+    """证据层回执（单一事实源）：键集与接线前**逐字相同**。
+
+    只有真的跳过了 seen 登记（`skipped_scope`）时才多一条计数——否则不动键集，
+    免得破坏既有回执结构（前端与验收脚本都按这套键读）。
+    """
+    receipt = {key: audit.get(key) for key in (
+        "evidence_layer", "annotated", "seen_dropped", "dedupe_dropped", "recorded", "reason")}
+    if int(audit.get("skipped_scope") or 0):
+        receipt["skipped_scope"] = int(audit.get("skipped_scope") or 0)
+    return receipt
+
+
+def _merge_evidence_audits(target: dict, extra: Mapping) -> dict:
+    """把多跳各跳的证据层回执并入同一条 `stats["evidence_layer"]`（缺口 1，不新增返回键）。
+
+    计数类累加，`evidence_layer` 版本取先有的非空值，`reason` 去重后拼接（截断 200 字）。
+    """
+    if not isinstance(extra, Mapping) or not extra:
+        return target
+    for key in ("annotated", "seen_dropped", "dedupe_dropped", "recorded", "skipped_scope"):
+        target[key] = int(target.get(key) or 0) + int(extra.get(key) or 0)
+    if not str(target.get("evidence_layer") or "").strip():
+        target["evidence_layer"] = str(extra.get("evidence_layer") or "")
+    reasons = [str(item).strip() for item in (target.get("reason"), extra.get("reason")) if str(item or "").strip()]
+    target["reason"] = "；".join(dict.fromkeys(reasons))[:200]
+    return target
+
+
+def _wire_hop_evidence_layer(evidence: list, *, question: str, plan: Mapping | None,
+                            run_meta: Mapping | None, store, round_index: int,
+                            corpus_version: str, route: str, audit: dict | None) -> list[dict]:
+    """多跳**每一跳**的证据层接线（Phase 02 缺口 1）：与 level1 同一套函数、同一套作用域。
+
+    每跳走"标注 → span 级去重 → 按 seen 跨轮去重 → 登记（中性 seen）"，
+    回执累加进调用方传进来的 `audit`（最终并入 `stats["evidence_layer"]`）。
+    拿不到 store 或作用域时**只记一条 `skipped_scope` 计数，绝不报错**，证据原样返回。
+    """
+    if store is None or not isinstance(run_meta, Mapping) or not _scope_available(_evidence_scope(run_meta)):
+        if audit is not None:
+            audit["skipped_scope"] = int(audit.get("skipped_scope") or 0) + 1
+        return list(evidence)
+    try:
+        kept, hop_audit = _apply_evidence_layer(
+            evidence, rejected=[], question=question, plan=plan, run_meta=run_meta,
+            store=store, round_index=round_index, corpus_version=corpus_version,
+            stage="multi_hop", route=route, witness_only=True, empty_fallback=False,
+        )
+    except Exception as exc:  # noqa: BLE001 —— 证据层绝不拖累多跳
+        if audit is not None:
+            audit["reason"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return list(evidence)
+    if audit is not None:
+        _merge_evidence_audits(audit, hop_audit)
+    return kept
+
+
+def _research_route(item: Mapping) -> str:
+    """level2（RAGFlow 研究）证据的检索通道：dataset 检索就是向量语义检索，归 `semantic`。
+
+    取值域仍来自 `qa_graph_contracts.QA_ROUTE_*`（单一事实源）；非 RAGFlow 证据
+    （分跳里混进来的文章/图谱证据）按既有口径 `_route_of_evidence` 判。
+    """
+    method = str(item.get("retrieval_method") or "").strip().casefold()
+    if method.startswith("ragflow") or str(item.get("source_type") or "") == "ragflow_chunk":
+        return QA_ROUTE_SEMANTIC
+    return _route_of_evidence(item)
+
+
+def _has_multi_hop_layer(item: Mapping) -> bool:
+    """这条证据是否已被**多跳某一跳**标注过（`provenance.stage == multi_hop`）。
+
+    只有逐跳标注过的才保留：整批标注（level1 / level2）会把 stage 覆盖成自己，
+    那样每跳的 provenance 就没了（P02-02 的意义所在）。其它情况一律重标，
+    免得把上一轮缓存里的旧 run_id 一直带着（缓存命中的证据必须重算本轮 provenance）。
+    """
+    layer = evidence_object(item)
+    provenance = layer.get("provenance")
+    return isinstance(provenance, Mapping) and str(provenance.get("stage") or "") == "multi_hop"
+
+
 def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapping | None,
                           run_meta: Mapping, store, round_index: int = 0,
-                          corpus_version: str = "") -> tuple[list[dict], dict]:
+                          corpus_version: str = "", stage: str = "level1_retrieval",
+                          route: str = "", witness_only: bool = False,
+                          empty_fallback: bool = True) -> tuple[list[dict], dict]:
     """阶段 02（P02-01…P02-04）主接线：证据层标注 + seen 登记 + 跨轮/跨 run 去重。
 
     只加不改：
@@ -415,10 +508,22 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
         否则本轮的登记会把自己过滤掉（mode=all 时尤其致命）；
       · 任何异常都原样返回证据 + 审计里写明原因——证据层绝不能把问答打断。
 
+    阶段 02 缺口 1 增补（多跳每一跳 / level2 复用同一条路，行为仍是"只加不改"）：
+      · `stage` / `route` 进 provenance，让每一跳、每一次 RAGFlow 检索都能被回溯；
+      · 多跳逐跳标注过的证据（`provenance.stage == multi_hop`）不再被整批标注覆盖，
+        否则每跳的 provenance 就没了（`annotated` 仍按"带标注的条数"计）；
+      · `witness_only=True`：本轮证据只登记成中性 `seen`。多跳每一跳的候选还没过闸门，
+        不能冒充 confirmed——否则之后被闸门拒掉的来源会因为 confirmed 永远躲过跨轮去重；
+      · `empty_fallback=False`：去重把整批证据清空时**返回空**而不是退回原证据
+        （逐跳用；level1 保持既有"绝不返回空证据包"的兜底口径）；
+      · 拿不到作用域三元组（owner/session/pack 全空）时**跳过登记但不报错**，
+        审计里记 `skipped_scope` 计数（跨用户/跨会话串味比少记一条危险得多）。
+
     返回 (证据, 审计)。
     """
     audit = {"evidence_layer": "skipped", "reason": "", "annotated": 0, "seen_dropped": 0,
-             "dedupe_dropped": 0, "recorded": 0, "scope": _evidence_scope(run_meta)}
+             "dedupe_dropped": 0, "recorded": 0, "skipped_scope": 0,
+             "scope": _evidence_scope(run_meta)}
     if not evidence_layer_enabled():
         audit["reason"] = "QA_EVIDENCE_LAYER_ENABLED=0"
         return list(evidence), audit
@@ -426,9 +531,12 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
         run_id = str(run_meta.get("id") or "")
         scope = audit["scope"]
         rejected_items = [item for item in (rejected or []) if isinstance(item, Mapping)]
-        reviewed = annotate_evidence_batch(
-            evidence, terms=question_terms(question, plan), run_id=run_id,
-            stage="level1_retrieval", round_index=round_index, corpus_version=corpus_version)
+        reviewed = [
+            dict(item) if _has_multi_hop_layer(item) else annotate_evidence(
+                item, terms=question_terms(question, plan), run_id=run_id, stage=stage,
+                route=route, round_index=round_index, corpus_version=corpus_version)
+            for item in (evidence or []) if isinstance(item, Mapping)
+        ]
         reviewed, fingerprint_audit = dedupe_by_fingerprint(reviewed)
         seen_before = load_seen(store, scope=scope, items=[*reviewed, *rejected_items])
         kept, seen_audit = filter_seen(reviewed, seen_before)
@@ -437,20 +545,43 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
                         for entry in seen_audit.get("dropped") or []}
         skipped = [item for item in reviewed
                    if str(evidence_object(item).get("source_fingerprint") or "") in dropped_keys]
-        recorded = record_seen(
-            store, scope=scope, accepted=kept, rejected=rejected_items, witnessed=skipped,
-            run_id=run_id, round_index=round_index,
-        )
+        if not _scope_available(scope):
+            # 缺作用域三元组：只标注、不登记（去重记忆宁可少一条，也不能串到别人身上）
+            audit["skipped_scope"] = 1
+        else:
+            if witness_only:
+                # 逐跳候选：通过的登记中性 `seen`；被跨轮去重丢掉的按"仍然拒绝"再次登记
+                # （刷新 last_seen_at，但不把已有的 rejected 身份降级成 seen——降级等于
+                # 下一轮不再丢它，跨轮去重就白做了）
+                recorded = record_seen(
+                    store, scope=scope, rejected=[*rejected_items, *skipped],
+                    witnessed=kept, run_id=run_id, round_index=round_index,
+                )
+            else:
+                # 整批路径：`skipped` 是"本轮被跨轮去重丢掉"的来源。它们**上一轮就已经是 rejected**
+                # （否则不会被丢），所以这里必须按 rejected 再登记一次，只刷新 last_seen_at。
+                # 早先写成 witnessed=skipped 会把它降级成中性 seen → 下一轮不再丢它、靠闸门再拒一次，
+                # 跨轮去重就白做了（与逐跳路径的口径也不一致）。
+                recorded = record_seen(
+                    store, scope=scope, accepted=kept,
+                    rejected=[*rejected_items, *skipped],
+                    run_id=run_id, round_index=round_index,
+                )
+            audit["recorded"] = int(recorded.get("recorded") or 0)
+            audit["record_error"] = str(recorded.get("error") or "")
         audit.update({
             "evidence_layer": EVIDENCE_LAYER_VERSION,
             "annotated": len(reviewed),
             "seen_dropped": int(seen_audit.get("dropped_count") or 0),
             "dedupe_dropped": int(fingerprint_audit.get("dropped_count") or 0),
-            "recorded": int(recorded.get("recorded") or 0),
             "seen_mode": str(seen_audit.get("mode") or ""),
-            "record_error": str(recorded.get("error") or ""),
         })
         if not kept:
+            if not empty_fallback:
+                # 多跳每一跳：这一跳没新证据就是没新证据，不许把"已知垃圾"当证据塞回去
+                # （回执里如实记 empty，缺口交给 logic_validation 说明）
+                audit["reason"] = "seen_dedupe_emptied_evidence"
+                return [], audit
             # 去重把证据清空了：宁可退回原证据（只加了标注），也不给用户一个空证据包
             audit["reason"] = "seen_dedupe_emptied_evidence_fallback"
             return reviewed, audit
@@ -587,7 +718,9 @@ def _hop_carry_terms(evidence, exclude, limit: int = 6):
 
 def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                    pack_id: str, limit: int, emit_stage_event=None,
-                   trace_recorder=None, round_index: int = 0):
+                   trace_recorder=None, round_index: int = 0, store=None,
+                   run_meta: Mapping | None = None, question: str = "",
+                   corpus_version: str = "", hop_audit: dict | None = None):
     """按 DAG 顺序执行多跳检索，返回 (合并后的 local, 每跳回执)。
 
     预算与跳数是**双重硬约束**：跳数上限 `QA_MAX_HOPS`，墙钟上限
@@ -597,6 +730,10 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
     阶段 10 增补：
       · `trace_recorder`：每跳完成后回调一次（写 `qa_reasoning_traces`，**失败不影响主流程**）；
       · `round_index`：递归重规划的轮次（0 = 首轮，1 = 依据缺失链接补检那一轮）。
+
+    阶段 02 缺口 1 增补：每一跳取回的证据都过一遍证据层（标注 + seen 登记 + 跨轮去重），
+    回执累加进调用方传入的 `hop_audit`，最终并入既有 `stats["evidence_layer"]`（不新增返回键）。
+    `store` / `run_meta` 缺省为 None：拿不到作用域时只记 `skipped_scope`，绝不报错。
     """
     import time as _time
 
@@ -699,6 +836,12 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             continue
 
         hop_evidence = list(hop_local.get("evidence") or [])
+        # ── 阶段 02（缺口 1）：本跳候选先过证据层（同一套作用域：标注 + seen + 跨轮去重）──
+        # 被跨轮去重丢掉的来源不进合并池；通过的候选只登记成中性 seen（还没过闸门）。
+        hop_evidence = _wire_hop_evidence_layer(
+            hop_evidence, question=question, plan=retrieval_plan, run_meta=run_meta,
+            store=store, round_index=round_index, corpus_version=corpus_version,
+            route=_hop_route(hop_evidence, hop_local.get("stats")), audit=hop_audit)
         added = 0
         for item in hop_evidence:
             ref = str(item.get("evidence_ref") or "")
@@ -762,8 +905,15 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                         repair_plan, industry_pack_id=pack_id, page_context={}, limit=limit)
                 except Exception:
                     repair_local = {"evidence": []}
+                # 阶段 02（缺口 1）：补检这一轮同样过证据层（它是多跳的第 r1 跳，不是旁路）
+                repair_evidence = _wire_hop_evidence_layer(
+                    list(repair_local.get("evidence") or []), question=question,
+                    plan=repair_plan, run_meta=run_meta, store=store,
+                    round_index=round_index + 1, corpus_version=corpus_version,
+                    route=_hop_route(repair_local.get("evidence") or [], repair_local.get("stats")),
+                    audit=hop_audit)
                 added = 0
-                for item in (repair_local.get("evidence") or []):
+                for item in repair_evidence:
                     ref = str(item.get("evidence_ref") or "")
                     if ref and ref in seen_refs:
                         continue
@@ -1215,6 +1365,8 @@ def build_qa_stage_handlers(
         # 上一跳定位到的实体作为下一跳的过滤条件；受预算与跳数双重约束，
         # 超预算就停在做完的跳并明确标注降级（不静默给半截结论）。
         hop_receipts = []
+        # 阶段 02（缺口 1）：多跳每一跳的证据层回执累加到这里，最后并入 stats["evidence_layer"]
+        hop_evidence_audit: dict = {}
         multi_hop_plan = retrieval_plan.get("decomposition") or {}
         if bool(getattr(config, "QA_MULTI_HOP_ENABLED", True)) and multi_hop_plan.get("is_multi_hop"):
             def _trace_recorder(entry):
@@ -1222,11 +1374,16 @@ def build_qa_stage_handlers(
 
                 `entry` 里的 route/results/accepted/rejected 由 `_run_multi_hop._record`
                 填；老的 recorder 调用点不传这些键也不影响（`.get` + 默认值兜底）。
+
+                注意：run_id 必须取本阶段作用域里的 `run_meta`——这里原先是 `run["id"]`，
+                而 `level1_retrieval` 里根本没有 `run` 这个名字（其它阶段才有），于是每跳都撞
+                `NameError`，被 `_record` 的 `except Exception: return` 静默吞掉 →
+                `qa_reasoning_traces` 永远是空的（Phase 01 F-7 的 route/计数一个都没落库）。
                 """
                 results = int(entry.get("results") or 0)
                 accepted = int(entry.get("accepted") or 0)
                 store.record_reasoning_trace(
-                    run["id"],
+                    str(run_meta.get("id") or ""),
                     hop_index=int(entry.get("hop_index") or 0),
                     sub_query_id=str(entry.get("sub_query_id") or ""),
                     sub_query=str(entry.get("sub_query") or ""),
@@ -1250,7 +1407,9 @@ def build_qa_stage_handlers(
             local, hop_receipts = _run_multi_hop(
                 article_retriever, retrieval_plan, local, context,
                 pack_id=pack_id, limit=12, emit_stage_event=emit_stage_event,
-                trace_recorder=_trace_recorder,
+                trace_recorder=_trace_recorder, store=store, run_meta=run_meta,
+                question=_planned_question(context), corpus_version=kb_version,
+                hop_audit=hop_evidence_audit,
             )
         elif multi_hop_plan.get("hops"):
             hop_receipts = [{
@@ -1294,8 +1453,9 @@ def build_qa_stage_handlers(
         )
         stats = dict(local.get("stats") or {})
         stats.update({"web_adopted": len(external.get("evidence") or []), "adopted": len(evidence)})
-        stats["evidence_layer"] = {key: evidence_audit.get(key) for key in (
-            "evidence_layer", "annotated", "seen_dropped", "dedupe_dropped", "recorded", "reason")}
+        # 阶段 02（缺口 1）：多跳每一跳的回执并入同一条统计（回执键集不变）
+        _merge_evidence_audits(evidence_audit, hop_evidence_audit)
+        stats["evidence_layer"] = _evidence_layer_receipt(evidence_audit)
         if policy_audit.get("policy_filter") == "applied":
             stats["policy_source_roles"] = policy_audit.get("source_roles") or {}
             stats["policy_noise_excluded"] = len(policy_audit.get("excluded_policy_noise") or [])
@@ -1527,6 +1687,32 @@ def build_qa_stage_handlers(
         plan_output = context["outputs"]["plan"]
         level1 = context["outputs"]["level1_draft"]
         emit_stage_event = context.get("_emit_stage_event")
+
+        def _wire_level2_evidence(payload: Mapping, *, corpus_version: str = "") -> dict:
+            """阶段 02（缺口 1）：RAGFlow/研究阶段产出的证据同样标注 + 登记 seen。
+
+            与 level1 同一套函数、同一套作用域；route 取 `QA_ROUTE_*` 里本批证据的主导通道
+            （RAGFlow dataset 检索 = `semantic`）。异常一律吞掉并如实记 reason：
+            证据层绝不打断二级检索，也绝不因为它让整条 run 降级。
+            """
+            items = [item for item in (payload.get("evidence") or []) if isinstance(item, Mapping)]
+            counts: dict[str, int] = {}
+            for item in items:
+                token = _research_route(item)
+                counts[token] = counts.get(token, 0) + 1
+            route = max(counts.items(), key=lambda pair: pair[1])[0] if counts else ""
+            wired, audit = _apply_evidence_layer(
+                items, rejected=[], question=_planned_question(context), plan=plan_output,
+                run_meta=run, store=store, corpus_version=corpus_version,
+                stage="level2_retrieval", route=route,
+            )
+            result_payload = dict(payload)
+            result_payload["evidence"] = wired
+            stats = dict(result_payload.get("stats") or {})
+            stats["evidence_layer"] = _evidence_layer_receipt(audit)
+            result_payload["stats"] = stats
+            return result_payload
+
         if not plan_output.get("needs_ragflow"):
             return {
                 "queries": [], "query_trace": [], "evidence": [], "excluded": {},
@@ -1601,6 +1787,8 @@ def build_qa_stage_handlers(
                     return _rag_retrieval_fallback(level1, "enhancement_no_relevant_evidence")
                 cached["rag_mode"] = "RAG增强检索"
                 cached["enhanced"] = True
+                # 阶段 02（缺口 1）：RAGFlow 证据同样过证据层（含缓存分支，别漏一条路）
+                cached = _wire_level2_evidence(cached, corpus_version=kb_version)
                 if callable(emit_stage_event):
                     emit_stage_event("stage_progress", {
                         "message": f"命中RAG增强检索缓存，已通过相关性过滤保留 {len(gated_evidence)} 条增强证据。",
@@ -1650,6 +1838,8 @@ def build_qa_stage_handlers(
             result["cache"] = {"hit": False, "kb_version": kb_version}
             result["rag_mode"] = "RAG增强检索" if filtered_evidence else "RAG检索"
             result["enhanced"] = bool(filtered_evidence)
+            # 阶段 02（缺口 1）：RAGFlow 取回的证据标注 provenance + 按作用域登记 seen
+            result = _wire_level2_evidence(result, corpus_version=kb_version)
             if callable(emit_stage_event):
                 emit_stage_event("stage_progress", {
                     "message": f"RAG增强检索已取得 {len(filtered_evidence)} 条证据，正在进入交叉核验。",

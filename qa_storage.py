@@ -981,6 +981,46 @@ class QaStore:
             finally:
                 cursor.close()
 
+    def prune_seen_evidence(self, older_than_days: int | None = None) -> int:
+        """Phase 02（缺口 2）：按保留期清理过期的 seen 身份，返回删除行数。
+
+        为什么要有：`qa_evidence_seen` 是**只增不减**的记忆表（每次检索都登记一批身份），
+        没有清理入口就会无限长下去（第一版刻意不做 TTL，先看写入量再定策略）。
+
+        保守口径：
+          · 只按**时间**删，不按作用域删——`older_than_days` 缺省取环境变量
+            `QA_EVIDENCE_SEEN_TTL_DAYS`（默认 30，最小 1），所以作用域不同的行各按自己的
+            最后见证时间过期，不会互相影响；
+          · 时间列用 `last_seen_at`（最后见证时间，老行缺失时退到 `first_seen_at`）；
+          · 维护入口里是**可选调用**，开关 `QA_EVIDENCE_SEEN_PRUNE_ENABLED` 默认关
+            （见 `qa_evidence.prune_seen_evidence` 的说明）：这是新表，先观察一段时间再开。
+        """
+        if older_than_days is None:
+            from qa_evidence import seen_ttl_days
+
+            older_than_days = seen_ttl_days()
+        try:
+            # 最小 1 天：传 0/负数一律按 1 天算，别让"清空全表"这种事发生
+            days = max(1, int(older_than_days))
+        except (TypeError, ValueError):
+            days = 30
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)) \
+            .isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        self.ensure_schema()
+        with self.database.lock:
+            cursor = self.database.connection.cursor()
+            try:
+                cursor.execute(
+                    "DELETE FROM qa_evidence_seen"
+                    " WHERE COALESCE(NULLIF(last_seen_at,''), first_seen_at) < ?",
+                    (cutoff,),
+                )
+                deleted = int(cursor.rowcount or 0)
+                self.database.connection.commit()
+                return deleted
+            finally:
+                cursor.close()
+
     def persist_reasoning_graph(self, run_id: str, graph: Mapping) -> None:
         self.ensure_schema()
         now = _now()

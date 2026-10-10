@@ -1005,7 +1005,20 @@ class IntelWorker:
     def _handle_task_cleanup(self, payload: Dict) -> Dict:
         """终态任务自动清理：删除保留期之前的 completed/failed/cancelled 任务与失效候选。"""
         from task_retention import cleanup_terminal_records
-        return {"success": True, **cleanup_terminal_records(self.repository.db)}
+        result = {"success": True, **cleanup_terminal_records(self.repository.db)}
+        # Phase 02（缺口 2）：`qa_evidence_seen` 的过期清理 —— **可选调用、默认关**
+        # （开关 QA_EVIDENCE_SEEN_PRUNE_ENABLED）。为什么默认关：这张表是 Phase 02 才建的
+        # 新表，先空转观察一段时间（行数 / 过期比例 / 清理后跨轮去重是否仍有效）再打开，
+        # 避免一上线就动生产记忆；清理本身按时间删，失败也不影响其它清理项。
+        try:
+            from qa_evidence import prune_seen_evidence
+            from qa_storage import QaStore
+
+            result["qa_evidence_seen"] = prune_seen_evidence(QaStore(self.repository.db))
+        except Exception as exc:  # noqa: BLE001 —— 维护项绝不拖累清理作业
+            result["qa_evidence_seen"] = {"enabled": False, "deleted": 0,
+                                          "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+        return result
 
     def _handle_qa_run(self, payload: Dict, context) -> Dict:
         """跑一次统一 QA：在 web 请求之外执行，并尊重作业租约的取消信号。"""

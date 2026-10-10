@@ -11,12 +11,14 @@
      后续 rejected 覆盖；重复登记是覆盖 + 计数，不是插新行；
   4. 失败路径：存储层异常一律吞掉并回报 `error`，绝不打断问答；`forget` 不允许
      在没有任何作用域键时清空全局。
+  5. Phase 02 缺口 2：seen 身份的 TTL / 清理入口（默认关的开关 + 按时间删的保守口径）。
 """
 import os
 import sqlite3
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 os.environ.setdefault("DATABASE_TYPE", "sqlite")
@@ -284,6 +286,127 @@ class SeenAdapterTests(unittest.TestCase):
             self.assertEqual(evidence_layer.seen_dedupe_mode(), "all")
         finally:
             os.environ.pop("QA_EVIDENCE_SEEN_DEDUPE", None)
+
+
+class SeenPruneTests(unittest.TestCase):
+    """Phase 02（缺口 2）：seen 身份的 TTL / 清理策略。
+
+    钉住四件事：
+      1. 过期行被删（按 `last_seen_at`，老行缺该值时退到 `first_seen_at`）、未过期行保留；
+      2. 只按时间删，不按作用域删——别的作用域的**新鲜**行不会因为本作用域有过期行而被牵连；
+      3. 开关 `QA_EVIDENCE_SEEN_PRUNE_ENABLED` **默认关**：关着时一条都不删；
+      4. 保留期 `QA_EVIDENCE_SEEN_TTL_DAYS` 默认 30、最小 1；失败路径只回报 error 不抛。
+    """
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db = SQLiteDatabase(os.path.join(self.temp_dir.name, "phase02-prune.sqlite3"))
+        self.db.connect()
+        self.db.create_tables()
+        self.store = QaStore(self.db)
+        self.store.ensure_schema()
+        self._env_backup = {key: os.environ.get(key) for key in (
+            "QA_EVIDENCE_SEEN_PRUNE_ENABLED", "QA_EVIDENCE_SEEN_TTL_DAYS")}
+        for key in self._env_backup:
+            os.environ.pop(key, None)
+
+    def tearDown(self):
+        for key, value in self._env_backup.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        try:
+            self.db.connection.close()
+        except Exception:
+            pass
+        self.temp_dir.cleanup()
+
+    def _record(self, fingerprint, scope=None, *, status="rejected"):
+        return self.store.record_seen_evidence(
+            records=[{"source_fingerprint": fingerprint, "span_fingerprint": "span-" + fingerprint,
+                      "evidence_ref": "article:1", "source_type": "article", "status": status}],
+            run_id="run-1", round_index=0, **(scope or SCOPE))
+
+    def _age(self, fingerprint, days, *, column="last_seen_at"):
+        """把某行的见证时间改到 N 天前（格式与 _now() 一致，直接字符串比较）。"""
+        moment = (datetime.now(timezone.utc) - timedelta(days=days)) \
+            .isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        with self.db.lock:
+            self.db.connection.execute(
+                "UPDATE qa_evidence_seen SET %s=? WHERE source_fingerprint=?" % column,
+                (moment, fingerprint))
+            self.db.connection.commit()
+
+    def _keys(self):
+        return {str(row[0]) for row in self.db.connection.execute(
+            "SELECT source_fingerprint FROM qa_evidence_seen").fetchall()}
+
+    def test_expired_rows_are_deleted_and_fresh_rows_kept(self):
+        self._record("fp-old")
+        self._record("fp-new")
+        self._age("fp-old", 31)
+        self.assertEqual(self.store.prune_seen_evidence(older_than_days=30), 1)
+        self.assertEqual(self._keys(), {"fp-new"})
+
+    def test_prune_is_age_based_across_scopes(self):
+        """只按时间删：别的作用域的新鲜行不会被本作用域的过期行牵连。"""
+        other = {"owner_user_id": "u2", "session_id": "s2", "industry_pack_id": "auto"}
+        self._record("fp-old-mine")
+        self._record("fp-fresh-mine")
+        self._record("fp-fresh-other", other)
+        self._age("fp-old-mine", 10)
+        self.assertEqual(self.store.prune_seen_evidence(older_than_days=7), 1)
+        self.assertEqual(self._keys(), {"fp-fresh-mine", "fp-fresh-other"})
+
+    def test_first_seen_at_is_the_fallback_for_missing_last_seen_at(self):
+        self._record("fp-legacy")
+        self._age("fp-legacy", 40, column="first_seen_at")
+        with self.db.lock:
+            self.db.connection.execute(
+                "UPDATE qa_evidence_seen SET last_seen_at='' WHERE source_fingerprint='fp-legacy'")
+            self.db.connection.commit()
+        self.assertEqual(self.store.prune_seen_evidence(older_than_days=30), 1)
+        self.assertEqual(self._keys(), set())
+
+    def test_explicit_days_win_and_minimum_is_one_day(self):
+        self._record("fp-recent")
+        self.assertEqual(self.store.prune_seen_evidence(older_than_days=30), 0)
+        # 负数/0 一律按最小 1 天处理：不许出现"传 0 就把全表清空"的事故
+        self.assertEqual(self.store.prune_seen_evidence(older_than_days=0), 0)
+        self._age("fp-recent", 2)
+        self.assertEqual(self.store.prune_seen_evidence(older_than_days=0), 1)
+
+    def test_ttl_default_and_floor_from_env(self):
+        self.assertEqual(evidence_layer.seen_ttl_days(), 30)
+        os.environ["QA_EVIDENCE_SEEN_TTL_DAYS"] = "7"
+        self.assertEqual(evidence_layer.seen_ttl_days(), 7)
+        os.environ["QA_EVIDENCE_SEEN_TTL_DAYS"] = "0"
+        self.assertEqual(evidence_layer.seen_ttl_days(), 1, "最小 1 天")
+        os.environ["QA_EVIDENCE_SEEN_TTL_DAYS"] = "胡说"
+        self.assertEqual(evidence_layer.seen_ttl_days(), 30, "坏值退回默认值")
+
+    def test_switch_is_off_by_default_and_deletes_nothing(self):
+        """开关默认关：这是新表，先观察一段时间再开（关着时维护入口照旧安全调用）。"""
+        self.assertFalse(evidence_layer.seen_prune_enabled())
+        self._record("fp-old")
+        self._age("fp-old", 90)
+        summary = evidence_layer.prune_seen_evidence(self.store)
+        self.assertEqual(summary, {"enabled": False, "deleted": 0, "ttl_days": 30})
+        self.assertEqual(self._keys(), {"fp-old"}, "开关关着时一条都不许删")
+
+        os.environ["QA_EVIDENCE_SEEN_PRUNE_ENABLED"] = "1"
+        os.environ["QA_EVIDENCE_SEEN_TTL_DAYS"] = "30"
+        self.assertTrue(evidence_layer.seen_prune_enabled())
+        summary = evidence_layer.prune_seen_evidence(self.store)
+        self.assertEqual((summary["enabled"], summary["deleted"], summary["ttl_days"]), (True, 1, 30))
+        self.assertEqual(self._keys(), set())
+
+    def test_prune_never_raises_on_broken_store(self):
+        os.environ["QA_EVIDENCE_SEEN_PRUNE_ENABLED"] = "1"
+        summary = evidence_layer.prune_seen_evidence(object())
+        self.assertEqual(summary["deleted"], 0)
+        self.assertTrue(summary["error"])
 
 
 if __name__ == "__main__":
