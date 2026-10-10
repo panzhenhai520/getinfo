@@ -20,8 +20,13 @@ schema 与证据状态枚举；**既有取值与既有 schema 一个字不改**�
 （`additionalProperties: False` 的历史冻结契约）更是完全不碰——证据层新字段一律走它放行的
 `metadata` 对象。
 
+Phase 03（核验层）在这里追加 `EVIDENCE_VERIFICATION_SCHEMA`（核验结论），并把它作为
+`EVIDENCE_OBJECT_SCHEMA` 的**可选**字段 `verification` 挂上去：不核验的调用方照旧能过校验，
+`status`/`relationship` 的语义与 Phase 02 逐字相同（回归用例钉着）。
+
 边界：本文件是纯常量 + schema（外加一个不参与链路的自校验函数），**不含业务逻辑**，
-不被任何写路径依赖；证据层的构造/指纹/去重逻辑在 `qa_evidence.py`。
+不被任何写路径依赖；证据层的构造/指纹/去重逻辑在 `qa_evidence.py`，
+核验逻辑在 `qa_verifier.py`。
 """
 
 from __future__ import annotations
@@ -119,8 +124,10 @@ EVIDENCE_STATUSES: Tuple[str, ...] = (
     EVIDENCE_STATUS_SUPPORTED, EVIDENCE_STATUS_REFUTED, EVIDENCE_STATUS_QUALIFIED,
     EVIDENCE_STATUS_CONTEXT, EVIDENCE_STATUS_UNVERIFIED,
 )
-"""证据对 Claim 的判定状态。`UNVERIFIED` = 尚未判定（旧数据 relationship 为空的缺省），
-**不等于** Phase 03 的 verifier 结论——本阶段只做"关系→状态"的规范化映射。"""
+"""证据对 Claim 的判定状态。`UNVERIFIED` = 尚未判定（旧数据 relationship 为空的缺省）。
+Phase 03 起核验结论记在 `metadata.evidence_layer.verification.verdict`（同取值域），
+`status` 仍保持 Phase 02 的"relationship 规范化映射"语义——两者并存、不互相顶替
+（既有调用方与 Phase 02 回归用例都按 `status` 读）。"""
 
 EVIDENCE_STATUS_BY_RELATIONSHIP = {
     "supports": EVIDENCE_STATUS_SUPPORTED,
@@ -300,6 +307,32 @@ EVIDENCE_RELATION_SCHEMA = {
 """证据里表达的关系。目前只有图谱边证据能给出（事件边/属性边），文章证据一律为空——
 宁可空着，也不把"共现"编成"因果"（01_V2_ARCHITECTURE §10 Verifier 第 8 条）。"""
 
+# ── 核验层 schema（Phase 03 · P03-01…P03-04）────────────────────────────────
+# 核验结论落在 `metadata.evidence_layer.verification`（可选字段），**不改**证据对象既有的
+# `status`/`relationship` 语义（Phase 02 的回归用例钉着它们），也不动 `qa_contracts` 的
+# 七个冻结 schema。结论取值域直接复用 `EVIDENCE_STATUSES`，不新造枚举。
+EVIDENCE_VERIFICATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verifier_version": {"type": "string"},     # 规则版本（换规则=换版本，缓存自然失效）
+        "config_hash": {"type": "string"},          # 权重/阈值指纹（同配置稳定）
+        "verdict": {"type": "string", "enum": list(EVIDENCE_STATUSES)},
+        "verified": {"type": "boolean"},            # = (verdict == SUPPORTED)，唯一可当"已验证"的取值
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "dimensions": {"type": "object"},           # relevance/entailment/source_quality/freshness/...
+        "reasons": {"type": "array", "items": {"type": "string"}},   # 机器可读原因码
+        "reason_text": {"type": "string"},          # 中文解释（可解释性）
+        "nli": {"type": "object"},                  # 蕴含判定后端与覆盖度
+        "checks": {"type": "array", "items": {"type": "object"}},
+        "text_source": {"type": "string", "enum": ["span", "excerpt"]},
+        "cache": {"type": "string", "enum": ["hit", "miss", "off"]},
+    },
+    "required": ["verifier_version", "verdict", "score"],
+    "additionalProperties": True,
+}
+"""证据核验结论（Phase 03）。`verdict` 与 `status` 并存：前者是 verifier 的判定，
+后者是 Phase 02 交付的"relationship 规范化映射"，两者语义不同、不许互相顶替。"""
+
 EVIDENCE_OBJECT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -314,6 +347,9 @@ EVIDENCE_OBJECT_SCHEMA = {
         "fingerprint": {"type": "string"},                # span 级身份（P02-04）
         "source_fingerprint": {"type": "string"},         # 来源级身份（同一篇文章/同一 chunk）
         "provenance": {"type": "object"},                 # P02-02
+        # Phase 03（P03-01…P03-04）：核验结论。**可选**——不做核验的调用方（或
+        # QA_VERIFIER_ENABLED=0 回滚态）产出的证据对象照样能过校验。
+        "verification": EVIDENCE_VERIFICATION_SCHEMA,
     },
     "required": ["evidence_ref", "status", "span", "fingerprint", "source"],
     "additionalProperties": True,
@@ -371,6 +407,7 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "evidence_span": EVIDENCE_SPAN_SCHEMA, "evidence_source": EVIDENCE_SOURCE_SCHEMA,
         "evidence_entity": EVIDENCE_ENTITY_SCHEMA, "evidence_relation": EVIDENCE_RELATION_SCHEMA,
         "evidence_object": EVIDENCE_OBJECT_SCHEMA,
+        "evidence_verification": EVIDENCE_VERIFICATION_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

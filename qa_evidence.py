@@ -516,18 +516,23 @@ def seen_records(items: Iterable, *, status: str) -> list:
 
 
 def record_seen(store, *, scope: Mapping, accepted: Iterable = (), rejected: Iterable = (),
-                witnessed: Iterable = (), run_id: str = "", round_index: int = 0) -> dict:
+                witnessed: Iterable = (), run_id: str = "", round_index: int = 0,
+                extra_rejected: Iterable = ()) -> dict:
     """P02-03：把本轮的 seen / confirmed / rejected 身份登记到 store（失败绝不影响主流程）。
 
     `scope` 必须显式给 (owner_user_id, session_id, industry_pack_id) 三元组——跨用户/
     跨会话/跨行业包串味是这一层最危险的错。
     `witnessed` 是"见过但本轮不作表态"的（例如因重复被跳过的），登记成中性 `seen`，
     既不冒充 confirmed，也不冤枉成 rejected。
+    `extra_rejected` 是**额外**要按 rejected 登记的身份（阶段 03 起：被核验闸门拒掉的证据）。
+    刻意做成独立参数而不是并进 `rejected`：调用点原有的 `rejected=[...]` 一字不动，
+    阶段 02 的源码级守门用例继续有效（跨阶段契约不破）。
     """
     summary = {"confirmed": 0, "rejected": 0, "seen": 0, "recorded": 0, "error": ""}
     scope = scope if isinstance(scope, Mapping) else {}
     records = (seen_records(accepted, status="confirmed")
                + seen_records(rejected, status="rejected")
+               + seen_records(extra_rejected, status="rejected")
                + seen_records(witnessed, status="seen"))
     if not records:
         return summary

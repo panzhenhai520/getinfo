@@ -1021,6 +1021,62 @@ class QaStore:
             finally:
                 cursor.close()
 
+    def get_verification_cache(self, cache_key: str) -> dict | None:
+        """阶段 03（P03-04）：读核验缓存（复用既有 `qa_retrieval_cache` 表，**不新增表/列**）。
+
+        为什么要落库：同一条证据会在 level1 / 多跳每一跳 / level2 / claim 级核验里反复比对，
+        进程重启或换 worker（gunicorn 多进程）后内存缓存全丢，落库才能跨进程复用。
+        namespace 固定为 `qa_verification`，与检索缓存**不串味**；过期行一律当未命中。
+        任何异常都返回 None（缓存只是加速器，坏掉不影响正确性）。
+        """
+        try:
+            self.ensure_schema()
+            now = _now()
+            with self.database.lock:
+                row = self.database.connection.execute(
+                    "SELECT payload_json FROM qa_retrieval_cache"
+                    " WHERE cache_key=? AND namespace=? AND expires_at>?",
+                    (str(cache_key), "qa_verification", now),
+                ).fetchone()
+            if not row:
+                return None
+            value = json.loads(row[0] or "{}")
+            return value if isinstance(value, dict) else None
+        except Exception:
+            return None
+
+    def put_verification_cache(self, cache_key: str, payload: Mapping,
+                               *, ttl_seconds: int = 900) -> None:
+        """阶段 03（P03-04）：写核验缓存（TTL 与过期时间进既有 `expires_at` 列）。
+
+        `kb_version` 列填核验版本（复用同一列表达"这条缓存属于哪套规则"，便于换版本自然失效）；
+        写失败一律吞掉——缓存绝不能拖累问答。
+        """
+        try:
+            from qa_verifier import CACHE_NAMESPACE, VERIFIER_VERSION
+        except Exception:  # noqa: BLE001
+            CACHE_NAMESPACE, VERIFIER_VERSION = "qa_verification", ""
+        try:
+            self.ensure_schema()
+            now = datetime.now(timezone.utc)
+            expires = now + timedelta(seconds=max(30, min(int(ttl_seconds or 900), 86400)))
+            with self.database.lock:
+                self.database.connection.execute(
+                    """INSERT INTO qa_retrieval_cache(
+                        cache_key,namespace,industry_pack_id,kb_version,scope_hash,
+                        payload_json,created_at,expires_at
+                    ) VALUES(?,?,?,?,?,?,?,?)
+                    ON CONFLICT(cache_key) DO UPDATE SET payload_json=excluded.payload_json,
+                        created_at=excluded.created_at,expires_at=excluded.expires_at""",
+                    (str(cache_key), CACHE_NAMESPACE, "", VERIFIER_VERSION, "",
+                     _json(dict(payload)),
+                     now.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+                     expires.isoformat(timespec="milliseconds").replace("+00:00", "Z")),
+                )
+                self.database.connection.commit()
+        except Exception:
+            return
+
     def persist_reasoning_graph(self, run_id: str, graph: Mapping) -> None:
         self.ensure_schema()
         now = _now()

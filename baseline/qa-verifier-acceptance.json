@@ -1,0 +1,391 @@
+{
+ "acceptance": {
+  "note": "硬指标（误判支持率 / 误判反证率）必须为 0；support_recall 是软下限",
+  "passed": true
+ },
+ "cache": {
+  "available": true,
+  "cache": {
+   "enabled": true,
+   "errors": 0,
+   "hits": 12,
+   "max_entries": 512,
+   "misses": 12,
+   "persist": false,
+   "persist_hits": 0,
+   "size": 12,
+   "stores": 0,
+   "ttl_seconds": 900
+  },
+  "first_pass_ms": 218.65,
+  "hit_rate": 0.5,
+  "items": 12,
+  "second_pass_ms": 3.2,
+  "speedup": 68.3
+ },
+ "config_hash": "9c835c80a357",
+ "generated_at_utc": "2026-10-10T15:54:39Z",
+ "golden": {
+  "benchmark_version": "qa-verifier-golden-v1",
+  "metrics": {
+   "avg_ms_per_pair": 1.506,
+   "contradiction_recall": 1.0,
+   "false_refute_rate": 0.0,
+   "false_support_rate": 0.0,
+   "pairs": 18,
+   "partial_support_rate": 0.0,
+   "qualified_share": 0.1111,
+   "support_precision": 1.0,
+   "support_recall": 1.0,
+   "unresolved_rate": 0.4444
+  },
+  "rows": [
+   {
+    "axis": "direct_support",
+    "contradiction": false,
+    "entailment": 0.9536,
+    "id": "g01",
+    "reasons": [
+     "supported_by_span"
+    ],
+    "score": 0.9105,
+    "sufficient": true,
+    "verdict": "SUPPORTED"
+   },
+   {
+    "axis": "direct_support",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g02",
+    "reasons": [
+     "supported_by_span"
+    ],
+    "score": 0.9241,
+    "sufficient": true,
+    "verdict": "SUPPORTED"
+   },
+   {
+    "axis": "direct_support",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g03",
+    "reasons": [
+     "supported_by_span"
+    ],
+    "score": 0.9236,
+    "sufficient": true,
+    "verdict": "SUPPORTED"
+   },
+   {
+    "axis": "keyword_only",
+    "contradiction": false,
+    "entailment": 0.0,
+    "id": "g04",
+    "reasons": [
+     "keyword_only_similarity"
+    ],
+    "score": 0.4278,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "keyword_only",
+    "contradiction": false,
+    "entailment": 0.0,
+    "id": "g05",
+    "reasons": [
+     "keyword_only_similarity"
+    ],
+    "score": 0.5054,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "negation_flip",
+    "contradiction": true,
+    "entailment": 1.0,
+    "id": "g06",
+    "reasons": [
+     "negation_flip"
+    ],
+    "score": 0.6236,
+    "sufficient": false,
+    "verdict": "REFUTED"
+   },
+   {
+    "axis": "negation_flip",
+    "contradiction": true,
+    "entailment": 1.0,
+    "id": "g07",
+    "reasons": [
+     "negation_flip"
+    ],
+    "score": 0.6236,
+    "sufficient": false,
+    "verdict": "REFUTED"
+   },
+   {
+    "axis": "number_mismatch",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g08",
+    "reasons": [
+     "number_mismatch",
+     "keyword_only_similarity"
+    ],
+    "score": 0.729,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "number_mismatch",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g09",
+    "reasons": [
+     "number_mismatch",
+     "keyword_only_similarity"
+    ],
+    "score": 0.7647,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "entity_mismatch",
+    "contradiction": false,
+    "entailment": 0.742,
+    "id": "g10",
+    "reasons": [
+     "entity_not_in_evidence",
+     "keyword_only_similarity"
+    ],
+    "score": 0.8188,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "time_inapplicable",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g11",
+    "reasons": [
+     "evidence_before_claim",
+     "keyword_only_similarity"
+    ],
+    "score": 0.808,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "second_hand",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g12",
+    "reasons": [
+     "partially_supported",
+     "second_hand_relay"
+    ],
+    "score": 0.8159,
+    "sufficient": false,
+    "verdict": "QUALIFIED"
+   },
+   {
+    "axis": "causal_inflation",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g13",
+    "reasons": [
+     "partially_supported",
+     "causal_inflation"
+    ],
+    "score": 0.9119,
+    "sufficient": false,
+    "verdict": "QUALIFIED"
+   },
+   {
+    "axis": "no_evidence",
+    "contradiction": false,
+    "entailment": 0.0,
+    "id": "g14",
+    "reasons": [
+     "no_span",
+     "authority_missing"
+    ],
+    "score": 0.263,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "direct_support",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g15",
+    "reasons": [
+     "supported_by_span"
+    ],
+    "score": 0.8551,
+    "sufficient": true,
+    "verdict": "SUPPORTED"
+   },
+   {
+    "axis": "irrelevant_but_negated",
+    "contradiction": false,
+    "entailment": 0.0929,
+    "id": "g16",
+    "reasons": [
+     "insufficient_overlap"
+    ],
+    "score": 0.4073,
+    "sufficient": false,
+    "verdict": "UNVERIFIED"
+   },
+   {
+    "axis": "long_text_unrelated_negation",
+    "contradiction": false,
+    "entailment": 0.4643,
+    "id": "g17",
+    "reasons": [
+     "supported_by_span"
+    ],
+    "score": 0.6405,
+    "sufficient": true,
+    "verdict": "SUPPORTED"
+   },
+   {
+    "axis": "procedural_negation_clause",
+    "contradiction": false,
+    "entailment": 1.0,
+    "id": "g18",
+    "reasons": [
+     "supported_by_span"
+    ],
+    "score": 0.9241,
+    "sufficient": true,
+    "verdict": "SUPPORTED"
+   }
+  ],
+  "verdicts": {
+   "CONTEXT": 0,
+   "QUALIFIED": 2,
+   "REFUTED": 2,
+   "SUPPORTED": 6,
+   "UNVERIFIED": 8
+  }
+ },
+ "real_sample": {
+  "available": true,
+  "captured_at_utc": "2026-10-10T15:22:18Z",
+  "claim_count": 8,
+  "claims": [
+   {
+    "claim_id": "l1-c1",
+    "pairs": 1,
+    "status": "unverified",
+    "support_count": 0
+   },
+   {
+    "claim_id": "l1-c2",
+    "pairs": 1,
+    "status": "confirmed",
+    "support_count": 1
+   },
+   {
+    "claim_id": "l1-c3",
+    "pairs": 1,
+    "status": "unverified",
+    "support_count": 0
+   },
+   {
+    "claim_id": "l1-c4",
+    "pairs": 2,
+    "status": "confirmed",
+    "support_count": 1
+   },
+   {
+    "claim_id": "l1-c5",
+    "pairs": 1,
+    "status": "confirmed",
+    "support_count": 1
+   },
+   {
+    "claim_id": "l1-c5",
+    "pairs": 0,
+    "status": "insufficient_evidence",
+    "support_count": 0
+   },
+   {
+    "claim_id": "l1-c1",
+    "pairs": 1,
+    "status": "unverified",
+    "support_count": 0
+   },
+   {
+    "claim_id": "l1-c2",
+    "pairs": 1,
+    "status": "confirmed",
+    "support_count": 1
+   }
+  ],
+  "elapsed_ms": 107.95,
+  "evidence_count": 12,
+  "fixture": "qa-verifier-real-sample-v1",
+  "model_self_assessment": {
+   "confirmed": 4,
+   "insufficient_evidence": 1,
+   "unverified": 3
+  },
+  "run": {
+   "created_at": "2026-10-10T02:43:49.487Z",
+   "id": "c3fd469f115d4002bd2824b397425756",
+   "industry_pack_id": "automotive_industry",
+   "mode": "standard",
+   "question_text": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？"
+  },
+  "stats": {
+   "claim_without_evidence": 1,
+   "claims": 8,
+   "confirmed": 4,
+   "conflicted": 0,
+   "insufficient_evidence": 1,
+   "pairs": 8,
+   "qualified": 0,
+   "refuted_pairs": 0,
+   "supported_pairs": 4,
+   "unsupported_claim_rate": 0.5,
+   "unverified": 3
+  }
+ },
+ "report_version": "qa-verifier-acceptance-v1",
+ "thresholds": {
+  "gate": "refuted",
+  "partial_min": 0.18,
+  "relevance_floor": 0.1,
+  "support_min": 0.34
+ },
+ "thresholds_verdict": {
+  "false_refute_rate": {
+   "passed": true,
+   "required": 0.0,
+   "value": 0.0
+  },
+  "false_support_rate": {
+   "passed": true,
+   "required": 0.0,
+   "value": 0.0
+  },
+  "support_recall_floor": {
+   "passed": true,
+   "required": 0.6,
+   "value": 1.0
+  }
+ },
+ "tool": "qa_verifier_acceptance",
+ "verifier_version": "qa-verifier-v1",
+ "weights": {
+  "entailment": 0.36,
+  "freshness": 0.12,
+  "independence": 0.14,
+  "relevance": 0.2,
+  "source_quality": 0.18
+ }
+}

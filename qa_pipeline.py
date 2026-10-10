@@ -38,6 +38,10 @@ from qa_retrieval import ArticleRetriever, default_web_search_service
 from qa_storage import QaStore
 from qa_flags import QaFeatureFlags
 from qa_resilience import QaCircuitOpen, QaPersistentResilience
+from qa_verifier import (
+    VERIFIER_VERSION, verification_cache, verification_of, verifier_enabled,
+    verify_claim_graph, verify_evidence_batch,
+)
 import config
 
 _PREWARM_LOCK = threading.Lock()
@@ -416,12 +420,60 @@ def _evidence_layer_receipt(audit: Mapping) -> dict:
 
     只有真的跳过了 seen 登记（`skipped_scope`）时才多一条计数——否则不动键集，
     免得破坏既有回执结构（前端与验收脚本都按这套键读）。
+
+    阶段 03 的核验回执**不走这里**：Phase 02 的回归用例把本回执的键集钉死了
+    （`tests/test_qa_phase02_wiring.py::test_receipt_keys_are_unchanged_and_hop_audit_is_merged`），
+    所以核验结果放在**兄弟键** `stats["verification"]`（见 `_verification_receipt`）——
+    既不破坏既有契约，也不用去改跨阶段的冻结键集。
     """
     receipt = {key: audit.get(key) for key in (
         "evidence_layer", "annotated", "seen_dropped", "dedupe_dropped", "recorded", "reason")}
     if int(audit.get("skipped_scope") or 0):
         receipt["skipped_scope"] = int(audit.get("skipped_scope") or 0)
     return receipt
+
+
+def _verification_receipt(audit: Mapping) -> dict:
+    """核验回执（阶段 03）：从证据层审计里摘出核验统计；没跑过核验则返回空字典。
+
+    空字典 = 调用方不要往 `stats` 里塞这个键 → 关掉 `QA_VERIFIER_ENABLED=0` 时
+    阶段返回结构与 Phase 02 逐字相同（一键回滚）。
+    """
+    value = audit.get("verification") if isinstance(audit, Mapping) else None
+    if not isinstance(value, Mapping) or not value:
+        return {}
+    return {key: value.get(key) for key in
+            ("verifier", "config_hash", "gate", "checked", "verdicts", "dropped",
+             "reasons", "reordered", "degraded", "reason")}
+
+
+def _merge_verification_audits(target: Mapping | None, extra: Mapping | None) -> dict:
+    """合并多跳各跳的核验回执：计数累加、verdicts/reasons 分布合并（键集不变）。"""
+    merged = dict(target) if isinstance(target, Mapping) else {}
+    extra = extra if isinstance(extra, Mapping) else {}
+    if not extra:
+        return merged
+    for key in ("checked", "dropped", "reordered"):
+        merged[key] = int(merged.get(key) or 0) + int(extra.get(key) or 0)
+    for field in ("verdicts", "reasons"):
+        table = dict(merged.get(field) or {})
+        for name, count in (extra.get(field) or {}).items():
+            table[str(name)] = int(table.get(str(name)) or 0) + int(count or 0)
+        merged[field] = table
+    for key in ("verifier", "config_hash", "gate"):
+        if extra.get(key):
+            merged[key] = extra[key]
+    if extra.get("cache"):
+        merged["cache"] = extra["cache"]
+    degraded = list(merged.get("degraded") or [])
+    for item in extra.get("degraded") or []:
+        if item not in degraded:
+            degraded.append(item)
+    if degraded:
+        merged["degraded"] = degraded[:5]
+    if extra.get("reason"):
+        merged["reason"] = str(extra["reason"])[:200]
+    return merged
 
 
 def _merge_evidence_audits(target: dict, extra: Mapping) -> dict:
@@ -433,6 +485,9 @@ def _merge_evidence_audits(target: dict, extra: Mapping) -> dict:
         return target
     for key in ("annotated", "seen_dropped", "dedupe_dropped", "recorded", "skipped_scope"):
         target[key] = int(target.get(key) or 0) + int(extra.get(key) or 0)
+    if isinstance(extra.get("verification"), Mapping):
+        target["verification"] = _merge_verification_audits(target.get("verification"),
+                                                            extra.get("verification"))
     if not str(target.get("evidence_layer") or "").strip():
         target["evidence_layer"] = str(extra.get("evidence_layer") or "")
     reasons = [str(item).strip() for item in (target.get("reason"), extra.get("reason")) if str(item or "").strip()]
@@ -545,6 +600,23 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
                         for entry in seen_audit.get("dropped") or []}
         skipped = [item for item in reviewed
                    if str(evidence_object(item).get("source_fingerprint") or "") in dropped_keys]
+
+        # ── 阶段 03（P03-01…P03-04）：证据核验（纯规则/统计，绝不调模型）──
+        # 顺序刻意放在"跨轮去重之后"：已经被见过的垃圾不必再花时间核验。
+        # 核验结论落在 metadata.evidence_layer.verification（证据顶层键集不变），
+        # 闸门默认只丢"有反证"的证据，且**绝不**把证据包清空（清空就退回原证据）。
+        def _verify(items):
+            return verify_evidence_batch(
+                items, claim_text=question, terms=question_terms(question, plan),
+                required_entities=_plan_entities(plan), store=store,
+                pack_id=str(scope.get("industry_pack_id") or ""),
+            )
+
+        verified, verify_audit = _verify(kept)
+        verified_refs = {str(item.get("evidence_ref") or "") for item in verified}
+        verifier_rejected = [item for item in kept
+                             if str(item.get("evidence_ref") or "") not in verified_refs]
+        kept = verified
         if not _scope_available(scope):
             # 缺作用域三元组：只标注、不登记（去重记忆宁可少一条，也不能串到别人身上）
             audit["skipped_scope"] = 1
@@ -552,10 +624,11 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
             if witness_only:
                 # 逐跳候选：通过的登记中性 `seen`；被跨轮去重丢掉的按"仍然拒绝"再次登记
                 # （刷新 last_seen_at，但不把已有的 rejected 身份降级成 seen——降级等于
-                # 下一轮不再丢它，跨轮去重就白做了）
+                # 下一轮不再丢它，跨轮去重就白做了）；被核验闸门拒掉的走 extra_rejected
                 recorded = record_seen(
                     store, scope=scope, rejected=[*rejected_items, *skipped],
                     witnessed=kept, run_id=run_id, round_index=round_index,
+                    extra_rejected=verifier_rejected,
                 )
             else:
                 # 整批路径：`skipped` 是"本轮被跨轮去重丢掉"的来源。它们**上一轮就已经是 rejected**
@@ -566,6 +639,7 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
                     store, scope=scope, accepted=kept,
                     rejected=[*rejected_items, *skipped],
                     run_id=run_id, round_index=round_index,
+                    extra_rejected=verifier_rejected,
                 )
             audit["recorded"] = int(recorded.get("recorded") or 0)
             audit["record_error"] = str(recorded.get("error") or "")
@@ -576,19 +650,65 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
             "dedupe_dropped": int(fingerprint_audit.get("dropped_count") or 0),
             "seen_mode": str(seen_audit.get("mode") or ""),
         })
+        if verifier_enabled() and verify_audit.get("verifier"):
+            audit["verification"] = {
+                key: verify_audit.get(key) for key in
+                ("verifier", "config_hash", "gate", "checked", "verdicts", "dropped",
+                 "reasons", "reordered", "degraded", "reason")
+            }
         if not kept:
             if not empty_fallback:
                 # 多跳每一跳：这一跳没新证据就是没新证据，不许把"已知垃圾"当证据塞回去
                 # （回执里如实记 empty，缺口交给 logic_validation 说明）
                 audit["reason"] = "seen_dedupe_emptied_evidence"
                 return [], audit
-            # 去重把证据清空了：宁可退回原证据（只加了标注），也不给用户一个空证据包
+            # 去重把证据清空了：宁可退回原证据（只加了标注），也不给用户一个空证据包。
+            # 退回的这批**照样要过核验**——不然"退回"就成了绕过核验的后门。
             audit["reason"] = "seen_dedupe_emptied_evidence_fallback"
-            return reviewed, audit
+            fallback, fallback_audit = _verify(reviewed)
+            if verifier_enabled() and fallback_audit.get("verifier"):
+                merged = _merge_verification_audits(audit.get("verification"), fallback_audit)
+                audit["verification"] = {
+                    key: merged.get(key) for key in
+                    ("verifier", "config_hash", "gate", "checked", "verdicts", "dropped",
+                     "reasons", "reordered", "degraded", "reason")
+                }
+            return fallback, audit
         return kept, audit
     except Exception as exc:  # noqa: BLE001 —— 证据层绝不打断问答
         audit["reason"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
         return list(evidence), audit
+
+
+def _plan_entities(plan: Mapping | None) -> list:
+    """计划里点名的实体（阶段 03 实体核验的输入：结论/问题点名要求的东西必须在证据里出现）。
+
+    不做新 NER：只认计划里已有的 `entities`/`topics`，且长度像实词（2…40 字）。
+    """
+    if not isinstance(plan, Mapping):
+        return []
+    values = []
+    for key in ("entities", "topics"):
+        for value in plan.get(key) or []:
+            clean = str(value or "").strip()
+            if 2 <= len(clean) <= 40 and clean not in values:
+                values.append(clean)
+    return values[:10]
+
+
+def _verify_claim_graph_in_place(graph: dict, *, store, question: str, run_meta: Mapping) -> dict:
+    """阶段 03（MASTER_RULES 第 11 条）：claim 级核验并写回 `verification_status`。
+
+    **只加不改**：返回的是核验摘要（stats 里含 unsupported_claim_rate），
+    图上的 claims/edges/conflicts 结构一字不动；任何异常都吞掉并记账——
+    核验绝不能因为一个坏 claim 把整条 run 打断。
+    """
+    try:
+        return verify_claim_graph(
+            graph, store=store, pack_id=str(_session_scope(run_meta)[2] or ""))
+    except Exception as exc:  # noqa: BLE001
+        return {"verifier_version": VERIFIER_VERSION, "enabled": verifier_enabled(),
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
 
 
 def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping) -> int:
@@ -958,6 +1078,82 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
     return merged, receipts
 
 
+def _verification_prompt_blocks(context: Mapping) -> dict:
+    """阶段 03：把核验结论整理成生成端看得懂的两块（证据级 + 结论级）。
+
+    为什么必须进生成端：MASTER_RULES 第 11 条——LLM 自由生成的内容不能直接当成已验证事实。
+    证据包里"取到了但没被确认支持"的条目、以及"结论没有直接证据"的条数，都必须让综合模型
+    看见，否则它会照着草稿把所有东西都写成已确证事实（真机实测草稿把所有 claim 都自评成
+    qualified）。这里只报告事实，不提要求之外的指令。
+    """
+    if not isinstance(context, Mapping):
+        return {}
+    outputs = context.get("outputs") if isinstance(context.get("outputs"), Mapping) else {}
+    blocks = {}
+    logic = outputs.get("logic_validation") if isinstance(outputs.get("logic_validation"), Mapping) else {}
+    verification = logic.get("verification") if isinstance(logic, Mapping) else None
+    if isinstance(verification, Mapping) and verification.get("checked"):
+        blocks["证据核验"] = {
+            "核验版本": verification.get("verifier"),
+            "已核验": verification.get("checked"),
+            "确认支持": verification.get("supported"),
+            "判定分布": verification.get("verdicts"),
+            "平均分": verification.get("avg_score"),
+            "要求": verification.get("note")
+                    or "只有判定为 SUPPORTED 的证据可作为事实结论依据；其余需注明不确定。",
+        }
+    graph = outputs.get("conflict_review") if isinstance(outputs.get("conflict_review"), Mapping) else {}
+    graph_verification = graph.get("verification") if isinstance(graph, Mapping) else None
+    stats = graph_verification.get("stats") if isinstance(graph_verification, Mapping) else None
+    if isinstance(stats, Mapping) and stats.get("claims"):
+        blocks["结论核验"] = {
+            "结论数": stats.get("claims"),
+            "有直接证据支持": stats.get("confirmed"),
+            "仅部分支持": stats.get("qualified"),
+            "与证据冲突": stats.get("conflicted"),
+            "证据不足": int(stats.get("insufficient_evidence") or 0),
+            "无支持证据占比": stats.get("unsupported_claim_rate"),
+        }
+    return blocks
+
+
+def _verification_summary(evidence: list) -> dict:
+    """证据核验分布（阶段 03）：只统计**已经核验过**的证据条目（不在这里重复跑核验）。
+
+    为什么放在逻辑校验里：`logic_validation` 是"能不能下结论"的关口，用户看到的降级
+    提示也来自它。核验分布（几条真支持 / 几条只是未核验）属于同一类信息——
+    但它**不改变 status/missing_links**：改状态会让"证据里有未核验项"直接变成降级，
+    那是产品决策，不是这一阶段能单方面定的（留到阶段 13 的 Final Verifier 一起定）。
+    """
+    verdicts: dict = {}
+    scores = []
+    unverified = 0
+    for item in evidence or []:
+        value = verification_of(item)
+        if not value:
+            unverified += 1
+            continue
+        verdict = str(value.get("verdict") or "")
+        if verdict:
+            verdicts[verdict] = verdicts.get(verdict, 0) + 1
+        try:
+            scores.append(float(value.get("score")))
+        except (TypeError, ValueError):
+            continue
+    checked = sum(verdicts.values())
+    return {
+        "verifier": VERIFIER_VERSION,
+        "enabled": verifier_enabled(),
+        "checked": checked,
+        "not_verified": unverified,
+        "verdicts": verdicts,
+        "supported": int(verdicts.get("SUPPORTED") or 0),
+        "avg_score": round(sum(scores) / len(scores), 4) if scores else None,
+        "note": ("证据中有 %d 条未能确认支持关系，作答时不得当作已确证事实。" % unverified)
+                if unverified else "",
+    }
+
+
 def _logic_validation(question: str, retrieval: Mapping, plan: Mapping) -> dict:
     """阶段 9 · 逻辑校验：因果链、条件满足、缺失链接（纯规则，不调用 LLM）。
 
@@ -1036,6 +1232,8 @@ def _logic_validation(question: str, retrieval: Mapping, plan: Mapping) -> dict:
         "degraded": status in ("degraded", "insufficient"),
         "note": note,
         "multi_hop": multi_hop,
+        # 阶段 03：证据核验分布（只报告，不改 status/note —— 见 _verification_summary 的说明）
+        "verification": _verification_summary(evidence),
     }
 
 
@@ -1299,6 +1497,9 @@ def build_qa_stage_handlers(
                     for item in ((logic.get("multi_hop") or {}).get("hops") or [])
                 ][:5],
             }
+            # 阶段 03（MASTER_RULES 第 11 条）：核验分布必须进生成端——
+            # 让综合模型知道"哪些证据只是取到了、并没有被确认支持"，不许当成已确证事实写。
+            summary.update(_verification_prompt_blocks(context))
         return standalone + "\n\n问题拆解与回答计划：" + json.dumps(summary, ensure_ascii=False)
 
     def _local_version(pack_id: str) -> str:
@@ -1456,6 +1657,10 @@ def build_qa_stage_handlers(
         # 阶段 02（缺口 1）：多跳每一跳的回执并入同一条统计（回执键集不变）
         _merge_evidence_audits(evidence_audit, hop_evidence_audit)
         stats["evidence_layer"] = _evidence_layer_receipt(evidence_audit)
+        verification_receipt = _verification_receipt(evidence_audit)
+        if verification_receipt:
+            # 阶段 03：核验回执放**兄弟键**（evidence_layer 的键集是 Phase 02 冻结的）
+            stats["verification"] = verification_receipt
         if policy_audit.get("policy_filter") == "applied":
             stats["policy_source_roles"] = policy_audit.get("source_roles") or {}
             stats["policy_noise_excluded"] = len(policy_audit.get("excluded_policy_noise") or [])
@@ -1710,6 +1915,9 @@ def build_qa_stage_handlers(
             result_payload["evidence"] = wired
             stats = dict(result_payload.get("stats") or {})
             stats["evidence_layer"] = _evidence_layer_receipt(audit)
+            verification_receipt = _verification_receipt(audit)
+            if verification_receipt:
+                stats["verification"] = verification_receipt
             result_payload["stats"] = stats
             return result_payload
 
@@ -1928,11 +2136,23 @@ def build_qa_stage_handlers(
         level1, level2, normalizer_audit = normalize_policy_claims(question, level1, level2, plan=plan_output)
         graph = build_claim_evidence_graph(level1, level2)
         graph["normalization_audit"] = normalizer_audit
+        # 阶段 03（MASTER_RULES 第 11 条）：模型自评的 claim 状态一律作废，
+        # 按"结论 → 引用的证据"逐对核验后重写 verification_status（纯规则，不调模型）
+        verification = _verify_claim_graph_in_place(
+            graph, store=store, question=question, run_meta=context["run"])
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
+            message = (f"证据图已建立：{len(graph.get('claims') or [])} 条结论、"
+                       f"{len(graph.get('evidence') or [])} 条证据，正在过滤真实冲突和缺口。")
+            stats = verification.get("stats") if isinstance(verification, Mapping) else None
+            if isinstance(stats, Mapping) and stats.get("claims"):
+                message += "核验：{claims} 条结论中 {confirmed} 条有直接证据支持，{unsupported} 条证据不足。".format(
+                    claims=stats.get("claims"), confirmed=stats.get("confirmed"),
+                    unsupported=int(stats.get("claims") or 0) - int(stats.get("confirmed") or 0))
             emit_stage_event("stage_progress", {
-                "message": f"证据图已建立：{len(graph.get('claims') or [])} 条结论、{len(graph.get('evidence') or [])} 条证据，正在过滤真实冲突和缺口。",
+                "message": message,
                 "evidence": list(graph.get("evidence") or [])[:6],
+                "verification": verification.get("stats") if isinstance(verification, Mapping) else {},
             })
         return graph
 
@@ -1943,7 +2163,11 @@ def build_qa_stage_handlers(
         level2 = raw_level2 if isinstance(raw_level2, Mapping) and "confirmed_claims" in raw_level2 else {}
         graph = context["outputs"].get("conflict_review")
         if not isinstance(graph, Mapping):
+            # fast 模式不跑 conflict_review：这里补建图，**同时补跑核验**，
+            # 否则快速路径上的 claim 又会退回"模型自评"（MASTER_RULES 第 11 条）
             graph = build_claim_evidence_graph(level1, level2)
+            _verify_claim_graph_in_place(graph, store=store, question=_question_for_synthesis(context),
+                                         run_meta=run)
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])

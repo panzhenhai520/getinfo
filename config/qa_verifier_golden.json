@@ -1,0 +1,208 @@
+{
+  "benchmark_version": "qa-verifier-golden-v1",
+  "generated_at": "2026-10-10T00:00:00Z",
+  "note": "阶段 03 核验层的**离线小样本**金标（人工标注，不使用任何模型/端点）。只用它算核验口径的可复算指标，核验实现本身不读这个文件（不构成『硬编码答案』）。sufficient=证据是否足以支持 claim；contradiction=证据是否构成反证。",
+  "pairs": [
+    {
+      "id": "g01",
+      "axis": "direct_support",
+      "claim": "宁德时代10月9日股价大涨，原因是固态电池量产消息与储能订单增长",
+      "title": "宁德时代10月9日股价大涨原因解析",
+      "evidence_text": "10月9日，宁德时代股价大涨5.2%，主要因为固态电池量产消息与储能订单增长。",
+      "published_at": "2026-10-09",
+      "authority_level": 60,
+      "sufficient": true,
+      "contradiction": false
+    },
+    {
+      "id": "g02",
+      "axis": "direct_support",
+      "claim": "2026年10月出台的新规要求民营医院在30日内完成备案",
+      "title": "民营医院备案新规落地",
+      "evidence_text": "2026年10月出台的新规要求民营医院在30日内完成备案，逾期不予受理。",
+      "published_at": "2026-10-02",
+      "authority_level": 60,
+      "sufficient": true,
+      "contradiction": false
+    },
+    {
+      "id": "g03",
+      "axis": "direct_support",
+      "claim": "医保局将门诊报销比例下调至50%",
+      "title": "门诊报销比例调整",
+      "evidence_text": "医保局公布：门诊报销比例下调至 50%，自 2026 年 10 月起执行。",
+      "published_at": "2026-10-01",
+      "authority_level": 60,
+      "sufficient": true,
+      "contradiction": false
+    },
+    {
+      "id": "g04",
+      "axis": "keyword_only",
+      "claim": "宁德时代股价大涨的原因",
+      "title": "宁德时代与比亚迪的差距",
+      "evidence_text": "10月9日，比亚迪销量创新高，芯片供应紧张，行业整体承压。",
+      "published_at": "2026-10-09",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g05",
+      "axis": "keyword_only",
+      "claim": "固态电池量产对整车成本的影响",
+      "title": "固态电池量产进展",
+      "evidence_text": "本周行业会议聚焦智能座舱与车载芯片，参会企业超过两百家。",
+      "published_at": "2026-10-05",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g06",
+      "axis": "negation_flip",
+      "claim": "医保新规不适用于民营医院",
+      "title": "医保新规适用范围的说明",
+      "evidence_text": "医保新规适用于民营医院，报销比例下调，结算方式同步调整。",
+      "published_at": "2026-10-01",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": true
+    },
+    {
+      "id": "g07",
+      "axis": "negation_flip",
+      "claim": "该补贴政策不包括新能源整车企业",
+      "title": "补贴政策覆盖范围",
+      "evidence_text": "该补贴政策包括新能源整车企业，申报窗口自 2026 年 10 月起开放。",
+      "published_at": "2026-10-01",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": true
+    },
+    {
+      "id": "g08",
+      "axis": "number_mismatch",
+      "claim": "2025年新能源补贴提高到30%",
+      "title": "新能源补贴标准",
+      "evidence_text": "2025年新能源补贴提高到20%，覆盖范围扩大至商用车。",
+      "published_at": "2026-01-05",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g09",
+      "axis": "number_mismatch",
+      "claim": "该基金规模为120亿元",
+      "title": "产业基金设立公告",
+      "evidence_text": "该基金规模为20亿元，首期到位资金8亿元。",
+      "published_at": "2026-09-20",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g10",
+      "axis": "entity_mismatch",
+      "claim": "比亚迪获得固态电池大额订单",
+      "title": "固态电池订单落地",
+      "evidence_text": "宁德时代获得固态电池大额订单，产能爬坡中。",
+      "published_at": "2026-10-08",
+      "authority_level": 60,
+      "required_entities": ["比亚迪"],
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g11",
+      "axis": "time_inapplicable",
+      "claim": "2026年11月起施行的备案要求",
+      "title": "备案要求将于11月施行",
+      "evidence_text": "备案要求将于 2026 年 11 月起施行，相关细则已经发布。",
+      "published_at": "2026-09-15",
+      "authority_level": 60,
+      "valid_from": "2026-11-01",
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g12",
+      "axis": "second_hand",
+      "claim": "宁德时代储能订单同比增长40%",
+      "title": "储能行业周报汇编",
+      "evidence_text": "宁德时代储能订单同比增长40%，公司产能利用率维持高位。",
+      "published_at": "2026-10-06",
+      "authority_level": 60,
+      "doc_type": "ai_qa_summary",
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g13",
+      "axis": "causal_inflation",
+      "claim": "宁德时代股价大涨是因为固态电池量产",
+      "title": "宁德时代股价异动",
+      "evidence_text": "宁德时代股价大涨5%，固态电池量产消息公布，储能订单增长。",
+      "published_at": "2026-10-09",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g14",
+      "axis": "no_evidence",
+      "claim": "某公司将于下季度赴港上市",
+      "title": "",
+      "evidence_text": "",
+      "published_at": "",
+      "authority_level": null,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g15",
+      "axis": "direct_support",
+      "claim": "家族办公室数量在2025年达到2000家",
+      "title": "香港家族办公室数量创新高",
+      "evidence_text": "截至 2025 年底，香港家族办公室数量达到 2000 家，同比增长 12%。",
+      "published_at": "2026-02-10",
+      "authority_level": 60,
+      "sufficient": true,
+      "contradiction": false
+    },
+    {
+      "id": "g16",
+      "axis": "irrelevant_but_negated",
+      "claim": "量子计算不适用于金融风控",
+      "title": "医保新规解读",
+      "evidence_text": "医保新规适用于民营医院，不含公立三级医院，报销比例下调。",
+      "published_at": "2026-10-01",
+      "authority_level": 60,
+      "sufficient": false,
+      "contradiction": false
+    },
+    {
+      "id": "g17",
+      "axis": "long_text_unrelated_negation",
+      "claim": "宁德时代10月9日股价大涨，收盘涨约3.84%",
+      "title": "车企与宁德时代，电池谁说了算？",
+      "evidence_text": "10月9日，宁德时代迎来久违的大涨，A股盘中一度涨超5％，截至收盘，仍涨约3.84％。此前近两个月，宁德时代股价持续走低。多位分析师认为，车企自研电池短期内无法替代头部供应商，未来两年格局不会改变。",
+      "published_at": "2026-10-09",
+      "authority_level": 60,
+      "sufficient": true,
+      "contradiction": false
+    },
+    {
+      "id": "g18",
+      "axis": "procedural_negation_clause",
+      "claim": "2026年10月出台的新规要求民营医院在30日内完成备案",
+      "title": "民营医院备案新规问答",
+      "evidence_text": "2026年10月出台的新规要求民营医院在30日内完成备案，逾期不予受理。",
+      "published_at": "2026-10-02",
+      "authority_level": 60,
+      "sufficient": true,
+      "contradiction": false
+    }
+  ]
+}

@@ -16,10 +16,10 @@
 |P02-02|provenance| PASS | provenance：source_identity（edge>doc+chunk>doc>article>web>url>ref）+ evidence_provenance（run/stage/route/round/corpus_version）+ annotate 落 metadata.evidence_layer；多跳每跳与 level2 均已接线（真跑 annotated=25 / recorded=34） | 2026-10-10 |
 |P02-03|seen 与 confirmed| PASS | seen 与 confirmed：新表 qa_evidence_seen（v7），三轴作用域隔离；被拒证据留身份；TTL 清理 prune_seen_evidence（QA_EVIDENCE_SEEN_TTL_DAYS 默认 30、开关默认关，挂在 task_cleanup）；真跑本 run 作用域 9 行（confirmed 8 / rejected 1）、其它作用域 0 行；20+7 例 | 2026-10-10 |
 |P02-04|fingerprint/去重| PASS | fingerprint/去重：三种指纹 + 跨轮去重（默认只丢上轮被拒来源）；整批与逐跳两条路径都保持 rejected 身份（不降级为 seen，已有源码级守门用例）；回执键集与接线前逐字相同；11+12 例 | 2026-10-10 |
-|P03-01|relevance/reranker|NOT_STARTED|||
-|P03-02|entailment/NLI|NOT_STARTED|||
-|P03-03|entity/time/negation/source verifier|NOT_STARTED|||
-|P03-04|EvidenceScore/reason/cache|NOT_STARTED|||
+|P03-01|relevance/reranker| PASS | qa_verifier（P03-01 段）：`relevance_score`（标题覆盖 ×2.5 / 正文前段 ×1.25，0.55/0.45 加权，知识库相似度仅 0–1 区间才当相似度用）+ `rerank_evidence`（按核验分稳定重排，同分保序）；接在 `_apply_evidence_layer` 核验之后（`QA_VERIFIER_RERANK` 默认开，审计记 `reordered`）。tests/test_qa_phase03_verifier.py 5 例 + 接线 2 例；真机 12 条证据重排实测重排 2 条 | 2026-10-10 |
+|P03-02|entailment/NLI| PASS | qa_verifier（P03-02 段）：**纯规则**方向性蕴含（claim 实词被证据覆盖比例：2 元组 ×0.65 + 3 元组 ×0.35）；可插拔后端 `register_entailment_backend` + `QA_NLI_BACKEND`，未注册名/后端抛错/未注册一律保守回落规则后端并记 `nli_backend_fallback`（SUPPORTED 降 QUALIFIED）；**证据不足永远给 UNVERIFIED/QUALIFIED，绝不给 SUPPORTED**。AST 级守门用例断言核验层不 import requests/urllib3/httpx/socket、源码内零 http(s) 字面量（GPU 端点禁用约束） | 2026-10-10 |
+|P03-03|entity/time/negation/source verifier| PASS | qa_verifier（P03-03 段）：实体一致性（required_entities 必须出现在证据实体表/文本里，不做新 NER）、时间适用性（早于 claim.valid_from / 晚于 valid_to 判不适用，时效半衰期 180 天）、否定一致性（多字否定词 + **仅在与结论最相关的分句上判** + 否定词前后 8 字必须出现对方实词才敢判 REFUTED）、来源核验（权威性、二手转述、因果夸大、relationship=contradicts 降级）。真机回放纠正了两处误判：整篇 900 字搜否定词导致 8 条 claim 里 6 条被误判 conflicted → 修正后 0 条；"逾期不予受理"程序性子句误判反证 → 修正后判 SUPPORTED | 2026-10-10 |
+|P03-04|EvidenceScore/reason/cache| PASS | qa_verifier（P03-04 段）：`evidence_score`（§11 加权口径，五项和为 1.0 + contradiction_risk 减项，钳制 [0,1]，逐项 `QA_VERIFIER_W_*` 可配）、21 个原因码 + 中文解释（`reason_text`）、`VerificationCache`（进程内 TTL+LRU + 可选落库**复用既有 `qa_retrieval_cache` 表**，namespace=qa_verification，**零迁移**）；`QaStore.get/put_verification_cache` 两个新方法。缓存键含权威性/发布时间/relationship/doc_type/要求实体/有效期/独立性/配置指纹（早期只用来源+正文，实测把 authority 从 60 改成 None 仍命中旧结论）。真机回放 12 条证据：第一遍 73–219ms → 第二遍 1.8–4.2ms（40–68x，命中率 0.5）；金标单条 0.9–2.4ms（调优前 3.6ms：OpenCC 归一化缓存 + 分句先整段归一化，判定结果逐条不变） | 2026-10-10 |
 |P04-01|BM25 Hunter|NOT_STARTED|||
 |P04-02|Semantic Hunter|NOT_STARTED|||
 |P04-03|Graph Hunter adapter|NOT_STARTED|||
