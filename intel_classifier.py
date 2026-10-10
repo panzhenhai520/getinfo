@@ -34,11 +34,56 @@ DEFAULT_RECENT_TODAY_WINDOW_DAYS = 5
 DEFAULT_RECENT_TREND_WINDOW_DAYS = 21
 
 
+# 短 ASCII 关键词护栏：长度 ≤4 且纯 ASCII 的词（PE/VC/FA/LP/GP/AI/5G…）在中文语料里
+# 极易被子串误命中，例如 openai/paper/huggingface/openpore/personinfo 里的 "pe"
+# 会被当成私募股权（PE）锚点，把不相干文章拉进行业包。
+_SHORT_ASCII_KEYWORD_MAX_LEN = 4
+# 只认「纯字母数字」的 ASCII 词：带空格/符号的关键词（如 "A/B"、"C++"）语义上不存在
+# 词边界问题，继续走原子串匹配，避免扩大改动面。
+_PURE_ASCII_KEYWORD_RE = re.compile(r'^[A-Za-z0-9]+$')
+
+
+def _is_short_ascii_keyword(keyword: str) -> bool:
+    """是否属于「长度 ≤4 的纯 ASCII 关键词」——需要加词边界护栏的那一类。"""
+    return (
+        len(keyword) <= _SHORT_ASCII_KEYWORD_MAX_LEN
+        and bool(_PURE_ASCII_KEYWORD_RE.match(keyword))
+    )
+
+
+def _contains_keyword(text: str, keyword: str) -> bool:
+    """关键词命中判定（统一护栏入口：``_matches`` 与 ``_industry_signal`` 共用）。
+
+    规则：
+      - 长度 ≤4 且纯 ASCII 的关键词 → 用 ASCII 前后视断言做**词边界**匹配；
+      - 其它关键词（中文、含空格/符号、长度 >4 的 ASCII）→ 保持原样子串匹配，
+        这是「不改变现有 12 个行业包行为」的关键（它们的锚点全是中文）。
+
+    ⚠️ 这里绝不能用 ``\\b``：Python 正则的 ``\\w`` 默认按 Unicode 匹配，**中文也算 \\w**，
+    所以 ``\\bPE\\b`` 匹配不到 ``PE基金``（PE 两侧都是"词字符"，没有边界），会系统性
+    漏掉真命中——实测 IPO 命中 56→9、LP 25→1。改用 ASCII 字符类前后视
+    ``(?<![A-Za-z0-9])PE(?![A-Za-z0-9])`` 后，中文紧邻（``PE基金`` / ``对pe的投资``）
+    仍命中，而 ``openai``/``paper`` 里的 ``pe`` 不再命中。
+
+    已知局限（不打算在本函数里修）：中文存在同形异义，``vc均热板``/``电解液添加剂vc``
+    里的 vc 不是创投；本护栏只负责"减少误命中"，不保证语义正确。
+
+    调用约定：text 与 keyword 都应先过 ``normalize_intel_text``（大小写不敏感由 casefold
+    保证，正则再带 re.I 作为双保险）。``re`` 模块自带编译缓存，这里无需额外缓存。
+    """
+    if not text or not keyword:
+        return False
+    if _is_short_ascii_keyword(keyword):
+        pattern = r'(?<![A-Za-z0-9])' + re.escape(keyword) + r'(?![A-Za-z0-9])'
+        return re.search(pattern, text, re.I) is not None
+    return keyword in text
+
+
 def _matches(text: str, keywords: List[str]) -> List[str]:
     found = []
     for keyword in keywords or []:
         normalized = normalize_intel_text(keyword)
-        if normalized and normalized in text:
+        if normalized and _contains_keyword(text, normalized):
             found.append(keyword)
     return found
 
@@ -309,15 +354,18 @@ def _industry_signal(text: str, industry_pack: Dict, title: str = '') -> bool:
     # 否则汽车/风洞等其它行业文章会因不含那些词而被误拒。
     for kw in industry_anchor_keywords(industry_pack):
         nm = normalize_intel_text(kw)
-        if nm and nm in t:
+        if nm and _contains_keyword(t, nm):
             return True
+    # 说明：下面这张硬编码词表**故意保持原样子串匹配**，不走 _contains_keyword。
+    # 表内 GPU/SCADA/DCS/PLC 是大写，而 t 已 casefold 成小写，加词边界会让这些
+    # "历史死词"复活成真命中，扩大准入面——超出本次护栏范围，故按最小改动处理。
     for kw in _INDUSTRY_CORE_TERMS:
         if kw in t:
             return True
     # 行业包特定实体：来源厂商/客户实体名（名词，非话题词）
     for src in (industry_pack or {}).get("default_sources") or []:
         nm = normalize_intel_text(str(src.get("name") or ""))
-        if nm and len(nm) >= 2 and nm in t:
+        if nm and len(nm) >= 2 and _contains_keyword(t, nm):
             return True
     return False
 
