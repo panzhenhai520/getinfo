@@ -1392,5 +1392,298 @@ class IntelPackImprovementTests(unittest.TestCase):
         self.assertIn("没有可执行项", record["reason"])
 
 
+# ─────────────────── 挖词质量：去样板 / 跨域名多样性 / 导航短语（真机夹具回归） ───────────────────
+# 真机（A 机 invest_mgmt，sample_limit=100、5 个域名）实测：top 候选词全是 wallstreetcn.com 页脚
+# 「本文来自华尔街见闻，欢迎下载APP查看更多」的碎片——华尔街(33) 华尔街见闻(25) 见闻(25)
+# app查看(24) 来自华尔街(24) 欢迎app(24)。这六个词必须**全部被剔除**（硬剔除，不是降权）。
+_WALLSTREET_FOOTER = "本文来自华尔街见闻，欢迎下载APP查看更多"
+_NOISE_TERMS = ("华尔街", "华尔街见闻", "见闻", "app查看", "来自华尔街", "欢迎app")
+# 真行业词（跨域名复现）——回归用：过滤不能把好词一起杀掉。
+_INDUSTRY_TERMS = ("私募股权", "基金备案")
+
+
+def _quality_pack_docs(footer_on_own_line: bool = False):
+    """两域名夹具语料（各 10 篇）：A 站（wallstreetcn.com）每篇都带同一句真机页脚。
+
+    * 页脚里的噪声词在 A 站 100% 复现、在 B 站 0% 出现 → 必须剔除；
+    * ``私募股权`` / ``基金备案`` 在 A、B 两站各 5 篇出现（跨域名复现）→ 必须保留；
+    * ``独角兽`` 只在 A 站 4 篇出现（跨域名多样性不足，但没到站点复现率门槛）→ 必须剔除。
+
+    ``footer_on_own_line=True`` 时页脚独占一行（10/10 复现 → 走"去样板"整行删除）；
+    False 时把页脚拼在正文句尾（每篇的行都不一样 → 只能靠站点级复现率判据剔除）。
+    """
+    docs = []
+    for index in range(10):
+        industry = "私募股权与基金备案的安排在本期均有进展，" if index < 5 else ""
+        extra = "独角兽相关内容见前述观察记录。" if index < 4 else ""
+        body = f"{industry}第 {index} 期观察：某机构在项目流转环节的操作路径出现变化。{extra}"
+        content = f"{body}\n{_WALLSTREET_FOOTER}" if footer_on_own_line else f"{body}{_WALLSTREET_FOOTER}"
+        docs.append(
+            {
+                "article_id": 500 + index,
+                "title": f"A 站观察第 {index} 期",
+                "domain": "wallstreetcn.com",
+                "content": content,
+            }
+        )
+    for index in range(10):
+        industry = "私募股权与基金备案的制度安排同步细化，" if index < 5 else ""
+        docs.append(
+            {
+                "article_id": 600 + index,
+                "title": f"B 站记录第 {index} 期",
+                "domain": "www.tmtpost.com",
+                "content": f"{industry}B 站第 {index} 期记录：机构投资者结构保持稳定，未见异常。",
+            }
+        )
+    return docs
+
+
+def _quality_peer_docs():
+    """对照语料：其它包已准入文章，刻意不含任何夹具词（保证判别力比值够高）。"""
+    return [
+        {
+            "article_id": 700 + index,
+            "title": f"对照文章 {index}",
+            "domain": "peer.example.com",
+            "content": "精细化工资产并购完成交割，交割流程已全部走完，投资人结构保持稳定。",
+        }
+        for index in range(4)
+    ]
+
+
+class IntelPackKeywordQualityTests(unittest.TestCase):
+    """挖词质量三件套（① 去样板 ② 跨域名多样性 ③ 导航短语）的真机噪声词回归。
+
+    隔离性与主用例一致：临时 sqlite + 假包加载器，**不连真库、不联网、不调模型、不碰 GPU**；
+    语料直接用 ``_pack_docs`` / ``_peer_docs`` 注入，不写任何生产配置。
+    """
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.db = SQLiteDatabase(os.path.join(self.temp_dir.name, "keyword_quality.sqlite3"))
+        self.assertTrue(self.db.connect())
+        self.assertEqual(
+            getattr(self.db, "backend", "sqlite"),
+            "sqlite",
+            "测试必须跑在隔离的临时 SQLite 上（检查 DATABASE_TYPE/SQLITE_BACKUP_PATH）",
+        )
+        self.assertTrue(self.db.create_tables())
+        m.use_database(self.db)
+        m.use_pack_loader(
+            _FakeLoader(
+                {
+                    "demo_pack": _demo_pack(),
+                    "gate_free_pack": _gate_free_pack(),
+                    "peer_pack": _peer_pack(),
+                },
+                database=self.db,
+            )
+        )
+
+    def tearDown(self):
+        m.use_pack_loader(ORIGINAL_LOADER)
+        m.use_database(ORIGINAL_REPOSITORY)
+        self.db.disconnect()
+        self.temp_dir.cleanup()
+
+    def _mine(self, pack_docs, peer_docs=None, top_n: int = 20):
+        return m.mine_keyword_candidates(
+            "demo_pack",
+            top_n=top_n,
+            sample_limit=100,
+            _pack_docs=pack_docs,
+            _peer_docs=_quality_peer_docs() if peer_docs is None else peer_docs,
+        )
+
+    @staticmethod
+    def _excluded_reasons(result) -> dict:
+        return {str(item.get("term")): str(item.get("reason") or "") for item in result["excluded"]}
+
+    @staticmethod
+    def _tokens_of(docs) -> set:
+        """按**挖词链路同一口径**取 token（含行级去样板），否则会拿未清洗的文本做断言。"""
+        templates = m._domain_template_lines(docs)
+        tokens = set()
+        for row in docs:
+            text = m._mine_doc_text(
+                row, templates.get(str(row.get("domain") or "")) or frozenset()
+            )
+            tokens.update(m._tokenize(text))
+        return tokens
+
+    # ── ① 真机噪声词夹具：这批词必须全部被剔除 ──
+    def test_machine_noise_terms_are_all_dropped(self):
+        docs = _quality_pack_docs()
+        result = self._mine(docs)
+        keywords = set(result["keywords"])
+        reasons = self._excluded_reasons(result)
+        tokens = self._tokens_of(docs)
+
+        # 夹具自身必须真的能切出噪声词（否则这条用例是空转）
+        produced = {term for term in _NOISE_TERMS if term in tokens}
+        self.assertTrue(produced, f"夹具没切出任何噪声词：{sorted(tokens)[:20]}")
+
+        for term in _NOISE_TERMS:
+            self.assertNotIn(term, keywords, f"真机站点样板词仍被推荐进候选：{term}")
+            self.assertNotIn(term, self._all_candidate_terms(result), term)
+        # 切出来的噪声词必须留下"被剔除"的痕迹与理由（硬剔除，不是降权）
+        for term in sorted(produced):
+            self.assertIn(term, reasons, f"{term} 没有出现在 excluded 里")
+            self.assertTrue(
+                "样板" in reasons[term] or "导航" in reasons[term],
+                f"{term} 的剔除理由不对：{reasons[term]}",
+            )
+        self.assertGreaterEqual(result["keyword_filter"]["site_boilerplate_dropped"], 1)
+        self.assertGreaterEqual(result["keyword_filter"]["nav_phrase_dropped"], 1)
+        self.assertTrue(any("站点样板词" in warn for warn in result["warnings"]))
+        # 判别力三条门槛仍在（回归：没被新规则挤掉）
+        self.assertEqual(result["discrimination"]["min_ratio"], m.DISCRIMINATION_MIN_RATIO)
+        self.assertEqual(result["discrimination"]["max_peer_rate"], m.DISCRIMINATION_MAX_PEER_RATE)
+        self.assertEqual(result["discrimination"]["min_pack_docs"], m.DISCRIMINATION_MIN_DOCS)
+
+    def _all_candidate_terms(self, result) -> set:
+        candidates = result.get("candidates") or {}
+        terms = set()
+        for bucket in ("core_keywords", "entity_keywords", "anchors"):
+            terms.update(str(item.get("term")) for item in (candidates.get(bucket) or []))
+        return terms
+
+    # ── ② 去样板：同一段页脚混进多篇文章 → 切词前就被删掉 ──
+    def test_repeated_footer_lines_are_stripped_before_counting(self):
+        docs = _quality_pack_docs(footer_on_own_line=True)
+        result = self._mine(docs)
+        reasons = self._excluded_reasons(result)
+
+        self.assertGreaterEqual(result["keyword_filter"]["template_line_count"], 1)
+        self.assertIn("wallstreetcn.com", result["keyword_filter"]["template_line_domains"])
+        self.assertTrue(any("去样板" in warn for warn in result["warnings"]))
+        for term in ("华尔街", "见闻", "华尔街见闻"):
+            self.assertNotIn(term, self._all_candidate_terms(result), term)
+            # 整行在切词**之前**就被删掉 → 连"被剔除"的痕迹都不该有（这些词根本没进过词频统计）
+            self.assertNotIn(term, reasons, f"{term} 是切词后才剔除的，去样板没生效")
+        # 去样板不能把正文里的真行业词一起删掉
+        self.assertIn("私募股权", self._keywords_for_tokenizer(result), result["keywords"])
+
+    def _keywords_for_tokenizer(self, result):
+        """按当前分词器给出回归断言用的关键词集合。
+
+        jieba 在 requirements.txt 里（生产就是它）；万一环境缺 jieba，_tokenize 会退化成
+        "中文 2/3-gram"，切不出「私募股权」这种四字短语，只能断言它的词片段。
+        """
+        if m._tokenizer_name() == "jieba":
+            return set(result["keywords"])
+        return set(result["keywords"]) | {"私募", "股权", "基金", "备案"}
+
+    # ── ③ 跨域名多样性：只在 A 站出现的词剔除；A、B 都出现的词保留 ──
+    def test_cross_domain_diversity_drops_single_domain_terms(self):
+        docs = _quality_pack_docs()
+        result = self._mine(docs)
+        keywords = set(result["keywords"])
+        reasons = self._excluded_reasons(result)
+        tokens = self._tokens_of(docs)
+
+        self.assertTrue(result["discrimination"]["cross_domain_enabled"])
+        self.assertGreaterEqual(result["keyword_filter"]["cross_domain_dropped"], 1)
+        # 「独角兽」只在 A 站 4 篇出现（4/10=40% 够不到站点复现率 60%）→ 只能靠跨域名判据剔除
+        self.assertIn("独角兽", tokens)
+        self.assertNotIn("独角兽", keywords)
+        self.assertIn("独角兽", reasons)
+        self.assertIn("跨域名多样性", reasons["独角兽"])
+        # 保留下来的一定跨域名（不变量）
+        for item in result["candidates"]["anchors"]:
+            self.assertGreaterEqual(item["domains"], m.CROSS_DOMAIN_MIN_DOMAINS, item["term"])
+
+    def test_real_industry_terms_across_domains_survive(self):
+        result = self._mine(_quality_pack_docs())
+        keywords = set(result["keywords"])
+        self.assertTrue(keywords, "过滤过猛：一个候选词都没剩下")
+        if m._tokenizer_name() == "jieba":
+            for term in _INDUSTRY_TERMS:
+                self.assertIn(term, keywords, f"真行业词被误杀：{term}")
+        else:  # pragma: no cover - 无 jieba 环境只切词片段
+            for term in ("私募", "基金", "备案"):
+                self.assertIn(term, keywords, f"真行业词被误杀：{term}")
+        # 真行业词是跨域名复现的
+        selected = {str(item["term"]): item for item in result["candidates"]["anchors"]}
+        for term in _INDUSTRY_TERMS:
+            if term in selected:
+                self.assertGreaterEqual(selected[term]["domains"], 2)
+                self.assertEqual(selected[term]["peer_rate"], 0.0)
+
+    # ── ④ 词形/导航短语过滤（与分词器无关的直接断言） ──
+    def test_nav_phrase_filter_drops_navigation_and_keeps_industry_words(self):
+        for term in (
+            "app查看", "欢迎app", "点击查看", "阅读原文", "扫码关注", "微信扫码", "来自华尔街",
+            "免责声明", "版权所有", "钛媒体app", "下载app", "点击下载", "查看更多", "关注我们",
+            "用户协议", "来源华尔街见闻", "某某公众号",
+        ):
+            self.assertTrue(m._nav_phrase_reason(term), f"导航式短语未被识别：{term}")
+        for term in _INDUSTRY_TERMS + (
+            "AI芯片", "Pre-IPO", "REITs基金", "点击率", "下载量", "独角兽", "固态电池", "中试线",
+        ):
+            self.assertEqual(m._nav_phrase_reason(term), "", f"真行业词被误判成导航短语：{term}")
+
+    # ── ⑤ 站点级复现率判据（用 A 机真实域名分布做夹具） ──
+    def test_site_boilerplate_reason_matches_real_machine_distribution(self):
+        # A 机 invest_mgmt 实测分布（100 篇 other）：wallstreetcn 31 / tmtpost 40 / cyzone 25 /
+        # qbitai 3 / zhidx 1
+        domain_docs = {
+            "wallstreetcn.com": 31, "www.tmtpost.com": 40, "www.cyzone.cn": 25,
+            "www.qbitai.com": 3, "zhidx.com": 1,
+        }
+        for term, per_domain in (
+            ("华尔街见闻", {"wallstreetcn.com": 25}),
+            ("见闻", {"wallstreetcn.com": 25}),
+            ("app查看", {"wallstreetcn.com": 24}),
+            ("来自华尔街", {"wallstreetcn.com": 24}),
+            ("华尔街", {"wallstreetcn.com": 25, "www.tmtpost.com": 4, "www.cyzone.cn": 4}),
+        ):
+            reason = m._site_boilerplate_reason(term, per_domain, domain_docs, 100)
+            self.assertIn("站点样板词", reason, f"{term} 没被判成站点样板：{reason}")
+        for term, per_domain in (
+            ("私募股权", {"wallstreetcn.com": 12, "www.tmtpost.com": 14, "www.cyzone.cn": 9}),
+            ("基金备案", {"wallstreetcn.com": 4, "www.tmtpost.com": 5}),
+        ):
+            self.assertEqual(
+                m._site_boilerplate_reason(term, per_domain, domain_docs, 100), "",
+                f"真行业词被误判成站点样板：{term}",
+            )
+        # 域名文档数 < SITE_BOILERPLATE_MIN_DOCS（样本太小）不参与判定
+        self.assertEqual(
+            m._site_boilerplate_reason("某冷门词", {"www.qbitai.com": 3}, domain_docs, 100), ""
+        )
+        # 单一域名语料：门槛收紧到 SOLO_RATE，60%~80% 之间不算样板
+        solo = {"only.example.com": 10}
+        self.assertEqual(m._site_boilerplate_reason("某词", {"only.example.com": 7}, solo, 10), "")
+        self.assertIn(
+            "站点样板词",
+            m._site_boilerplate_reason("某词", {"only.example.com": 8}, solo, 10),
+        )
+
+    # ── ⑥ 机构名分桶：core_keywords 与 entity_keywords 互斥 ──
+    def test_candidate_buckets_are_disjoint_entity_names_go_to_entity_bucket(self):
+        result = self._mine(_quality_pack_docs())
+        candidates = result["candidates"]
+        core = {str(item["term"]) for item in candidates["core_keywords"]}
+        entity = {str(item["term"]) for item in candidates["entity_keywords"]}
+        self.assertEqual(core & entity, set(), "同一个词不能同时进 core_keywords 与 entity_keywords")
+        self.assertEqual(
+            {str(item["term"]) for item in candidates["anchors"]}, core | entity,
+            "anchors 必须是 core ∪ entity",
+        )
+        for item in candidates["entity_keywords"]:
+            self.assertEqual(item["bucket"], "entity_keywords")
+            self.assertTrue(m._is_entity_term(item["term"]))
+        for item in candidates["core_keywords"]:
+            self.assertEqual(item["bucket"], "core_keywords")
+            self.assertFalse(m._is_entity_term(item["term"]))
+        # 机构名启发式本身（机构/组织后缀 + ≥4 字）
+        self.assertTrue(m._is_entity_term("中国证券投资基金业协会"))
+        self.assertTrue(m._is_entity_term("上海证券交易所"))
+        self.assertFalse(m._is_entity_term("交易所"))  # 命中后缀但只有 3 字 → 按概念词走 core
+        self.assertFalse(m._is_entity_term("私募股权"))
+
+
 if __name__ == "__main__":
     unittest.main()

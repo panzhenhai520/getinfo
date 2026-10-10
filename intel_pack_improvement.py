@@ -39,6 +39,9 @@ from industry_packs import (
 from intel_classifier import classify_article, match_fixed_topics
 from intel_contracts import DEFAULT_INDUSTRY_PACK_ID, utc_text
 from intel_database import ARTICLE_TIME_SQL, IntelRepository, intel_repository
+# 去样板复用仓库既有模块：intel_boilerplate.FRAME_MARKERS 是"分享/评论/热文推荐/扫码关注/
+# 版权声明"这类页面框架特征词，已用于入库前判废，这里直接拿来做"挖词前去样板"（不另造一套）。
+from intel_boilerplate import FRAME_MARKERS as BOILERPLATE_FRAME_MARKERS
 
 MODULE_VERSION = "1.0.0"
 
@@ -91,6 +94,7 @@ MAX_RATIO_FOR_SCORE = 20.0
 # 1 个域名**且**≥80% 的命中文档标题里都有它**（真行业词很少在单一域名下被当标题模板反复套用）。
 # 处理方式：排序分 ×0.5（rank_score），并在候选对象上打 template_suspect 标记；
 # 判别力过滤与达标判定都不受影响（最终仍由影子自测 + 抓文章实测 + 人工审核把关）。
+# 注意：页脚/导航这类**必须拦住**的噪声不能只降权——见下面 SITE_BOILERPLATE_* 硬剔除口径。
 TEMPLATE_TITLE_RATIO = 0.8
 TEMPLATE_SUSPECT_PENALTY = 0.5
 # 站点级模板噪声降权（同样只降排序、不剔除）：页脚/导航/免责声明常被正文抽取带进来
@@ -99,6 +103,32 @@ TEMPLATE_SUSPECT_PENALTY = 0.5
 # 本包 other 恰恰是"没进本行"的文章，一个词覆盖其中一半又只来自单一站点，多半是站点模板而非行业词。
 BOILERPLATE_PACK_RATE = 0.5
 BOILERPLATE_SUSPECT_PENALTY = 0.5
+
+# ── 去样板 + 词形过滤（**硬剔除**，2026-10 真机实测后补的口径）──────────────────
+# 为什么必须硬剔除：A 机投资包（invest_mgmt，sample_limit=100，语料 5 个域名）挖出来的 top 候选词是
+#   华尔街(33，3 个域名) 华尔街见闻(25) 见闻(25) app查看(24) 来自华尔街(24) 欢迎app(24)
+# —— 全是 wallstreetcn.com 页脚「本文来自华尔街见闻，欢迎下载APP查看更多」的碎片。上面那两条
+# template_suspect / boilerplate_suspect 只降权不剔除，且要求「单域名 + 本包 other 出现率 ≥50%」，
+# 这批词的出现率只有 24%~33%，够不到门槛，于是照样被推荐。硬剔除靠下面三条独立判据：
+#   ① 站点级复现率：某词在同一域名 ≥60% 的文档里都出现（该域名文档数 ≥8），且在**其它域名**
+#      几乎不出现（出现率 ≤15%）→ 判为站点样板词。取 60% 而不是 80%：页脚/导航在整站几乎每页
+#      都出现，60% 已是强信号；真正防误杀的是后半句「其它域名几乎不出现」——真行业词会跨来源复现。
+#      语料只有单一域名时（没有跨站证据）门槛收紧到 80%（SITE_BOILERPLATE_SOLO_RATE）并出 warning。
+#   ② 跨域名多样性：命中必须来自 ≥2 个域名。理由同①的后半句：页脚/导航只属于某一个站，而真正的
+#      行业词会在多个来源反复出现。（任务给的「单一域名占命中 ≤80%」与「≥2 个域名」其实等价：
+#      只有一个域名时占比必然 100%，所以取更强的「≥2 个域名」口径。语料本身只有 1 个域名时这条
+#      无从判别，直接不启用——否则会把整份语料全杀掉。）
+#   ③ 导航式短语：中英混排的按钮/客户端短语（app查看/欢迎app）、导航词拼成的短语
+#      （点击查看/阅读原文/扫码关注）、出处声明（来自华尔街）——见 _nav_phrase_reason()。
+SITE_BOILERPLATE_MIN_DOCS = 8
+SITE_BOILERPLATE_RATE = 0.6
+SITE_BOILERPLATE_SOLO_RATE = 0.8
+SITE_BOILERPLATE_OTHER_RATE = 0.15
+# 语料级「站点复现行」：同一域名下 ≥60% 的文档都出现的短行（≤200 字）视为页脚/导航行，切词前删掉
+# （整行去样板；跨行/跨字段的碎片由上面①的「站点级复现率」兜住）。
+SITE_TEMPLATE_LINE_RATE = 0.6
+SITE_TEMPLATE_LINE_MAX_CHARS = 200
+CROSS_DOMAIN_MIN_DOMAINS = 2
 MAX_EXAMPLES = 3
 TITLE_LIMIT = 120
 # 语料截断：分类链路本身按 20 万字符截断，本模块为控制内存/带宽按 2 万字符截断
@@ -184,6 +214,34 @@ _URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.I)
 _TOKEN_SHAPE_RE = re.compile(r"^[0-9A-Za-z\u4e00-\u9fff][0-9A-Za-z\u4e00-\u9fff\-\+_%]*$")
 # 年份/日期/数量类噪声（"2026年""3月""12日""5亿"）。
 _NOISE_TOKEN_RE = re.compile(r"^[0-9]+(\.[0-9]+)?[年月日时分秒个条项万元亿千百%]*$")
+
+# ── 导航式短语（词形/组合过滤，硬剔除）───────────────────────────────
+# 维护位置就是下面四行常量 + _nav_phrase_reason()：新增一类导航/交互短语时，
+# 能写成模式就加到 _NAV_PHRASE_PATTERNS，只是"构件词"（如新的"订阅号"）就加到 _NAV_CUE_WORDS。
+_NAV_PHRASE_PATTERNS = (
+    # ① 显式清单：动作按钮/入口短语（新增导航短语优先加这里）
+    re.compile(
+        r"^(点击查看|点击下载|查看全文|查看更多|查看详情|阅读原文|阅读全文|扫码关注|扫一扫|"
+        r"关注我们|联系我们|关于我们|返回首页|欢迎下载|欢迎关注|欢迎投稿|投稿邮箱|商务合作)"
+    ),
+    # ② 页脚法律/服务条款声明
+    re.compile(r"(免责声明|版权声明|版权所有|未经授权|转载请注明|如有侵权|用户协议|隐私政策)$"),
+    # ③ 出处/转载声明前缀（"来自华尔街""来源华尔街见闻"这类是署名，不是主题词）
+    re.compile(r"^(来自|来源|转自|摘自|原载|本文来自|以上内容)"),
+    # ④ 站点自指后缀（"钛媒体app""某某公众号"）
+    re.compile(r"(app|客户端|公众号|微博|头条号|官网)$"),
+    # ⑤ 纯英文导航词
+    re.compile(r"^(app|menu|login|share|download|click|more|read|wap|home)$"),
+)
+# 导航/交互构件词：中英混排时命中其一即判为按钮/客户端短语。
+_NAV_CUE_WORDS = (
+    "查看", "点击", "下载", "关注", "欢迎", "阅读", "原文", "扫码", "扫一扫", "打开", "返回",
+    "分享", "收藏", "点赞", "评论", "登录", "注册", "订阅", "转发", "更多", "详情", "首页",
+    "客服", "客户端", "二维码", "微信", "微博", "公众号",
+)
+# 纯 ASCII 的导航/客户端词（"app" 之类单字母词条被 _is_valid_token 放行，需要单独挡掉）。
+_NAV_ASCII_HINTS = ("app", "wap", "menu", "login", "share", "download", "click", "more", "read")
+_ASCII_LETTER_RE = re.compile(r"[a-z]")
 
 
 # ─────────────────────────── 依赖注入（测试/多租户隔离用） ───────────────────────────
@@ -325,8 +383,18 @@ def _tokenizer_name() -> str:
     return "ngram_fallback"
 
 
+def _is_entity_term(term: str) -> bool:
+    """机构/品牌名启发式：命中机构后缀且 ≥4 字 → 进 entity_keywords 桶。
+
+    两桶互斥（同一个词只会落一个桶）：机构/品牌名走 entity_keywords（包实体词，不进
+    fixed_topics），其余走 core_keywords；分类只影响可读性，不影响门禁效果
+    （industry_anchor_keywords() 把两者都当"证明行业归属"的词）。
+    """
+    token = str(term or "")
+    return bool(_ENTITY_SUFFIX_RE.search(token)) and len(token) >= 4
+
+
 def _is_valid_token(token: str) -> bool:
-    token = str(token or "").strip()
     if not token or token in _STOPWORDS:
         return False
     if _NOISE_TOKEN_RE.match(token):
@@ -380,6 +448,167 @@ def _tokenize(text: str) -> List[str]:
     return tokens + phrases
 
 
+# ─────────────────────────── 去样板 / 导航短语过滤（硬剔除） ───────────────────────────
+def _nav_phrase_reason(term: str) -> str:
+    """导航式短语判定：命中返回原因文本，否则返回空串（词形级判据，不依赖语料）。
+
+    三类通用规则 + 一张可维护清单（_NAV_PHRASE_PATTERNS）：
+      ① 中英混排且含导航构件词（app查看 / 欢迎app / 下载app / 钛媒体app）——中英混排本身也可能是
+         真行业词（AI芯片 / Pre-IPO / REITs基金），所以**必须同时**含导航构件词才剔除；
+      ② 纯中文且由 ≥2 个导航构件词拼成（点击查看 / 阅读原文 / 扫码关注 / 微信扫码）；
+      ③ 出处前缀开头、站点自指后缀结尾、页脚法律声明（来自华尔街 / 某某公众号 / 免责声明）。
+    """
+    token = str(term or "").strip()
+    if not token:
+        return ""
+    low = token.casefold()
+    for pattern in _NAV_PHRASE_PATTERNS:
+        if pattern.search(low):
+            return f"导航式短语（命中模式 {pattern.pattern[:28]}）"
+    if _ASCII_LETTER_RE.search(low):
+        cue = next((item for item in _NAV_CUE_WORDS if item in token), "")
+        hint = next((item for item in _NAV_ASCII_HINTS if item in low), "")
+        if cue or hint:
+            return f"中英混排的导航短语（含「{cue or hint}」）"
+        return ""
+    cues = [item for item in _NAV_CUE_WORDS if item in token]
+    if len(cues) >= 2:
+        return "导航式短语（由「%s」等导航构件词拼成）" % "」「".join(cues[:3])
+    return ""
+
+
+def _normalized_line(line: str) -> str:
+    """行归一化：去掉所有空白，用于"同一行是否重复出现"的比对。"""
+    return re.sub(r"\s+", "", str(line or ""))
+
+
+def _doc_lines(text: str) -> List[str]:
+    return [line.strip() for line in str(text or "").replace("\r", "\n").split("\n")]
+
+
+def _domain_template_lines(rows: Sequence[Dict]) -> Dict[str, frozenset]:
+    """语料级「站点复现行」：同一域名下 ≥SITE_TEMPLATE_LINE_RATE 的文档都出现的短行。
+
+    页脚/导航被正文抽取带进来时通常整行一字不差地重复，按站点统计复现率即可识别。
+    只统计短行（≤SITE_TEMPLATE_LINE_MAX_CHARS 字），避免把"整篇正文"当成模板行；
+    域名文档数不足 SITE_BOILERPLATE_MIN_DOCS 的站点不参与判定（样本太小，复现率不可信）。
+
+    注意：按**原始正文**分行统计，不能用 _doc_text——它内部的 normalize_intel_text 会把
+    整篇文本折叠成一行，行结构就没了（页脚会粘在最后一段正文尾部）。
+    """
+    counters: Dict[str, Counter] = {}
+    docs_per_domain: Counter = Counter()
+    for row in rows or []:
+        domain = str((row or {}).get("domain") or "")
+        docs_per_domain[domain] += 1
+        counter = counters.setdefault(domain, Counter())
+        for line in _raw_doc_lines(row):
+            normalized = _normalized_line(line)
+            if not normalized or len(normalized) > SITE_TEMPLATE_LINE_MAX_CHARS:
+                continue
+            counter[normalized] += 1
+    templates: Dict[str, frozenset] = {}
+    for domain, counter in counters.items():
+        total = docs_per_domain[domain]
+        if total < SITE_BOILERPLATE_MIN_DOCS:
+            continue
+        lines = frozenset(
+            line
+            for line, count in counter.items()
+            if count / float(total) >= SITE_TEMPLATE_LINE_RATE
+        )
+        if lines:  # 只记有模板行的域名（没识别出模板行的站点不必出现在过程数据里）
+            templates[domain] = lines
+    return templates
+
+
+def _raw_doc_lines(row: Dict) -> List[str]:
+    """原文行（标题 + 正文，按原始换行切）——用于统计站点复现行。"""
+    title = str((row or {}).get("title") or "")
+    content = str((row or {}).get("content") or "")[:SAMPLE_CONTENT_CHARS]
+    return _doc_lines(title) + _doc_lines(content)
+
+
+def _strip_boilerplate_lines(text: str, template_lines: frozenset = frozenset()) -> str:
+    """切词前去样板（两级）：
+
+      ① 整行删除：语料级站点复现行（同一域名 ≥60% 文档一字不差重复的短行）；
+      ② 局部删除：命中 ``intel_boilerplate.FRAME_MARKERS`` 的框架短语——**只删短语本身**，
+         保留同一行的其它文字。为什么不像该模块那样整行删：我们在统计词频，而正文抽取器常把
+         页脚粘在最后一段正文尾部（真机语料就是"…踏板也要撑得住。本文来自华尔街见闻，欢迎…"），
+         整行删掉会把整段正文的词频一起抹掉；删短语既挡住"下载APP/点击查看"这类模板词，
+         又不动正文。特征词表本身直接复用仓库既有模块，不另造一套。
+    """
+    kept: List[str] = []
+    for line in _doc_lines(text):
+        if not line:
+            continue
+        if _normalized_line(line) in template_lines:
+            continue
+        cleaned = line
+        for marker in BOILERPLATE_FRAME_MARKERS:
+            if marker in cleaned:
+                cleaned = cleaned.replace(marker, " ")
+        cleaned = " ".join(cleaned.split())
+        if cleaned:
+            kept.append(cleaned)
+    return "\n".join(kept)
+
+
+def _mine_doc_text(row: Dict, template_lines: frozenset = frozenset()) -> str:
+    """与 ``_doc_text`` 同口径，但正文先做行级去样板再拼判定文本。
+
+    必须先按**原始正文**分行删样板行、再 normalize：反过来（先 _doc_text 再按行删）不行——
+    normalize_intel_text 会把整篇折叠成一行，页脚就粘在正文尾部删不掉了。
+    """
+    content = str((row or {}).get("content") or "")[:SAMPLE_CONTENT_CHARS]
+    return _doc_text(row, content=_strip_boilerplate_lines(content, template_lines))
+
+
+def _site_boilerplate_reason(
+    term: str,
+    term_domains: Dict[str, int],
+    domain_docs: Dict[str, int],
+    total_docs: int,
+) -> str:
+    """站点级复现率判据：命中返回原因文本，否则空串（硬剔除用）。
+
+    ``term_domains`` = 该词在各域名的命中文档数；``domain_docs`` = 各域名的文档总数。
+    判定：存在某个域名 D（文档数 ≥ SITE_BOILERPLATE_MIN_DOCS），该词在 D 的复现率
+    ≥ SITE_BOILERPLATE_RATE（≥60%），且在**其它域名**的复现率 ≤ SITE_BOILERPLATE_OTHER_RATE
+    （≤15%）→ 站点样板词。语料只有单一域名时没有跨站证据，门槛收紧到 SITE_BOILERPLATE_SOLO_RATE。
+    """
+    in_term_domains = term_domains or {}
+    for domain, docs_in_domain in (domain_docs or {}).items():
+        docs_in_domain = _as_int(docs_in_domain)
+        if docs_in_domain < SITE_BOILERPLATE_MIN_DOCS:
+            continue
+        hits = _as_int(in_term_domains.get(domain))
+        if hits <= 0:
+            continue
+        rate = hits / float(docs_in_domain)
+        other_docs = max(0, _as_int(total_docs) - docs_in_domain)
+        if other_docs <= 0:
+            if rate >= SITE_BOILERPLATE_SOLO_RATE:
+                return (
+                    f"站点样板词：语料只有单一域名 {domain}，该词在 {round(rate * 100)}% 的文档里复现"
+                )
+            continue
+        if rate < SITE_BOILERPLATE_RATE:
+            continue
+        other_hits = sum(
+            _as_int(value) for key, value in in_term_domains.items() if key != domain
+        )
+        other_rate = other_hits / float(other_docs)
+        if other_rate > SITE_BOILERPLATE_OTHER_RATE:
+            continue
+        return (
+            f"站点样板词：域名 {domain} 下 {round(rate * 100)}% 的文档都出现，"
+            f"其它域名仅 {round(other_rate * 100, 1)}%"
+        )
+    return ""
+
+
 # ─────────────────────────── 命中口径 ───────────────────────────
 try:  # 复用分类器的命中口径（ASCII 词走单词边界、中文走子串），保证统计与判定链路一致
     from intel_classifier import _keyword_occurrences as _classifier_occurrences
@@ -396,11 +625,16 @@ def _keyword_present(text: str, keyword: str) -> bool:
     return _keyword_hits(text, keyword) > 0
 
 
-def _doc_text(row: Dict) -> str:
-    """把一篇文章拼成与 classify_article 一致的判定文本（标题×2 + 采集关键词 + 正文）。"""
+def _doc_text(row: Dict, content: Optional[str] = None) -> str:
+    """把一篇文章拼成与 classify_article 一致的判定文本（标题×2 + 采集关键词 + 正文）。
+
+    ``content`` 可传入"已去样板的正文"（挖词链路的 ``_mine_doc_text`` 就是这么用的）；
+    不传则取原始正文。
+    """
     title = str((row or {}).get("title") or "")
     matched = str((row or {}).get("matched_keywords") or "")
-    content = str((row or {}).get("content") or "")[:SAMPLE_CONTENT_CHARS]
+    if content is None:
+        content = str((row or {}).get("content") or "")[:SAMPLE_CONTENT_CHARS]
     return normalize_intel_text(f"{title}\n{title}\n{matched}\n{content}")
 
 
@@ -865,6 +1099,10 @@ def mine_keyword_candidates(
         比值 = (本包出现率 + ε) / (其它包已准入语料出现率 + ε) ≥ 3
         且 对照出现率 ≤ 10%、且本包命中文档数 ≥ 3。
 
+    挖词前先**去样板**（见 _strip_boilerplate_lines）：删掉语料级站点复现行与
+    intel_boilerplate.FRAME_MARKERS 命中的框架行，再统计词频；统计后再按
+    「站点级复现率」「跨域名多样性」「导航式短语」三条硬剔除规则过筛。
+
     ``_pack_docs`` / ``_peer_docs`` 是内部复用参数（assess_pack 已经查过一次语料，
     避免重复拉库）；外部调用不用传。
     """
@@ -886,12 +1124,20 @@ def mine_keyword_candidates(
             "库内没有其它包的已准入文章作为对照语料，判别力过滤已退化（只看词频与文档数）"
         )
 
+    # 去样板（切词前）：站点复现行只在**本包语料**里统计（本包的站点模板才是我们要挡的），
+    # 但两份语料都按它清洗，避免"同一句页脚在本包被删、在对照语料里还算命中"的不对称统计。
+    template_lines = _domain_template_lines(pack_docs)
+    template_line_count = sum(len(lines) for lines in template_lines.values())
+
     def _index(rows: Sequence[Dict]) -> Tuple[List[set], List[set], List[str]]:
         body_sets: List[set] = []
         title_sets: List[set] = []
         titles: List[str] = []
         for row in rows:
-            body_sets.append(set(_tokenize(_doc_text(row))))
+            clean = _mine_doc_text(
+                row, template_lines.get(str(row.get("domain") or "")) or frozenset()
+            )
+            body_sets.append(set(_tokenize(clean)))
             title_sets.append(set(_tokenize(str(row.get("title") or ""))))
             titles.append(_truncate(row.get("title")))
         return body_sets, title_sets, titles
@@ -919,6 +1165,25 @@ def mine_keyword_candidates(
     excluded: List[Dict] = []
     pack_total = len(pack_docs)
     peer_total = len(peer_docs)
+    # 域名分布：判断"站点样板词"与"跨域名多样性"要用。空域名（抓取没带 domain）也算一个桶，
+    # 但整个语料只有 1 个域名时跨域名判据无从判别，按"不启用"处理（否则会把语料全杀掉）。
+    domain_docs: Dict[str, int] = {}
+    for row in pack_docs:
+        key = str((row or {}).get("domain") or "")
+        domain_docs[key] = domain_docs.get(key, 0) + 1
+    cross_domain_enabled = len(domain_docs) >= CROSS_DOMAIN_MIN_DOMAINS
+    if not cross_domain_enabled and pack_total >= SITE_BOILERPLATE_MIN_DOCS:
+        warnings.append(
+            f"本包 other 语料只有 {len(domain_docs)} 个域名，跨域名多样性判据未启用；"
+            f"站点样板判定已收紧到 {SITE_BOILERPLATE_SOLO_RATE:.0%}"
+        )
+    if template_line_count:
+        warnings.append(
+            f"去样板：在 {len(template_lines)} 个域名下识别出 {template_line_count} 条"
+            f"「≥{SITE_TEMPLATE_LINE_RATE:.0%} 文档复现」的模板行，已在统计词频前删除"
+        )
+    nav_phrase_dropped = site_boilerplate_dropped = cross_domain_dropped = 0
+
     for token, item in stats.items():
         if not _is_valid_token(token):
             continue
@@ -931,6 +1196,37 @@ def mine_keyword_candidates(
                     "term": token,
                     "hits": item["hits"],
                     "reason": f"本包 other 语料命中文档数 < {DISCRIMINATION_MIN_DOCS}",
+                }
+            )
+            continue
+        # ① 导航式短语（词形级）：app查看 / 欢迎app / 点击查看 / 阅读原文 / 来自华尔街 …
+        nav_reason = _nav_phrase_reason(token)
+        if nav_reason:
+            nav_phrase_dropped += 1
+            excluded.append({"term": token, "hits": item["hits"], "reason": nav_reason})
+            continue
+        hit_domain_counts: Dict[str, int] = {}
+        for index in item["docs"]:
+            key = str(pack_docs[index].get("domain") or "")
+            hit_domain_counts[key] = hit_domain_counts.get(key, 0) + 1
+        hit_domains = set(hit_domain_counts)
+        # ② 站点级复现率：同一域名下 ≥60% 文档复现 + 其它域名几乎不出现 → 站点样板词，直接剔除
+        site_reason = _site_boilerplate_reason(token, hit_domain_counts, domain_docs, pack_total)
+        if site_reason:
+            site_boilerplate_dropped += 1
+            excluded.append({"term": token, "hits": item["hits"], "reason": site_reason})
+            continue
+        # ③ 跨域名多样性：命中只来自单一域名 → 是某个站的页脚/导航，不是行业词，直接剔除
+        if cross_domain_enabled and len(hit_domains) < CROSS_DOMAIN_MIN_DOMAINS:
+            cross_domain_dropped += 1
+            excluded.append(
+                {
+                    "term": token,
+                    "hits": item["hits"],
+                    "reason": (
+                        f"跨域名多样性不足：命中全部来自单一域名 "
+                        f"{sorted(hit_domains)[0]}（真行业词会跨来源复现）"
+                    ),
                 }
             )
             continue
@@ -975,9 +1271,6 @@ def mine_keyword_candidates(
             * min(ratio, MAX_RATIO_FOR_SCORE),
             4,
         )
-        hit_domains = {
-            str(pack_docs[index].get("domain") or "") for index in item["docs"]
-        }
         title_ratio = item["title_hits"] / float(item["hits"]) if item["hits"] else 0.0
         template_suspect = len(hit_domains) <= 1 and title_ratio >= TEMPLATE_TITLE_RATIO
         boilerplate_suspect = len(hit_domains) <= 1 and pack_rate >= BOILERPLATE_PACK_RATE
@@ -1025,12 +1318,29 @@ def mine_keyword_candidates(
             f"特征（疑似站点页脚/导航模板词），已按 {BOILERPLATE_SUSPECT_PENALTY} 系数降权并标记"
             "boilerplate_suspect，请人工复核后再采纳"
         )
+    if site_boilerplate_dropped:
+        warnings.append(
+            f"已剔除 {site_boilerplate_dropped} 个站点样板词（同一域名 ≥{SITE_BOILERPLATE_RATE:.0%} "
+            f"文档复现、其它域名 ≤{SITE_BOILERPLATE_OTHER_RATE:.0%}）"
+        )
+    if cross_domain_dropped:
+        warnings.append(
+            f"已剔除 {cross_domain_dropped} 个「只来自单一域名」的词"
+            f"（跨域名多样性要求 ≥{CROSS_DOMAIN_MIN_DOMAINS} 个域名）"
+        )
+    if nav_phrase_dropped:
+        warnings.append(
+            f"已剔除 {nav_phrase_dropped} 个导航式短语（查看/下载/关注/扫码/出处声明 …）"
+        )
 
     core_objects: List[Dict] = []
     entity_objects: List[Dict] = []
     anchor_objects: List[Dict] = []
     for token, stat in selected:
-        entity = bool(_ENTITY_SUFFIX_RE.search(token)) and len(token) >= 4
+        # 同一个词只进一个桶：命中机构/组织后缀的走 entity_keywords（包实体词），其余走
+        # core_keywords。两桶**互斥**——同一词同在两处会让合并进包后在 candidate_gate 与
+        # core_keywords 各写一份、人工复核也看到重复项；取舍是"机构/品牌名一律归实体桶"。
+        entity = _is_entity_term(token)
         obj = _candidate_object(token, stat, entity=entity)
         anchor_objects.append(obj)
         (entity_objects if entity else core_objects).append(obj)
@@ -1052,9 +1362,27 @@ def mine_keyword_candidates(
             "template_penalty": TEMPLATE_SUSPECT_PENALTY,
             "boilerplate_pack_rate": BOILERPLATE_PACK_RATE,
             "boilerplate_penalty": BOILERPLATE_SUSPECT_PENALTY,
+            # 硬剔除口径（去样板 / 跨域名 / 导航短语），供 UI 展示与复算
+            "site_boilerplate_min_docs": SITE_BOILERPLATE_MIN_DOCS,
+            "site_boilerplate_rate": SITE_BOILERPLATE_RATE,
+            "site_boilerplate_other_rate": SITE_BOILERPLATE_OTHER_RATE,
+            "site_boilerplate_solo_rate": SITE_BOILERPLATE_SOLO_RATE,
+            "cross_domain_min_domains": CROSS_DOMAIN_MIN_DOMAINS,
+            "cross_domain_enabled": cross_domain_enabled,
         },
         "template_suspect_count": suspect_count,
         "boilerplate_suspect_count": boilerplate_count,
+        # 去样板 / 硬剔除的过程数据（UI 可展示"为什么这批词没被推荐"）
+        "keyword_filter": {
+            "site_boilerplate_dropped": site_boilerplate_dropped,
+            "cross_domain_dropped": cross_domain_dropped,
+            "nav_phrase_dropped": nav_phrase_dropped,
+            "template_line_domains": sorted(template_lines),
+            "template_line_count": template_line_count,
+            "domain_doc_counts": dict(
+                sorted(domain_docs.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+            ),
+        },
         # 面向 UI 的候选对象（term/hits/examples）；anchors 是"可当门禁锚点"的全集
         # （core ∪ entity，按分值排序），合并时按 _merge_candidates_into_pack 的规则落位。
         "candidates": {
@@ -1155,6 +1483,7 @@ def assess_pack(pack_id: str, *, sample_limit: int = DEFAULT_SAMPLE_LIMIT) -> Di
         "candidate_keywords": mining["keywords"],
         "candidate_evidence": {
             "discrimination": mining["discrimination"],
+            "keyword_filter": mining.get("keyword_filter") or {},
             "excluded": mining["excluded"][:20],
             "excluded_count": mining["excluded_count"],
             "template_suspect_count": mining.get("template_suspect_count", 0),
