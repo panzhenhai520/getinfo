@@ -5,8 +5,11 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
+import threading
+import time
 import uuid
 import re
 from html import escape
@@ -1436,6 +1439,1324 @@ def restore_industry_pack_backup(backup_id: int):
         410,
         request_id=request_id,
     )
+
+
+# ── 主题文章入库情况评估 + 【改进】建议（DECISION_LOG D-009）──────────────────
+# 评估引擎在 intel_pack_improvement.py（规则链路、纯 CPU，不调任何模型端点）。
+# 本层只做四件事：调用 + 限时 + 进程内缓存 + 把「引擎缺失/超时/内部报错」降级成
+# success=false（读接口 200、写接口 503），绝不让引擎问题演变成 500 把页面打崩。
+# 硬规矩 D-009：【改进】页只允许出现 status="verified"（拿影子自测真跑过且达标）的建议；
+# 未自测/未达标的建议只能在评估卡上以灰色计数与原因出现，不允许推给人工审核。
+
+_INTEL_PACK_IMPROVEMENT_MODULE = "intel_pack_improvement"
+_INTEL_PACK_IMPROVEMENT_REQUIRED = (
+    "assess_pack",
+    "run_self_test_and_stage",
+    "list_suggestions",
+    "get_suggestion",
+    "mark_applied",
+    "record_after_apply",
+)
+_INTEL_PACK_ASSESSMENT_TIMEOUT = 180         # 单次 assess_pack 的等待上限（秒）
+_INTEL_PACK_SELF_TEST_TIMEOUT = 240          # 影子自测 + 抓文章实测的等待上限（秒）
+_INTEL_PACK_APPLY_TIMEOUT = 180              # 激活 + 回写建议的等待上限（秒）
+_INTEL_PACK_ASSESSMENT_CACHE_TTL = 600       # 评估结果进程内缓存时长（秒）
+_SUGGESTION_STATUS_VERIFIED = "verified"
+_IMPROVEMENT_POLICY_NOTE = (
+    "只有通过影子自测（status=verified）的建议才会显示在【改进】页（DECISION_LOG D-009）"
+)
+_INTEL_PACK_ASSESSMENT_CACHE: dict = {}
+_INTEL_PACK_ASSESSMENT_CACHE_LOCK = threading.Lock()
+
+# 指标键名按引擎契约：admit_rate 准入率 / false_positive 误准入 / topic_assoc 主题关联 / other_pct 其他占比
+_RATE_METRIC_KEYS = frozenset(
+    {"other_pct", "peer_other_pct", "admit_rate", "false_positive", "topic_assoc"}
+)
+_INTEL_METRIC_LABELS = {
+    "other_pct": ("other 占比", "down"),
+    "peer_other_pct": ("同行中位数 other 占比", "down"),
+    "admit_rate": ("准入率", "up"),
+    "false_positive": ("误准入率", "down"),
+    "topic_assoc": ("主题关联率", "up"),
+    "articles": ("样本文章数", ""),
+}
+_INTEL_METRIC_ALIASES = {
+    "other_ratio": "other_pct",
+    "other_share": "other_pct",
+    "other_percent": "other_pct",
+    "admission_rate": "admit_rate",
+    "ingest_rate": "admit_rate",
+    "accept_rate": "admit_rate",
+    "admitted_rate": "admit_rate",
+    "admit_ratio": "admit_rate",
+    "misadmission_rate": "false_positive",
+    "false_accept_rate": "false_positive",
+    "wrong_admission_rate": "false_positive",
+    "false_admit_rate": "false_positive",
+    "topic_relevance": "topic_assoc",
+    "topic_relevance_rate": "topic_assoc",
+    "topic_match_rate": "topic_assoc",
+    "topic_hit_rate": "topic_assoc",
+    "peer_other": "peer_other_pct",
+    "article_count": "articles",
+    "sample_articles": "articles",
+}
+_INTEL_KEYWORD_GROUP_LABELS = {
+    "core_keywords": "核心关键词",
+    "entity_keywords": "实体关键词（备案机构）",
+    "anchors": "锚点词",
+    "anchor_keywords": "锚点词",
+    "expanded_keywords": "扩展关键词",
+    "trend_keywords": "趋势关键词",
+    "event_keywords": "事件关键词",
+}
+_INTEL_SOURCE_GROUP_LABELS = {
+    "disable_sources": "建议停用",
+    "deactivate_sources": "建议停用",
+    "replace_sources": "建议替换",
+    "add_sources": "建议补充",
+    "supplement_sources": "建议补抓",
+    "fetch_sources": "建议补抓",
+    "sources": "信源建议",
+    "source_actions": "信源建议",
+}
+_INTEL_SOURCE_ACTION_LABELS = {
+    "disable": "停用",
+    "deactivate": "停用",
+    "drop": "停用",
+    "remove": "停用",
+    "pause": "暂停",
+    "replace": "替换",
+    "swap": "替换",
+    "enable": "启用",
+    "add": "补充",
+    "supplement": "补抓",
+    "backfill": "补抓",
+    "fetch": "补抓",
+    "crawl": "补抓",
+    "keep": "保留",
+}
+
+
+class _IntelPackEngineUnavailable(RuntimeError):
+    """评估引擎未就绪（模块没落地或接口不全）：降级成 success=false，不抛 500。"""
+
+
+class _IntelPackEngineTimeout(RuntimeError):
+    """评估引擎超时：放弃本次等待（daemon 线程继续跑完，不阻塞工作进程）。"""
+
+
+def _improvement_engine():
+    """惰性加载评估引擎；不可用时抛 _IntelPackEngineUnavailable（测试可打桩替换本函数）。"""
+
+    try:
+        module = importlib.import_module(_INTEL_PACK_IMPROVEMENT_MODULE)
+    except Exception as exc:  # 模块还没落地 / 依赖缺失
+        raise _IntelPackEngineUnavailable(
+            f"评估引擎未就绪：{_INTEL_PACK_IMPROVEMENT_MODULE} 不可用（{type(exc).__name__}: {exc}）"
+        ) from exc
+    missing = [
+        name for name in _INTEL_PACK_IMPROVEMENT_REQUIRED
+        if not callable(getattr(module, name, None))
+    ]
+    if missing:
+        raise _IntelPackEngineUnavailable("评估引擎未就绪：缺少接口 " + "、".join(missing))
+    return module
+
+
+def _engine_call(func, timeout_seconds: int, label: str = "评估引擎"):
+    """带超时执行引擎调用（daemon 线程）：超时抛 _IntelPackEngineTimeout，异常原样抛出。"""
+
+    box: dict = {}
+
+    def _worker():
+        try:
+            box["value"] = func()
+        except BaseException as exc:  # noqa: BLE001 - 引擎异常要带回来，绝不能吞掉
+            box["error"] = exc
+
+    thread = threading.Thread(target=_worker, name="intel-pack-improvement", daemon=True)
+    thread.start()
+    thread.join(int(timeout_seconds))
+    if thread.is_alive():
+        raise _IntelPackEngineTimeout(f"{label}超过 {int(timeout_seconds)} 秒未返回")
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
+
+
+def _engine_failure_payload(exc: Exception, *, request_id: str, industry_pack_id: str, elapsed_ms: int) -> dict:
+    """引擎侧失败的统一响应体（读接口用 200，写接口用 503，都不是 500）。"""
+
+    if isinstance(exc, _IntelPackEngineUnavailable):
+        reason = str(exc)
+        engine_ready = False
+    elif isinstance(exc, _IntelPackEngineTimeout):
+        reason = str(exc)
+        engine_ready = True
+    else:
+        _log.warning("行业包评估引擎调用失败 pack=%s: %s", industry_pack_id, exc)
+        reason = f"评估失败：{type(exc).__name__}: {exc}"
+        engine_ready = True
+    return {
+        "success": False,
+        "engine_ready": engine_ready,
+        "reason": reason,
+        "request_id": request_id,
+        "industry_pack_id": industry_pack_id,
+        "elapsed_ms": elapsed_ms,
+    }
+
+
+def _assessment_cache_key(pack_id: str, sample_limit: int) -> tuple:
+    return (str(pack_id), int(sample_limit))
+
+
+def _assessment_cache_get(pack_id: str, sample_limit: int):
+    key = _assessment_cache_key(pack_id, sample_limit)
+    now = time.monotonic()
+    with _INTEL_PACK_ASSESSMENT_CACHE_LOCK:
+        entry = _INTEL_PACK_ASSESSMENT_CACHE.get(key)
+        if not entry:
+            return None
+        stored_at, payload = entry
+        age = now - stored_at
+        if age > _INTEL_PACK_ASSESSMENT_CACHE_TTL:
+            _INTEL_PACK_ASSESSMENT_CACHE.pop(key, None)
+            return None
+        return payload, round(age, 1)
+
+
+def _assessment_cache_put(pack_id: str, sample_limit: int, payload: dict) -> None:
+    with _INTEL_PACK_ASSESSMENT_CACHE_LOCK:
+        _INTEL_PACK_ASSESSMENT_CACHE[_assessment_cache_key(pack_id, sample_limit)] = (
+            time.monotonic(),
+            payload,
+        )
+
+
+def _assessment_cache_invalidate(pack_id: str = "") -> None:
+    """自测/发布/复测后作废缓存，否则卡片继续显示发布前的旧数字。"""
+
+    with _INTEL_PACK_ASSESSMENT_CACHE_LOCK:
+        if not pack_id:
+            _INTEL_PACK_ASSESSMENT_CACHE.clear()
+            return
+        for key in [item for item in _INTEL_PACK_ASSESSMENT_CACHE if item[0] == str(pack_id)]:
+            _INTEL_PACK_ASSESSMENT_CACHE.pop(key, None)
+
+
+def _run_pack_assessment(
+    pack_id: str, *, sample_limit: int, timeout_seconds: int, refresh: bool = False
+) -> dict:
+    """跑一次评估（默认先读进程内缓存）。引擎不可用/超时抛对应异常，由调用方降级。"""
+
+    if not refresh:
+        cached = _assessment_cache_get(pack_id, sample_limit)
+        if cached:
+            payload, age = cached
+            return {"assessment": payload, "cached": True, "elapsed_ms": 0, "cache_age_seconds": age}
+    engine = _improvement_engine()
+    started = time.monotonic()
+    payload = _engine_call(
+        lambda: engine.assess_pack(pack_id, sample_limit=sample_limit),
+        timeout_seconds,
+        "主题入库评估",
+    )
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if not isinstance(payload, dict):
+        raise ValueError("评估引擎返回结构异常（不是对象）")
+    _assessment_cache_put(pack_id, sample_limit, payload)
+    return {"assessment": payload, "cached": False, "elapsed_ms": elapsed_ms, "cache_age_seconds": 0}
+
+
+def _first_present(mapping, *names):
+    """取第一个「有内容」的键值（兼容引擎字段名变动）。"""
+
+    if not isinstance(mapping, dict):
+        return None
+    for name in names:
+        if name in mapping and mapping.get(name) not in (None, "", [], {}):
+            return mapping.get(name)
+    return None
+
+
+def _first_number(*values):
+    for value in values:
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _is_rate_metric(key: str) -> bool:
+    text = str(key or "")
+    return text in _RATE_METRIC_KEYS or text.endswith("_pct") or text.endswith("_rate")
+
+
+def _canonical_metric_key(key: str) -> str:
+    text = str(key or "").strip()
+    return _INTEL_METRIC_ALIASES.get(text, text)
+
+
+def _metric_percent(key: str, value):
+    """比率类指标的百分数数值（引擎契约：0~100，与其阈值 30.0/20.0 同口径）。
+
+    引擎的 _pct() 返回 0~100，所以这里不做 0~1 换算（0.5 就是 0.5%）；不是比率类
+    指标或取不到值时返回 None。
+    """
+
+    number = _first_number(value)
+    if number is None or not _is_rate_metric(key):
+        return None
+    return round(number, 4)
+
+
+def _format_metric(key: str, value) -> str:
+    if value is None or value == "":
+        return "—"
+    number = _first_number(value)
+    if number is None:
+        return str(value)
+    if key == "articles" or key.endswith("_count"):
+        return str(int(round(number)))
+    if _is_rate_metric(key):
+        percent = _metric_percent(key, number)
+        return f"{percent:.1f}%" if percent is not None else f"{number:g}"
+    return f"{number:g}"
+
+
+def _format_metric_delta(key: str, value) -> str:
+    number = _first_number(value)
+    if number is None:
+        return "—"
+    return f"{number:+.1f}pp" if _is_rate_metric(key) else f"{number:+g}"
+
+
+def _metric_lookup(mapping, canonical: str):
+    if not isinstance(mapping, dict):
+        return None
+    value = mapping.get(canonical)
+    if value not in (None, ""):
+        return value
+    for key, target in _INTEL_METRIC_ALIASES.items():
+        if target == canonical and mapping.get(key) not in (None, ""):
+            return mapping.get(key)
+    return None
+
+
+def _metric_rows(before: dict, after: dict, delta: dict) -> list:
+    """自测指标对比表：before → after + Δ（Δ 单位统一为百分点）。"""
+
+    keys: list = []
+    for source in (before, after, delta):
+        if isinstance(source, dict):
+            for key in source:
+                canonical = _canonical_metric_key(key)
+                if canonical not in keys:
+                    keys.append(canonical)
+    rows = []
+    for key in keys:
+        label, good_when = _INTEL_METRIC_LABELS.get(key, (str(key).replace("_", " "), ""))
+        left = _metric_lookup(before, key)
+        right = _metric_lookup(after, key)
+        diff = _first_number(_metric_lookup(delta, key))
+        if diff is not None and _is_rate_metric(key):
+            # 引擎给的比率差值可能是 0.13 这种小数，统一折算成 13.0 个百分点再展示
+            diff = _metric_percent(key, diff)
+        if diff is None:
+            left_percent = _metric_percent(key, left)
+            right_percent = _metric_percent(key, right)
+            if left_percent is not None and right_percent is not None:
+                diff = round(right_percent - left_percent, 4)
+        improved = None
+        if diff is not None and good_when:
+            improved = diff < 0 if good_when == "down" else diff > 0
+        rows.append(
+            {
+                "key": key,
+                "label": label,
+                "good_when": good_when,
+                "before": _format_metric(key, left),
+                "after": _format_metric(key, right),
+                "delta": _format_metric_delta(key, diff),
+                "improved": improved,
+            }
+        )
+    return rows
+
+
+def _split_metrics(raw_metrics) -> tuple:
+    """把引擎的自测/复测 metrics 拆成 (before, after, delta)，兼容扁平 *_before/*_after 写法。"""
+
+    if not isinstance(raw_metrics, dict):
+        return {}, {}, {}
+    before = _first_present(raw_metrics, "before", "before_metrics", "baseline", "baseline_metrics")
+    after = _first_present(raw_metrics, "after", "after_metrics")
+    delta = _first_present(raw_metrics, "delta", "deltas", "diff")
+    return (
+        dict(before) if isinstance(before, dict) else {},
+        dict(after) if isinstance(after, dict) else {},
+        dict(delta) if isinstance(delta, dict) else {},
+    )
+
+
+def _keyword_addition_item(group: str, entry) -> dict:
+    """单条「建议新增关键词」：值 + 命中文章数 + 示例标题。"""
+
+    if isinstance(entry, str):
+        value, hits, examples, reason = entry.strip(), None, [], ""
+    elif isinstance(entry, dict):
+        value = str(_first_present(entry, "value", "keyword", "term", "word", "text", "name") or "").strip()
+        hits = _first_present(entry, "hits", "hit_count", "matches", "article_count", "articles", "count")
+        examples = _first_present(entry, "examples", "example_titles", "titles", "samples", "sample_titles") or []
+        reason = str(_first_present(entry, "reason", "why", "note") or "")
+    else:
+        return {}
+    if not value:
+        return {}
+    if not isinstance(examples, (list, tuple)):
+        examples = [examples]
+    return {
+        "group": group,
+        "group_label": _INTEL_KEYWORD_GROUP_LABELS.get(group, group or "候选关键词"),
+        "value": value[:120],
+        "hits": coerce_int(hits, None, 0) if hits not in (None, "") else None,
+        "examples": [str(text)[:160] for text in list(examples)[:3]],
+        "reason": reason[:300],
+    }
+
+
+def _keyword_addition_items(candidates) -> list:
+    """候选关键词归一化：支持 {core_keywords:[{value,hits,examples}]} 与裸列表两种写法。"""
+
+    items: list = []
+    if isinstance(candidates, dict):
+        pairs = list(candidates.items())
+    elif isinstance(candidates, (list, tuple)):
+        pairs = [("", candidates)]
+    else:
+        return items
+    for group, entries in pairs:
+        group_key = str(group or "").strip()
+        if group_key in _INTEL_SOURCE_GROUP_LABELS:
+            continue  # 信源建议走另一条归一化，别当关键词渲染
+        entries = entries if isinstance(entries, (list, tuple)) else [entries]
+        for entry in entries:
+            item = _keyword_addition_item(group_key, entry)
+            if item:
+                items.append(item)
+    return items
+
+
+def _source_action_item(group: str, group_label: str, entry) -> dict:
+    """单条信源建议：停用/替换/补抓 + 理由（低准入与零产出在展示层再做视觉区分）。"""
+
+    if isinstance(entry, str):
+        entry = {"source": entry.strip()}
+    if not isinstance(entry, dict):
+        return {}
+    name = str(
+        _first_present(entry, "source", "source_name", "name", "url", "domain", "site") or ""
+    ).strip()
+    if not name:
+        return {}
+    action_raw = str(
+        _first_present(entry, "action", "verdict", "suggestion", "decision", "op", "operation") or ""
+    ).strip()
+    label = _INTEL_SOURCE_ACTION_LABELS.get(action_raw.lower(), action_raw) or group_label or "调整"
+    articles = _first_present(entry, "articles", "hits", "article_count", "count", "admitted", "admitted_count")
+    rate = _first_present(entry, "admit_rate", "admission_rate", "rate", "admitted_ratio", "admitted_pct")
+    rate_percent = _metric_percent("admit_rate", rate)
+    return {
+        "group": group,
+        "source": name[:200],
+        "url": str(
+            _first_present(entry, "url", "source_url", "link", "suggested_url", "replace_with") or ""
+        )[:400],
+        "action": label,
+        "action_raw": action_raw,
+        "reason": str(_first_present(entry, "reason", "why", "note", "detail", "message") or "")[:400],
+        "articles": coerce_int(articles, None, 0) if articles not in (None, "") else None,
+        "admit_rate": rate_percent,
+        "last_article_at": str(
+            _first_present(entry, "last_article_at", "latest_at", "last_seen_at", "recent_at", "last_published_at") or ""
+        ),
+        "zero_output": bool(_first_present(entry, "zero_output", "no_articles", "empty"))
+        or (coerce_int(articles, None, 0) == 0),
+    }
+
+
+def _source_action_items(raw_sources) -> list:
+    items: list = []
+    if isinstance(raw_sources, dict):
+        pairs = list(raw_sources.items())
+    elif isinstance(raw_sources, (list, tuple)):
+        pairs = [("", raw_sources)]
+    else:
+        return items
+    for group, entries in pairs:
+        group_key = str(group or "").strip()
+        group_label = _INTEL_SOURCE_GROUP_LABELS.get(group_key, "")
+        entries = entries if isinstance(entries, (list, tuple)) else [entries]
+        for entry in entries:
+            item = _source_action_item(group_key, group_label, entry)
+            if item:
+                items.append(item)
+    return items
+
+
+def _dedupe_source_items(items: list) -> list:
+    seen = set()
+    result = []
+    for item in items:
+        key = (item.get("source"), item.get("action"))
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
+def _improvement_display(raw: dict) -> dict:
+    """把引擎的建议结构归一成前端只认的一套字段：引擎字段名变动也不会让页面白屏。"""
+
+    raw = raw if isinstance(raw, dict) else {}
+    payload = _first_present(raw, "payload", "change", "changes", "proposal", "plan", "detail", "content", "data")
+    payload = payload if isinstance(payload, dict) else {}
+    candidates = _first_present(raw, "candidates", "add_keywords", "keyword_additions", "additions") or _first_present(
+        payload, "candidates", "add_keywords", "keyword_additions", "additions", "keywords"
+    )
+    source_raw = _first_present(raw, "source_actions", "source_changes", "sources", "actions") or _first_present(
+        payload, "source_actions", "source_changes", "sources", "actions"
+    )
+    # 信源类建议的 payload 直接按动作分桶（disable_sources / replace_sources / add_sources …）
+    source_buckets: dict = {}
+    for container in (raw, payload):
+        if not isinstance(container, dict):
+            continue
+        for key, value in container.items():
+            if str(key) in _INTEL_SOURCE_GROUP_LABELS and str(key) not in ("sources", "source_actions"):
+                source_buckets[str(key)] = value
+    source_from_candidates: list = []
+    if isinstance(candidates, dict) and candidates and all(
+        str(key) in _INTEL_SOURCE_GROUP_LABELS for key in candidates
+    ):
+        source_from_candidates = _source_action_items(candidates)
+        keyword_additions: list = []
+    else:
+        keyword_additions = _keyword_addition_items(candidates)
+    source_actions = _dedupe_source_items(
+        source_from_candidates + _source_action_items(source_raw) + _source_action_items(source_buckets)
+    )
+
+    kind_raw = str(_first_present(raw, "kind", "type", "target_kind", "scope", "category") or "").lower()
+    if kind_raw in ("keyword", "keywords", "关键词", "core_keywords"):
+        kind = "keyword"
+    elif kind_raw in ("source", "sources", "信源", "feed"):
+        kind = "source"
+    elif keyword_additions:
+        kind = "keyword"
+    elif source_actions:
+        kind = "source"
+    else:
+        kind = "unknown"
+    kind_label = {"keyword": "关键词类", "source": "信源类", "unknown": "其他"}[kind]
+
+    metrics_raw = _first_present(raw, "metrics", "self_test_metrics", "test_metrics") or {}
+    before, after, delta = _split_metrics(metrics_raw)
+    if not before:
+        extra_before = _first_present(raw, "before_metrics", "baseline_metrics", "baseline")
+        if isinstance(extra_before, dict):
+            before = dict(extra_before)
+    if not after:
+        extra_after = _first_present(raw, "after_metrics", "verify_metrics", "after")
+        if isinstance(extra_after, dict):
+            after = dict(extra_after)
+    if not before and not after and isinstance(metrics_raw, dict):
+        # 扁平写法：整包 metrics 就是自测基线，after 由复测接口回填
+        before = {
+            key: value
+            for key, value in metrics_raw.items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        }
+    crawl_probe = _first_present(metrics_raw, "crawl_probe", "crawl_probe_result") or _first_present(
+        raw, "crawl_probe"
+    )
+    status = str(raw.get("status") or "")
+    verified = status == _SUGGESTION_STATUS_VERIFIED
+    reason = str(_first_present(raw, "reason", "note", "summary", "message") or "")
+    if not reason and isinstance(metrics_raw, dict):
+        reason = str(metrics_raw.get("reason") or "")
+    return {
+        "suggestion_id": str(_first_present(raw, "suggestion_id", "id") or ""),
+        "kind": kind,
+        "kind_label": kind_label,
+        "status": status,
+        "verified": verified,
+        "hidden_from_review": not verified,
+        "self_test_note": "已通过影子自测" if verified else "未通过影子自测（不显示在【改进】页）",
+        "reason": reason[:600],
+        "created_at": str(_first_present(raw, "created_at", "staged_at", "time", "updated_at") or ""),
+        "keyword_additions": keyword_additions,
+        "source_actions": source_actions,
+        "metrics": {
+            "before": before,
+            "after": after,
+            "delta": delta,
+            "rows": _metric_rows(before, after, delta),
+        },
+        "crawl_probe": crawl_probe if isinstance(crawl_probe, dict) else {},
+    }
+
+
+def _assessment_source_rate(assessment: dict):
+    """整包准入率（百分数）：优先引擎直接给的字段，其次对信源表求和（取不到返回 None）。"""
+
+    direct = _first_number(
+        assessment.get("admit_rate"),
+        assessment.get("admission_rate"),
+        assessment.get("admit_pct"),
+        assessment.get("admitted_pct"),
+        assessment.get("ingest_rate"),
+        assessment.get("accept_rate"),
+    )
+    if direct is not None:
+        return round(direct, 4)
+    sources = assessment.get("sources")
+    if not isinstance(sources, (list, tuple)) or not sources:
+        return None
+    # 口径一：逐源「准入数 / 文章数」求和（assess_pack 的信源表就是这两个计数）
+    admitted = 0.0
+    attempted = 0.0
+    usable = True
+    for row in sources:
+        if not isinstance(row, dict):
+            usable = False
+            break
+        got = _first_number(
+            row.get("admitted_count"), row.get("admitted"), row.get("admitted_articles"),
+            row.get("articles"), row.get("admit_count"),
+        )
+        seen = _first_number(
+            row.get("article_count"), row.get("candidates"), row.get("discovered"),
+            row.get("attempted"), row.get("candidate_count"), row.get("found"),
+        )
+        if got is None or seen is None:
+            usable = False
+            break
+        admitted += got
+        attempted += seen
+    if usable and attempted > 0:
+        return round(100.0 * admitted / attempted, 4)
+    # 口径二：逐源已给准入率（admitted_pct / admit_rate，百分数）+ 文章数做加权平均
+    weighted = 0.0
+    weight_sum = 0.0
+    for row in sources:
+        if not isinstance(row, dict):
+            continue
+        rate = _metric_percent(
+            "admit_rate",
+            _first_number(
+                row.get("admitted_pct"), row.get("admit_rate"), row.get("admission_rate"), row.get("rate")
+            ),
+        )
+        weight = _first_number(
+            row.get("article_count"), row.get("articles"), row.get("admitted"), row.get("hits"), row.get("count")
+        )
+        if rate is None or weight is None or weight <= 0:
+            continue
+        weighted += rate * weight
+        weight_sum += weight
+    if weight_sum > 0:
+        return round(weighted / weight_sum, 4)
+    return None
+
+
+def _assessment_metrics(assessment: dict) -> dict:
+    """从评估结果抽复测要对比的指标（键名与引擎自测 metrics 对齐）。"""
+
+    if not isinstance(assessment, dict):
+        return {}
+    metrics = {
+        "other_pct": _first_number(assessment.get("other_pct")),
+        "peer_other_pct": _first_number(assessment.get("peer_other_pct")),
+        "articles": _first_number(assessment.get("articles")),
+        "admit_rate": _assessment_source_rate(assessment),
+    }
+    for key in ("false_positive", "topic_assoc", "admit_rate"):
+        value = _first_number(assessment.get(key))
+        if value is not None:
+            metrics[key] = value
+    return {key: value for key, value in metrics.items() if value is not None}
+
+
+def _metric_delta(before: dict, after: dict) -> dict:
+    delta = {}
+    for key in set(before or {}) | set(after or {}):
+        left = _first_number((before or {}).get(key))
+        right = _first_number((after or {}).get(key))
+        if left is None or right is None:
+            continue
+        delta[key] = round(right - left, 6)
+    return delta
+
+
+def _load_engine_and_suggestion(pack_id: str, suggestion_id: str, timeout_seconds: int):
+    """取引擎 + 建议（含归属校验）。异常分类：引擎不可用/超时、建议不存在、跨包，由调用方转状态码。"""
+
+    engine = _improvement_engine()
+    suggestion = _engine_call(
+        lambda: engine.get_suggestion(suggestion_id), timeout_seconds, "读取改进建议"
+    )
+    if not isinstance(suggestion, dict) or not suggestion:
+        raise FileNotFoundError("改进建议不存在")
+    owner = str(_first_present(suggestion, "industry_pack_id", "pack_id") or pack_id)
+    if owner != str(pack_id):
+        raise ValueError("该改进建议不属于当前行业包")
+    return engine, suggestion
+
+
+def _suggestion_lookup_failure(exc: Exception, *, request_id: str, pack_id: str, started: float):
+    """把「取引擎/取建议」的失败统一转成响应；引擎侧失败一律 503 且 shape 与降级响应一致。"""
+
+    if isinstance(exc, (FileNotFoundError, ValueError)):
+        return _error(str(exc), 404 if isinstance(exc, FileNotFoundError) else 400, request_id=request_id)
+    return (
+        jsonify(
+            _engine_failure_payload(
+                exc,
+                request_id=request_id,
+                industry_pack_id=pack_id,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+            )
+        ),
+        503,
+    )
+
+
+def _improvement_prepare_hook(engine):
+    """探测引擎是否提供「把候选词写进新发布版本」的可选钩子。
+
+    冻结接口里没有这一步：引擎只把建议落表（payload.candidates + merge_targets），
+    真正把词合并进行业包配置并发布新版本需要额外能力。这里按可选钩子探测，
+    缺失时 apply 会明确降级并在响应/UI 上告知"新词不会生效"，绝不假装发布成功。
+    """
+
+    for name in ("prepare_pack_version", "publish_candidate_version", "apply_suggestion", "prepare_activation"):
+        hook = getattr(engine, name, None)
+        if callable(hook):
+            return name, hook
+    return "", None
+
+
+def _call_prepare_hook(hook, pack_id: str, suggestion_id: str, timeout_seconds: int):
+    """兼容两种调用写法：位置参数 (pack_id, suggestion_id) 与关键字形式。"""
+
+    try:
+        return _engine_call(
+            lambda: hook(pack_id, suggestion_id), timeout_seconds, "写入候选配置版本"
+        )
+    except TypeError:
+        return _engine_call(
+            lambda: hook(pack_id=pack_id, suggestion_id=suggestion_id),
+            timeout_seconds,
+            "写入候选配置版本",
+        )
+
+
+def _reject_via_engine(engine, suggestion_id: str, reason: str, timeout_seconds: int):
+    """优先用引擎的拒绝钩子；返回 (结果, 走通的接口名)，都没命中返回 (None, "")。"""
+
+    for name in ("mark_rejected", "reject_suggestion", "update_suggestion_status", "set_suggestion_status"):
+        hook = getattr(engine, name, None)
+        if not callable(hook):
+            continue
+        try:
+            if name in ("mark_rejected", "reject_suggestion"):
+                result = _engine_call(
+                    lambda hook=hook: hook(suggestion_id, reason=reason), timeout_seconds, "拒绝改进建议"
+                )
+            else:
+                result = _engine_call(
+                    lambda hook=hook: hook(suggestion_id, status="rejected", reason=reason),
+                    timeout_seconds,
+                    "拒绝改进建议",
+                )
+        except TypeError:
+            continue  # 签名不匹配，换下一个钩子
+        return (result if isinstance(result, dict) else {"status": "rejected"}), f"engine:{name}"
+    return None, ""
+
+
+def _reject_suggestion_in_database(suggestion_id: str, reason: str) -> bool:
+    """【临时降级路径】引擎没有拒绝接口时，直接把建议行置 rejected 并写 reason。
+
+    只在 mark_rejected / reject_suggestion / update_suggestion_status 全都不存在时使用；
+    只往 rejected 方向改，绝不写 verified ——否则等于绕过 D-009 的影子自测门槛。
+    """
+
+    db = getattr(intel_repository, "db", None)
+    if db is None:
+        return False
+    updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    variants = (
+        (
+            "UPDATE intel_pack_improvements SET status=?, reason=?, updated_at=? WHERE id=?",
+            ("rejected", reason, updated_at, str(suggestion_id)),
+        ),
+        (
+            "UPDATE intel_pack_improvements SET status=?, reason=? WHERE id=?",
+            ("rejected", reason, str(suggestion_id)),
+        ),
+    )
+    for sql, params in variants:
+        try:
+            db._ensure_connection()
+            with db.lock:
+                cursor = db.connection.cursor()
+                try:
+                    cursor.execute(sql, params)
+                    db.connection.commit()
+                except Exception:
+                    db.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+            return True
+        except Exception as exc:  # 表/列不存在、库不可用：换下一种写法
+            _log.warning("改进建议兜底置 rejected 失败（%s）：%s", sql.split(" SET ")[0], exc)
+            continue
+    return False
+
+
+@intel_bp.route("/packs/<pack_id>/topic-ingestion-assessment", methods=["GET"])
+@login_required
+def get_pack_topic_ingestion_assessment(pack_id: str):
+    """主题文章入库情况评估卡数据：other% 与同行对比、分类分布、门禁归因、信源表。
+
+    查询参数：
+      · refresh=1      跳过进程内缓存强制重算（默认 600 秒内直接读缓存）
+      · sample_limit   参与评估的文章样本数（默认 300，范围 20~2000；实测 100 篇约 21 秒）
+      · timeout_seconds 本次等待上限（默认 180 秒，范围 5~300）
+    引擎不可用时返回 200 + {"success": false, "reason": ...}，页面显示「引擎未就绪」而不是报错。
+    """
+
+    request_id = _request_id()
+    try:
+        normalized_id = _industry_pack_id(pack_id)
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    sample_limit = coerce_int(request.args.get("sample_limit"), 300, 20, 2000)
+    timeout_seconds = coerce_int(
+        request.args.get("timeout_seconds"), _INTEL_PACK_ASSESSMENT_TIMEOUT, 5, 300
+    )
+    refresh = str(request.args.get("refresh") or "").strip().lower() in ("1", "true", "yes", "on")
+    started = time.monotonic()
+    payload = {
+        "success": True,
+        "request_id": request_id,
+        "industry_pack_id": normalized_id,
+        "sample_limit": sample_limit,
+        "timeout_seconds": timeout_seconds,
+        "engine_ready": True,
+    }
+    try:
+        outcome = _run_pack_assessment(
+            normalized_id, sample_limit=sample_limit, timeout_seconds=timeout_seconds, refresh=refresh
+        )
+    except (_IntelPackEngineUnavailable, _IntelPackEngineTimeout) as exc:
+        return jsonify(
+            _engine_failure_payload(
+                exc,
+                request_id=request_id,
+                industry_pack_id=normalized_id,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+            )
+        )
+    except Exception as exc:  # 引擎内部报错也只降级，不让卡片 500
+        return jsonify(
+            _engine_failure_payload(
+                exc,
+                request_id=request_id,
+                industry_pack_id=normalized_id,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+            )
+        )
+    payload.update(
+        {
+            "assessment": outcome["assessment"],
+            "cached": outcome["cached"],
+            "cache_age_seconds": outcome["cache_age_seconds"],
+            "cache_ttl_seconds": _INTEL_PACK_ASSESSMENT_CACHE_TTL,
+            "elapsed_ms": outcome["elapsed_ms"],
+        }
+    )
+    return jsonify(payload)
+
+
+@intel_bp.route("/packs/<pack_id>/improvements/assess", methods=["POST"])
+@admin_required
+def assess_pack_improvements(pack_id: str):
+    """跑一次影子自测并把建议入库（同步执行，可能数十秒，响应里回传实际耗时）。
+
+    请求体：{"sample_limit": 400, "timeout_seconds": 240}
+    引擎内部：评估 → 挖候选 → 影子重跑分类 → 抓文章实测（真联网、无模型），双达标才 verified。
+    只有自测达标（status=verified）的建议才会出现在【改进】页；未达标的返回计数与原因。
+    """
+
+    request_id = _request_id()
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
+    try:
+        normalized_id = _industry_pack_id(pack_id)
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    sample_limit = coerce_int(data.get("sample_limit"), 400, 20, 2000)
+    timeout_seconds = coerce_int(
+        data.get("timeout_seconds"), _INTEL_PACK_SELF_TEST_TIMEOUT, 5, 600
+    )
+    started = time.monotonic()
+    try:
+        engine = _improvement_engine()
+        result = _engine_call(
+            lambda: engine.run_self_test_and_stage(normalized_id, sample_limit=sample_limit),
+            timeout_seconds,
+            "影子自测",
+        )
+    except Exception as exc:  # 引擎缺失/超时/报错统一降级成 503
+        return jsonify(
+            _engine_failure_payload(
+                exc,
+                request_id=request_id,
+                industry_pack_id=normalized_id,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+            )
+        ), 503
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if not isinstance(result, dict):
+        return jsonify(
+            _engine_failure_payload(
+                ValueError("影子自测返回结构异常（不是对象）"),
+                request_id=request_id,
+                industry_pack_id=normalized_id,
+                elapsed_ms=elapsed_ms,
+            )
+        ), 503
+    status = str(result.get("status") or "")
+    # 自测可能改了草稿、甚至发布了候选版本：评估缓存必须作废
+    _assessment_cache_invalidate(normalized_id)
+    return jsonify(
+        {
+            "success": True,
+            "request_id": request_id,
+            "industry_pack_id": normalized_id,
+            "suggestion_id": str(result.get("suggestion_id") or ""),
+            "status": status,
+            "verified": status == _SUGGESTION_STATUS_VERIFIED,
+            "visible_in_review": status == _SUGGESTION_STATUS_VERIFIED,
+            "hidden_from_review": status != _SUGGESTION_STATUS_VERIFIED,
+            "metrics": result.get("metrics") or {},
+            "reason": str(result.get("reason") or ""),
+            "sample_limit": sample_limit,
+            "timeout_seconds": timeout_seconds,
+            "elapsed_ms": elapsed_ms,
+            "display": _improvement_display(result),
+            "policy": _IMPROVEMENT_POLICY_NOTE,
+        }
+    )
+
+
+@intel_bp.route("/packs/<pack_id>/improvements", methods=["GET"])
+@login_required
+def list_pack_improvements(pack_id: str):
+    """改进建议列表。默认只返回 status=verified（DECISION_LOG D-009）。
+
+    查询参数：
+      · status  显式查询某个状态（供后台排查）：staged / rejected / applied / all(=全部)
+      · limit   可选截断条数（0 = 不截断）
+    非 verified 的条目一律带 hidden_from_review=true，页面不得据此渲染进【改进】页。
+    """
+
+    request_id = _request_id()
+    try:
+        normalized_id = _industry_pack_id(pack_id)
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    raw_status = request.args.get("status")
+    status_filter = _SUGGESTION_STATUS_VERIFIED if raw_status is None else str(raw_status).strip()
+    if status_filter.lower() in ("all", "*", "any"):
+        status_filter = ""
+    limit = coerce_int(request.args.get("limit"), 0, 0, 500)
+    timeout_seconds = coerce_int(request.args.get("timeout_seconds"), 30, 5, 300)
+    started = time.monotonic()
+    try:
+        engine = _improvement_engine()
+        rows = _engine_call(
+            lambda: engine.list_suggestions(normalized_id, status=""), timeout_seconds, "读取改进建议"
+        )
+    except Exception as exc:
+        payload = _engine_failure_payload(
+            exc,
+            request_id=request_id,
+            industry_pack_id=normalized_id,
+            elapsed_ms=int((time.monotonic() - started) * 1000),
+        )
+        payload.update(
+            {
+                "suggestions": [],
+                "total": 0,
+                "hidden_count": 0,
+                "counts_by_status": {},
+                "candidate_apply_supported": False,
+            }
+        )
+        return jsonify(payload)
+    if not isinstance(rows, (list, tuple)):
+        payload = _engine_failure_payload(
+            ValueError("改进建议列表结构异常（不是数组）"),
+            request_id=request_id,
+            industry_pack_id=normalized_id,
+            elapsed_ms=int((time.monotonic() - started) * 1000),
+        )
+        payload.update(
+            {
+                "suggestions": [],
+                "total": 0,
+                "hidden_count": 0,
+                "counts_by_status": {},
+                "candidate_apply_supported": False,
+            }
+        )
+        return jsonify(payload)
+    suggestions = []
+    hidden_count = 0
+    counts_by_status: dict = {}
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        item_status = str(item.get("status") or "")
+        counts_by_status[item_status] = counts_by_status.get(item_status, 0) + 1
+        if item_status != _SUGGESTION_STATUS_VERIFIED:
+            hidden_count += 1
+        if status_filter and item_status != status_filter:
+            continue
+        entry = dict(item)
+        entry["hidden_from_review"] = item_status != _SUGGESTION_STATUS_VERIFIED
+        entry["display"] = _improvement_display(item)
+        suggestions.append(entry)
+    if limit:
+        suggestions = suggestions[:limit]
+    return jsonify(
+        {
+            "success": True,
+            "request_id": request_id,
+            "industry_pack_id": normalized_id,
+            "suggestions": suggestions,
+            "total": len(suggestions),
+            "status_filter": status_filter or "(all)",
+            "hidden_count": hidden_count,
+            "counts_by_status": counts_by_status,
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+            "engine_ready": True,
+            # 引擎是否具备「把候选词写进新发布版本」的能力：False 时前端必须提示
+            # "发布只会激活当前已发布版本，新词不会生效"，避免让用户误以为改进已上线。
+            "candidate_apply_supported": bool(_improvement_prepare_hook(engine)[0]),
+            "prepare_hook": _improvement_prepare_hook(engine)[0],
+            "policy": _IMPROVEMENT_POLICY_NOTE,
+        }
+    )
+
+
+@intel_bp.route("/packs/<pack_id>/improvements/<suggestion_id>/apply", methods=["POST"])
+@admin_required
+def apply_pack_improvement(pack_id: str, suggestion_id: str):
+    """发布一条已验证的改进建议：二次确认 → activation 激活（带备份/可回滚）→ mark_applied。
+
+    请求体：{"confirm": true, "plan_sha256": "<dry-run 预览返回值>", "target_version_id": 可选}
+    · 缺 confirm 或缺 plan_sha256 → 400（不允许"一键直发"）
+    · 建议状态不是 verified → 409（D-009：绝不能把未自测的建议推上线）
+    · 服务端会用 activation.preview() 重算计划，与客户端确认过的 plan_sha256 不一致 → 409
+    · 激活失败原样回传 activation 的错误（400/500），只有 mark_applied 失败不影响已完成的发布
+    """
+
+    request_id = _request_id()
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
+    if not bool(data.get("confirm")):
+        return _error("发布配置变更必须二次确认：请求体缺少 confirm=true", 400, request_id=request_id)
+    plan_sha256 = str(data.get("plan_sha256") or "").strip()
+    if not plan_sha256:
+        return _error(
+            "发布配置变更必须携带 dry-run 预览返回的 plan_sha256", 400, request_id=request_id
+        )
+    try:
+        normalized_id = _industry_pack_id(pack_id)
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    timeout_seconds = coerce_int(data.get("timeout_seconds"), _INTEL_PACK_APPLY_TIMEOUT, 10, 600)
+    started = time.monotonic()
+    try:
+        engine, suggestion = _load_engine_and_suggestion(normalized_id, suggestion_id, timeout_seconds)
+    except FileNotFoundError as exc:
+        return _error(str(exc), 404, request_id=request_id)
+    except ValueError as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception as exc:
+        return _suggestion_lookup_failure(
+            exc, request_id=request_id, pack_id=normalized_id, started=started
+        )
+    suggestion_status = str(suggestion.get("status") or "")
+    if suggestion_status != _SUGGESTION_STATUS_VERIFIED:
+        return _error(
+            f"该建议当前状态为「{suggestion_status or '未知'}」，未通过影子自测，禁止发布（DECISION_LOG D-009）",
+            409,
+            request_id=request_id,
+        )
+    # 可选：引擎若提供「把候选词合并成新发布版本」的钩子，必须先跑它，否则 activation
+    # 只会激活当前已发布版本（建议里的新词不会生效）。缺失时明确降级并在响应里告知。
+    prepare_name, prepare_hook = _improvement_prepare_hook(engine)
+    prepare_result: dict = {}
+    if prepare_hook is not None:
+        try:
+            raw_prepare = _call_prepare_hook(prepare_hook, normalized_id, suggestion_id, timeout_seconds)
+        except (ValueError, RuntimeError, IndustryPackError) as exc:
+            return _error(f"候选配置写入新版本失败：{exc}", 400, request_id=request_id)
+        except Exception as exc:
+            return _error(f"候选配置写入新版本失败：{type(exc).__name__}: {exc}", 503, request_id=request_id)
+        prepare_result = raw_prepare if isinstance(raw_prepare, dict) else {}
+        if prepare_result.get("error"):
+            return _error(f"候选配置写入新版本失败：{prepare_result.get('error')}", 400, request_id=request_id)
+    prepared_version_id = coerce_int(prepare_result.get("target_version_id"), None, 1)
+    try:
+        preview = industry_pack_activation_service.preview(
+            normalized_id, target_version_id=prepared_version_id
+        )
+    except (ValueError, RuntimeError, IndustryPackError) as exc:
+        return _error(f"行业包激活预览失败：{exc}", 400, request_id=request_id)
+    except Exception as exc:
+        return _error(f"行业包激活预览失败：{type(exc).__name__}: {exc}", 500, request_id=request_id)
+    if str(preview.get("plan_sha256") or "") != plan_sha256:
+        return _error("行业包激活计划已经变化，请重新预览并确认", 409, request_id=request_id)
+    client_version_id = coerce_int(data.get("target_version_id"), None, 1)
+    if client_version_id is not None and int(client_version_id) != int(preview.get("target_version_id") or 0):
+        return _error("目标发布版本已经变化，请重新预览并确认", 409, request_id=request_id)
+    try:
+        activation_result = industry_pack_activation_service.activate(
+            normalized_id,
+            target_version_id=int(preview["target_version_id"]),
+            expected_plan_sha256=plan_sha256,
+            actor=_admin_actor(),
+        )
+    except (ValueError, RuntimeError, IndustryPackError) as exc:
+        return _error(f"配置发布失败：{exc}", 400, request_id=request_id)
+    except Exception as exc:
+        _log.exception("改进建议发布失败 pack=%s suggestion=%s", normalized_id, suggestion_id)
+        return _error(f"配置发布失败：{type(exc).__name__}: {exc}", 500, request_id=request_id)
+    mark_error = ""
+    suggestion_after: dict = {}
+    try:
+        suggestion_after = _engine_call(
+            lambda: engine.mark_applied(suggestion_id, activation_result=activation_result),
+            timeout_seconds,
+            "回写建议状态",
+        ) or {}
+    except Exception as exc:  # 发布已经成功落地，回写失败只在响应里标注，不回滚
+        mark_error = f"{type(exc).__name__}: {exc}"
+        _log.warning("回写改进建议失败 suggestion=%s: %s", suggestion_id, exc)
+    _assessment_cache_invalidate(normalized_id)
+    return jsonify(
+        {
+            "success": True,
+            "request_id": request_id,
+            "industry_pack_id": normalized_id,
+            "suggestion_id": suggestion_id,
+            "status": str((suggestion_after or {}).get("status") or "applied"),
+            "target_version_id": int(preview["target_version_id"]),
+            "plan_sha256": plan_sha256,
+            "activation": activation_result,
+            "mark_applied_error": mark_error,
+            # 候选词是否真的写进了新版本：引擎没提供 prepare 钩子时为 False，
+            # 此时本次只激活了当前已发布版本，前端必须把这条警告显示给用户。
+            "candidate_terms_applied": bool(prepare_name and prepare_result),
+            "prepare_hook": prepare_name,
+            "prepare_result": prepare_result,
+            "warning": "" if (prepare_name and prepare_result) else (
+                "引擎未提供「把候选词写入新发布版本」的接口（prepare_pack_version / "
+                "publish_candidate_version）：本次只把行业包激活到当前已发布版本，"
+                "本建议里的新词不会生效。请引擎侧补齐该接口后再发布。"
+            ),
+            "verify_after_apply_url": (
+                f"/api/intel/packs/{normalized_id}/improvements/{suggestion_id}/verify-after-apply"
+            ),
+            "policy": _IMPROVEMENT_POLICY_NOTE,
+        }
+    )
+
+
+@intel_bp.route("/packs/<pack_id>/improvements/<suggestion_id>/reject", methods=["POST"])
+@admin_required
+def reject_pack_improvement(pack_id: str, suggestion_id: str):
+    """人工拒绝一条改进建议：置 rejected 并写 reason（不改任何线上配置）。
+
+    请求体：{"reason": "不采纳原因"}
+    优先走引擎的 mark_rejected(suggestion_id, reason=...)；引擎没提供时才降级到
+    【临时降级路径】直接改建议表状态（且只允许往 rejected 方向改）。
+    """
+
+    request_id = _request_id()
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
+    reason = str(data.get("reason") or "").strip()
+    if not reason:
+        return _error("拒绝改进建议必须写明 reason", 400, request_id=request_id)
+    try:
+        normalized_id = _industry_pack_id(pack_id)
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    timeout_seconds = coerce_int(data.get("timeout_seconds"), 30, 5, 300)
+    started = time.monotonic()
+    try:
+        engine, suggestion = _load_engine_and_suggestion(normalized_id, suggestion_id, timeout_seconds)
+    except FileNotFoundError as exc:
+        return _error(str(exc), 404, request_id=request_id)
+    except ValueError as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception as exc:
+        return _suggestion_lookup_failure(
+            exc, request_id=request_id, pack_id=normalized_id, started=started
+        )
+    already_rejected = str(suggestion.get("status") or "") == "rejected"
+    if str(suggestion.get("status") or "") == "applied":
+        return _error("该建议已发布生效，不能拒绝；如需回退请走配置回滚", 409, request_id=request_id)
+    result, updated_via = _reject_via_engine(engine, suggestion_id, reason, timeout_seconds)
+    if not updated_via:
+        if not _reject_suggestion_in_database(suggestion_id, reason):
+            return _error(
+                "评估引擎未提供拒绝接口（mark_rejected），且兜底状态更新失败；建议暂未标记为 rejected",
+                503,
+                request_id=request_id,
+            )
+        updated_via = "database:fallback"
+    return jsonify(
+        {
+            "success": True,
+            "request_id": request_id,
+            "industry_pack_id": normalized_id,
+            "suggestion_id": suggestion_id,
+            "status": str((result or {}).get("status") or "rejected"),
+            "reason": reason,
+            "updated_via": updated_via,
+            "already_rejected": already_rejected,
+            "policy": _IMPROVEMENT_POLICY_NOTE,
+        }
+    )
+
+
+@intel_bp.route(
+    "/packs/<pack_id>/improvements/<suggestion_id>/verify-after-apply", methods=["POST"]
+)
+@admin_required
+def verify_pack_improvement_after_apply(pack_id: str, suggestion_id: str):
+    """发布后复测闭环：重新评估 → record_after_apply 回填前后对比（纯 CPU 规则链路，不调模型）。
+
+    请求体：{"sample_limit": 500, "timeout_seconds": 120}
+    """
+
+    request_id = _request_id()
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
+    try:
+        normalized_id = _industry_pack_id(pack_id)
+    except (ValueError, IndustryPackError) as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    sample_limit = coerce_int(data.get("sample_limit"), 500, 20, 2000)
+    timeout_seconds = coerce_int(data.get("timeout_seconds"), 120, 5, 600)
+    started = time.monotonic()
+    try:
+        engine, suggestion = _load_engine_and_suggestion(normalized_id, suggestion_id, timeout_seconds)
+    except FileNotFoundError as exc:
+        return _error(str(exc), 404, request_id=request_id)
+    except ValueError as exc:
+        return _error(str(exc), 400, request_id=request_id)
+    except Exception as exc:
+        return _suggestion_lookup_failure(
+            exc, request_id=request_id, pack_id=normalized_id, started=started
+        )
+    try:
+        outcome = _run_pack_assessment(
+            normalized_id, sample_limit=sample_limit, timeout_seconds=timeout_seconds, refresh=True
+        )
+    except Exception as exc:
+        return jsonify(
+            _engine_failure_payload(
+                exc,
+                request_id=request_id,
+                industry_pack_id=normalized_id,
+                elapsed_ms=int((time.monotonic() - started) * 1000),
+            )
+        ), 503
+    assessment = outcome["assessment"]
+    # 复测的 before 取建议落库时记下的自测指标（引擎 metrics.before），after 用刚跑的评估重算
+    before = _split_metrics(
+        _first_present(suggestion, "metrics", "self_test_metrics", "test_metrics") or {}
+    )[0]
+    if not before:
+        extra_before = _first_present(suggestion, "before_metrics", "baseline_metrics", "baseline")
+        if isinstance(extra_before, dict):
+            before = dict(extra_before)
+    after = _assessment_metrics(assessment)
+    delta = _metric_delta(before, after)
+    metrics = {
+        "assessed_at": assessment.get("assessed_at"),
+        "sample_limit": sample_limit,
+        "other_pct": assessment.get("other_pct"),
+        "peer_other_pct": assessment.get("peer_other_pct"),
+        "articles": assessment.get("articles"),
+        "categories": assessment.get("categories"),
+        "gate_failures": assessment.get("gate_failures"),
+        "sources": assessment.get("sources") or [],
+        "admit_rate": after.get("admit_rate"),
+        "before": before,
+        "after": after,
+        "delta": delta,
+        "rows": _metric_rows(before, after, delta),
+    }
+    record_result: dict = {}
+    record_error = ""
+    try:
+        record_result = _engine_call(
+            lambda: engine.record_after_apply(suggestion_id, metrics), timeout_seconds, "回填复测指标"
+        ) or {}
+    except Exception as exc:
+        record_error = f"{type(exc).__name__}: {exc}"
+        _log.warning("回填复测指标失败 suggestion=%s: %s", suggestion_id, exc)
+    _assessment_cache_invalidate(normalized_id)
+    payload = {
+        "success": True,
+        "request_id": request_id,
+        "industry_pack_id": normalized_id,
+        "suggestion_id": suggestion_id,
+        "before": before,
+        "after": after,
+        "delta": delta,
+        "rows": metrics["rows"],
+        "assessment": assessment,
+        "sample_limit": sample_limit,
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+        "recorded": not record_error,
+        "record_error": record_error,
+    }
+    if isinstance(record_result, dict) and record_result:
+        payload["record_result"] = record_result
+    return jsonify(payload)
 
 
 def _report_date_from_title(title: str) -> str:

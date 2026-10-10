@@ -1283,7 +1283,7 @@
   "name": "投资管理",
   "negative_keywords": [],
   "pack_kind": "primary",
-  "pack_version": "1.0.0",
+  "pack_version": "1.1.0",
   "ragflow_policy": {
     "upload_crawled_articles": true,
     "knowledge_base_key": "news",

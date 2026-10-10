@@ -690,6 +690,66 @@
   body.skin-darkblue .radar-status.gap{background:rgba(248,113,113,.18);color:#fca5a5}
   body.skin-darkblue .radar-status.out{background:rgba(148,163,184,.18);color:#cbd5e1}
   body.skin-darkblue .radar-status.unknown{background:rgba(245,158,11,.18);color:#fbbf24}
+  /* ── 主题文章入库情况评估 +【改进】（DECISION_LOG D-009）──
+     只复用本页既有的 .metric/.panel-card/.antibot-table/.source-table-wrap/.action，
+     新增样式一律走 --admin-* 变量，并补齐深蓝皮肤覆盖，避免出现白底黑字/黑底黑字。 */
+  .ingest-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ingest-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ingest-bars { display: grid; gap: 7px; }
+  .ingest-bar-row { display: grid; grid-template-columns: minmax(96px, 190px) 1fr 76px; gap: 10px; align-items: center; font-size: 12px; }
+  .ingest-bar-track { height: 9px; border-radius: 999px; background: #eef2f3; overflow: hidden; }
+  .ingest-bar-fill { height: 100%; border-radius: 999px; background: var(--admin-brand); }
+  .ingest-bar-row.is-other .ingest-bar-fill { background: #b45309; }
+  .ingest-bar-value { color: var(--admin-muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .ingest-src-head, .ingest-src-row { display: grid; grid-template-columns: minmax(150px, 1.5fr) 84px 92px 132px minmax(150px, 1.3fr); gap: 8px; align-items: center; padding: 9px 11px; min-width: 740px; }
+  .ingest-src-head { color: var(--admin-muted); background: #f3f7f7; font-size: 11px; font-weight: 800; }
+  .ingest-src-row { border-top: 1px solid #edf1f2; font-size: 12px; }
+  .ingest-src-row .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ingest-src-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ingest-src-verdict { color: var(--admin-muted); }
+  .ingest-src-row.is-low { background: #fff7ed; }
+  .ingest-src-row.is-zero { background: #fef2f2; }
+  .ingest-src-row.is-low .ingest-src-verdict { color: #b45309; font-weight: 700; }
+  .ingest-src-row.is-zero .ingest-src-verdict { color: #b42318; font-weight: 700; }
+  .ingest-gate-row { display: grid; grid-template-columns: minmax(130px, 230px) 1fr 84px; gap: 10px; align-items: center; font-size: 12px; }
+  .ingest-note { margin: 8px 0 0; color: var(--admin-muted); font-size: 12px; line-height: 1.6; }
+  #improvementDialog { width: min(1180px, calc(100vw - 34px)); }
+  .improvement-head { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .improvement-head h2 { margin: 0; font-size: 18px; }
+  .improvement-head p { margin: 6px 0 0; max-width: 720px; font-size: 12.5px; line-height: 1.65; color: var(--admin-muted); }
+  .improvement-counts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--admin-muted); }
+  .improvement-list { display: grid; gap: 14px; margin-top: 14px; max-height: 62vh; overflow-y: auto; }
+  .improvement-card { border: 1px solid var(--admin-line); border-radius: 13px; background: #fbfcfc; overflow: hidden; }
+  .improvement-card-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 11px 14px; border-bottom: 1px solid var(--admin-line); background: #f3f7f7; }
+  .improvement-card-head b { font-size: 13.5px; }
+  .improvement-card-body { display: grid; gap: 12px; padding: 12px 14px; }
+  .improvement-block h4 { margin: 0 0 6px; font-size: 13px; }
+  .improvement-block .antibot-table { min-width: 560px; }
+  .improvement-confirm, .improvement-verify { padding: 11px 12px; border-radius: 11px; border: 1px dashed var(--admin-line); font-size: 12px; line-height: 1.65; }
+  .improvement-confirm { border-color: #e2b866; background: #fffdf5; }
+  .improvement-verify { border-color: #9ccfc4; background: #f4fbf9; }
+  .improvement-hash { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  .improvement-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .improvement-examples { margin: 4px 0 0; padding-left: 18px; color: var(--admin-muted); }
+  .status-chip.verified { color: #087067; background: #d9f5ed; }
+  body.skin-darkblue .ingest-bar-track { background: #12233f; }
+  body.skin-darkblue .ingest-bar-row.is-other .ingest-bar-fill { background: #fbbf24; }
+  body.skin-darkblue .ingest-src-head { background: #12233f !important; color: #dbeafe !important; border-color: rgba(96,165,250,.2) !important; }
+  body.skin-darkblue .ingest-src-row { border-color: rgba(96,165,250,.14); color: #dbeafe; }
+  body.skin-darkblue .ingest-src-row.is-low { background: rgba(245,158,11,.12); }
+  body.skin-darkblue .ingest-src-row.is-zero { background: rgba(248,113,113,.12); }
+  body.skin-darkblue .ingest-src-row.is-low .ingest-src-verdict { color: #fbbf24; }
+  body.skin-darkblue .ingest-src-row.is-zero .ingest-src-verdict { color: #fca5a5; }
+  body.skin-darkblue .improvement-card { background: #0e1d3a; border-color: rgba(96,165,250,.24); }
+  body.skin-darkblue .improvement-card-head { background: #12233f; border-color: rgba(96,165,250,.2); }
+  body.skin-darkblue .improvement-confirm { background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.42); }
+  body.skin-darkblue .improvement-verify { background: rgba(16,185,129,.1); border-color: rgba(16,185,129,.36); }
+  body.skin-darkblue .status-chip.verified { background: rgba(16,185,129,.18); color: #6ee7b7; }
+  body.skin-darkblue .antibot-empty { color: #8ea6c8; }
+  .ingest-good { color: #087067; font-weight: 700; }
+  .ingest-bad { color: #b42318; font-weight: 700; }
+  body.skin-darkblue .ingest-good { color: #6ee7b7; }
+  body.skin-darkblue .ingest-bad { color: #fca5a5; }
   </style>
 </head>
 <body>
@@ -879,6 +939,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <button class="tab-button" type="button" role="tab" data-tab="topics" onclick="setTab('topics')">内部主题</button>
           <button class="tab-button" type="button" role="tab" data-tab="attention" onclick="setTab('attention')">注意力方向</button>
           <button class="tab-button" type="button" role="tab" data-tab="sources" onclick="setTab('sources')">来源管理</button>
+          <button class="tab-button" type="button" role="tab" data-tab="ingestion" onclick="setTab('ingestion')">入库评估</button>
           <button class="tab-button" type="button" role="tab" data-tab="radar" onclick="setTab('radar')">海外标题雷达</button>
           <button class="tab-button" type="button" role="tab" data-tab="releases" onclick="setTab('releases')">版本与生命周期</button>
           <button class="tab-button" type="button" role="tab" data-tab="remote" onclick="setTab('remote')">分布式服务设置</button>
@@ -1108,6 +1169,54 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
               <div class="antibot-empty" id="rssHealthEmpty">还没有体检结果。点右上角「开始体检」，会对本包的每个 RSS 源真订阅一次再判定。</div>
             </div>
+          </div>
+        </section>
+
+        <!-- 主题文章入库情况评估：回答「本包的文章到底有没有进对主题」。
+             数字来自规则链路（纯 CPU，不调模型），并作为【改进】页的数据底座：
+             只有跑过影子自测且达标的建议，才允许出现在【改进】页（DECISION_LOG D-009）。 -->
+        <section class="tab-panel" data-panel="ingestion">
+          <div class="section-head">
+            <div>
+              <h3>主题文章入库情况评估</h3>
+              <p>统计本行业包文章的<b>主题落点</b>：落在 other（未归类）的比例、与同行中位数的差距、门禁卡点归因，以及每个信源的实际产出与准入率。评估与自测都是规则链路，<b>纯 CPU、不调任何模型</b>。</p>
+            </div>
+            <div class="ingest-head-actions">
+              <button class="action secondary" type="button" id="ingestAssessBtn" onclick="loadIngestionAssessment(true)">重新评估</button>
+              <button class="action secondary" type="button" id="ingestSelfTestBtn" onclick="runImprovementSelfTest()">跑影子自测生成建议</button>
+              <button class="action" type="button" id="ingestImproveBtn" onclick="openImprovements()">改进</button>
+            </div>
+          </div>
+
+          <div class="source-metrics ingest-metrics">
+            <div class="metric"><strong id="ingestOtherPct">—</strong><span>other 占比（越低越好）</span></div>
+            <div class="metric"><strong id="ingestPeerOther">—</strong><span>同行中位数 other 占比</span></div>
+            <div class="metric"><strong id="ingestGap">—</strong><span>与同行差距</span></div>
+            <div class="metric"><strong id="ingestArticles">—</strong><span>参与评估文章数</span></div>
+          </div>
+
+          <div id="ingestStatus" class="status" aria-live="polite"></div>
+
+          <div class="panel-card">
+            <div class="section-head"><div><h3>主题分布</h3><p id="ingestCategoryMeta" class="muted">评估后显示各主题命中文章数；other 是「没被任何主题接住」的部分。</p></div></div>
+            <div id="ingestCategories" class="ingest-bars muted">尚未评估。</div>
+          </div>
+
+          <div class="panel-card">
+            <div class="section-head"><div><h3>门禁归因</h3><p class="muted">other 的文章主要卡在哪一关。这是「该加词还是该停源」的直接依据：同一类原因堆得越高，越说明词表或信源入口不匹配。</p></div></div>
+            <div id="ingestGateFailures" class="ingest-bars muted">尚未评估。</div>
+          </div>
+
+          <div class="panel-card">
+            <div class="section-head"><div><h3>信源产出与准入</h3><p class="muted" id="ingestSourceMeta">低准入率与零产出的信源会被标色：橙色=准入率低（入口或栏目不匹配），红色=零产出（建议停用或换入口）。</p></div></div>
+            <div class="source-table-wrap">
+              <div class="ingest-src-head"><span>信源</span><span>文章数</span><span>准入率</span><span>最近有新文</span><span>结论</span></div>
+              <div id="ingestSources" class="muted">尚未评估。</div>
+            </div>
+          </div>
+
+          <div class="keyword-note" style="margin-top:12px">
+            <div class="help-rule" id="ingestImprovementHint">未通过影子自测的建议不会出现在【改进】页（DECISION_LOG D-009），只会在这里以灰色计数显示。</div>
           </div>
         </section>
 
@@ -1402,6 +1511,29 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </dialog>
 
+<!-- 【改进】页（模态）：只列 status=verified 的建议。
+     硬规矩 D-009：未自测/未达标的建议一律不在这里出现，也不能点进详情。 -->
+<dialog id="improvementDialog">
+  <div class="dialog-body">
+    <div class="improvement-head">
+      <div>
+        <h2>改进建议</h2>
+        <p>这里<b>只列出已通过影子自测</b>的建议：候选词已经拿本包真实语料重跑过一遍分类规则链，且真联网抓了一轮新文章做实测，准入率/误准入/主题关联全部达标后才会落到这里。<b>未达标的建议不会出现，也不会推给你审核。</b>信源处置请看「入库评估」页的信源产出表（引擎目前只产出关键词类建议，出现信源类建议时会同样显示在这里）。</p>
+      </div>
+      <div class="improvement-counts" id="improvementCounts"></div>
+    </div>
+    <div id="improvementStatus" class="status" aria-live="polite"></div>
+    <div id="improvementList" class="improvement-list">
+      <p class="muted">正在加载…</p>
+    </div>
+    <div class="dialog-actions">
+      <button class="action secondary" type="button" onclick="closeImprovements()">关闭</button>
+      <button class="action secondary" type="button" id="improvementSelfTestBtn" onclick="runImprovementSelfTest()">重跑影子自测</button>
+      <button class="action secondary" type="button" onclick="loadImprovements()">刷新</button>
+    </div>
+  </div>
+</dialog>
+
 <script>
 let selected = '';
 let active = '';
@@ -1459,7 +1591,7 @@ function showKeywordHelp(ev, key) {
 async function api(url, options) {
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.success) throw Error(data.error || data.message || `请求失败 HTTP ${response.status}`);
+  if (!response.ok || !data.success) throw Error(data.error || data.reason || data.message || `请求失败 HTTP ${response.status}`);
   return data;
 }
 
@@ -1486,6 +1618,7 @@ function setTab(name) {
   if (name === 'remote') loadRemoteConfig();
   if (name === 'attention') loadAttention();
   if (name === 'sources') loadAntibotBoard();
+  if (name === 'ingestion') loadIngestionAssessment(false);
   if (name === 'radar') loadBuzzingRadar();
 }
 
@@ -3675,6 +3808,602 @@ async function load() {
     authorityProfiles = authority.profiles || {};
     await Promise.all([loadCards(), loadLifecycle()]);
   } catch (error) { $('cards').innerHTML = `<div class="muted">加载失败：${esc(error.message)}</div>`; }
+}
+
+// ══ 主题文章入库情况评估 +【改进】（DECISION_LOG D-009）════════════════════
+// 硬规矩：【改进】页只允许显示 status="verified"（拿本包真实语料重跑过分类规则链、
+// 影子自测达标）的建议；未达标的只能在评估卡上以灰字计数出现，且不给详情入口。
+// 评估/自测/复测全部是规则链路，纯 CPU，不调任何模型端点。
+let ingestAssessment = null;
+let ingestSampleLimit = 500;
+let improvementBound = false;
+// 引擎是否具备「把候选词写进新发布版本」的能力（由列表接口回传）：False 时发布只会
+// 激活当前已发布版本，必须在二次确认里明确警告，不能让用户以为改进已经上线。
+let improvementApplySupported = false;
+
+const INGEST_GATE_LABELS = {
+  anchor_miss: '未命中锚点词（准入硬门槛）',
+  entity_miss: '未命中备案机构',
+  keyword_miss: '未命中任何关键词',
+  no_keyword_hit: '未命中任何关键词',
+  negative_hit: '命中负向词（扣分）',
+  negative_keyword: '命中负向词，相关性被扣至阈值以下',
+  industry_filter: '未命中行业核心词/包实体（前置拦截）',
+  no_anchor: '未命中行业包锚点词',
+  below_threshold: '词表得分低于门槛',
+  below_min_score: '相关性分数低于 minimum_relevance_score',
+  score_below_threshold: '词表得分低于门槛',
+  no_signal: '命中锚点但未命中趋势/事件信号',
+  topic_ambiguous: '多主题歧义，未归类',
+  parse_failed: '正文解析失败',
+  no_topic: '没有匹配到任何主题',
+  unknown: '其它/无判定依据',
+};
+
+const INGEST_CATEGORY_LABELS = { trend: '趋势', event: '事件', other: '其他（other）' };
+
+function ingestNum(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+// 引擎契约：比率类指标一律是百分数（0~100，_pct() 产出），不做 0~1 换算
+function ingestPctValue(value) {
+  return ingestNum(value);
+}
+
+function ingestTime(value) {
+  const text = String(value || '').trim();
+  return text ? text.replace('T', ' ').slice(0, 16) : '—';
+}
+
+async function ingestFetchJson(url, options) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, data };
+}
+
+function ingestApi(path, body) {
+  return api('/api/intel/packs/' + encodeURIComponent(selected) + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
+}
+
+function renderIngestEmpty(reason) {
+  ['ingestOtherPct', 'ingestPeerOther', 'ingestGap', 'ingestArticles'].forEach(id => { $(id).textContent = '—'; });
+  const text = esc(reason || '尚未评估。');
+  $('ingestCategories').innerHTML = '<span class="muted">' + text + '</span>';
+  $('ingestGateFailures').innerHTML = '<span class="muted">' + text + '</span>';
+  $('ingestSources').innerHTML = '<div class="ingest-src-row"><span class="ingest-src-name">—</span><span class="num">—</span><span class="num">—</span><span>—</span><span class="ingest-src-verdict">' + text + '</span></div>';
+}
+
+// ── 评估卡加载 ──────────────────────────────────────────────────────────
+async function loadIngestionAssessment(force) {
+  if (!selected) {
+    $('ingestStatus').textContent = '请先在左侧选择一个行业包。';
+    renderIngestEmpty('请先选择行业包。');
+    return;
+  }
+  const button = $('ingestAssessBtn');
+  if (button) button.disabled = true;
+  $('ingestStatus').classList.remove('error');
+  $('ingestStatus').textContent = force ? '正在重新评估：读全量分类 + 挖候选词（实测 100 篇样本约 21 秒，请稍候）…' : '正在读取评估结果…';
+  try {
+    const url = '/api/intel/packs/' + encodeURIComponent(selected) + '/topic-ingestion-assessment' + (force ? '?refresh=1' : '');
+    const { data } = await ingestFetchJson(url, { cache: 'no-store' });
+    if (!data.success) {
+      // 引擎未就绪/超时：接口返回 200 + success=false，这里渲染成提示而不是报错
+      ingestAssessment = null;
+      renderIngestEmpty(data.reason || '评估暂不可用。');
+      $('ingestStatus').textContent = data.reason || '评估暂不可用。';
+      $('ingestStatus').classList.add('error');
+    } else {
+      ingestAssessment = data.assessment || {};
+      ingestSampleLimit = Number(data.sample_limit) || ingestSampleLimit;
+      renderIngestion(ingestAssessment, data);
+      $('ingestStatus').textContent = data.cached
+        ? `已读取缓存结果（${Math.round(Number(data.cache_age_seconds) || 0)} 秒前生成，缓存 ${Math.round((Number(data.cache_ttl_seconds) || 0) / 60)} 分钟；点「重新评估」强制重算）`
+        : `评估完成，耗时 ${Number(data.elapsed_ms) || 0} ms（上限 ${data.timeout_seconds || '-'} 秒）`;
+    }
+  } catch (error) {
+    ingestAssessment = null;
+    renderIngestEmpty('评估请求失败：' + error.message);
+    $('ingestStatus').textContent = '评估请求失败：' + error.message;
+    $('ingestStatus').classList.add('error');
+  } finally {
+    if (button) button.disabled = false;
+    loadImprovementCounts();
+  }
+}
+
+function renderIngestion(assessment, meta) {
+  const other = ingestPctValue(assessment.other_pct);
+  const peer = ingestPctValue(assessment.peer_other_pct);
+  $('ingestOtherPct').textContent = other === null ? '—' : other.toFixed(1) + '%';
+  $('ingestPeerOther').textContent = peer === null ? '—' : peer.toFixed(1) + '%';
+  const gapBox = $('ingestGap');
+  if (other !== null && peer !== null) {
+    const gap = other - peer;
+    gapBox.textContent = (gap >= 0 ? '+' : '') + gap.toFixed(1) + 'pp';
+    gapBox.className = gap > 5 ? 'ingest-bad' : (gap <= 0 ? 'ingest-good' : '');
+    gapBox.title = `本包 other ${other.toFixed(1)}% − 同行中位数 ${peer.toFixed(1)}%（同行样本 ${assessment.peer_pack_count || '-'} 个包）`;
+  } else {
+    gapBox.textContent = '—';
+    gapBox.className = '';
+  }
+  $('ingestArticles').textContent = assessment.articles === null || assessment.articles === undefined ? '—' : String(assessment.articles);
+  $('ingestCategoryMeta').textContent = '评估时间 ' + ingestTime(assessment.assessed_at) +
+    (meta && meta.cached ? ' · 本次读缓存' : '') +
+    ' · 样本上限 ' + (meta && meta.sample_limit ? meta.sample_limit : '-') + ' 篇；other 是「没被任何主题接住」的部分。';
+
+  // 主题分布（引擎 categories = {trend, event, other}）
+  const categories = ingestBarRows(assessment.categories, key => INGEST_CATEGORY_LABELS[key] || key);
+  const maxCount = categories.reduce((peak, row) => Math.max(peak, row.count || 0), 0);
+  $('ingestCategories').innerHTML = categories.length
+    ? categories.map(row => ingestBarMarkup(row, maxCount, /other|其他/.test(row.rawKey || ''))).join('')
+    : '<span class="muted">评估结果没有主题分布数据。</span>';
+
+  // 门禁归因（引擎 gate_failures = {total, counts, buckets[{key,label,count,pct,fixable_by_keywords}]}）
+  const gates = ingestBarRows(assessment.gate_failures, key => INGEST_GATE_LABELS[key] || key);
+  const maxGate = gates.reduce((peak, row) => Math.max(peak, row.count || 0), 0);
+  $('ingestGateFailures').innerHTML = gates.length
+    ? gates.map(row => ingestBarMarkup(row, maxGate, false)).join('')
+    : '<span class="muted">评估结果没有门禁归因数据（样本里没有落在 other 的文章）。</span>';
+
+  renderIngestSources(assessment.sources, assessment.source_verdict_counts);
+}
+
+// categories / gate_failures 支持三种写法：{名字: 次数}、[{name,count}]、引擎的 {counts,buckets}
+function ingestBarRows(raw, labeler) {
+  const rows = [];
+  const push = (key, label, count) => {
+    const value = ingestNum(count);
+    if (value === null) return;
+    rows.push({ rawKey: String(key), name: label, count: value });
+  };
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    if (Array.isArray(raw.buckets)) {
+      raw.buckets.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        push(item.key, labeler(String(item.label || item.key || '未命名')), item.count);
+      });
+      return rows.filter(row => row.count !== null).sort((left, right) => right.count - left.count);
+    }
+    if (raw.counts && typeof raw.counts === 'object' && !Array.isArray(raw.counts)) {
+      Object.keys(raw.counts).forEach(key => push(key, labeler(key), raw.counts[key]));
+      return rows.filter(row => row.count !== null).sort((left, right) => right.count - left.count);
+    }
+    Object.keys(raw).forEach(key => {
+      const value = raw[key];
+      if (value && typeof value === 'object') {
+        push(key, labeler(String(value.label || value.name || key)), value.count !== undefined ? value.count : value.articles);
+      } else {
+        push(key, labeler(key), value);
+      }
+    });
+  } else if (Array.isArray(raw)) {
+    raw.forEach(item => {
+      if (!item || typeof item !== 'object') return;
+      push(
+        item.key || item.name || item.category || item.topic,
+        labeler(String(item.label || item.name || item.category || item.topic || item.key || item.reason || '未命名')),
+        item.count !== undefined ? item.count : (item.articles !== undefined ? item.articles : item.hits)
+      );
+    });
+  }
+  return rows.filter(row => row.count !== null).sort((left, right) => right.count - left.count);
+}
+
+function ingestBarMarkup(row, maxCount, isOther) {
+  const width = Math.max(2, Math.round((row.count || 0) / (maxCount || 1) * 100));
+  return `<div class="ingest-bar-row${isOther ? ' is-other' : ''}">
+    <span title="${esc(row.name)}">${esc(row.name)}</span>
+    <span class="ingest-bar-track"><span class="ingest-bar-fill" style="width:${width}%"></span></span>
+    <span class="ingest-bar-value">${row.count} 篇</span>
+  </div>`;
+}
+
+function ingestSourceVerdict(row) {
+  const explicit = row.verdict || row.conclusion || row.advice;
+  if (explicit) return String(explicit);
+  const articles = ingestNum(row.article_count !== undefined ? row.article_count : (row.articles !== undefined ? row.articles : row.count));
+  const rate = ingestPctValue(row.admitted_pct !== undefined ? row.admitted_pct : (row.admit_rate !== undefined ? row.admit_rate : row.admission_rate));
+  if (articles === 0) return '零产出：建议停用或换入口';
+  if (rate !== null && rate < 20) return '准入率低：栏目/入口与门禁不匹配';
+  if (rate !== null && rate >= 50) return '产出正常';
+  return '需观察';
+}
+
+function renderIngestSources(sources, verdictCounts) {
+  const box = $('ingestSources');
+  const countsBox = $('ingestSourceMeta');
+  if (countsBox) {
+    const counts = verdictCounts && typeof verdictCounts === 'object' ? verdictCounts : {};
+    const parts = Object.keys(counts).map(key => esc(key) + ' ' + counts[key]).join(' · ');
+    countsBox.textContent = parts ? '信源体检口径（引擎判定）：' + parts : '信源体检口径（引擎判定）：零产出/准入率低/长期无新文/有效。';
+  }
+  if (!Array.isArray(sources) || !sources.length) {
+    box.innerHTML = '<div class="ingest-src-row"><span class="ingest-src-name">—</span><span class="num">—</span><span class="num">—</span><span>—</span><span class="ingest-src-verdict">评估结果没有已启用信源。</span></div>';
+    return;
+  }
+  box.innerHTML = sources.map(row => {
+    if (!row || typeof row !== 'object') return '';
+    const name = String(row.source_name || row.name || row.domain || row.source_url || row.url || '未命名信源');
+    const url = String(row.source_url || row.url || '');
+    const articles = ingestNum(row.article_count !== undefined ? row.article_count : (row.articles !== undefined ? row.articles : row.count));
+    const admitted = ingestNum(row.admitted_count !== undefined ? row.admitted_count : row.admitted);
+    const rate = ingestPctValue(row.admitted_pct !== undefined ? row.admitted_pct : (row.admit_rate !== undefined ? row.admit_rate : row.admission_rate));
+    const verdict = ingestSourceVerdict(row);
+    const isZero = articles === 0 || /零产出/.test(verdict);
+    const isLow = !isZero && (/准入率低/.test(verdict) || (rate !== null && rate < 20));
+    return `<div class="ingest-src-row${isZero ? ' is-zero' : (isLow ? ' is-low' : '')}">
+      <span class="ingest-src-name" title="${esc(url || name)}">${esc(name)}</span>
+      <span class="num" title="准入 ${admitted === null ? '—' : admitted} 篇">${articles === null ? '—' : articles}</span>
+      <span class="num">${rate === null ? '—' : rate.toFixed(1) + '%'}</span>
+      <span>${esc(ingestTime(row.last_article_at || row.latest_at || row.last_seen_at || row.recent_at))}</span>
+      <span class="ingest-src-verdict">${esc(verdict)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── 未达标计数（灰字，不可点击）──────────────────────────────────────────
+async function loadImprovementCounts() {
+  if (!selected) return;
+  try {
+    const { data } = await ingestFetchJson('/api/intel/packs/' + encodeURIComponent(selected) + '/improvements', { cache: 'no-store' });
+    if (!data.success) {
+      $('ingestImprovementHint').textContent = '改进建议暂不可用：' + (data.reason || '评估引擎未就绪');
+      return;
+    }
+    const verified = Number(data.total || 0);
+    const hidden = Number(data.hidden_count || 0);
+    $('ingestImprovementHint').innerHTML =
+      '只有<b>通过影子自测</b>的建议才会出现在【改进】页（DECISION_LOG D-009）。当前：已通过 <b>' + verified +
+      '</b> 条；未达标 <span class="muted">' + hidden + ' 条</span>（灰字计数，不提供详情入口）。';
+    if ($('improvementDialog').open) {
+      $('improvementCounts').innerHTML =
+        '<span class="status-chip verified">已通过影子自测 ' + verified + ' 条</span>' +
+        '<span class="muted">未达标 ' + hidden + ' 条（不显示）</span>';
+    }
+  } catch (error) { /* 计数失败不影响主卡片 */ }
+}
+
+// ── 影子自测（生成建议）─────────────────────────────────────────────────
+async function runImprovementSelfTest() {
+  if (!selected) { alert('请先选择一个行业包。'); return; }
+  const buttons = [$('ingestSelfTestBtn'), $('improvementSelfTestBtn')].filter(Boolean);
+  buttons.forEach(button => { button.disabled = true; });
+  const statusBox = $('improvementDialog').open ? $('improvementStatus') : $('ingestStatus');
+  statusBox.classList.remove('error');
+  statusBox.textContent = '正在跑影子自测：挖候选词 → 用本包真实语料重跑分类规则链 → 真联网抓一轮新文章实测 → 双达标才落 verified…（同步执行，通常数十秒，上限 240 秒）';
+  try {
+    const payload = await ingestApi('/improvements/assess', { sample_limit: 400, timeout_seconds: 240 });
+    const verified = payload.verified === true;
+    statusBox.textContent = `自测完成，耗时 ${Number(payload.elapsed_ms) || 0} ms（上限 ${payload.timeout_seconds || '-'} 秒）：建议 ${payload.suggestion_id || '—'} · 状态 ${payload.status || '未知'} · ` +
+      (verified ? '已达到门槛，已进入【改进】页。' : `未达标，不会出现在【改进】页。原因：${payload.reason || '未给出'}`);
+    statusBox.classList.toggle('error', !verified);
+    if ($('improvementDialog').open) await loadImprovements();
+    await loadImprovementCounts();
+    if (currentTab === 'ingestion') await loadIngestionAssessment(true);
+  } catch (error) {
+    statusBox.textContent = '影子自测失败：' + error.message;
+    statusBox.classList.add('error');
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}
+
+// ──【改进】页（只显示 verified）─────────────────────────────────────────
+function openImprovements() {
+  if (!selected) { alert('请先选择一个行业包。'); return; }
+  $('improvementDialog').showModal();
+  bindImprovementList();
+  loadImprovements();
+}
+
+function closeImprovements() { $('improvementDialog').close(); }
+
+async function loadImprovements() {
+  const list = $('improvementList');
+  if (!selected) { list.innerHTML = '<p class="muted">请先选择一个行业包。</p>'; return; }
+  $('improvementStatus').classList.remove('error');
+  $('improvementStatus').textContent = '正在读取已通过影子自测的建议…';
+  try {
+    const { data } = await ingestFetchJson(
+      '/api/intel/packs/' + encodeURIComponent(selected) + '/improvements?status=verified',
+      { cache: 'no-store' }
+    );
+    if (!data.success) {
+      list.innerHTML = '';
+      $('improvementCounts').innerHTML = '';
+      $('improvementStatus').textContent = data.reason || '改进建议暂不可用。';
+      $('improvementStatus').classList.add('error');
+      return;
+    }
+    $('improvementStatus').textContent = '';
+    renderImprovementList(data);
+  } catch (error) {
+    $('improvementStatus').textContent = '读取失败：' + error.message;
+    $('improvementStatus').classList.add('error');
+  }
+}
+
+function renderImprovementList(data) {
+  const list = $('improvementList');
+  const items = data.suggestions || [];
+  // 保守判定：只有服务端明确说"引擎具备该能力"才认为可以写入新版本，避免过度承诺
+  improvementApplySupported = data.candidate_apply_supported === true;
+  const hidden = Number(data.hidden_count || 0);
+  $('improvementCounts').innerHTML =
+    '<span class="status-chip verified">已通过影子自测 ' + items.length + ' 条</span>' +
+    '<span class="muted">未达标 ' + hidden + ' 条（不显示）</span>' +
+    (improvementApplySupported ? '' : '<span class="status-chip warning">候选词写版本：引擎未提供</span>');
+  if (!items.length) {
+    list.innerHTML = '<p class="muted">当前没有「已通过影子自测」的建议。点下面「重跑影子自测」用最新语料生成一轮候选——未达标的候选不会出现在这里，也不会推给你审核。</p>';
+    return;
+  }
+  list.innerHTML = items.map(improvementCardMarkup).join('');
+}
+
+function improvementCardMarkup(item) {
+  const display = item.display || {};
+  const id = String(item.suggestion_id || display.suggestion_id || '');
+  const metrics = display.metrics || {};
+  const rows = metrics.rows || [];
+  const keywordBlock = (display.keyword_additions || []).length
+    ? `<div class="improvement-block"><h4>建议新增关键词（命中数为本包真实语料实测）</h4>
+        <table class="antibot-table"><thead><tr><th>词表</th><th>建议新增</th><th>命中文章数</th><th>示例标题</th></tr></thead>
+        <tbody>${keywordRowsMarkup(display.keyword_additions)}</tbody></table></div>`
+    : '';
+  const sourceBlock = (display.source_actions || []).length
+    ? `<div class="improvement-block"><h4>信源调整建议</h4>
+        <table class="antibot-table"><thead><tr><th>信源</th><th>建议动作</th><th>文章数</th><th>准入率</th><th>理由</th></tr></thead>
+        <tbody>${sourceRowsMarkup(display.source_actions)}</tbody></table></div>`
+    : '';
+  const probeBlock = crawlProbeMarkup(display.crawl_probe);
+  return `<article class="improvement-card" data-id="${esc(id)}">
+    <div class="improvement-card-head">
+      <div><b>${esc(display.kind_label || '改进建议')}</b>
+        <span class="status-chip verified">${esc(display.self_test_note || '已通过影子自测')}</span>
+        <span class="muted">${esc(display.created_at || '')}</span></div>
+      <div class="improvement-actions">
+        <button class="action secondary" type="button" data-act="reject">拒绝</button>
+        <button class="action" type="button" data-act="apply">同意并发布</button>
+      </div>
+    </div>
+    <div class="improvement-card-body">
+      ${display.reason ? `<p class="muted" style="margin:0">${esc(display.reason)}</p>` : ''}
+      ${keywordBlock}
+      ${sourceBlock}
+      <div class="improvement-block"><h4>影子自测指标对比（自测前 → 自测后）</h4>
+        <table class="antibot-table"><thead><tr><th>指标</th><th>自测前</th><th>自测后</th><th>Δ</th></tr></thead>
+        <tbody>${metricRowsMarkup(rows)}</tbody></table>
+        <p class="muted" style="margin:6px 0 0">Δ 单位为百分点：误准入率下降、准入率与主题关联率上升、other 占比下降才算改好。达标后才会落到本页。</p>
+      </div>
+      ${probeBlock}
+      <div class="improvement-confirm" hidden></div>
+      <div class="improvement-verify" hidden></div>
+    </div>
+  </article>`;
+}
+
+function keywordRowsMarkup(items) {
+  if (!items.length) return '<tr><td colspan="4" class="muted">没有关键词类候选。</td></tr>';
+  return items.map(item => {
+    const examples = (item.examples || []).map(text => `<li>${esc(text)}</li>`).join('');
+    return `<tr><td>${esc(item.group_label || item.group || '候选词')}</td>
+      <td><b>${esc(item.value || '')}</b></td>
+      <td class="num">${item.hits === null || item.hits === undefined ? '—' : esc(String(item.hits))}</td>
+      <td>${examples ? '<ul class="improvement-examples">' + examples + '</ul>' : '<span class="muted">—</span>'}</td></tr>`;
+  }).join('');
+}
+
+function sourceRowsMarkup(items) {
+  if (!items.length) return '<tr><td colspan="5" class="muted">没有信源类候选。</td></tr>';
+  return items.map(item => {
+    const rate = item.admit_rate === null || item.admit_rate === undefined ? '—' : Number(item.admit_rate).toFixed(1) + '%';
+    const url = item.url ? `<br><span class="muted improvement-hash">${esc(item.url)}</span>` : '';
+    return `<tr><td>${esc(item.source || '')}${url}</td><td>${esc(item.action || '调整')}</td>
+      <td class="num">${item.articles === null || item.articles === undefined ? '—' : esc(String(item.articles))}</td>
+      <td class="num">${rate}</td><td>${esc(item.reason || '—')}</td></tr>`;
+  }).join('');
+}
+
+function metricRowsMarkup(rows) {
+  if (!rows || !rows.length) return '<tr><td colspan="4" class="muted">引擎未返回可对比的指标。</td></tr>';
+  return rows.map(row => {
+    const cls = row.improved === true ? 'ingest-good' : (row.improved === false ? 'ingest-bad' : '');
+    return `<tr class="${cls}"><td>${esc(String(row.label || row.key || ''))}</td>
+      <td class="num">${esc(row.before === null || row.before === undefined ? '—' : String(row.before))}</td>
+      <td class="num">${esc(row.after === null || row.after === undefined ? '—' : String(row.after))}</td>
+      <td class="num"><b>${esc(row.delta === null || row.delta === undefined ? '—' : String(row.delta))}</b></td></tr>`;
+  }).join('');
+}
+
+function crawlProbeMarkup(probe) {
+  if (!probe || typeof probe !== 'object') return '';
+  const rows = Array.isArray(probe.sources) ? probe.sources : (Array.isArray(probe.per_source) ? probe.per_source : null);
+  const cell = value => esc(value === null || value === undefined || value === '' ? '—' : String(value));
+  let body = '';
+  if (probe.fetched_total !== undefined || probe.new_article_admit_rate_after !== undefined) {
+    body += '<div class="muted">抓取 ' + cell(probe.fetched_total) + ' 篇 · 成功解析 ' + cell(probe.parsed_total) +
+      ' 篇 · 解析失败 ' + cell(probe.parse_failed_total) + ' 篇 · 新文章准入率 ' +
+      cell(probe.new_article_admit_rate_before) + '% → ' + cell(probe.new_article_admit_rate_after) + '%' +
+      (probe.sample_available === false ? ' · <b>样本不可用</b>（抓不到＝不等于准入率 0）' : '') + '</div>';
+  }
+  if (rows && rows.length) {
+    body += '<table class="antibot-table" style="margin-top:8px"><thead><tr><th>信源</th><th>抓取</th><th>解析失败</th><th>准入前</th><th>准入后</th><th>入口状态</th></tr></thead><tbody>' +
+      rows.map(row => {
+        if (!row || typeof row !== 'object') return '';
+        const name = row.source_name || row.source || row.name || row.domain || '—';
+        const before = row.admit_rate_before !== undefined ? row.admit_rate_before : row.admit_before;
+        const after = row.admit_rate_after !== undefined ? row.admit_rate_after : row.admit_after;
+        return `<tr><td>${esc(String(name))}</td><td class="num">${cell(row.fetched)}</td><td class="num">${cell(row.parse_failed)}</td>` +
+          `<td class="num">${cell(before)}</td><td class="num">${cell(after)}</td><td>${cell(row.listing_status || row.listing_error || row.errors || row.error)}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  }
+  const flat = Object.keys(probe).filter(key => ['string', 'number', 'boolean'].includes(typeof probe[key]) && !/^fetched_total|parsed_total|parse_failed_total|new_article_admit_rate/.test(key));
+  if (!body && flat.length) body = '<div class="muted">' + flat.map(key => esc(key) + '：' + cell(probe[key])).join(' · ') + '</div>';
+  if (Array.isArray(probe.errors) && probe.errors.length) {
+    body += '<div class="muted" style="margin-top:6px">抓取错误：' + probe.errors.slice(0, 5).map(item => esc(typeof item === 'object' ? (item.error || JSON.stringify(item)) : String(item))).join('；') + '</div>';
+  }
+  if (!body) return '';
+  return '<div class="improvement-block"><h4>抓文章实测（真抓一轮：新文章能不能过门禁）</h4>' + body + '</div>';
+}
+
+function improvementCard(id) {
+  return document.querySelector(`.improvement-card[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`);
+}
+
+function bindImprovementList() {
+  if (improvementBound) return;
+  improvementBound = true;
+  $('improvementList').addEventListener('click', event => {
+    const button = event.target.closest('button[data-act]');
+    if (!button) return;
+    const card = button.closest('.improvement-card');
+    const id = card ? card.dataset.id : '';
+    if (!id) return;
+    const act = button.dataset.act;
+    if (act === 'apply') startImprovementApply(id);
+    else if (act === 'apply-confirm') confirmImprovementApply(id);
+    else if (act === 'apply-cancel') cancelImprovementApply(id);
+    else if (act === 'reject') rejectImprovement(id);
+    else if (act === 'verify') runVerifyAfterApply(id);
+  });
+}
+
+function setImprovementButtons(card, disabled) {
+  card.querySelectorAll('.improvement-card-head button[data-act]').forEach(button => { button.disabled = disabled; });
+}
+
+// ① 同意并发布 → 先取 activation 预览，把版本号与 plan_sha256 摆给用户看
+async function startImprovementApply(id) {
+  const card = improvementCard(id);
+  if (!card) return;
+  const panel = card.querySelector('.improvement-confirm');
+  panel.hidden = false;
+  panel.dataset.planSha = '';
+  panel.dataset.targetVersion = '';
+  panel.innerHTML = '正在向 activation 服务预览本次配置变更…';
+  try {
+    const payload = await api('/api/intel/industry-packs/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ industry_pack_id: selected }),
+    });
+    const preview = payload.preview || {};
+    const counts = preview.source_counts || {};
+    panel.dataset.planSha = preview.plan_sha256 || '';
+    panel.dataset.targetVersion = preview.target_version_id || '';
+    if (!panel.dataset.planSha) {
+      panel.innerHTML = '预览没有返回 plan_sha256，不能发布。请先确认该行业包已有已发布版本。';
+      return;
+    }
+    panel.innerHTML = `<b>二次确认</b>：把 <b>${esc(selected)}</b> 激活到发布版本 <b>#${esc(String(preview.target_version_id || ''))}</b>。
+      会先做配置备份（失败可回滚），历史文章不受影响。<br>
+      信源变化：新增 ${counts.add_sources || 0} · 更新 ${counts.update_sources || 0} · 关联 ${counts.upsert_associations || 0} · 停用 ${counts.deactivate_associations || 0}<br>
+      plan_sha256：<span class="improvement-hash">${esc(String(preview.plan_sha256 || ''))}</span><br>
+      <span class="muted">核对上面两行后再确认：版本号与计划哈希就是本次发布的唯一凭据；不一致会被服务端拒绝。</span>
+      ${improvementApplySupported ? '' : '<div class="ingest-bad" style="margin-top:8px">⚠ 引擎当前未提供「把候选词写入新发布版本」的接口（prepare_pack_version / publish_candidate_version）：确认后只会把行业包激活到当前已发布版本，<b>本建议里的新词不会生效</b>。请先在引擎侧补齐该接口。</div>'}
+      <div class="improvement-actions" style="margin-top:8px">
+        <button class="action secondary" type="button" data-act="apply-cancel">取消</button>
+        <button class="action" type="button" data-act="apply-confirm">确认发布</button>
+      </div>`;
+  } catch (error) {
+    panel.innerHTML = '预览失败：' + esc(error.message) +
+      '<div class="improvement-actions" style="margin-top:8px"><button class="action secondary" type="button" data-act="apply">重试预览</button></div>';
+  }
+}
+
+function cancelImprovementApply(id) {
+  const card = improvementCard(id);
+  if (!card) return;
+  const panel = card.querySelector('.improvement-confirm');
+  panel.hidden = true;
+  panel.innerHTML = '';
+}
+
+// ② 确认发布 → apply（confirm + plan_sha256）→ ③ 自动复测
+async function confirmImprovementApply(id) {
+  const card = improvementCard(id);
+  if (!card) return;
+  const panel = card.querySelector('.improvement-confirm');
+  const planSha = panel.dataset.planSha || '';
+  const targetVersion = Number(panel.dataset.targetVersion || 0);
+  if (!planSha) {
+    panel.innerHTML = '缺少 plan_sha256：请重新点「同意并发布」获取激活预览。';
+    return;
+  }
+  panel.innerHTML = '正在发布：备份 → 信源落地 → 激活发布版本…（大库可能数十秒，请勿关闭窗口）';
+  try {
+    const payload = await ingestApi('/improvements/' + encodeURIComponent(id) + '/apply', {
+      confirm: true,
+      plan_sha256: planSha,
+      target_version_id: targetVersion || undefined,
+    });
+    const activation = payload.activation || {};
+    panel.innerHTML = `<b>已发布</b>：激活记录 ${esc(String(activation.activation_id || '').slice(0, 12))} · 生效发布版本 #${esc(String(payload.target_version_id || ''))}` +
+      (payload.mark_applied_error ? `<br><span class="muted">建议状态回写失败（发布已生效）：${esc(payload.mark_applied_error)}</span>` : '') +
+      (payload.candidate_terms_applied === false ? `<br><span class="ingest-bad">⚠ ${esc(payload.warning || '候选词未写入新版本，本次只是激活了当前已发布版本')}</span>` : '') +
+      '<br><span class="muted">下面自动跑一次复测：用发布后的真实文章重新评估，回填前后对比。</span>';
+    setImprovementButtons(card, true);
+    await runVerifyAfterApply(id);
+    await loadImprovementCounts();
+    if (currentTab === 'ingestion') await loadIngestionAssessment(true);
+  } catch (error) {
+    panel.innerHTML = '发布失败：' + esc(error.message) +
+      '<div class="improvement-actions" style="margin-top:8px"><button class="action secondary" type="button" data-act="apply-cancel">收起</button><button class="action" type="button" data-act="apply-confirm">重试发布</button></div>';
+  }
+}
+
+// ③ 发布后复测：重新评估 + record_after_apply（纯 CPU 规则链路）
+async function runVerifyAfterApply(id) {
+  const card = improvementCard(id);
+  if (!card) return;
+  const box = card.querySelector('.improvement-verify');
+  box.hidden = false;
+  box.innerHTML = '正在自动复测：重新评估本包文章 → 回填发布后指标…';
+  try {
+    const payload = await ingestApi('/improvements/' + encodeURIComponent(id) + '/verify-after-apply', {
+      sample_limit: ingestSampleLimit || 500,
+      timeout_seconds: 180,
+    });
+    const assessment = payload.assessment || {};
+    box.innerHTML = '<b>发布后复测</b>' + (payload.recorded ? '' : `（指标回填失败：${esc(payload.record_error || '')}）`) +
+      `<br>评估时间 ${esc(ingestTime(assessment.assessed_at))} · 样本 ${esc(String(payload.sample_limit || ''))} 篇 · 耗时 ${Number(payload.elapsed_ms) || 0} ms` +
+      '<table class="antibot-table" style="margin-top:8px"><thead><tr><th>指标</th><th>发布前</th><th>发布后</th><th>Δ</th></tr></thead>' +
+      `<tbody>${metricRowsMarkup(payload.rows || [])}</tbody></table>` +
+      '<span class="muted">复测是规则链路（纯 CPU、不调模型）；刚发布时新文章可能还没采回来，Δ 会随后续采集继续变化。</span>';
+  } catch (error) {
+    box.innerHTML = '复测失败：' + esc(error.message) +
+      '<div class="improvement-actions" style="margin-top:8px"><button class="action secondary" type="button" data-act="verify">重试复测</button></div>';
+  }
+}
+
+// ④ 拒绝：写 reason（未达标建议本来就不在这里，这里是人工否决已通过自测的建议）
+async function rejectImprovement(id) {
+  const card = improvementCard(id);
+  if (!card) return;
+  const input = prompt('拒绝这条改进建议的原因（会写入审计，必填）：', '');
+  if (input === null) return;
+  const reason = String(input).trim();
+  if (!reason) { alert('必须写明拒绝原因，否则无法记录审计。'); return; }
+  const panel = card.querySelector('.improvement-confirm');
+  panel.hidden = false;
+  panel.innerHTML = '正在记录拒绝原因…';
+  try {
+    await ingestApi('/improvements/' + encodeURIComponent(id) + '/reject', { reason: reason });
+    card.style.opacity = '.55';
+    setImprovementButtons(card, true);
+    panel.innerHTML = '已拒绝（原因已记录）：' + esc(reason) + '<br><span class="muted">刷新后该建议不再出现在本页。</span>';
+    await loadImprovementCounts();
+  } catch (error) {
+    panel.innerHTML = '拒绝失败：' + esc(error.message);
+  }
 }
 
 load();
