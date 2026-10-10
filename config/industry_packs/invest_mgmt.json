@@ -53,7 +53,60 @@
       "业绩报酬",
       "管理费",
       "投资协议",
-      "投资决策委员会"
+      "投资决策委员会",
+      "中国证券投资基金业协会",
+      "中基协",
+      "中国证券监督管理委员会",
+      "证监会",
+      "国家金融监督管理总局",
+      "国务院国有资产监督管理委员会",
+      "国务院国资委",
+      "中华人民共和国财政部",
+      "国家发展和改革委员会",
+      "上海证券交易所",
+      "深圳证券交易所",
+      "北京证券交易所",
+      "全国社会保障基金理事会",
+      "中国保险资产管理业协会",
+      "中国证券业协会",
+      "中国银行业协会",
+      "国家集成电路产业投资基金",
+      "国家制造业转型升级基金",
+      "国家中小企业发展基金",
+      "华为投资控股",
+      "一汽股权投资",
+      "重庆渝富控股集团",
+      "国投创合基金管理",
+      "建信金融资产投资",
+      "无锡市创新投资集团",
+      "中银金融资产投资",
+      "浙江省创新投资集团",
+      "中国石化集团资本",
+      "中移资本控股",
+      "联通资本投资控股",
+      "山东省财金投资集团",
+      "山东省鲁信投资控股集团",
+      "中银集团投资",
+      "厦门金圆投资集团",
+      "上海浦东科创集团",
+      "广东省粤科金融集团",
+      "中国石油集团昆仑资本",
+      "腾讯投资",
+      "深圳市腾讯产业投资基金",
+      "中金基金管理",
+      "凯辉基金",
+      "国开金融",
+      "海尔集团",
+      "建信信托",
+      "华泰资产管理",
+      "宁波通商基金管理",
+      "深创投不动产基金管理",
+      "盈峰控股集团",
+      "国科嘉和",
+      "诚通基金管理",
+      "合肥兴泰资本管理",
+      "歌斐资产管理",
+      "交通银行"
     ],
     "entity_keywords": [
       "中国证券投资基金业协会",
@@ -224,206 +277,762 @@
       "url": "https://www.cyzone.cn/"
     },
     {
-      "name": "投中网 CVSource（RSSHub）",
-      "url": "http://10.88.0.1:1200/chinaventure/news",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "professional_trade_media",
       "authority_level": 3,
       "authority_scope": [
         "media_reporting"
       ],
+      "is_enabled": true,
+      "name": "钛媒体",
       "polling_interval_minutes": 720,
-      "publisher_key": "chinaventure.com.cn"
+      "publisher_key": "tmtpost.com",
+      "source_role": "professional_trade_media",
+      "source_type": "rss",
+      "url": "https://www.tmtpost.com/rss.xml"
     },
     {
-      "name": "36氪快讯（RSSHub）",
-      "url": "http://10.88.0.1:1200/36kr/newsflashes",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "professional_trade_media",
-      "authority_level": 2,
+      "authority_level": 3,
       "authority_scope": [
         "media_reporting"
       ],
+      "is_enabled": true,
+      "name": "华尔街见闻",
       "polling_interval_minutes": 360,
-      "publisher_key": "36kr.com"
+      "publisher_key": "dedicated.wallstreetcn.com",
+      "source_role": "professional_trade_media",
+      "source_type": "rss",
+      "url": "https://dedicated.wallstreetcn.com/rss.xml"
     },
     {
-      "name": "36氪热榜（RSSHub）",
-      "url": "http://10.88.0.1:1200/36kr/hot-list",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "professional_trade_media",
-      "authority_level": 2,
-      "authority_scope": [
-        "media_reporting"
-      ],
-      "polling_interval_minutes": 720,
-      "publisher_key": "36kr.com"
-    },
-    {
-      "name": "虎嗅（RSSHub）",
-      "url": "http://10.88.0.1:1200/huxiu/article",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "professional_trade_media",
       "authority_level": 3,
       "authority_scope": [
         "media_reporting"
       ],
+      "is_enabled": true,
+      "name": "创业邦",
       "polling_interval_minutes": 720,
-      "publisher_key": "huxiu.com"
+      "publisher_key": "cyzone.cn",
+      "source_role": "professional_trade_media",
+      "source_type": "rss",
+      "url": "https://www.cyzone.cn/rss"
     },
     {
-      "name": "财新（RSSHub）",
-      "url": "http://10.88.0.1:1200/caixin/latest",
-      "source_type": "rss",
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
       "is_enabled": true,
+      "name": "中新网财经",
+      "polling_interval_minutes": 720,
+      "publisher_key": "chinanews.com.cn",
+      "source_role": "consumer_media",
+      "source_type": "rss",
+      "url": "https://www.chinanews.com.cn/rss/finance.xml"
+    },
+    {
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "新浪财经·热点滚动",
+      "polling_interval_minutes": 720,
+      "publisher_key": "rss.sina.com.cn",
       "source_role": "professional_trade_media",
+      "source_type": "rss",
+      "url": "http://rss.sina.com.cn/roll/finance/hot_roll.xml"
+    },
+    {
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "投资界",
+      "polling_interval_minutes": 720,
+      "publisher_key": "pedaily.cn",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.pedaily.cn/pe"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "research_finding"
+      ],
+      "is_enabled": true,
+      "name": "清科研究中心",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "pedata.cn",
+      "source_role": "independent_research",
+      "source_type": "website",
+      "url": "https://www.pedata.cn"
+    },
+    {
       "authority_level": 4,
       "authority_scope": [
         "media_reporting"
       ],
+      "is_enabled": true,
+      "name": "证券时报",
       "polling_interval_minutes": 720,
-      "publisher_key": "caixin.com"
+      "publisher_key": "stcn.com",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.stcn.com/article/list/kx.html"
     },
     {
-      "name": "第一财经简报（RSSHub）",
-      "url": "http://10.88.0.1:1200/yicai/brief",
-      "source_type": "rss",
+      "authority_level": 4,
+      "authority_scope": [
+        "media_reporting"
+      ],
       "is_enabled": true,
+      "name": "中国证券报·中证网",
+      "polling_interval_minutes": 720,
+      "publisher_key": "cs.com.cn",
       "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.cs.com.cn"
+    },
+    {
       "authority_level": 3,
       "authority_scope": [
         "media_reporting"
       ],
-      "polling_interval_minutes": 720,
-      "publisher_key": "yicai.com"
-    },
-    {
-      "name": "财联社热门（RSSHub）",
-      "url": "http://10.88.0.1:1200/cls/hot",
-      "source_type": "rss",
       "is_enabled": true,
-      "source_role": "professional_trade_media",
-      "authority_level": 3,
-      "authority_scope": [
-        "media_reporting"
-      ],
+      "name": "财联社·电报",
       "polling_interval_minutes": 360,
-      "publisher_key": "cls.cn"
+      "publisher_key": "cls.cn",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.cls.cn/telegraph"
     },
     {
-      "name": "华尔街见闻资讯（RSSHub）",
-      "url": "http://10.88.0.1:1200/wallstreetcn/news/global",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "professional_trade_media",
-      "authority_level": 2,
+      "authority_level": 3,
       "authority_scope": [
         "media_reporting"
       ],
+      "is_enabled": true,
+      "name": "界面新闻",
+      "polling_interval_minutes": 720,
+      "publisher_key": "jiemian.com",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.jiemian.com"
+    },
+    {
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "澎湃新闻",
+      "polling_interval_minutes": 720,
+      "publisher_key": "thepaper.cn",
+      "source_role": "consumer_media",
+      "source_type": "website",
+      "url": "https://www.thepaper.cn"
+    },
+    {
+      "authority_level": 3,
+      "authority_scope": [
+        "media_reporting"
+      ],
+      "is_enabled": true,
+      "name": "36氪·快讯",
       "polling_interval_minutes": 360,
-      "publisher_key": "wallstreetcn.com"
+      "publisher_key": "36kr.com",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://36kr.com/newsflashes"
     },
     {
-      "name": "钛媒体 RSS",
-      "url": "https://www.tmtpost.com/rss.xml",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "professional_trade_media",
       "authority_level": 3,
       "authority_scope": [
         "media_reporting"
       ],
-      "polling_interval_minutes": 720,
-      "publisher_key": "tmtpost.com"
-    },
-    {
-      "name": "界面新闻 RSS",
-      "url": "https://a.jiemian.com/index.php?m=article&a=rss",
-      "source_type": "rss",
       "is_enabled": true,
-      "source_role": "professional_trade_media",
-      "authority_level": 3,
-      "authority_scope": [
-        "media_reporting"
-      ],
-      "polling_interval_minutes": 720,
-      "publisher_key": "jiemian.com"
-    },
-    {
-      "name": "美国 SEC 新闻稿",
-      "url": "https://www.sec.gov/news/pressreleases.rss",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "government_regulator",
-      "authority_level": 5,
-      "authority_scope": [
-        "regulatory_decision",
-        "official_rule"
-      ],
+      "name": "投中网",
       "polling_interval_minutes": 1440,
-      "publisher_key": "sec.gov",
-      "content_type": "official",
-      "language": "en",
-      "market": "US",
-      "expected_classifications": [
-        "event",
-        "trend",
-        "other"
-      ],
-      "api_key_required": false,
-      "access_cost": "free_public_rss"
+      "publisher_key": "chinaventure.com.cn",
+      "source_role": "professional_trade_media",
+      "source_type": "website",
+      "url": "https://www.chinaventure.com.cn"
     },
     {
-      "name": "美联储货币政策新闻稿",
-      "url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
-      "source_type": "rss",
+      "authority_level": 5,
+      "authority_scope": [
+        "association_position",
+        "industry_standard"
+      ],
       "is_enabled": true,
-      "source_role": "government_regulator",
+      "name": "中国证券投资基金业协会",
+      "polling_interval_minutes": 720,
+      "publisher_key": "amac.org.cn",
+      "source_role": "industry_association",
+      "source_type": "website",
+      "url": "https://www.amac.org.cn"
+    },
+    {
       "authority_level": 5,
       "authority_scope": [
         "regulatory_decision",
+        "official_rule",
         "official_statistics"
       ],
-      "polling_interval_minutes": 1440,
-      "publisher_key": "federalreserve.gov",
-      "content_type": "official",
-      "language": "en",
-      "market": "US",
-      "expected_classifications": [
-        "trend",
-        "event",
-        "other"
-      ],
-      "api_key_required": false,
-      "access_cost": "free_public_rss"
+      "is_enabled": true,
+      "name": "中基协·私募管理人公示",
+      "polling_interval_minutes": 10080,
+      "publisher_key": "gs.amac.org.cn",
+      "source_role": "government_regulator",
+      "source_type": "website",
+      "url": "https://gs.amac.org.cn/amac-infodisc/res/pof/manager/index.html"
     },
     {
-      "name": "欧洲央行新闻",
-      "url": "https://www.ecb.europa.eu/rss/press.html",
-      "source_type": "rss",
-      "is_enabled": true,
-      "source_role": "government_regulator",
       "authority_level": 5,
       "authority_scope": [
         "regulatory_decision",
+        "official_rule",
         "official_statistics"
       ],
-      "polling_interval_minutes": 1440,
-      "publisher_key": "ecb.europa.eu",
-      "content_type": "official",
-      "language": "en",
-      "market": "EU",
-      "expected_classifications": [
-        "trend",
-        "event",
-        "other"
+      "is_enabled": true,
+      "name": "中国证监会",
+      "polling_interval_minutes": 720,
+      "publisher_key": "csrc.gov.cn",
+      "source_role": "government_regulator",
+      "source_type": "website",
+      "url": "http://www.csrc.gov.cn"
+    },
+    {
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
       ],
-      "api_key_required": false,
-      "access_cost": "free_public_rss"
+      "is_enabled": true,
+      "name": "国务院国资委",
+      "polling_interval_minutes": 720,
+      "publisher_key": "sasac.gov.cn",
+      "source_role": "government_regulator",
+      "source_type": "website",
+      "url": "http://www.sasac.gov.cn"
+    },
+    {
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "is_enabled": true,
+      "name": "国家发展改革委",
+      "polling_interval_minutes": 720,
+      "publisher_key": "ndrc.gov.cn",
+      "source_role": "government_regulator",
+      "source_type": "website",
+      "url": "https://www.ndrc.gov.cn"
+    },
+    {
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "is_enabled": true,
+      "name": "中国政府网·最新政策",
+      "polling_interval_minutes": 720,
+      "publisher_key": "gov.cn",
+      "source_role": "government_regulator",
+      "source_type": "website",
+      "url": "https://www.gov.cn/zhengce/zuixin"
+    },
+    {
+      "authority_level": 5,
+      "authority_scope": [
+        "regulatory_decision",
+        "official_rule",
+        "official_statistics"
+      ],
+      "is_enabled": true,
+      "name": "财政部",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "mof.gov.cn",
+      "source_role": "government_regulator",
+      "source_type": "website",
+      "url": "https://www.mof.gov.cn"
+    },
+    {
+      "authority_level": 5,
+      "authority_scope": [
+        "exchange_filing",
+        "listing_rule",
+        "issuer_filing"
+      ],
+      "is_enabled": true,
+      "name": "上海证券交易所",
+      "polling_interval_minutes": 720,
+      "publisher_key": "sse.com.cn",
+      "source_role": "exchange_official",
+      "source_type": "website",
+      "url": "http://www.sse.com.cn"
+    },
+    {
+      "authority_level": 5,
+      "authority_scope": [
+        "exchange_filing",
+        "listing_rule",
+        "issuer_filing"
+      ],
+      "is_enabled": true,
+      "name": "深圳证券交易所",
+      "polling_interval_minutes": 720,
+      "publisher_key": "szse.cn",
+      "source_role": "exchange_official",
+      "source_type": "website",
+      "url": "https://www.szse.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "华为投资控股",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "huawei.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.huawei.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "一汽股权（中国一汽集团）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "faw.com.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.faw.com.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "重庆渝富控股集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "cqyfkgjt.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.cqyfkgjt.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "国投创合基金管理",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "sdicfof.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.sdicfof.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "建信金融资产投资",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "ccbfi.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.ccbfi.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "无锡市创新投资集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "wuxicapital.com.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.wuxicapital.com.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "中银金融资产投资（母行）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "boc.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.boc.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "浙江省创新投资集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "zjfh.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.zjfh.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "中国石化集团资本",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "capital.sinopec.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "http://capital.sinopec.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "中移资本控股（中国移动）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "10086.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.10086.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "联通资本投资控股（中国联通）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "chinaunicom.com.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.chinaunicom.com.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "山东省财金投资集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "sdcj.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.sdcj.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "山东省鲁信投资控股集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "luxin.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.luxin.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "中银集团投资",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "bocgi.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.bocgi.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "厦门金圆投资集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "xmjyjt.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.xmjyjt.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "上海浦东科创集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "spinnotec.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.spinnotec.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "广东省粤科金融集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "gvcgc.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.gvcgc.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "中国石油集团昆仑资本",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "kunlun-cap.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "http://www.kunlun-cap.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "腾讯投资",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "investment.tencent.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://investment.tencent.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "腾讯产业投资基金（集团）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "tencent.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.tencent.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "中金基金管理",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "ciccfund.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.ciccfund.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "凯辉基金",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "cathaycapital.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.cathaycapital.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "国开金融",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "cdb-capital.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.cdb-capital.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "海尔集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "haier.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.haier.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "建信信托",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "ccbtrust.com.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.ccbtrust.com.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "华泰资产管理",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "htam.com.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.htam.com.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "宁波通商基金管理（集团）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "nbtsg.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.nbtsg.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "深创投不动产基金（集团）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "szvc.com.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.szvc.com.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "盈峰控股集团",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "infore.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.infore.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "国科嘉和",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "cashcapital.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.cashcapital.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "诚通基金管理",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "cctfund.cn",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "http://www.cctfund.cn"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "合肥兴泰资本（集团）",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "xtkg.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.xtkg.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "歌斐资产管理",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "gopherasset.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.gopherasset.com"
+    },
+    {
+      "authority_level": 4,
+      "authority_scope": [
+        "publisher_self_statement"
+      ],
+      "is_enabled": true,
+      "name": "交通银行",
+      "polling_interval_minutes": 1440,
+      "publisher_key": "bankcomm.com",
+      "source_role": "issuer_official",
+      "source_type": "website",
+      "url": "https://www.bankcomm.com"
     }
   ],
   "enabled": true,
@@ -501,23 +1110,167 @@
     {
       "key": "topic_1",
       "keywords": [
-        "监管 / 新规 / 征求意见稿 / 自律处分 / 基金备案 / 基金管理人登记"
+        "监管 / 新规 / 征求意见稿 / 自律处分 / 基金备案 / 基金管理人登记",
+        "监管",
+        "新规",
+        "征求意见稿",
+        "自律处分",
+        "基金备案",
+        "基金管理人登记"
       ],
       "name": "监管与备案"
     },
     {
       "key": "topic_2",
       "keywords": [
-        "募资 / 基金成立 / 首关 / 终关 / LP出资 / 母基金"
+        "募资 / 基金成立 / 首关 / 终关 / LP出资 / 母基金",
+        "募资",
+        "基金成立",
+        "首关",
+        "终关",
+        "LP出资",
+        "母基金"
       ],
       "name": "募资与基金设立"
     },
     {
       "key": "topic_3",
       "keywords": [
-        "IPO / 上市 / 过会 / 退出 / 减持 / 回购"
+        "IPO / 上市 / 过会 / 退出 / 减持 / 回购",
+        "IPO",
+        "上市",
+        "过会",
+        "退出",
+        "减持",
+        "回购"
       ],
       "name": "退出与IPO"
+    },
+    {
+      "key": "topic_4",
+      "keywords": [
+        "并购",
+        "收购",
+        "合并",
+        "股权转让",
+        "并购基金"
+      ],
+      "name": "并购重组"
+    },
+    {
+      "key": "topic_5",
+      "keywords": [
+        "政府引导基金",
+        "国有资本投资运营",
+        "返投",
+        "让利",
+        "容错机制"
+      ],
+      "name": "国资与引导基金"
+    },
+    {
+      "key": "topic_6",
+      "keywords": [
+        "耐心资本",
+        "长期资本",
+        "保险资金",
+        "社保基金",
+        "长期资本入市"
+      ],
+      "name": "耐心资本与长期资本"
+    },
+    {
+      "key": "topic_7",
+      "keywords": [
+        "S基金",
+        "二手份额",
+        "S交易",
+        "退出通道"
+      ],
+      "name": "S基金与二手份额"
+    },
+    {
+      "key": "topic_8",
+      "keywords": [
+        "硬科技",
+        "半导体",
+        "人工智能",
+        "新能源",
+        "生物医药",
+        "产业投资基金"
+      ],
+      "name": "硬科技与AI投资"
+    },
+    {
+      "key": "topic_9",
+      "keywords": [
+        "投后管理",
+        "组合管理",
+        "项目储备",
+        "增值服务"
+      ],
+      "name": "投后管理与赋能"
+    },
+    {
+      "key": "topic_10",
+      "keywords": [
+        "人事变动",
+        "任免",
+        "董事长",
+        "总经理",
+        "换届",
+        "增资"
+      ],
+      "name": "人事与治理"
+    },
+    {
+      "key": "topic_11",
+      "keywords": [
+        "债转股",
+        "金融资产投资",
+        "市场化债转股"
+      ],
+      "name": "银行AIC与债转股"
+    },
+    {
+      "key": "topic_12",
+      "keywords": [
+        "华为投资控股有限公司",
+        "一汽股权投资（天津）有限公司",
+        "重庆渝富控股集团有限公司",
+        "国投创合基金管理有限公司",
+        "建信金融资产投资有限公司",
+        "无锡市创新投资集团有限公司",
+        "中银金融资产投资有限公司",
+        "浙江省创新投资集团有限公司",
+        "中国石化集团资本有限公司",
+        "中移资本控股有限责任公司",
+        "联通资本投资控股有限公司",
+        "山东省财金投资集团有限公司",
+        "山东省鲁信投资控股集团有限公司",
+        "中银集团投资有限公司",
+        "厦门金圆投资集团有限公司",
+        "上海浦东科创集团有限公司",
+        "广东省粤科金融集团有限公司",
+        "中国石油集团昆仑资本有限公司",
+        "腾讯投资",
+        "深圳市腾讯产业投资基金有限公司",
+        "中金基金管理有限公司",
+        "凯辉基金",
+        "国开金融有限责任公司",
+        "海尔集团公司",
+        "建信信托有限责任公司",
+        "华泰资产管理有限公司",
+        "宁波通商基金管理有限公司",
+        "深创投不动产基金管理（深圳）有限公司",
+        "盈峰控股集团有限公司",
+        "国科嘉和（北京）投资管理有限公司",
+        "诚通基金管理有限公司",
+        "合肥兴泰资本管理有限公司",
+        "歌斐资产管理有限公司",
+        "交通银行股份有限公司"
+      ],
+      "name": "关注主体动态"
     }
   ],
   "id": "invest_mgmt",
@@ -530,11 +1283,11 @@
   "name": "投资管理",
   "negative_keywords": [],
   "pack_kind": "primary",
-  "pack_version": "1.1.0",
+  "pack_version": "1.0.0",
   "ragflow_policy": {
     "upload_crawled_articles": true,
     "knowledge_base_key": "news",
-    "qa_retrieval_enabled": true
+    "qa_retrieval_enabled": false
   },
   "schema_version": 3,
   "serpapi_queries": [
