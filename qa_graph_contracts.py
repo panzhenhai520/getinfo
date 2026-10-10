@@ -1048,13 +1048,241 @@ GAP_LOOP_SCHEMA = {
 """缺口循环整体回执（P07-05/P07-06）：停止原因 + 每轮回执 + 缺口清单 + 下一跳清单。"""
 
 
+# ── Phase 08（P08-01…P08-06）：Context Graph / Context Planner ────────────────
+# 边界：本阶段只做"按任务组装最小有效 Context"，**不新增任何检索/核验/生成能力**。
+# 契约设计口径（与 Phase 04~07 一致）：
+#   1. §4 的九段上下文**逐字**入 `CONTEXT_SECTIONS`，缺一段就有守门用例挂；
+#   2. §5 的 ContextUtility 五个乘子**逐字**入 `CONTEXT_UTILITY_FACTORS`，权重和为 1；
+#   3. §6 的 Context Gap 四个动作**逐字**入 `CONTEXT_GAP_ACTIONS`；Context Gap
+#      **默认不得触发昂贵新检索**（MASTER_RULES 第 13 条）——契约里用
+#      `requires_retrieval` 恒 False 把这条硬规则写成机器可校验形态；
+#   4. 引用可回溯：`CONTEXT_ITEM_SCHEMA.grounding` 必须能指到 Phase 02 的
+#      `evidence_ref` + 最小 span；指不到的条目必须显式 `grounded=false`
+#      （不许伪装成有据，MASTER_RULES 第 11 条）。
+CONTEXT_PACK_VERSION = "qa-context-pack-v1"
+"""Context Pack 组装版本（换组装口径=换版本）：整包与回执都可复算到这个版本号。"""
+
+CONTEXT_UTILITY_VERSION = "qa-context-utility-v1"
+"""ContextUtility 口径版本（§5）：分量定义/权重/词面统计方式变更都要换版本号。"""
+
+CONTEXT_GAP_VERSION = "qa-context-gap-v1"
+"""Context Gap 检测版本（§6）：检测规则与动作映射变更都要换版本号。"""
+
+CONTEXT_SELECTION_VERSION = "qa-context-selection-v1"
+"""selection trace 版本（P08-06）：选择决策的记法变更要换版本号。"""
+
+GROUNDING_VERSION = "qa-grounding-v1"
+"""生成端 grounding 校验版本：校验规则（无证据断言/引用越界/反证漏引）变更要换版本号。"""
+
+CONTEXT_SECTIONS: Tuple[str, ...] = (
+    "system_context", "task_context", "evidence_context", "counter_evidence",
+    "memory_context", "skill_context", "working_memory", "constraints", "budget",
+)
+"""§4 统一 Context Pack 的九段（**逐字**）。本阶段只填 7 段：
+`memory_context` / `skill_context` 是 Phase 09 / Phase 11 的产物，本阶段留
+**空段 + `deferred_to` 标注**（宁缺勿造，不提前实现后续 Phase）。"""
+
+CONTEXT_ITEM_KINDS: Tuple[str, ...] = (
+    "claim", "evidence", "counter_evidence", "gap", "constraint",
+    "task", "system", "memory", "skill", "working_memory",
+)
+"""ContextItem 种类：7 种本阶段可产出 + 3 种（memory/skill/working_memory）本阶段只占位。"""
+
+CONTEXT_ITEM_SOURCES: Tuple[str, ...] = (
+    "evidence_graph", "evidence", "plan", "verification", "gap_analyzer", "request", "config",
+)
+"""ContextItem 的**来源**（provenance 的可读形态）：每一条都必须是上游阶段真实产出物，
+禁止"凭空造一条上下文"。"""
+
+CONTEXT_DECISIONS: Tuple[str, ...] = ("included", "excluded")
+"""selection trace 的两种决策。"""
+
+CONTEXT_SELECTION_REASONS: Tuple[str, ...] = (
+    "MANDATORY_SECTION", "COUNTER_EVIDENCE_RESERVED", "TOP_UTILITY", "DIVERSITY_BONUS",
+    "OVER_TOKEN_BUDGET", "DUPLICATE_IDENTITY", "LOW_UTILITY", "NOT_TASK_RELEVANT",
+    "NO_GROUNDING_SPAN", "SECTION_DEFERRED", "BUDGET_EXHAUSTED",
+)
+"""选择/淘汰原因码（每条决策必须带一个，可复算"为什么这条没进包"）。"""
+
+CONTEXT_GAP_ACTIONS: Tuple[str, ...] = (
+    "REPACK_CONTEXT", "EXPAND_EVIDENCE_SPAN", "LOAD_COUNTEREVIDENCE", "LOAD_SKILL",
+)
+"""§6 Context Gap 的四个动作（**逐字**）：证据已存在但 Agent 没拿到 → 先重组上下文。"""
+
+CONTEXT_GAP_TYPES: Tuple[str, ...] = (
+    "OMITTED_EVIDENCE", "TRUNCATED_SPAN", "MISSING_COUNTEREVIDENCE",
+    "UNGROUNDED_CLAIM", "DUPLICATE_SECTION", "SKILL_NOT_AVAILABLE",
+)
+"""Context Gap 类型六值（本仓库口径，与 §12 的十种 Evidence Gap 严格区分）：
+`OMITTED_EVIDENCE` 证据在图上但没进包；`TRUNCATED_SPAN` 进了包但 span 被截断/摘要不足；
+`MISSING_COUNTEREVIDENCE` 该条结论的反证没进包；`UNGROUNDED_CLAIM` 进包的结论没有可回溯 span；
+`DUPLICATE_SECTION` 同一事实在多个段落重复占用预算；`SKILL_NOT_AVAILABLE` §8 需要的能力
+（contradiction_resolution / citation_verification）属 Phase 11 的 skill_context，本阶段为空段
+——只**标注**这个动作，绝不假装已加载。"""
+
+CONTEXT_UTILITY_FACTORS: Tuple[str, ...] = (
+    "relevance", "evidence_strength", "task_necessity", "freshness", "diversity",
+)
+"""§5 ContextUtility 的五个乘子（**逐字**）：
+`ContextUtility = Relevance × EvidenceStrength × TaskNecessity × Freshness × Diversity / TokenCost`。
+全部 ∈ [0,1]；`TokenCost` 是分母（token 估算，见 `qa_context_pack.estimate_tokens`）。"""
+
+CONTEXT_UTILITY_WEIGHTS = {
+    "relevance": 0.34, "evidence_strength": 0.26, "task_necessity": 0.22,
+    "freshness": 0.10, "diversity": 0.08,
+}
+"""五个乘子取"加权几何平均"时的权重（和为 1）。乘以权重是为了让分数可解释：
+直接把五个 [0,1] 相乘会让任何一个小分量把整条压到 0（实测：一条权威但没有时间戳的证据
+会被 freshness 直接清零），几何平均保留"任一维度为 0 则该维度确实没贡献"的语义，
+但不至于因为一个未知维度把整条证据判死。"""
+
+CONTEXT_GROUNDING_VIOLATIONS: Tuple[str, ...] = (
+    "CLAIM_WITHOUT_EVIDENCE", "CLAIM_WITH_UNVERIFIED_EVIDENCE", "CITATION_NOT_IN_MAP",
+    "CITATION_WITHOUT_SPAN", "NUMBER_WITHOUT_SPAN", "COUNTER_EVIDENCE_OMITTED",
+    "UNMARKED_UNGROUNDED_TEXT",
+)
+"""生成端 grounding 违规码七值（校验用，**不动冻结 schema**）：
+前五条是"无证据断言/引用不上"，后两条是"漏反证/无标注"。
+`blocking` 的判定见 `qa_context_pack.GROUNDING_BLOCKING_VIOLATIONS`。"""
+
+CONTEXT_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "item_id": {"type": "string"},
+        "kind": {"type": "string", "enum": list(CONTEXT_ITEM_KINDS)},
+        "section": {"type": "string", "enum": list(CONTEXT_SECTIONS)},
+        "text": {"type": "string"},
+        "tokens": {"type": "integer", "minimum": 0},
+        "source_stage": {"type": "string", "enum": list(CONTEXT_ITEM_SOURCES) + [""]},
+        "grounding": {
+            "type": "object",
+            "properties": {
+                "grounded": {"type": "boolean"},
+                "evidence_ref": {"type": "string"},
+                "evidence_id": {"type": "string"},
+                "span": {"type": "object"},
+                "source_url": {"type": "string"},
+                "reason": {"type": "string"},
+            },
+            "required": ["grounded"],
+            "additionalProperties": True,
+        },
+        "utility": {"type": "number", "minimum": 0},
+        "utility_factors": {"type": "object"},
+        "claim_id": {"type": "string"},
+        "evidence_ref": {"type": "string"},
+        "metadata": {"type": "object"},
+    },
+    "required": ["item_id", "kind", "section", "text", "tokens", "grounding"],
+    "additionalProperties": True,
+}
+"""ContextItem（P08-01）：每一条上下文都必须能回答"它从哪来、能不能回溯到最小 span"。"""
+
+CONTEXT_EDGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "edge_id": {"type": "string"},
+        "src": {"type": "string"},
+        "dst": {"type": "string"},
+        "relation": {"type": "string",
+                     "enum": ["SUPPORTS", "REFUTES", "DERIVED_FROM", "REQUIRES", "CONSTRAINS"]},
+        "section": {"type": "string"},
+    },
+    "required": ["edge_id", "src", "dst", "relation"],
+    "additionalProperties": True,
+}
+"""Context 图中的边（P08-01）：只表达"这条上下文与哪条 claim/证据/子问题有关系"，
+关系值域取 §3.2 推荐边名的子集（SUPPORTS/REFUTES/DERIVED_FROM/REQUIRES/CONSTRAINS）。"""
+
+CONTEXT_SELECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "trace_version": {"type": "string"},
+        "item_id": {"type": "string"},
+        "kind": {"type": "string", "enum": list(CONTEXT_ITEM_KINDS)},
+        "section": {"type": "string", "enum": list(CONTEXT_SECTIONS)},
+        "decision": {"type": "string", "enum": list(CONTEXT_DECISIONS)},
+        "reason": {"type": "string", "enum": list(CONTEXT_SELECTION_REASONS)},
+        "utility": {"type": "number", "minimum": 0},
+        "utility_factors": {"type": "object"},
+        "tokens": {"type": "integer", "minimum": 0},
+        "reserved": {"type": "boolean"},
+        "budget_after": {"type": "integer", "minimum": 0},
+        "rank": {"type": "integer", "minimum": 0},
+        "detail": {"type": "string"},
+    },
+    "required": ["trace_version", "item_id", "decision", "reason", "tokens"],
+    "additionalProperties": True,
+}
+"""selection trace 的单条记录（P08-06）：同输入同输出，`reason` 必须来自冻结枚举。"""
+
+CONTEXT_GAP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "gap_id": {"type": "string"},
+        "context_gap_type": {"type": "string", "enum": list(CONTEXT_GAP_TYPES)},
+        "claim_id": {"type": "string"},
+        "evidence_ref": {"type": "string"},
+        "section": {"type": "string", "enum": list(CONTEXT_SECTIONS) + [""]},
+        "action": {"type": "string", "enum": list(CONTEXT_GAP_ACTIONS)},
+        "requires_retrieval": {"type": "boolean"},
+        "detail": {"type": "string"},
+        "tokens_recoverable": {"type": "integer", "minimum": 0},
+    },
+    "required": ["gap_id", "context_gap_type", "action", "requires_retrieval"],
+    "additionalProperties": True,
+}
+"""Context Gap（P08-05）：`requires_retrieval` 恒为 False（MASTER_RULES 第 13 条）。"""
+
+CONTEXT_PACK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pack_version": {"type": "string"},
+        "pack_id": {"type": "string"},
+        "built_at": {"type": "string"},
+        "task": {"type": "object"},
+        "sections": {"type": "object"},
+        "items": {"type": "array", "items": CONTEXT_ITEM_SCHEMA},
+        "citation_map": {"type": "object"},
+        "citation_index": {"type": "object"},
+        "grounding": {"type": "object"},
+        "budget": {"type": "object"},
+        "context_gaps": {"type": "array", "items": CONTEXT_GAP_SCHEMA},
+        "selection_trace": {"type": "array", "items": CONTEXT_SELECTION_SCHEMA},
+        "stats": {"type": "object"},
+    },
+    "required": ["pack_version", "sections", "items", "citation_map", "budget", "stats"],
+    "additionalProperties": True,
+}
+"""Context Pack（P08-03）：九段 + 引用索引 + 预算回执 + Context Gap + selection trace。"""
+
+GROUNDING_REPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "grounding_version": {"type": "string"},
+        "checked_claims": {"type": "integer", "minimum": 0},
+        "grounded_claims": {"type": "integer", "minimum": 0},
+        "ungrounded_claims": {"type": "integer", "minimum": 0},
+        "violations": {"type": "array", "items": {"type": "object"}},
+        "violation_counts": {"type": "object"},
+        "blocking": {"type": "boolean"},
+        "blocking_codes": {"type": "array",
+                           "items": {"type": "string", "enum": list(CONTEXT_GROUNDING_VIOLATIONS)}},
+        "note": {"type": "string"},
+    },
+    "required": ["grounding_version", "checked_claims", "violations", "blocking"],
+    "additionalProperties": True,
+}
+"""生成端 grounding 校验回执（不改冻结 FINAL_ANSWER_SCHEMA：只**校验**，不新增字段）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
-            "缺口类型 %d / 优先级分档 %d"
+            "缺口类型 %d / 优先级分档 %d / Context 段 %d / ContextItem 种类 %d / Context Gap 动作 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
@@ -1063,7 +1291,8 @@ def describe() -> str:
                len(QUERY_INTENTS), len(EXECUTION_NODE_KINDS),
                len(EVIDENCE_GRAPH_NODE_TYPES), len(EVIDENCE_GRAPH_RELATIONSHIPS),
                len(CONTRADICTION_RESOLUTION_CODES),
-               len(QA_GAP_TYPES), len(GAP_PRIORITY_BANDS)))
+               len(QA_GAP_TYPES), len(GAP_PRIORITY_BANDS),
+               len(CONTEXT_SECTIONS), len(CONTEXT_ITEM_KINDS), len(CONTEXT_GAP_ACTIONS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -1135,6 +1364,13 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "next_hop": NEXT_HOP_SCHEMA,
         "gap_loop_round": GAP_LOOP_ROUND_SCHEMA,
         "gap_loop": GAP_LOOP_SCHEMA,
+        # Phase 08（P08-01…P08-06）
+        "context_item": CONTEXT_ITEM_SCHEMA,
+        "context_edge": CONTEXT_EDGE_SCHEMA,
+        "context_selection": CONTEXT_SELECTION_SCHEMA,
+        "context_gap": CONTEXT_GAP_SCHEMA,
+        "context_pack": CONTEXT_PACK_SCHEMA,
+        "grounding_report": GROUNDING_REPORT_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

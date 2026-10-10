@@ -218,3 +218,9 @@
 |P07-04|无增益收敛与五停止原因|`python -m pytest tests/test_qa_phase07_convergence.py tests/test_qa_phase07_pipeline.py -q`|连续两轮无增益得 NO_GAIN；unresolved 得 UNRESOLVABLE_CONTRADICTION；五值可产出|**20 + 16 passed**；五值齐备用例；真机复算 NO_GAIN 13/13、构造用例复现 UNRESOLVABLE|PASS|`baseline/qa-gap-acceptance.json`|
 |P07-R1|执行图占位升级（P07）|`python -m pytest tests -q -k phase05`|gap_loop 由 deferred 改已实现、三路径都有、开关关标 skipped|节点 `implemented=True`、stage=level1_retrieval、model_tier=rule；开关关时 skipped 且不进关键路径估算；Phase 05 用例同步通过|PASS|`qa_execution_graph.py`|
 |P07-R2|冻结契约与零迁移|`python -m pytest tests/test_qa_phase07_contracts.py -q`|七指纹不变、枚举不扩、仍 v7、无网络与模型痕迹|**15 passed**；七指纹与 P00-02 逐字相同；QA_STOP_REASONS 仍 5 值（只补产出路径）；无新表新列；AST 守门通过|PASS|同上|
+|P08-01/02|ContextItem/Graph 与 token 预算|`python -m pytest tests -q -k phase08`|项可寻址、预算裁剪确定且可复算|**117 passed**；预算 600 时 18477→7024（保留 38.0%、裁 75 条）、1200 时 18477→12241（保留 66.2%）；6000 以上不裁（真机数据装得下）|PASS|`qa_context_pack.py`；`baseline/qa-context-acceptance.json`|
+|P08-03|Context Pack 与引用标注|`python -m pytest tests/test_qa_phase08_grounding.py -q`|引用必须回溯到 Phase 02 最小 span|真机 **93/93 = 1.0** 可回溯，逐条复算 span 与正文切片相等全部成立；23 例|PASS|同上|
+|P08-04|反证预留|`python -m pytest tests/test_qa_phase08_counter.py -q`|预算为反驳侧留额度|真机 0 对象（qa_conflicts 与 REFUTES 边全 0），能力证据来自构造用例；10 例|PASS|同上|
+|P08-05/06|Context Gap 与 selection trace|`python -m pytest tests/test_qa_phase08_gaps.py tests/test_qa_phase08_trace.py -q`|缺口给动作、逐项记录入选与被裁原因|真机 TRUNCATED_SPAN 12 / SKILL_NOT_AVAILABLE 9 / UNGROUNDED_CLAIM 6，**触发新检索 0 条**；21 例|PASS|同上|
+|P08-R1|生成端 grounding 校验|`python -m pytest tests/test_qa_phase08_grounding.py -q`|无证据断言必须被拦或标注|真机 13 条最终答案：阻断级违规 0（真机分母 0）、85 处数字不在被引用 span 内、40 条 claim 引用了未验证支持，13/13 全部显式标注；构造注入（抹证据绑定、包外引用、span 外数字）各 13/13 检出、拦截率 1.0|PASS|同上|
+|P08-R2|冻结契约与基线|`python -m pytest tests/test_qa_phase08_contracts.py -q`|七指纹不变、不改冻结 schema|**20 passed**；全量 2428 passed / 1 skipped / 0 failed（Phase 07 基线 2311+1 未破）；零迁移|PASS|同上|

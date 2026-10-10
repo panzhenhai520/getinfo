@@ -19,8 +19,8 @@ from qa_evidence import (
     load_seen, record_seen,
 )
 from qa_graph_contracts import (
-    QA_ROUTE_GRAPH, QA_ROUTE_GRAPH_ATTRIBUTE, QA_ROUTE_KEYWORD, QA_ROUTE_PAGE_CONTEXT,
-    QA_ROUTE_POLICY_EXACT, QA_ROUTE_SEMANTIC, QA_ROUTE_WEB,
+    CONTEXT_PACK_VERSION, QA_ROUTE_GRAPH, QA_ROUTE_GRAPH_ATTRIBUTE, QA_ROUTE_KEYWORD,
+    QA_ROUTE_PAGE_CONTEXT, QA_ROUTE_POLICY_EXACT, QA_ROUTE_SEMANTIC, QA_ROUTE_WEB,
 )
 from qa_level1 import QaLevel1Generator, empty_level1_result
 from qa_orchestrator import QaStageFailure
@@ -46,6 +46,7 @@ from qa_gap_analyzer import (
     GAP_ANALYZER_VERSION, GapLoopState, gap_analyzer_enabled, gap_summary,
     plan_next_hops, review_graph as review_gap_graph,
 )
+from qa_context_pack import context_pack_enabled
 from qa_verifier import (
     VERIFIER_VERSION, verification_cache, verification_of, verifier_enabled,
     verify_claim_graph, verify_evidence_batch,
@@ -737,6 +738,29 @@ def _build_evidence_graph_layer(graph: dict, *, plan: Mapping | None, run_meta: 
                 "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
+def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
+                              run_meta: Mapping, working_memory: Mapping | None = None) -> dict:
+    """阶段 08（P08-01…P08-06）：按任务组装最小有效 Context Pack。
+
+    **只加不改**：结果挂在 `graph["context_pack"]` 这个兄弟键上（Phase 06 的
+    `graph["evidence_graph"]`、Phase 07 的 `stats["gap_loop"]` 同样手法），
+    既有的 claims/evidence/edges/conflicts 键集与冻结契约一个字不动。
+    关掉 `QA_CONTEXT_PACK`（默认关）时本函数一次都不被调用，行为逐字回到接线前。
+    任何异常都吞掉并记账：组装上下文绝不能把整条 run 打断。
+    """
+    try:
+        from qa_context_pack import build_context_pack, context_pack_receipt
+
+        pack = build_context_pack(graph=graph, plan=plan, request=request,
+                                  working_memory=working_memory,
+                                  run_id=str(run_meta.get("id") or ""))
+        pack["receipt"] = context_pack_receipt(pack)
+        return pack
+    except Exception as exc:  # noqa: BLE001
+        return {"pack_version": CONTEXT_PACK_VERSION,
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+
 def _attach_gap_review(graph: Mapping, layer: dict, *, plan: Mapping | None,
                        previous_stop_reason: str = "") -> dict:
     """阶段 07（P07-06）：在证据图上做一次缺口复核，结果挂 `layer["gap_review"]`。
@@ -763,6 +787,34 @@ def _gap_stop_reason_from_level1(context: Mapping) -> str:
     stats = level1.get("stats") if isinstance(level1, Mapping) else {}
     receipt = stats.get("gap_loop") if isinstance(stats, Mapping) else {}
     return str((receipt or {}).get("stop_reason") or "") if isinstance(receipt, Mapping) else ""
+
+
+def _context_working_memory(context: Mapping) -> dict:
+    """阶段 08：`working_memory` 段的素材 —— 只读**既有回执**，不新增事实。
+
+    取三样已经存在的东西：① 检索规模（取到几条证据）；② 缺口循环的停止原因；
+    ③ 核验分布。它们是"这一轮已经做到哪一步"的可信快照，正好是 §4 working_memory 要的内容。
+    缺什么就少什么（不会编默认值）。
+    """
+    outputs = context.get("outputs") if isinstance(context, Mapping) else {}
+    outputs = outputs if isinstance(outputs, Mapping) else {}
+    level1 = outputs.get("level1_retrieval") if isinstance(outputs.get("level1_retrieval"), Mapping) else {}
+    stats = level1.get("stats") if isinstance(level1.get("stats"), Mapping) else {}
+    working: dict = {}
+    evidence = level1.get("evidence") or []
+    if evidence:
+        working["已取到证据"] = len(evidence)
+    gap_loop = stats.get("gap_loop") if isinstance(stats.get("gap_loop"), Mapping) else {}
+    if gap_loop.get("stop_reason"):
+        working["缺口循环停止原因"] = str(gap_loop.get("stop_reason"))
+    verification = stats.get("verification") if isinstance(stats.get("verification"), Mapping) else {}
+    if verification.get("checked"):
+        working["已核验证据"] = int(verification.get("checked") or 0)
+        working["确认支持"] = int(verification.get("supported") or 0)
+    fleet = stats.get("hunter_fleet") if isinstance(stats.get("hunter_fleet"), Mapping) else {}
+    if fleet.get("hunters"):
+        working["检索通道数"] = len(fleet.get("hunters") or [])
+    return working
 
 
 def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping) -> int:
@@ -2741,6 +2793,14 @@ def build_qa_stage_handlers(
                     plan=(plan_output if isinstance(plan_output, Mapping) else {}),
                     previous_stop_reason=_gap_stop_reason_from_level1(context))
             graph["evidence_graph"] = evidence_graph
+        # 阶段 08（P08-01…P08-06）：按任务组装最小有效上下文包（默认关；结果挂兄弟键）。
+        # 放在这里而不是 synthesis：`conflict_review` 的输出会整体落进 qa_stage_runs.details_json，
+        # 于是上下文包连同 selection trace **免费持久化**（Phase 06 同样的手法，零迁移）。
+        if context_pack_enabled():
+            graph["context_pack"] = _build_context_pack_layer(
+                graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
+                request=context["request"], run_meta=context["run"],
+                working_memory=_context_working_memory(context))
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
             message = (f"证据图已建立：{len(graph.get('claims') or [])} 条结论、"
@@ -2786,9 +2846,34 @@ def build_qa_stage_handlers(
                         graph, graph["evidence_graph"],
                         plan=(context["outputs"].get("plan") or {}),
                         previous_stop_reason=_gap_stop_reason_from_level1(context))
+            if context_pack_enabled():
+                # 阶段 08：fast 路径同样组装上下文包（口径与 standard/deep 一致，只是没有 level2 计划）
+                graph["context_pack"] = _build_context_pack_layer(
+                    graph, plan=(context["outputs"].get("plan") or {}),
+                    request=context["request"], run_meta=run,
+                    working_memory=_context_working_memory(context))
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])
+        # 阶段 08：上下文包（若已组装）就是生成端的唯一证据视图；组装失败一律当没有，
+        # 于是生成端逐字回到接线前的行为（回滚口径）。
+        context_pack = graph.get("context_pack") if isinstance(graph, Mapping) else None
+        if not isinstance(context_pack, Mapping) or context_pack.get("error"):
+            context_pack = None
+        elif callable(context.get("_emit_stage_event")):
+            receipt = context_pack.get("receipt") if isinstance(context_pack.get("receipt"), Mapping) else {}
+            budget = receipt.get("budget") if isinstance(receipt.get("budget"), Mapping) else {}
+            context["_emit_stage_event"]("stage_progress", {
+                "message": ("上下文包 %s：%d 条 / %s token（裁剪前 %s），引用 %s 条，"
+                            "上下文缺口 %s 条（触发检索 %s 条）" % (
+                                receipt.get("pack_id") or context_pack.get("pack_id"),
+                                receipt.get("items") or 0, budget.get("used"),
+                                budget.get("estimated_tokens_before"),
+                                receipt.get("citations") or 0,
+                                sum((receipt.get("context_gaps") or {}).values()),
+                                receipt.get("retrieval_requested") or 0)),
+                "context_pack": receipt,
+            })
         retrieval_mode = str((context["outputs"].get("level2_retrieval") or {}).get("rag_mode") or "")
         if not retrieval_mode:
             retrieval_mode = "RAG增强检索" if (context["outputs"].get("level2_retrieval") or {}).get("enhanced") else "RAG检索"
@@ -2837,6 +2922,7 @@ def build_qa_stage_handlers(
                 graph=graph, level1=level1, level2=level2,
                 degradation=degradation, profile=profile, models=models,
                 token_callback=_token_callback if callable(emit_stage_event) else None,
+                context_pack=context_pack,
             )
             resilience.circuit_success(dependency)
             return result

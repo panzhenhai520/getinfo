@@ -1,0 +1,1517 @@
+{
+ "report_version": "qa-context-acceptance-v1",
+ "captured_at_utc": "2026-10-10T21:19:12Z",
+ "source": {
+  "snapshot": "baseline\\qa-context-real-sample.json",
+  "snapshot_version": "qa-context-real-sample-v1",
+  "captured_at_utc": "2026-10-10T20:57:51Z",
+  "access": "readonly (BEGIN READ ONLY + statement_timeout=20s + LIMIT)",
+  "host": "117.50.211.93",
+  "note": "离线复算：真机 run 早于本阶段接线，上下文包是按同一份代码在同一份真实证据上现装的；线上行为见 tests/test_qa_phase08_pipeline.py"
+ },
+ "params": {
+  "budget": 6000,
+  "reserve": 0.2,
+  "estimator": "qa-token-estimate-v1",
+  "pack_version": "qa-context-pack-v1",
+  "grounding_version": "qa-grounding-v1",
+  "utility_version": "qa-context-utility-v1"
+ },
+ "runs": [
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "mode": "standard",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "claims": 3,
+   "evidence": 3,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 355,
+   "tokens_after": 355,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 3,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "TRUNCATED_SPAN": 1
+   },
+   "context_gap_actions": {
+    "EXPAND_EVIDENCE_SPAN": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 11,
+    "included": 11,
+    "excluded": 0,
+    "reason_distribution": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 4
+    },
+    "included_reasons": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 4
+    },
+    "reserved_included": 0,
+    "tokens_included": 355,
+    "avg_utility_included": 0.0229119
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 4,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 1,
+    "ungrounded_claims": 1,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 4,
+    "number_not_in_full_excerpt": 3
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "mode": "standard",
+   "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+   "claims": 12,
+   "evidence": 6,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 1703,
+   "tokens_after": 1703,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 6,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "TRUNCATED_SPAN": 2,
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "EXPAND_EVIDENCE_SPAN": 2,
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 17,
+    "included": 17,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 10,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 10,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 1703,
+    "avg_utility_included": 0.01348784
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 4,
+     "NUMBER_WITHOUT_SPAN": 2
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 4,
+    "ungrounded_claims": 4,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 2,
+    "number_not_in_full_excerpt": 1
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "mode": "standard",
+   "question": "最近一周最重要的技术进展是什么",
+   "claims": 6,
+   "evidence": 2,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 691,
+   "tokens_after": 691,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 2,
+   "traceable_rate": 1.0,
+   "context_gaps": {},
+   "context_gap_actions": {},
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 11,
+    "included": 11,
+    "excluded": 0,
+    "reason_distribution": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 4
+    },
+    "included_reasons": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 4
+    },
+    "reserved_included": 0,
+    "tokens_included": 691,
+    "avg_utility_included": 0.02213498
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 14,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 2
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 2,
+    "ungrounded_claims": 2,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 14,
+    "number_not_in_full_excerpt": 2
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "239ba38b18ee456f8a0d2304ec6ac342",
+   "skipped": "缺少问题或可用证据",
+   "claims": 0,
+   "evidence": 0
+  },
+  {
+   "run_id": "2af7dd7fed684803ad0572f82d8ce042",
+   "skipped": "缺少问题或可用证据",
+   "claims": 0,
+   "evidence": 0
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "mode": "standard",
+   "question": "帮我总结一下当前行业的主要风险",
+   "claims": 9,
+   "evidence": 3,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 954,
+   "tokens_after": 954,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 3,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "SKILL_NOT_AVAILABLE": 1,
+    "TRUNCATED_SPAN": 1
+   },
+   "context_gap_actions": {
+    "EXPAND_EVIDENCE_SPAN": 1,
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 13,
+    "included": 13,
+    "excluded": 0,
+    "reason_distribution": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 6
+    },
+    "included_reasons": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 6
+    },
+    "reserved_included": 0,
+    "tokens_included": 954,
+    "avg_utility_included": 0.01935196
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 10,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 3
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 3,
+    "ungrounded_claims": 3,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 10,
+    "number_not_in_full_excerpt": 1
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "4d89571a535142fcbb2249c654592323",
+   "skipped": "缺少问题或可用证据",
+   "claims": 0,
+   "evidence": 0
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "mode": "standard",
+   "question": "出货量超1.9万台，占全球约77.9%的是什么",
+   "claims": 12,
+   "evidence": 12,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 2001,
+   "tokens_after": 2001,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 12,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "TRUNCATED_SPAN": 2,
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "EXPAND_EVIDENCE_SPAN": 2,
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 23,
+    "included": 23,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 16,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 16,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 2001,
+    "avg_utility_included": 0.01093749
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 9,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 1,
+    "ungrounded_claims": 1,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 9,
+    "number_not_in_full_excerpt": 5
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "mode": "standard",
+   "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+   "claims": 12,
+   "evidence": 12,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 2732,
+   "tokens_after": 2732,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 12,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 23,
+    "included": 23,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 16,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 16,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 2732,
+    "avg_utility_included": 0.01209979
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 4,
+     "NUMBER_WITHOUT_SPAN": 2
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 4,
+    "ungrounded_claims": 4,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 2,
+    "number_not_in_full_excerpt": 1
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+   "skipped": "缺少问题或可用证据",
+   "claims": 0,
+   "evidence": 0
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "mode": "standard",
+   "question": "这个行业最近最大的一笔融资是多少",
+   "claims": 6,
+   "evidence": 2,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 710,
+   "tokens_after": 710,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 2,
+   "traceable_rate": 1.0,
+   "context_gaps": {},
+   "context_gap_actions": {},
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 11,
+    "included": 11,
+    "excluded": 0,
+    "reason_distribution": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 4
+    },
+    "included_reasons": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 4
+    },
+    "reserved_included": 0,
+    "tokens_included": 710,
+    "avg_utility_included": 0.02217579
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 7,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 2
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 2,
+    "ungrounded_claims": 2,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 7,
+    "number_not_in_full_excerpt": 2
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "mode": "standard",
+   "question": "特斯拉无人驾驶出租车已经在运行了吗",
+   "claims": 6,
+   "evidence": 1,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 408,
+   "tokens_after": 408,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 1,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "UNGROUNDED_CLAIM": 1
+   },
+   "context_gap_actions": {
+    "REPACK_CONTEXT": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 10,
+    "included": 10,
+    "excluded": 0,
+    "reason_distribution": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 3
+    },
+    "included_reasons": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 3
+    },
+    "reserved_included": 0,
+    "tokens_included": 408,
+    "avg_utility_included": 0.02610536
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 2,
+     "NUMBER_WITHOUT_SPAN": 1
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 2,
+    "ungrounded_claims": 2,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 1,
+    "number_not_in_full_excerpt": 1
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "mode": "standard",
+   "question": "行业里排名靠前的公司最近有什么动作",
+   "claims": 9,
+   "evidence": 3,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 967,
+   "tokens_after": 967,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 3,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 13,
+    "included": 13,
+    "excluded": 0,
+    "reason_distribution": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 6
+    },
+    "included_reasons": {
+     "MANDATORY_SECTION": 7,
+     "TOP_UTILITY": 6
+    },
+    "reserved_included": 0,
+    "tokens_included": 967,
+    "avg_utility_included": 0.01870618
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 14,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 3
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 3,
+    "ungrounded_claims": 3,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 14,
+    "number_not_in_full_excerpt": 4
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "skipped": "缺少问题或可用证据",
+   "claims": 0,
+   "evidence": 0
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "mode": "standard",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "claims": 12,
+   "evidence": 7,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 1785,
+   "tokens_after": 1785,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 7,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 18,
+    "included": 18,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 11,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 11,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 1785,
+    "avg_utility_included": 0.015856
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 4,
+     "NUMBER_WITHOUT_SPAN": 4
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 4,
+    "ungrounded_claims": 4,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 4,
+    "number_not_in_full_excerpt": 3
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "mode": "standard",
+   "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+   "claims": 15,
+   "evidence": 15,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 2303,
+   "tokens_after": 2303,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 15,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "UNGROUNDED_CLAIM": 3,
+    "TRUNCATED_SPAN": 2,
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "REPACK_CONTEXT": 3,
+    "EXPAND_EVIDENCE_SPAN": 2,
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 27,
+    "included": 27,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 20,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 20,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 2303,
+    "avg_utility_included": 0.01301111
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 5,
+     "NUMBER_WITHOUT_SPAN": 1
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 5,
+    "ungrounded_claims": 5,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 1,
+    "number_not_in_full_excerpt": 1
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "mode": "standard",
+   "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+   "claims": 15,
+   "evidence": 15,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 1387,
+   "tokens_after": 1387,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 15,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "TRUNCATED_SPAN": 2,
+    "UNGROUNDED_CLAIM": 2,
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "EXPAND_EVIDENCE_SPAN": 2,
+    "REPACK_CONTEXT": 2,
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 27,
+    "included": 27,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 20,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 20,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 1387,
+    "avg_utility_included": 0.01140923
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 9,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 5
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 5,
+    "ungrounded_claims": 5,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 9,
+    "number_not_in_full_excerpt": 4
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  },
+  {
+   "run_id": "d83ab463596747b6971ccebff3661d63",
+   "skipped": "缺少问题或可用证据",
+   "claims": 0,
+   "evidence": 0
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "mode": "standard",
+   "question": "最近工信部在人形机器人领域有什么动态",
+   "claims": 12,
+   "evidence": 12,
+   "verified": 0,
+   "verify_error": "TypeError: verify_evidence_batch() got an unexpected keyword argument 'claims'",
+   "tokens_before": 2481,
+   "tokens_after": 2481,
+   "trimmed_items": 0,
+   "trim_reasons": {},
+   "counter_evidence": 0,
+   "counter_evidence_used": 0,
+   "citations": 12,
+   "traceable_rate": 1.0,
+   "context_gaps": {
+    "TRUNCATED_SPAN": 2,
+    "SKILL_NOT_AVAILABLE": 1
+   },
+   "context_gap_actions": {
+    "EXPAND_EVIDENCE_SPAN": 2,
+    "LOAD_SKILL": 1
+   },
+   "retrieval_requested": 0,
+   "selection": {
+    "trace_version": "qa-context-selection-v1",
+    "rows": 23,
+    "included": 23,
+    "excluded": 0,
+    "reason_distribution": {
+     "TOP_UTILITY": 16,
+     "MANDATORY_SECTION": 7
+    },
+    "included_reasons": {
+     "TOP_UTILITY": 16,
+     "MANDATORY_SECTION": 7
+    },
+    "reserved_included": 0,
+    "tokens_included": 2481,
+    "avg_utility_included": 0.01565481
+   },
+   "grounding": {
+    "blocking": false,
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 8,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 4
+    },
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "checked_claims": 4,
+    "ungrounded_claims": 4,
+    "status_before": "partial",
+    "status_after": "partial",
+    "marked": true,
+    "number_strict": 8,
+    "number_not_in_full_excerpt": 4
+   },
+   "injections": [
+    {
+     "variant": "A_no_evidence_binding",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CLAIM_WITHOUT_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "B_out_of_pack_ref",
+     "detected": true,
+     "blocking": true,
+     "codes": [
+      "CITATION_NOT_IN_MAP",
+      "CITATION_WITHOUT_SPAN",
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    },
+    {
+     "variant": "C_number_outside_span",
+     "detected": true,
+     "blocking": false,
+     "codes": [
+      "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+      "NUMBER_WITHOUT_SPAN"
+     ],
+     "status_before": "partial",
+     "status_after": "partial",
+     "marked": true
+    }
+   ]
+  }
+ ],
+ "budget_ladder": {
+  "600": {
+   "runs": 13,
+   "tokens_before": 18477,
+   "tokens_after": 7024,
+   "trimmed": 75,
+   "counter_used": 0,
+   "citations": 38,
+   "gaps": 37,
+   "retrieval_requested": 0,
+   "duplicates_collapsed": 86,
+   "trim_reasons": {
+    "OVER_TOKEN_BUDGET": 75
+   },
+   "kept_rate": 0.380148
+  },
+  "1200": {
+   "runs": 13,
+   "tokens_before": 18477,
+   "tokens_after": 12241,
+   "trimmed": 32,
+   "counter_used": 0,
+   "citations": 66,
+   "gaps": 35,
+   "retrieval_requested": 0,
+   "duplicates_collapsed": 86,
+   "trim_reasons": {
+    "OVER_TOKEN_BUDGET": 32
+   },
+   "kept_rate": 0.662499
+  },
+  "3000": {
+   "runs": 13,
+   "tokens_before": 18477,
+   "tokens_after": 18477,
+   "trimmed": 0,
+   "counter_used": 0,
+   "citations": 93,
+   "gaps": 27,
+   "retrieval_requested": 0,
+   "duplicates_collapsed": 86,
+   "trim_reasons": {},
+   "kept_rate": 1.0
+  },
+  "6000": {
+   "runs": 13,
+   "tokens_before": 18477,
+   "tokens_after": 18477,
+   "trimmed": 0,
+   "counter_used": 0,
+   "citations": 93,
+   "gaps": 27,
+   "retrieval_requested": 0,
+   "duplicates_collapsed": 86,
+   "trim_reasons": {},
+   "kept_rate": 1.0
+  },
+  "12000": {
+   "runs": 13,
+   "tokens_before": 18477,
+   "tokens_after": 18477,
+   "trimmed": 0,
+   "counter_used": 0,
+   "citations": 93,
+   "gaps": 27,
+   "retrieval_requested": 0,
+   "duplicates_collapsed": 86,
+   "trim_reasons": {},
+   "kept_rate": 1.0
+  }
+ },
+ "totals": {
+  "runs_scored": 13,
+  "runs_skipped": 6,
+  "runs_without_grounding": 6,
+  "tokens_before": 18477,
+  "tokens_after": 18477,
+  "trimmed_items": 0,
+  "trim_reasons": {},
+  "citations": 93,
+  "refutes_edges": 0,
+  "counter_evidence_items": 0,
+  "traceable_rate": 1.0,
+  "context_gap_types": {
+   "TRUNCATED_SPAN": 12,
+   "SKILL_NOT_AVAILABLE": 9,
+   "UNGROUNDED_CLAIM": 6
+  },
+  "context_gap_actions": {
+   "EXPAND_EVIDENCE_SPAN": 12,
+   "LOAD_SKILL": 9,
+   "REPACK_CONTEXT": 6
+  },
+  "retrieval_requested": 0,
+  "grounding_checked": 13,
+  "grounding_blocking": 0,
+  "grounding_blocking_rate": 0.0,
+  "grounding_marked": 13,
+  "grounding_status_downgraded": 0,
+  "grounding_interception_rate": null,
+  "grounding_violations": {
+   "NUMBER_WITHOUT_SPAN": 85,
+   "CLAIM_WITH_UNVERIFIED_EVIDENCE": 40
+  },
+  "grounding_number_strict": 85,
+  "grounding_number_not_in_full_excerpt": 32
+ },
+ "injection": {
+  "A_no_evidence_binding": {
+   "cases": 13,
+   "detected": 13,
+   "blocking": 13,
+   "marked": 13,
+   "codes": {
+    "CLAIM_WITHOUT_EVIDENCE": 13,
+    "NUMBER_WITHOUT_SPAN": 13
+   },
+   "blocked_rate": 1.0
+  },
+  "B_out_of_pack_ref": {
+   "cases": 13,
+   "detected": 13,
+   "blocking": 13,
+   "marked": 13,
+   "codes": {
+    "CITATION_NOT_IN_MAP": 13,
+    "CITATION_WITHOUT_SPAN": 13,
+    "NUMBER_WITHOUT_SPAN": 13,
+    "CLAIM_WITH_UNVERIFIED_EVIDENCE": 11
+   },
+   "blocked_rate": 1.0
+  },
+  "C_number_outside_span": {
+   "cases": 13,
+   "detected": 13,
+   "blocking": 0,
+   "marked": 13,
+   "codes": {
+    "CLAIM_WITH_UNVERIFIED_EVIDENCE": 13,
+    "NUMBER_WITHOUT_SPAN": 13
+   },
+   "blocked_rate": 1.0
+  }
+ },
+ "acceptance": {
+  "traceability_ok": true,
+  "context_gap_never_triggers_retrieval": true,
+  "budget_respected": true,
+  "trim_is_deterministic": true,
+  "grounding_rate_measured": true,
+  "injection_blocked_rate": 1.0,
+  "passed": true
+ }
+}

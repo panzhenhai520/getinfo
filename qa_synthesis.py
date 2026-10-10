@@ -14,6 +14,13 @@ from typing import Callable, Mapping
 import requests
 
 from qa_contracts import QA_CONTRACT_VERSION, QaContractError, validate_final_answer
+from qa_context_pack import (
+    build_prompt_blocks,
+    check_grounding,
+    grounding_gate_enabled,
+    mark_ungrounded_answer,
+    normalize_evidence_layer,
+)
 from qa_level1 import (
     OpenAIJsonModelClient,
     _client_last_usage,
@@ -364,6 +371,27 @@ def _filter_claims_to_refs(claims: list[dict], refs: set[str]) -> list[dict]:
         item["evidence_refs"] = kept_refs
         filtered.append(item)
     return filtered
+
+
+def _packed_claims(claims: list[dict], refs: set[str]) -> list[dict]:
+    """按上下文包收窄结论（阶段 08）：只丢"证据被裁掉"的结论。
+
+    **没有 evidence_ref 的结论必须保留**：它们是"证据不足"那一类，生成端要看见并显式标注
+    【无证据】，而不是被悄悄过滤掉（过滤掉等于把无据结论藏起来，反而更危险）。
+    """
+    if not refs:
+        return list(claims)
+    kept = []
+    for claim in claims:
+        claim_refs = [str(ref) for ref in claim.get("evidence_refs") or []]
+        if not claim_refs:
+            kept.append(dict(claim))
+            continue
+        item = dict(claim)
+        item["evidence_refs"] = [ref for ref in claim_refs if ref in refs]
+        if item["evidence_refs"]:
+            kept.append(item)
+    return kept
 
 
 def _filter_conflicts_to_refs(conflicts: list[Mapping], refs: set[str]) -> list[dict]:
@@ -1073,7 +1101,7 @@ class QaFinalSynthesizer:
         self.model_client = model_client or OpenAIJsonModelClient()
 
     @staticmethod
-    def _messages(*, question: str, graph: Mapping, level1: Mapping, level2: Mapping, degradation: list, repair_error: str = "", prior: str = "") -> list[dict]:
+    def _messages(*, question: str, graph: Mapping, level1: Mapping, level2: Mapping, degradation: list, repair_error: str = "", prior: str = "", context_pack: Mapping | None = None) -> list[dict]:
         claims = _eligible_claims(graph)
         evidence = list(graph.get("evidence") or [])
         conflicts = list(graph.get("conflicts") or [])
@@ -1082,6 +1110,18 @@ class QaFinalSynthesizer:
             official_refs = {str(item.get("evidence_ref")) for item in evidence}
             claims = _filter_claims_to_refs(claims, official_refs)
             conflicts = _filter_conflicts_to_refs(conflicts, official_refs)
+        # 阶段 08（P08-03）：上下文包是生成端的**唯一证据视图**（§4：Answer Composer 主要看到
+        # Verified Claims / Primary+Counter Evidence / Citation Map）——包内没有的证据不进提示，
+        # 引用编号也直接取包里的（包内编号与 `_citation_map` 同口径，有守门用例钉等值）。
+        pack_refs = set()
+        if isinstance(context_pack, Mapping) and isinstance(context_pack.get("citation_map"), Mapping):
+            pack_refs = {str(ref) for ref in context_pack["citation_map"].values() if str(ref)}
+        if pack_refs:
+            packed = [item for item in evidence if str(item.get("evidence_ref")) in pack_refs]
+            if packed:
+                evidence = packed
+                claims = _packed_claims(claims, pack_refs)
+                conflicts = _filter_conflicts_to_refs(conflicts, pack_refs)
         citation_map = _citation_map(evidence)
         compact_evidence = [{
             "evidence_ref": item.get("evidence_ref"), "title": item.get("title"),
@@ -1108,6 +1148,17 @@ class QaFinalSynthesizer:
             "如果用户在 question 中提供“用户调整意见”，必须优先服从该意见并调整回答组织方式；"
             "如果是“用户确认”继续，则沿用此前计划，不要把确认语当作新问题。"
         )
+        pack_blocks = build_prompt_blocks(context_pack) if isinstance(context_pack, Mapping) else {}
+        if pack_blocks:
+            # 阶段 08（P08-03 + 生成端约束）：把"无证据断言"的拦法**写在提示里**——
+            # 引用只许用包内引用索引的 [n]；包内没有证据的内容必须显式标注【无证据】。
+            system += (
+                "本轮附带的 context_pack 是唯一可用的上下文包："
+                "正文引用只允许使用 context_pack.引用索引 里的 [n]；"
+                "引用索引之外的 [n] 与包外 evidence_ref 一律视为引用错误；"
+                "包内没有证据支持的句子必须显式写上【无证据】；"
+                "context_pack.反证 与 上下文缺口 必须展示，不得只讲支持性结论。"
+            )
         required = {
             "contract_version": QA_CONTRACT_VERSION,
             "status": "ready|partial|insufficient_evidence",
@@ -1135,6 +1186,8 @@ class QaFinalSynthesizer:
             "level2_gaps": list(level2.get("evidence_gaps") or []),
             "degradation": list(degradation or []), "required_shape": required,
         }
+        if pack_blocks:
+            body["context_pack"] = pack_blocks
         user = json.dumps(body, ensure_ascii=False)
         if repair_error:
             user += "\n只修复 JSON，不增加任何事实：" + repair_error[:1000] + "\n原输出：" + prior[:20000]
@@ -1151,8 +1204,10 @@ class QaFinalSynthesizer:
         profile,
         models: Mapping,
         token_callback: Callable[[str], None] | None = None,
+        context_pack: Mapping | None = None,
     ) -> dict:
-        messages = self._messages(question=question, graph=graph, level1=level1, level2=level2, degradation=degradation)
+        messages = self._messages(question=question, graph=graph, level1=level1, level2=level2,
+                                  degradation=degradation, context_pack=context_pack)
         # 本阶段的模型用量：首答 + 引用修复重试逐次收集，最后累加（拿不到就不挂该键）
         usage_parts: list[dict] = []
 
@@ -1224,11 +1279,23 @@ class QaFinalSynthesizer:
         for attempt in range(2):
             try:
                 parsed = extract_json_object(raw)
-                result = self._lock_to_graph(parsed, graph, level1, level2, degradation, models, question=question)
+                result = self._lock_to_graph(parsed, graph, level1, level2, degradation, models,
+                                             question=question, context_pack=context_pack)
                 source_text = json.dumps({"claims": result["claims"], "evidence": result["evidence"]}, ensure_ascii=False)
                 unsupported = _unsupported_numbers(result["answer"], source_text)
                 if unsupported:
                     raise QaContractError("最终答案包含证据外数字: " + ", ".join(unsupported[:10]))
+                # 阶段 08（生成端约束）：出包前先过 grounding 闸门。
+                # 第一次不过 → 抛错触发**修复重试**（真正的"拦住"：把违规回炉给模型）；
+                # 第二次仍不过 → **显式标注**（status 降 partial + 正文【无证据】+ degradation_reasons），
+                # 绝不静默放行（MASTER_RULES 第 11 条）。校验只读，冻结 schema 一个字段都不加。
+                report = self._grounding_report(result, context_pack=context_pack, graph=graph)
+                if report and report.get("blocking") and attempt == 0:
+                    raise QaContractError("生成端 grounding 未通过: " + "; ".join(
+                        str(item.get("detail") or item.get("code"))
+                        for item in (report.get("violations") or [])[:5]))
+                if report and report.get("violations"):
+                    result = mark_ungrounded_answer(result, report, pack=context_pack)
                 return _finalize(validate_final_answer(result))
             except (QaContractError, KeyError, TypeError, ValueError) as exc:
                 last_error = exc
@@ -1239,6 +1306,7 @@ class QaFinalSynthesizer:
                     self._messages(
                         question=question, graph=graph, level1=level1, level2=level2,
                         degradation=degradation, repair_error=str(exc), prior=str(raw),
+                        context_pack=context_pack,
                     ),
                     timeout=(
                         _int_env("QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS", 6, 3, 120)
@@ -1268,7 +1336,30 @@ class QaFinalSynthesizer:
         ))
 
     @staticmethod
-    def _lock_to_graph(parsed: Mapping, graph: Mapping, level1: Mapping, level2: Mapping, degradation: list, models: Mapping, *, question: str = "") -> dict:
+    def _grounding_report(result: Mapping, *, context_pack: Mapping | None, graph: Mapping | None) -> dict:
+        """生成端 grounding 校验（默认关；打开后返回回执）。任何异常都不许影响出答案。"""
+        if not grounding_gate_enabled():
+            return {}
+        try:
+            extra = []
+            pack_refs = set()
+            if isinstance(context_pack, Mapping) and isinstance(context_pack.get("citation_map"), Mapping):
+                pack_refs = {str(ref) for ref in context_pack["citation_map"].values() if str(ref)}
+            for item in ((graph or {}).get("evidence") or []):
+                if not isinstance(item, Mapping):
+                    continue
+                ref = str(item.get("evidence_ref") or "")
+                if ref and ref not in pack_refs:
+                    # 包外证据（官方原文优先等过滤路径会产生）也要能被校验到，
+                    # 否则会把"合法的包外引用"误判成引用错误。
+                    extra.append(normalize_evidence_layer(item))
+            return check_grounding(result, pack=context_pack, extra_evidence=extra)
+        except Exception as exc:      # noqa: BLE001 —— 校验绝不拖累主流程
+            return {"grounding_version": "qa-grounding-v1", "checked_claims": 0, "violations": [],
+                    "blocking": False, "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+    @staticmethod
+    def _lock_to_graph(parsed: Mapping, graph: Mapping, level1: Mapping, level2: Mapping, degradation: list, models: Mapping, *, question: str = "", context_pack: Mapping | None = None) -> dict:
         allowed_claims = {str(item.get("claim_id") or ""): item for item in _eligible_claims(graph)}
         requested_ids = []
         for item in parsed.get("claims") or parsed.get("claim_ids") or []:
@@ -1288,6 +1379,16 @@ class QaFinalSynthesizer:
             evidence = _official_evidence(evidence)
             official_refs = {str(item.get("evidence_ref")) for item in evidence}
             selected_claims = _filter_claims_to_refs(selected_claims, official_refs)
+        # 阶段 08：上下文包就是本轮证据全集（与提示里给模型看到的一致）。
+        # 只有当过滤后仍有结论时才真的收窄——否则宁可用整图，也不出一道没有结论的空答案。
+        if isinstance(context_pack, Mapping) and isinstance(context_pack.get("citation_map"), Mapping):
+            pack_refs = {str(ref) for ref in context_pack["citation_map"].values() if str(ref)}
+            if pack_refs:
+                packed = [item for item in evidence if str(item.get("evidence_ref")) in pack_refs]
+                packed_claims = _packed_claims(selected_claims, pack_refs)
+                if packed and (packed_claims or not selected_claims):
+                    evidence = packed
+                    selected_claims = packed_claims
         evidence_refs = {str(item.get("evidence_ref")) for item in evidence}
         citations = list(dict.fromkeys(str(item) for item in parsed.get("citations") or []))
         if official_only:

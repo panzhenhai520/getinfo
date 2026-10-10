@@ -185,7 +185,9 @@ class BudgetStopTests(unittest.TestCase):
         self.assertTrue(any(node["node_kind"] == "answer" for node in graph["nodes"]))
 
     def test_only_three_stop_reasons_are_possible_this_phase(self):
-        """NO_GAIN / UNRESOLVABLE_CONTRADICTION 属 Phase 07 的缺口闭环，本阶段不许产出。"""
+        """**规划期**（建图那一刻）只可能产出三值：NO_GAIN / UNRESOLVABLE_CONTRADICTION 是
+        运行期结论，要等检索/核验/裁决跑完才知道 —— 它们由 Phase 07 的缺口循环
+        （`qa_gap_analyzer.GapLoopState`，见 tests/test_qa_phase07_*.py）给出，不在这张图上。"""
         produced = set()
         for kwargs in ({"mode": "fast"}, {"mode": "standard"}, {"mode": "deep"},
                        {"mode": "deep", "total_seconds": 60},

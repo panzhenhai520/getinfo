@@ -43,12 +43,12 @@
 |P07-04|seen dedupe| PASS | 复用 Phase 02 既有 seen 机制：Query Fingerprint = 归一查询 + route + 约束 + 语料版本 + 检索配置；三种去重全留痕（同批重复 / 已搜指纹 / 已见且被拒来源，MASTER_RULES 第 14 条）；dropped_by_basis 把命中已搜查询与同一缺口重复规划分开记账；真机 13 次命中全部是 already_planned（already_searched=0，边界已记） | 2026-10-11 |
 |P07-05|no-gain convergence| PASS | §14 逐字：连续 QA_GAP_NO_GAIN_ROUNDS（默认 2）轮 new_verified_claims==0 且 resolved_high_priority_gaps==0 才收敛；第 0 轮是基线不计入连续数；resolved 口径严格（gap_id 内容哈希，上轮有本轮没了才算）；收敛后不再发补充跳；20 例；端到端同证据 retriever 得 NO_GAIN，真机复算 13/13 | 2026-10-11 |
 |P07-06|stop reasons| PASS | 五值**真的都能被产出**（Phase 05 留的账本阶段结清）：decide_stop_reason 唯一决策点（UNRESOLVABLE_CONTRADICTION 优先于 ANSWERABLE 优先于 BUDGET_EXHAUSTED 优先于 NO_GAIN 优先于 MAX_DEPTH，每条带 factors）；UNRESOLVABLE_CONTRADICTION 唯一权威出口是证据图缺口复核（引 Phase 06 的 unresolved 与理由码）；真机 0 条矛盾故用真机素材构造用例复现；MAX_DEPTH 只在高优缺口仍在且补充跳上限用完时给；五值齐备有专门用例 | 2026-10-11 |
-|P08-01|ContextItem/Graph|NOT_STARTED|||
-|P08-02|ContextUtility/token budget|NOT_STARTED|||
-|P08-03|Context Pack Builder|NOT_STARTED|||
-|P08-04|counter-evidence reservation|NOT_STARTED|||
-|P08-05|Context Gap|NOT_STARTED|||
-|P08-06|selection trace|NOT_STARTED|||
+|P08-01|ContextItem/Graph| PASS | 新增 qa_context_pack.py：ContextItem 与 ContextGraph（项之间可寻址、可复算），只吃 Phase 02/03 的证据对象与核验结论，不另造证据；20 例契约用例 | 2026-10-11 |
+|P08-02|ContextUtility/token budget| PASS | ContextUtility 与 token 预算：确定性相对预算单位（不调 tokenizer，能力边界已记）；固定预算下裁剪顺序确定（同输入同输出）；15 例 | 2026-10-11 |
+|P08-03|Context Pack Builder| PASS | Context Pack Builder：citation_map 与 citation_index 带 evidence_ref 加 Phase 02 证据指纹加最小 span；真机 93/93 引用可回溯，且逐条复算 content_excerpt[start:end] 与 span.quote 相等全部成立；14 例 | 2026-10-11 |
+|P08-04|counter-evidence reservation| PASS | 反证预留：预算里为 REFUTES 侧留额度；真机 qa_conflicts 与 REFUTES 边全为 0（对象为 0），能力证据来自构造用例（与 Phase 06 同一处置口径）；10 例 | 2026-10-11 |
+|P08-05|Context Gap| PASS | Context Gap 与动作：TRUNCATED_SPAN 12 / SKILL_NOT_AVAILABLE 9 / UNGROUNDED_CLAIM 6，对应动作 EXPAND_EVIDENCE_SPAN 12 / LOAD_SKILL 9 / REPACK_CONTEXT 6，**触发新检索 0 条**（§6 与 MASTER_RULES 13）；10 例 | 2026-10-11 |
+|P08-06|selection trace| PASS | selection trace：逐项记录入选与被裁原因（真机裁剪 75 条原因全为 OVER_TOKEN_BUDGET）；11 例 | 2026-10-11 |
 |P09-01|memory schema/version/relations|NOT_STARTED|||
 |P09-02|memory types|NOT_STARTED|||
 |P09-03|Write Gate|NOT_STARTED|||
