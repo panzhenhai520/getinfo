@@ -962,6 +962,205 @@ class IntelPackImprovementTests(unittest.TestCase):
         self.assertIsNone(result["crawl_probe"]["new_article_admit_rate_after"])
         self.assertEqual(result["suggestion"]["status"], "rejected")
 
+    # ── 回归：抓文章实测闸门必须真的跑起来（2026-10 位置参数 TypeError 事故）──
+    def _recording_probe(self, calls):
+        """记录调用形态的探针桩：除 pack_id 外任何位置参数都会被记进 ``calls``。"""
+
+        def _runner(pack_id, *args, **kwargs):
+            calls.append({"pack_id": pack_id, "args": args, "kwargs": dict(kwargs)})
+            return self._good_probe(
+                pack_id,
+                kwargs.get("candidates"),
+                per_source=kwargs["per_source"],
+                timeout_seconds=kwargs["timeout_seconds"],
+                max_sources=kwargs["max_sources"],
+            )
+
+        return _runner
+
+    def test_run_self_test_calls_probe_with_candidates_as_keyword(self):
+        """自测必须以**全关键字**调用探针：candidates 不许再占第二个位置参数。
+
+        修复前引擎写的是 ``runner(pack_id, candidates, per_source=...)``，位置参数喂给了
+        只收关键字的 ``crawl_probe`` → TypeError → 闸门恒 fail-closed。
+        """
+        self._seed_demo_scenario()
+        calls = []
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=100,
+            probe_runner=self._recording_probe(calls),
+            source_probe_runner=self._source_probe_stub([]),
+        )
+
+        self.assertEqual(len(calls), 1, "自测只应调用探针一次")
+        call = calls[0]
+        self.assertEqual(call["pack_id"], "demo_pack")
+        self.assertEqual(call["args"], (), "除 pack_id 外不允许出现任何位置参数")
+        self.assertEqual(
+            set(call["kwargs"]),
+            {"candidates", "per_source", "timeout_seconds", "max_sources"},
+        )
+        self.assertIsInstance(call["kwargs"]["candidates"], dict)
+        # 闸门真的开了：抓文章实测达标 → verified（修复前这条路径恒 rejected）
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(result["suggestion"]["status"], "verified")
+        self.assertIn("抓文章实测达标", result["reason"])
+
+    def test_probe_runner_with_keyword_only_candidates_is_supported(self):
+        """关键字专用签名的探针能正常跑：证明调用形态确实是关键字，不是位置参数。"""
+        self._seed_demo_scenario()
+        called = []
+
+        def _keyword_only(pack_id, *, candidates, per_source, timeout_seconds, max_sources):
+            called.append((pack_id, candidates))
+            return self._good_probe(
+                pack_id,
+                candidates,
+                per_source=per_source,
+                timeout_seconds=timeout_seconds,
+                max_sources=max_sources,
+            )
+
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=100,
+            probe_runner=_keyword_only,
+            source_probe_runner=self._source_probe_stub([]),
+        )
+
+        self.assertEqual(len(called), 1)
+        self.assertEqual(result["status"], "verified")
+
+    def test_probe_type_error_reported_as_parameter_error_not_missing_sample(self):
+        """探针抛 TypeError（参数不匹配）必须报**明确的参数错误**，不许被吞成"未取得样本"。"""
+        self._seed_demo_scenario()
+        error_text = (
+            "crawl_probe() takes 1 positional argument but 2 positional arguments "
+            "(and 3 keyword-only arguments) were given"
+        )
+
+        def _broken(pack_id, candidates=None, *, per_source, timeout_seconds, max_sources):
+            raise TypeError(error_text)
+
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=100,
+            probe_runner=_broken,
+            source_probe_runner=self._source_probe_stub([]),
+        )
+
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("抓文章实测探针调用失败", result["reason"])
+        self.assertIn("positional argument", result["reason"])
+        self.assertNotIn("未取得样本", result["reason"])
+        self.assertEqual(result["suggestion"]["status"], "rejected")
+        # 落库后的 reason 同样带参数错误，事后查库能看见真因
+        stored = m.get_suggestion(result["suggestion"]["suggestion_id"])
+        self.assertIn("positional argument", stored["reason"])
+        self.assertNotIn("未取得样本", stored["reason"])
+        self.assertEqual(
+            stored["evidence"]["crawl_probe"]["errors"][0]["stage"], "probe_runner"
+        )
+        self.assertEqual(
+            stored["metrics"]["crawl_probe"]["errors"][0]["error"][:60],
+            error_text[:60],
+        )
+
+    def test_incompatible_probe_signature_is_rejected_before_calling(self):
+        """签名连 candidates 都不收：**不调用**探针，直接记明确的参数不匹配理由。"""
+        self._seed_demo_scenario()
+        calls = []
+
+        def _incompatible(pack_id, per_source, timeout_seconds, max_sources):
+            calls.append(pack_id)
+            raise AssertionError("签名绑不上时不允许再调用探针")
+
+        result = m.run_self_test_and_stage(
+            "demo_pack",
+            sample_limit=100,
+            probe_runner=_incompatible,
+            source_probe_runner=self._source_probe_stub([]),
+        )
+
+        self.assertEqual(calls, [], "签名绑不上就不该调用探针")
+        self.assertEqual(result["status"], "rejected")
+        self.assertIn("探针调用参数不匹配", result["reason"])
+        self.assertIn("_incompatible", result["reason"])
+        self.assertNotIn("未取得样本", result["reason"])
+        self.assertEqual(result["suggestion"]["status"], "rejected")
+
+    def test_real_crawl_probe_sample_flows_into_metrics(self):
+        """正常路径：真 ``crawl_probe``（选源/列表/正文全打桩，不联网）的
+        ``parsed_total`` / ``sample_available`` 必须如实进 metrics，且闸门能放行。"""
+        self._seed_demo_scenario()
+        source = {
+            "source_id": 42,
+            "source_name": "离线列表页",
+            "source_url": "https://offline.example.com/news",
+            "verdict": "准入率低",
+            "source_type": "list_page",
+            "metadata": {},
+        }
+        listing = [
+            {
+                "url": "https://offline.example.com/1",
+                "title": "固态电池产线动态",
+                "published_at": _date(1),
+            },
+            {
+                "url": "https://offline.example.com/2",
+                "title": "无关条目一",
+                "published_at": _date(1),
+            },
+            {
+                "url": "https://offline.example.com/3",
+                "title": "无关条目二",
+                "published_at": _date(1),
+            },
+        ]
+
+        def _content(entry, *, timeout_seconds):
+            body = (
+                "演示趋势词与固态电池相关纪要。"
+                if entry["url"].endswith("/1")
+                else "与主题无关的简述。"
+            )
+            return {
+                "title": entry["title"],
+                "content": body,
+                "matched_keywords": "",
+                "url": entry["url"],
+            }, ""
+
+        with patch.object(m, "_probe_select_sources", lambda pack_id, limit: [source]), patch.object(
+            m,
+            "_probe_fetch_listing",
+            lambda src, *, limit, timeout_seconds: (listing, ""),
+        ), patch.object(m, "_probe_fetch_content", _content):
+            result = m.run_self_test_and_stage(
+                "demo_pack",
+                sample_limit=100,
+                source_probe_runner=self._source_probe_stub([]),
+            )
+
+        probe = result["crawl_probe"]
+        self.assertEqual(probe["fetched_total"], 3)
+        self.assertEqual(probe["parsed_total"], 3)
+        self.assertEqual(probe["parse_failed_total"], 0)
+        self.assertTrue(probe["sample_available"])
+        self.assertEqual(probe["errors"], [])
+        # 如实进 metrics（不是 None、不是 0）
+        probe_metrics = result["suggestion"]["metrics"]["crawl_probe"]
+        self.assertEqual(probe_metrics["parsed_total"], 3)
+        self.assertTrue(probe_metrics["sample_available"])
+        self.assertEqual(probe_metrics["fetched_total"], 3)
+        self.assertEqual(probe_metrics["sources"][0]["source_id"], 42)
+        # 样本达标 → 闸门放行（这条路径就是被 TypeError 关死的"加词"路径）
+        self.assertEqual(result["crawl_probe"]["new_article_admit_rate_before"], 0.0)
+        self.assertEqual(result["crawl_probe"]["new_article_admit_rate_after"], round(100.0 / 3, 4))
+        self.assertEqual(result["status"], "verified")
+
     def _passing_metrics(self):
         """一份"影子 + 抓文章双达标"的指标（供 verified 相关用例复用）。"""
         return {

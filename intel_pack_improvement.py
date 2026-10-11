@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import inspect
 import json
 import re
 import time
@@ -1815,6 +1816,78 @@ def _shadow_verdict(shadow: Dict) -> Dict:
     return {"passed": not reasons, "reason": "；".join(reasons), "checks": checks}
 
 
+# 探针"调用层"错误的 stage 标记：出现这两类说明探针**根本没跑起来**（参数不匹配/签名不符），
+# 必须原样写进 reason，绝不能被 except 吞掉后伪装成"抓文章测试未取得样本"（2026-10 事故根因）。
+PROBE_CALL_ERROR_STAGES = ("probe_runner", "signature")
+PROBE_CALL_ERROR_STAGE = PROBE_CALL_ERROR_STAGES[0]
+
+
+def _probe_call_error(probe) -> str:
+    """取"探针调用本身失败"的错误文本（没有它，参数错误会伪装成业务上的"没抓到样本"）。"""
+    if not isinstance(probe, dict):
+        return ""
+    for item in probe.get("errors") or []:
+        if isinstance(item, dict) and str(item.get("stage") or "") in PROBE_CALL_ERROR_STAGES:
+            return str(item.get("error") or "探针调用失败")
+    return ""
+
+
+def _failed_probe(pack_id, error: str) -> Dict:
+    """探针没跑起来时的占位结果：错误落在 ``errors[0].stage="probe_runner"``，闸门据此报真因。"""
+    return {
+        "pack_id": str(pack_id),
+        "probed_at": utc_text(),
+        "sources": [],
+        "parsed_total": 0,
+        "fetched_total": 0,
+        "parse_failed_total": 0,
+        "new_article_admit_rate_before": None,
+        "new_article_admit_rate_after": None,
+        "sample_available": False,
+        "errors": [{"stage": PROBE_CALL_ERROR_STAGE, "error": _truncate(str(error), 300)}],
+    }
+
+
+def _plan_probe_call(runner, pack_id, candidates, *, per_source, timeout_seconds, max_sources):
+    """按 runner 的**真实签名**决定怎么喂参数，返回 ``(args, kwargs, error)``。
+
+    为什么要有这一层（2026-10 事故）：引擎按位置参数喂 ``candidates``，而 ``crawl_probe`` 只收
+    关键字，TypeError 被调用方的 ``except Exception`` 吞成"抓文章测试未取得样本"，闸门一直是
+    fail-closed 却看不出真因——所有 keyword 建议恒 rejected。这里先用 ``inspect.signature`` 试绑：
+    优先**全关键字**调用；签名不收关键字时才退回位置参数（兼容老桩函数）；两条都绑不上就直接
+    返回明确的参数错误文本，由调用方记进 ``probe.errors``（stage=probe_runner）。
+
+    ``error`` 非空时 ``args``/``kwargs`` 无意义，调用方**不得**再调用 runner。
+    """
+    kwargs = {
+        "per_source": per_source,
+        "timeout_seconds": timeout_seconds,
+        "max_sources": max_sources,
+    }
+    try:
+        sig = inspect.signature(runner)
+    except (TypeError, ValueError):
+        # 取不到签名（内置/C 扩展/奇怪的可调用对象）：按全关键字调用，异常交给调用方兜底
+        return (pack_id,), dict(kwargs, candidates=candidates), ""
+    plans = (
+        ((pack_id,), {**kwargs, "candidates": candidates}),  # 首选：全关键字
+        ((pack_id, candidates), dict(kwargs)),               # 兼容：candidates 走第二个位置参数
+    )
+    bind_errors = []
+    for args, call_kwargs in plans:
+        try:
+            sig.bind(*args, **call_kwargs)
+        except TypeError as exc:
+            bind_errors.append(str(exc))
+            continue
+        return args, call_kwargs, ""
+    name = getattr(runner, "__name__", "") or type(runner).__name__
+    return [], {}, (
+        f"探针调用参数不匹配（runner={name}，签名 {sig}）："
+        f"关键字调用失败（{bind_errors[0]}）；位置调用失败（{bind_errors[1]}）"
+    )
+
+
 def _crawl_probe_verdict(probe) -> Dict:
     """抓文章实测是否达标。抓不到样本（0 篇解析成功）一律不达标。"""
     if not isinstance(probe, dict):
@@ -1829,9 +1902,15 @@ def _crawl_probe_verdict(probe) -> Dict:
     after = _as_float(probe.get("new_article_admit_rate_after"))
     checks: List[Dict] = []
     if parsed <= 0:
+        call_error = _probe_call_error(probe)
         return {
             "passed": False,
-            "reason": "抓文章测试未取得样本，无法验证（抓取失败不计为 0% 准入率）",
+            # 探针压根没跑起来（参数/调用错误）必须原样报出来，不能和"抓取真的失败"混为一谈
+            "reason": (
+                f"抓文章实测探针调用失败（探针未真正执行，属参数/调用错误，不是抓取失败）：{call_error}"
+                if call_error
+                else "抓文章测试未取得样本，无法验证（抓取失败不计为 0% 准入率）"
+            ),
             "checks": [
                 {
                     "key": "crawl_probe_sample",
@@ -2084,16 +2163,19 @@ def _probe_fetch_content(item: Dict, *, timeout_seconds: float) -> Tuple[Optiona
 
 def crawl_probe(
     pack_id: str,
+    candidates=None,  # 兼容位：允许第二个位置参数（老调用方/文档都按位置传 candidates）
     *,
     per_source: int = CRAWL_PROBE_PER_SOURCE,
     timeout_seconds: float = CRAWL_PROBE_TIMEOUT_SECONDS,
     max_sources: int = CRAWL_PROBE_MAX_SOURCES,
-    candidates=None,
     source_picker=None,
     listing_fetcher=None,
     content_fetcher=None,
 ) -> Dict:
     """真跑一遍抓文章测试：抓新文章 → 改前/改后各分类一次（纯网络 + CPU，不调模型）。
+
+    ``candidates`` 既可关键字也可位置传入（2026-10 曾因引擎按位置传、探针只收关键字，
+    导致 TypeError 被 except 吞成"未取得样本"、keyword 建议永远 verified 不了）。
 
     * ``timeout_seconds`` 是**总预算**：每步开始前检查剩余预算，单次请求超时取
       ``min(剩余预算, 20s)``。阻塞中的 socket 无法中断，实际耗时可能略超预算。
@@ -3658,6 +3740,9 @@ def run_self_test_and_stage(
     ``probe_runner`` 需满足
     ``(pack_id, candidates, *, per_source, timeout_seconds, max_sources) -> dict`` 签名，
     默认用 ``crawl_probe``（真联网）；测试传入桩函数即可完全离线。
+    调用**全关键字**发起（``candidates=`` 也走关键字，不再占第二个位置参数），且发起前先用
+    ``inspect.signature`` 试绑校验；签名不兼容时把明确的参数错误写进 ``probe.errors``，
+    由 ``_crawl_probe_verdict`` 原样报进 reason（不允许再伪装成"未取得样本"）。
 
     信源类建议另跑一道**信源实测探针**：``source_probe_runner`` 需满足
     ``(pack_id, *, limit, timeout_seconds) -> dict`` 签名，默认用 ``probe_sources``（真联网）；
@@ -3675,27 +3760,23 @@ def run_self_test_and_stage(
     # 抓文章实测：即使没有关键词候选也要跑——信源类建议需要它的逐源 fetched/parse_failed/errors。
     runner = probe_runner or crawl_probe
     shadow: Optional[Dict] = None
-    try:
-        probe = runner(
-            pack_id,
-            candidates,
-            per_source=per_source,
-            timeout_seconds=probe_timeout_seconds,
-            max_sources=probe_max_sources,
-        )
-    except Exception as exc:
-        probe = {
-            "pack_id": str(pack_id),
-            "probed_at": utc_text(),
-            "sources": [],
-            "parsed_total": 0,
-            "fetched_total": 0,
-            "parse_failed_total": 0,
-            "new_article_admit_rate_before": None,
-            "new_article_admit_rate_after": None,
-            "sample_available": False,
-            "errors": [{"stage": "probe_runner", "error": _probe_error_text(exc)}],
-        }
+    # 先按 runner 的真实签名试绑参数（全关键字优先），绑不上就记明确的参数错误，
+    # 不再让 TypeError 被 except 吞成"未取得样本"。
+    call_args, call_kwargs, call_error = _plan_probe_call(
+        runner,
+        pack_id,
+        candidates,
+        per_source=per_source,
+        timeout_seconds=probe_timeout_seconds,
+        max_sources=probe_max_sources,
+    )
+    if call_error:
+        probe = _failed_probe(pack_id, f"{call_error}")
+    else:
+        try:
+            probe = runner(*call_args, **call_kwargs)
+        except Exception as exc:
+            probe = _failed_probe(pack_id, _probe_error_text(exc))
     if not isinstance(probe, dict):
         probe = {"pack_id": str(pack_id), "sources": [], "parsed_total": 0, "errors": []}
 
