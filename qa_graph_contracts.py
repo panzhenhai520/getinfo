@@ -3575,6 +3575,127 @@ AUDIT_REPLAY_SCHEMA = {
 }
 """P15-06 的回放链：四层各自的条数 + 层间引用是否闭环 + **重放是否逐字复现**。"""
 
+# ── Phase 16（P16-01…P16-06）：可观测性 UI ─────────────────────────────────────
+# 本段的边界（§15 可观测性 UI + §23 Search Trace + §32 Phase 10 的 UI 清单）：
+#   1. **本阶段不产生任何新业务语义**：六个视图（执行图/证据图/上下文/记忆/检索轨迹/
+#      成本延迟看板）都是**只读投影** —— 数据一律来自前序阶段已经落盘的产物
+#      （`qa_stage_runs.details_json` 的阶段输出、`qa_reasoning_traces`、`memory_*`、
+#      `qa_retrieval_cache`），UI 层**不另算一套**口径。
+#   2. **每个数字都必须带出处**：契约里的 `numbers` 把"字段 → 值 + 来源 + 口径定义"
+#      绑在一起，`source` 指向**拥有该口径的那个阶段**（不是"UI 算的"）。
+#   3. **空态/降级态是合法结果**：开关关着、老 run 没有该阶段产物、库里一条 run 都没有
+#      时，视图必须如实给 `empty`/`degraded`/`unavailable` 状态与理由，**绝不用 0 冒充**。
+#   4. 只读硬约束：视图只暴露读接口，UI 不得改证据/结论/记忆（见 `OBSERVABILITY_READ_ONLY`）。
+OBSERVABILITY_UI_VERSION = "qa-observability-ui-v1"
+"""可观测性 UI 的总口径版本（P16-01…P16-06 的公共锚点；本阶段零迁移、零新表）。"""
+
+OBSERVABILITY_VIEWS: Tuple[str, ...] = (
+    "execution", "evidence", "context", "memory", "search_trace", "dashboard",
+)
+"""§15 要求的四图（Execution / Evidence / Context / Memory）+ §23 Search Trace +
+§32 的 cost/latency/token/cache/skill dashboard，共六个视图。"""
+
+OBSERVABILITY_STATES: Tuple[str, ...] = ("ok", "empty", "degraded", "unavailable")
+"""视图的四种状态（闭集合）：
+
+`ok`=有真实产物且口径完整；`empty`=口径可用但**确实没有对象**（例如开关关着、老 run 没有
+该阶段产物）；`degraded`=有产物但带着降级/错误标记（例如阶段 `degraded`、视图内某一路
+读失败）；`unavailable`=该视图在当前部署上**根本不可得**（例如抓不到库/表不存在）。
+后三种都是**合法且必须如实呈现**的结果 —— 不允许用 0 或空表冒充 `ok`。"""
+
+OBSERVABILITY_NUMBER_FIELDS: Tuple[str, ...] = ("field", "value", "source", "definition")
+"""`numbers` 里每个数字的四个必填位：字段名 / 值 / **来源** / **口径定义**。
+
+`source` 的形态固定为 `"<阶段>·<载体路径>"`（例如
+`"P05·qa_stage_runs.details_json#result.stats.execution_graph"`），
+`definition` 是中文口径说明 —— 这两项就是"界面展示的每个数字都能追到某个阶段的产物"
+的机器可校验形态。"""
+
+OBSERVABILITY_STATE_REASONS: Tuple[str, ...] = (
+    "PRODUCT_PRESENT",              # ok：确实读到了该阶段的产物
+    "SWITCH_OFF",                   # empty：该阶段的开关默认关（产物键根本不存在）
+    "NO_STAGE_ARTIFACT",            # empty：老 run 没跑过该阶段 / 该阶段没留产物
+    "NO_RUN_IN_SCOPE",              # empty：作用域内一条 run 都没有
+    "NO_MEMORY_IN_SCOPE",           # empty：库里一条记忆都没有
+    "NO_SKILL_TELEMETRY",           # empty：还没有技能遥测行
+    "NO_CACHE_ENTRY",               # empty：缓存表为空
+    "PHASE_DEGRADED",               # degraded：产物带着错误/降级标记
+    "PARTIAL_READ",                 # degraded：某一路读失败，其余照常呈现
+    "STORE_UNAVAILABLE",            # unavailable：拿不到库/表
+)
+"""视图状态理由码（闭集合）：**不允许"没有理由的空态"** —— 每个非 `ok` 状态都必须点名原因。"""
+
+OBSERVABILITY_NUMBER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "field": {"type": "string"},
+        # 值可以是标量，也可以是分布映射（例如 by_status / trim_reasons 这类"计数表"）——
+        # 契约故意不把 value 收成标量，否则 `_check_node` 会对它递归，把合法载荷误判失败。
+        "value": {"type": ["integer", "number", "string", "boolean", "null",
+                           "object", "array"]},
+        "source": {"type": "string"},
+        "definition": {"type": "string"},
+    },
+    "required": list(OBSERVABILITY_NUMBER_FIELDS),
+    "additionalProperties": True,
+}
+"""单条口径数字（`numbers` 的 value 形状）。`source` / `definition` 都**不许为空串**。"""
+
+OBSERVABILITY_VIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "view_version": {"type": "string", "enum": [OBSERVABILITY_UI_VERSION]},
+        "view": {"type": "string", "enum": list(OBSERVABILITY_VIEWS)},
+        "run_id": {"type": "string"},
+        "state": {"type": "string", "enum": list(OBSERVABILITY_STATES)},
+        "state_reason": {"type": "string", "enum": list(OBSERVABILITY_STATE_REASONS)},
+        "state_text": {"type": "string"},
+        "source": {"type": "string"},
+        "notes": {"type": "array", "items": {"type": "string"}},
+        "numbers": {"type": "object"},
+        "payload": {"type": "object"},
+        "generated_at": {"type": "string"},
+        "read_only": {"type": "boolean"},
+    },
+    "required": ["view_version", "view", "run_id", "state", "state_reason", "source",
+                 "numbers", "payload", "read_only"],
+    "additionalProperties": True,
+}
+"""一个视图的完整载荷（六个视图共用同一张契约）：**状态 + 理由 + 来源 + 口径数字 + 正文**。
+
+`read_only` 恒为 True（P16 的硬约束：UI 只读）。`state_reason` 取闭集合，`state_text` 是
+给人看的中文说明 —— 即便是 `ok` 也要写清楚"数是从哪份产物上读的"。"""
+
+OBSERVABILITY_READ_ONLY = True
+"""P16 只读硬约束：可观测性视图**只暴露读路径**，不得通过 UI 改动证据/结论/记忆。
+
+代码侧守门（`tests/test_qa_phase16_observability_ui.py`）：
+  · 投影模块与 API 模块的 AST 里**没有** INSERT/UPDATE/DELETE 语句与写方法调用；
+  · API 蓝图只注册 GET 方法；
+  · 模板里只有 GET fetch，没有任何非 GET 的请求动词。"""
+
+OBSERVABILITY_SOURCES: Tuple[str, ...] = (
+    "P01·qa_reasoning_traces",
+    "P02·qa_stage_runs.details_json#result.stats.evidence_layer",
+    "P05·qa_stage_runs.details_json#result.stats.execution_graph",
+    "P06·qa_stage_runs.details_json#result.evidence_graph",
+    "P07·qa_stage_runs.details_json#result.stats.gap_loop",
+    "P08·qa_stage_runs.details_json#result.context_pack",
+    "P08·qa_events.payload.context_pack",
+    "P09·memory_item/memory_recall_log",
+    "P10·memory_validation/memory_contradiction",
+    "P11·qa_stage_runs(stage=skill:<id>)/result.skill_telemetry",
+    "P12·skill_performance_memory/source_reliability_memory",
+    "P15·memory_item(scope/scope_key/decay_score)",
+    "P00·qa_stage_runs(latency_ms/token_usage_json)",
+    "P04·qa_retrieval_cache(namespace)",
+    "P14·qa_stage_runs.details_json#result.stats.acquisition",
+)
+"""六个视图允许引用的**来源白名单**（每个来源点名"拥有该口径的阶段 + 载体"）。
+
+守门用例断言：投影模块产出的每一条 `numbers[*].source` 都以这里某一项为前缀 ——
+这样"UI 层另算一套"就不可能悄悄发生（新来源必须显式加进白名单）。"""
+
 
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
@@ -3583,7 +3704,7 @@ def describe() -> str:
             "证据不足输出 %s / 获取动作 %s / 获取效用 %s / 问诊 %s / 上下文不重复追问 %s / "
             "临床安全权重 %s / 重复提问重对齐 %s / "
             "记忆安全 %s / 作用域强制 %s / 轮次隔离 %s / 长期时效 %s / "
-            "安全硬触发 %s / 日志最小化 %s / 审计回放 %s："
+            "安全硬触发 %s / 日志最小化 %s / 审计回放 %s / 可观测性 UI %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
@@ -3597,7 +3718,8 @@ def describe() -> str:
             "重复提问触发判据 %d / 不满意依据 %d / 思路选项 %d / 会话配置键 %d / "
             "作用域决策 %d / 作用域理由码 %d / 内容种类 %d / 轮次隔离理由 %d / "
             "跨轮次策略 %d / 长期时效理由 %d / 安全触发档 %d / 安全触发理由 %d / "
-            "日志最小化规则 %d / 审计事件种类 %d / 回放层 %d"
+            "日志最小化规则 %d / 审计事件种类 %d / 回放层 %d / "
+            "可观测性视图 %d / 视图状态 %d / 视图状态理由 %d / 口径来源 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION, EXPERIENCE_MEMORY_VERSION,
@@ -3609,6 +3731,7 @@ def describe() -> str:
                MEMORY_SAFETY_VERSION, SCOPE_ENFORCEMENT_VERSION, ENCOUNTER_ISOLATION_VERSION,
                LONGITUDINAL_FRESHNESS_VERSION, SAFETY_CRITICAL_OVERRIDE_VERSION,
                PRIVACY_MINIMAL_LOG_VERSION, MEMORY_AUDIT_REPLAY_VERSION,
+               OBSERVABILITY_UI_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
@@ -3636,7 +3759,9 @@ def describe() -> str:
                 len(CROSS_ENCOUNTER_POLICIES), len(LONGITUDINAL_FRESHNESS_REASONS),
                 len(SAFETY_TRIGGER_KINDS), len(SAFETY_TRIGGER_REASONS),
                 len(PRIVACY_MINIMAL_RULES), len(MEMORY_AUDIT_EVENT_KINDS),
-                len(AUDIT_REPLAY_LAYERS)))
+                len(AUDIT_REPLAY_LAYERS),
+                len(OBSERVABILITY_VIEWS), len(OBSERVABILITY_STATES),
+                len(OBSERVABILITY_STATE_REASONS), len(OBSERVABILITY_SOURCES)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -3769,6 +3894,9 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "safety_enforcement": SAFETY_ENFORCEMENT_SCHEMA,
         "privacy_minimal_log": PRIVACY_MINIMAL_LOG_SCHEMA,
         "audit_replay": AUDIT_REPLAY_SCHEMA,
+        # Phase 16（P16-01…P16-06）
+        "observability_view": OBSERVABILITY_VIEW_SCHEMA,
+        "observability_number": OBSERVABILITY_NUMBER_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

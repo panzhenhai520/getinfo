@@ -3190,5 +3190,149 @@ class QaStore:
         value["record"] = _decode_json(value.get("payload_json"), {})
         return value
 
+    # ── Phase 16（P16-01…P16-06）：可观测性 UI 的**只读**读侧 ──────────────────────
+    # 硬约束：这一段**只允许 SELECT** —— 刻意不调 `ensure_schema()`（那是 DDL），
+    # 表不存在/列不存在/库不可达一律退化成"带 error 的空结果"，由上层如实呈现
+    # `empty`/`unavailable` 空态（**绝不用 0 冒充**）。业务写路径一行都不在这里。
+    def observability_token_usage(self, *, industry_pack_id: str = "", limit: int = 2000) -> dict:
+        """P16-06：token 用量汇总（读 `qa_stage_runs.token_usage_json`）。
+
+        口径来源是 Phase 00·P00-04 已经落好的那一列（`qa_orchestrator.record_stage` 把
+        阶段输出里的 `token_usage` 摘出来写进 `token_usage_json`）。这里**只做加总**：
+        · `by_key` 是**所见键的原样求和**（不假设只有 tokens_in/tokens_out）；
+        · `tokens_total` 取记录里真的有的那个键，没有就留 None —— 不用加法"算"一个出来
+          （不同端点的 total 可能含缓存命中，`in+out≠total` 是常态）。
+        """
+        result = {"rows": 0, "by_key": {}, "tokens_in": None, "tokens_out": None,
+                  "tokens_total": None, "by_stage": {}, "error": ""}
+        try:
+            params: list = []
+            if industry_pack_id:
+                sql = ("SELECT s.stage AS stage, s.token_usage_json AS usage FROM qa_stage_runs s "
+                       "JOIN qa_runs r ON r.id = s.run_id WHERE r.industry_pack_id=? "
+                       "AND s.token_usage_json IS NOT NULL AND s.token_usage_json NOT IN ('', '{}')")
+                params.append(str(industry_pack_id))
+            else:
+                sql = ("SELECT stage AS stage, token_usage_json AS usage FROM qa_stage_runs "
+                       "WHERE token_usage_json IS NOT NULL AND token_usage_json NOT IN ('', '{}')")
+            sql += " LIMIT ?"
+            params.append(max(1, min(int(limit), 20000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            by_key: dict = {}
+            by_stage: dict = {}
+            for row in rows:
+                value = _row_dict(row) or {}
+                usage = _decode_json(value.get("usage"), {})
+                if not isinstance(usage, Mapping):
+                    continue
+                result["rows"] += 1
+                stage = str(value.get("stage") or "")
+                bucket = by_stage.setdefault(stage, {})
+                for key, raw in usage.items():
+                    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+                        continue
+                    name = str(key)
+                    by_key[name] = by_key.get(name, 0) + int(raw)
+                    bucket[name] = bucket.get(name, 0) + int(raw)
+            result["by_key"] = by_key
+            result["by_stage"] = by_stage
+            for name in ("tokens_in", "tokens_out", "tokens_total"):
+                if name in by_key:
+                    result[name] = int(by_key[name])
+        except Exception as exc:  # noqa: BLE001 —— 读不到就是空态，绝不打断
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return result
+
+    def observability_cache_stats(self, *, limit: int = 5000) -> dict:
+        """P16-06：检索/核验缓存的只读统计（`qa_retrieval_cache`，按 `namespace` 分组）。
+
+        `expired` 用字符串比较（`qa_resilience` 与本模块写的时间戳格式逐字相同，
+        见两边 `_text`/`_now`）—— 与 `cache_get` 的 `expires_at>?` 判据同一口径。
+        """
+        result = {"entries": 0, "by_namespace": {}, "expired": 0, "live": 0, "error": ""}
+        try:
+            with self.database.lock:
+                rows = self.database.connection.execute(
+                    "SELECT namespace AS namespace, expires_at AS expires_at "
+                    "FROM qa_retrieval_cache LIMIT ?",
+                    (max(1, min(int(limit), 50000)),),
+                ).fetchall()
+            now = _now()
+            by_namespace: dict = {}
+            for row in rows:
+                value = _row_dict(row) or {}
+                name = str(value.get("namespace") or "")
+                bucket = by_namespace.setdefault(name, {"entries": 0, "expired": 0})
+                bucket["entries"] += 1
+                result["entries"] += 1
+                if str(value.get("expires_at") or "") <= now:
+                    bucket["expired"] += 1
+                    result["expired"] += 1
+            result["by_namespace"] = by_namespace
+            result["live"] = result["entries"] - result["expired"]
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return result
+
+    def observability_memory_recalls(self, *, run_id: str = "", limit: int = 500) -> list[dict]:
+        """P16-04/P16-05：记忆召回留痕（`memory_recall_log`，Phase 09·P09-04 写的行）。
+
+        `hits` / `counts_json` 都是**当时记下来的**，这里原样读出（召回条数不从别处推算）。
+        """
+        try:
+            sql = "SELECT * FROM memory_recall_log"
+            params: list = []
+            if run_id:
+                sql += " WHERE run_id=?"
+                params.append(str(run_id))
+            sql += " ORDER BY id DESC LIMIT ?"
+            params.append(max(1, min(int(limit), 10000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            out = []
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["channels"] = _decode_json(value.get("channels_json"), [])
+                value["counts"] = _decode_json(value.get("counts_json"), {})
+                value["payload"] = _decode_json(value.get("payload_json"), {})
+                out.append(value)
+            return out
+        except Exception:  # noqa: BLE001
+            return []
+
+    def observability_supersession_chain(self, memory_id: str, *, limit: int = 50) -> list[dict]:
+        """P16-04：取代链（`memory_relation` 的 SUPERSEDES 边 + `memory_item.superseded_by`）。
+
+        逐跳沿 `SUPERSEDES` 边走，`seen` 去环（脏数据里出现环时只走一圈，绝不挂死）。
+        """
+        chain: list = []
+        seen: set = set()
+        current = str(memory_id or "")
+        cap = max(1, min(int(limit), 200))
+        while current and current not in seen and len(chain) < cap:
+            seen.add(current)
+            rows = self.memory_relations([current], relations=("SUPERSEDES",))
+            nxt = ""
+            for row in rows:
+                candidate = str(row.get("target_memory_id") or "")
+                if candidate and candidate not in seen:
+                    nxt = candidate
+                    chain.append({"from": current, "to": candidate,
+                                  "relation": str(row.get("relation") or ""),
+                                  "rationale": str(row.get("rationale") or ""),
+                                  "created_from_run_id": str(row.get("created_from_run_id") or "")})
+                    break
+            if not nxt:
+                items = self.load_memory_items(memory_ids=[current], include_all_scopes=True, limit=1)
+                follow = str((items[0] if items else {}).get("superseded_by") or "")
+                if follow and follow not in seen:
+                    chain.append({"from": current, "to": follow, "relation": "SUPERSEDED_BY",
+                                  "rationale": "memory_item.superseded_by 列指明的后继",
+                                  "created_from_run_id": ""})
+                    nxt = follow
+            current = nxt
+        return chain
+
 
 __all__ = ["QaStore"]

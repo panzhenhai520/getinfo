@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可观测性 - {{ platform_name }}</title>
+<link href="/static/css/tailwind.css" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/fontawesome.css">
+<link rel="stylesheet" href="/static/css/dashboard-theme.css">
+<style>
+  body{background:#f8fafc;min-height:100vh}
+  .qo-wrap{max-width:1440px;margin:84px auto 40px;padding:0 22px}
+  .qo-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .qo-title{font-size:22px;font-weight:700;color:#0f172a}
+  .qo-sub{font-size:13px;color:#64748b;margin-top:5px;max-width:820px;line-height:1.6}
+  .qo-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;
+    font-size:11px;font-weight:700;background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+  .qo-badge.ro{background:#eef2ff;color:#4338ca;border-color:#c7d2fe}
+  .qo-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .qo-picker input,.qo-picker select{font-size:13px;padding:7px 10px;border:1px solid #d7e0e6;border-radius:9px;background:#fff;color:#0f172a;min-width:230px}
+  .qo-btn{font-size:13px;padding:7px 14px;border-radius:9px;border:1px solid #0f766e;background:#0f766e;color:#fff;cursor:pointer}
+  .qo-btn.ghost{background:#fff;color:#0f766e}
+  .qo-btn:disabled{opacity:.55;cursor:not-allowed}
+  .qo-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+  .qo-tab{font-size:13px;padding:8px 14px;border-radius:999px;border:1px solid #dbe5e7;background:#fff;
+    color:#334155;cursor:pointer}
+  .qo-tab.active{background:#0f766e;border-color:#0f766e;color:#fff;font-weight:600}
+  .qo-banner{border-radius:12px;padding:13px 16px;font-size:13px;line-height:1.7;margin-bottom:14px;display:none}
+  .qo-banner.show{display:block}
+  .qo-banner.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+  .qo-banner.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+  .qo-banner.bad{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+  .qo-panel{display:none}
+  .qo-panel.active{display:block}
+  .qo-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:14px}
+  .qo-viewhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .qo-state{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
+  .qo-state.ok{background:#ecfdf5;color:#047857}
+  .qo-state.empty{background:#f1f5f9;color:#475569}
+  .qo-state.degraded{background:#fffbeb;color:#92400e}
+  .qo-state.unavailable{background:#fef2f2;color:#b91c1c}
+  .qo-statetext{font-size:12.5px;color:#475569;line-height:1.7}
+  .qo-src{font-size:11.5px;color:#0f766e;font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+  .qo-sec-title{font-size:14px;font-weight:700;color:#0f172a;margin:14px 0 8px}
+  table.qo-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.qo-table th,table.qo-table td{border-bottom:1px solid #eef2f5;padding:7px 8px;text-align:left;vertical-align:top}
+  table.qo-table th{background:#f8fafc;color:#334155;font-weight:600;white-space:nowrap}
+  table.qo-table td.k{color:#0f172a;font-weight:600;white-space:nowrap}
+  table.qo-table td.v{color:#0f172a;word-break:break-word}
+  table.qo-table td.s{color:#0f766e;font-family:ui-monospace,Consolas,monospace;font-size:11px;word-break:break-all}
+  table.qo-table td.d{color:#64748b;font-size:11.5px}
+  .qo-empty{color:#94a3b8;text-align:center;padding:38px 16px;font-size:13px}
+  .qo-empty .fa{display:block;font-size:30px;color:#cbd5e1;margin-bottom:10px}
+  .qo-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .qo-chip{font-size:11px;color:#334155;background:#eef2f5;border:1px solid #dbe5e7;border-radius:999px;padding:3px 9px}
+  .qo-chip.warn{background:#fffbeb;border-color:#fde68a;color:#92400e}
+  .qo-chip.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+  .qo-chip.ok{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
+  .qo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .qo-kpi{background:#f8fafc;border:1px solid #eef2f5;border-radius:11px;padding:11px 13px}
+  .qo-kpi .name{font-size:11.5px;color:#64748b}
+  .qo-kpi .val{font-size:19px;font-weight:700;color:#0f172a;margin-top:4px;word-break:break-all}
+  .qo-svg-wrap{overflow:auto;border:1px solid #eef2f5;border-radius:11px;background:#fcfdfe;padding:10px}
+  .qo-layer{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:5px 0}
+  .qo-node{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:6px 9px;font-size:11.5px;color:#0f172a}
+  .qo-node.deferred{border-style:dashed;color:#94a3b8}
+  .qo-node.ran{border-color:#0f766e;background:#ecfdf5}
+  .qo-node .nk{font-size:10px;color:#64748b;display:block}
+  .qo-mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#334155;word-break:break-all}
+  .qo-legend{font-size:11.5px;color:#64748b;margin-top:6px}
+  body.skin-darkblue{background:#08152c}
+  body.skin-darkblue .qo-title,body.skin-darkblue .qo-sec-title{color:#e6f0ff}
+  body.skin-darkblue .qo-sub,body.skin-darkblue .qo-statetext,body.skin-darkblue .qo-legend{color:#9fb4d4}
+  body.skin-darkblue .qo-card,body.skin-darkblue .qo-kpi,body.skin-darkblue .qo-node{background:#0e1d3a;border-color:rgba(96,165,250,.24);color:#dbe7ff}
+  body.skin-darkblue table.qo-table th{background:#12233f;color:#c9d8ee}
+  body.skin-darkblue table.qo-table td{border-bottom-color:rgba(96,165,250,.14);color:#dbe7ff}
+  body.skin-darkblue .qo-svg-wrap{background:#0b1930;border-color:rgba(96,165,250,.20)}
+  body.skin-darkblue .qo-tab{background:#0e1d3a;border-color:rgba(96,165,250,.24);color:#c9d8ee}
+  body.skin-darkblue .qo-tab.active{background:#0f766e;border-color:#0f766e;color:#fff}
+  @media (max-width:760px){
+    .qo-wrap{margin:76px auto 30px;padding:0 12px}
+    .qo-picker input,.qo-picker select{min-width:160px}
+  }
+</style>
+</head>
+<body>
+{% include "_dashboard_nav.html" %}
+<main class="qo-wrap" data-view-root="qa-observability" data-read-only="1">
+  <div class="qo-head">
+    <div>
+      <div class="qo-title"><i class="fa fa-diagram-project"></i> 可观测性</div>
+      <div class="qo-sub">
+        Execution Graph / Evidence Graph / Context Inspector / Memory Graph / Search Trace / 成本延迟看板，
+        六个视图都是**只读投影**：每个数字都标注了它来自哪个阶段的产物与口径，页面本身不计算任何业务量，
+        也不提供任何修改证据、结论或记忆的入口。
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+      <span class="qo-badge ro"><i class="fa fa-lock"></i> 只读视图</span>
+      <div class="qo-picker">
+        <select id="qoRunSelect" aria-label="选择问答运行"><option value="">加载运行列表…</option></select>
+        <input id="qoRunInput" type="text" placeholder="或直接输入 run_id" aria-label="run_id">
+        <button type="button" class="qo-btn" id="qoLoadBtn">加载</button>
+        <button type="button" class="qo-btn ghost" id="qoRefreshBtn">刷新</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="qo-banner" id="qoBanner" role="status" aria-live="polite"></div>
+
+  <div class="qo-tabs" id="qoTabs" role="tablist">
+    <button type="button" class="qo-tab active" data-view="execution" role="tab">执行图</button>
+    <button type="button" class="qo-tab" data-view="evidence" role="tab">证据图</button>
+    <button type="button" class="qo-tab" data-view="context" role="tab">上下文检查器</button>
+    <button type="button" class="qo-tab" data-view="memory" role="tab">记忆视图</button>
+    <button type="button" class="qo-tab" data-view="search_trace" role="tab">检索轨迹</button>
+    <button type="button" class="qo-tab" data-view="dashboard" role="tab">成本延迟看板</button>
+  </div>
+
+  <!-- 六个视图面板：结构与契约一一对应（state / source / numbers / 正文 / notes） -->
+  <section class="qo-panel active" id="qoPanel-execution" data-view="execution" role="tabpanel">
+    <div class="qo-card">
+      <div class="qo-viewhead">
+        <span class="qo-state empty" id="qoState-execution">加载中</span>
+        <span class="qo-mono" id="qoReason-execution"></span>
+        <span class="qo-chip" id="qoVersion-execution"></span>
+      </div>
+      <div class="qo-statetext" id="qoText-execution">等待数据…</div>
+      <div class="qo-src" id="qoSource-execution"></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">口径数字（每个数字都带来源与口径）</div>
+      <div id="qoNumbers-execution"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">执行图</div>
+      <div id="qoBody-execution"><div class="qo-empty"><i class="fa fa-diagram-project"></i>暂无执行图</div></div>
+    </div>
+    <div class="qo-card" id="qoNotesCard-execution" style="display:none">
+      <div class="qo-sec-title">口径备注</div>
+      <ul id="qoNotes-execution" style="margin:0;padding-left:20px;font-size:12.5px;color:#475569;line-height:1.8"></ul>
+    </div>
+  </section>
+
+  <section class="qo-panel" id="qoPanel-evidence" data-view="evidence" role="tabpanel">
+    <div class="qo-card">
+      <div class="qo-viewhead">
+        <span class="qo-state empty" id="qoState-evidence">加载中</span>
+        <span class="qo-mono" id="qoReason-evidence"></span>
+        <span class="qo-chip" id="qoVersion-evidence"></span>
+      </div>
+      <div class="qo-statetext" id="qoText-evidence">等待数据…</div>
+      <div class="qo-src" id="qoSource-evidence"></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">口径数字</div>
+      <div id="qoNumbers-evidence"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">证据图</div>
+      <div id="qoBody-evidence"><div class="qo-empty"><i class="fa fa-circle-nodes"></i>暂无证据图</div></div>
+    </div>
+    <div class="qo-card" id="qoNotesCard-evidence" style="display:none">
+      <div class="qo-sec-title">口径备注</div>
+      <ul id="qoNotes-evidence" style="margin:0;padding-left:20px;font-size:12.5px;color:#475569;line-height:1.8"></ul>
+    </div>
+  </section>
+
+  <section class="qo-panel" id="qoPanel-context" data-view="context" role="tabpanel">
+    <div class="qo-card">
+      <div class="qo-viewhead">
+        <span class="qo-state empty" id="qoState-context">加载中</span>
+        <span class="qo-mono" id="qoReason-context"></span>
+        <span class="qo-chip" id="qoVersion-context"></span>
+      </div>
+      <div class="qo-statetext" id="qoText-context">等待数据…</div>
+      <div class="qo-src" id="qoSource-context"></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">口径数字</div>
+      <div id="qoNumbers-context"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">上下文条目（为何加入 / 来自哪里 / 是否复验）</div>
+      <div id="qoBody-context"><div class="qo-empty"><i class="fa fa-layer-group"></i>暂无上下文包</div></div>
+    </div>
+    <div class="qo-card" id="qoNotesCard-context" style="display:none">
+      <div class="qo-sec-title">口径备注</div>
+      <ul id="qoNotes-context" style="margin:0;padding-left:20px;font-size:12.5px;color:#475569;line-height:1.8"></ul>
+    </div>
+  </section>
+
+  <section class="qo-panel" id="qoPanel-memory" data-view="memory" role="tabpanel">
+    <div class="qo-card">
+      <div class="qo-viewhead">
+        <span class="qo-state empty" id="qoState-memory">加载中</span>
+        <span class="qo-mono" id="qoReason-memory"></span>
+        <span class="qo-chip" id="qoVersion-memory"></span>
+      </div>
+      <div class="qo-statetext" id="qoText-memory">等待数据…</div>
+      <div class="qo-src" id="qoSource-memory"></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">口径数字</div>
+      <div id="qoNumbers-memory"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">记忆条目（类型 / 来源 / 置信 / 时效 / 复验 / 复用 / 状态 / 取代链）</div>
+      <div id="qoBody-memory"><div class="qo-empty"><i class="fa fa-brain"></i>暂无记忆</div></div>
+    </div>
+    <div class="qo-card" id="qoNotesCard-memory" style="display:none">
+      <div class="qo-sec-title">口径备注</div>
+      <ul id="qoNotes-memory" style="margin:0;padding-left:20px;font-size:12.5px;color:#475569;line-height:1.8"></ul>
+    </div>
+  </section>
+
+  <section class="qo-panel" id="qoPanel-search_trace" data-view="search_trace" role="tabpanel">
+    <div class="qo-card">
+      <div class="qo-viewhead">
+        <span class="qo-state empty" id="qoState-search_trace">加载中</span>
+        <span class="qo-mono" id="qoReason-search_trace"></span>
+        <span class="qo-chip" id="qoVersion-search_trace"></span>
+      </div>
+      <div class="qo-statetext" id="qoText-search_trace">等待数据…</div>
+      <div class="qo-src" id="qoSource-search_trace"></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">§15 追加字段（记忆 / 上下文 / 技能）</div>
+      <div class="qo-grid" id="qoAdditions-search_trace"><div class="qo-empty"><i class="fa fa-plus"></i>暂无</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">口径数字</div>
+      <div id="qoNumbers-search_trace"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">逐动作轨迹（为什么搜 / 搜了什么 / 走哪个通道 / 找到什么 / 为什么接受或拒绝 / 为什么继续或停止）</div>
+      <div id="qoBody-search_trace"><div class="qo-empty"><i class="fa fa-route"></i>暂无检索轨迹</div></div>
+    </div>
+    <div class="qo-card" id="qoNotesCard-search_trace" style="display:none">
+      <div class="qo-sec-title">口径备注</div>
+      <ul id="qoNotes-search_trace" style="margin:0;padding-left:20px;font-size:12.5px;color:#475569;line-height:1.8"></ul>
+    </div>
+  </section>
+
+  <section class="qo-panel" id="qoPanel-dashboard" data-view="dashboard" role="tabpanel">
+    <div class="qo-card">
+      <div class="qo-viewhead">
+        <span class="qo-state empty" id="qoState-dashboard">加载中</span>
+        <span class="qo-mono" id="qoReason-dashboard"></span>
+        <span class="qo-chip" id="qoVersion-dashboard"></span>
+      </div>
+      <div class="qo-statetext" id="qoText-dashboard">等待数据…</div>
+      <div class="qo-src" id="qoSource-dashboard"></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">成本 / 延迟 / token / 缓存 / 技能</div>
+      <div class="qo-grid" id="qoKpi-dashboard"><div class="qo-empty"><i class="fa fa-gauge"></i>暂无数据</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">口径数字</div>
+      <div id="qoNumbers-dashboard"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div></div>
+    </div>
+    <div class="qo-card">
+      <div class="qo-sec-title">阶段延迟 / 错误码 / 缓存 / 技能明细</div>
+      <div id="qoBody-dashboard"><div class="qo-empty"><i class="fa fa-table-list"></i>暂无明细</div></div>
+    </div>
+    <div class="qo-card" id="qoNotesCard-dashboard" style="display:none">
+      <div class="qo-sec-title">口径备注</div>
+      <ul id="qoNotes-dashboard" style="margin:0;padding-left:20px;font-size:12.5px;color:#475569;line-height:1.8"></ul>
+    </div>
+  </section>
+</main>
+
+<script>
+// ── 可观测性页面：只读渲染 ────────────────────────────────────────────────────
+// 硬约束：本文件**只有 GET 请求**；不提供任何修改证据/结论/记忆的入口。
+const QO_VIEWS = ['execution', 'evidence', 'context', 'memory', 'search_trace', 'dashboard'];
+const QO_STATE_TEXT = {ok: '正常', empty: '空态', degraded: '降级', unavailable: '不可得'};
+
+function qoEsc(v){
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function qoText(v){
+  if(v === null || v === undefined) return '—';
+  if(typeof v === 'object') return qoEsc(JSON.stringify(v));
+  return qoEsc(v);
+}
+function qoById(id){ return document.getElementById(id); }
+function qoBanner(kind, html){
+  const el = qoById('qoBanner');
+  el.className = 'qo-banner show ' + kind;
+  el.innerHTML = html;
+}
+function qoClearBanner(){ const el = qoById('qoBanner'); el.className = 'qo-banner'; el.innerHTML = ''; }
+
+function qoSetState(view, payload){
+  const state = String((payload || {}).state || 'unavailable');
+  const chip = qoById('qoState-' + view);
+  if(chip){
+    chip.className = 'qo-state ' + (QO_STATE_TEXT[state] ? state : 'unavailable');
+    chip.innerHTML = '<i class="fa fa-circle-info"></i> ' + qoEsc(QO_STATE_TEXT[state] || state);
+  }
+  const reason = qoById('qoReason-' + view);
+  if(reason) reason.textContent = String((payload || {}).state_reason || '');
+  const version = qoById('qoVersion-' + view);
+  if(version) version.textContent = '契约 ' + String((payload || {}).view_version || '');
+  const text = qoById('qoText-' + view);
+  if(text) text.textContent = String((payload || {}).state_text || '');
+  const src = qoById('qoSource-' + view);
+  if(src) src.textContent = String((payload || {}).source || '');
+  const notesCard = qoById('qoNotesCard-' + view);
+  const notes = (payload || {}).notes || [];
+  if(notesCard && notes.length){
+    notesCard.style.display = '';
+    qoById('qoNotes-' + view).innerHTML = notes.map(function(n){ return '<li>' + qoEsc(n) + '</li>'; }).join('');
+  } else if(notesCard){
+    notesCard.style.display = 'none';
+  }
+}
+
+function qoRenderNumbers(view, payload){
+  const host = qoById('qoNumbers-' + view);
+  if(!host) return;
+  const numbers = (payload || {}).numbers || {};
+  const keys = Object.keys(numbers);
+  if(!keys.length){
+    host.innerHTML = '<div class="qo-empty"><i class="fa fa-table-list"></i>暂无口径数字</div>';
+    return;
+  }
+  const rows = keys.map(function(key){
+    const item = numbers[key] || {};
+    return '<tr><td class="k">' + qoEsc(item.field || key) + '</td>' +
+           '<td class="v">' + qoText(item.value) + '</td>' +
+           '<td class="s">' + qoEsc(item.source || '') + '</td>' +
+           '<td class="d">' + qoEsc(item.definition || '') + '</td></tr>';
+  }).join('');
+  host.innerHTML = '<table class="qo-table"><thead><tr>' +
+    '<th>字段</th><th>值</th><th>来源（阶段·载体）</th><th>口径</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── P16-01 执行图 ─────────────────────────────────────────────────────────────
+function qoRenderExecution(payload){
+  const host = qoById('qoBody-execution');
+  const body = payload.payload || {};
+  const nodes = body.nodes || [];
+  const edges = body.edges || [];
+  if(!nodes.length && !edges.length){
+    host.innerHTML = '<div class="qo-empty"><i class="fa fa-diagram-project"></i>暂无执行图节点明细' +
+      '<div class="qo-legend">（空态是合法结果：该 run 没有执行图产物，或复算版本与回执不一致）</div></div>';
+    return;
+  }
+  const ran = {};
+  (body.node_runs || []).forEach(function(row){ if(row.node_id) ran[String(row.node_id)] = row; });
+  // 分层：优先用回执里的并行组，其次按边做最长路径分层，最后兜底单层
+  let layers = [];
+  const groups = body.parallel_groups || [];
+  if(groups.length){
+    const byId = {};
+    nodes.forEach(function(n){ byId[String(n.node_id || '')] = n; });
+    groups.forEach(function(g){
+      const ids = g.node_ids || g.nodes || [];
+      const row = ids.map(function(id){ return byId[String(id)]; }).filter(Boolean);
+      if(row.length) layers.push(row);
+    });
+  }
+  if(!layers.length){
+    const depth = {}, kids = {}, indeg = {};
+    nodes.forEach(function(n){ const id = String(n.node_id || ''); depth[id] = 0; indeg[id] = 0; kids[id] = []; });
+    edges.forEach(function(e){
+      const a = String(e.from || e.src || ''), b = String(e.to || e.dst || '');
+      if(kids[a] && depth[b] !== undefined){ kids[a].push(b); indeg[b] = (indeg[b] || 0) + 1; }
+    });
+    let queue = Object.keys(indeg).filter(function(id){ return !indeg[id]; });
+    const order = [], pending = Object.assign({}, indeg);
+    while(queue.length){
+      const id = queue.shift(); order.push(id);
+      (kids[id] || []).forEach(function(b){
+        depth[b] = Math.max(depth[b] || 0, (depth[id] || 0) + 1);
+        pending[b] = (pending[b] || 0) - 1;
+        if(!pending[b]) queue.push(b);
+      });
+    }
+    Object.keys(depth).forEach(function(id){ if(order.indexOf(id) < 0) order.push(id); });
+    const buckets = {};
+    order.forEach(function(id){ const d = depth[id] || 0; (buckets[d] = buckets[d] || []).push(id); });
+    const byId = {};
+    nodes.forEach(function(n){ byId[String(n.node_id || '')] = n; });
+    layers = Object.keys(buckets).sort(function(a, b){ return Number(a) - Number(b); })
+      .map(function(d){ return buckets[d].map(function(id){ return byId[id]; }).filter(Boolean); });
+  }
+  const svgRows = layers.map(function(row, index){
+    const items = row.map(function(n){
+      const id = String(n.node_id || '');
+      const deferred = (n.implemented === false) || (n.status === 'deferred');
+      const cls = 'qo-node' + (deferred ? ' deferred' : (ran[id] ? ' ran' : ''));
+      return '<div class="' + cls + '" title="' + qoEsc(String(n.purpose || '')) + '">' +
+             qoEsc(String(n.label || n.name || id)) +
+             '<span class="nk">' + qoEsc(String(n.node_kind || n.stage || '')) +
+             (deferred ? ' · 占位' : (ran[id] ? ' · 已运行' : '')) + '</span></div>';
+    }).join('');
+    return '<div class="qo-layer"><span class="qo-chip">第 ' + (index + 1) + ' 层</span>' + items + '</div>';
+  }).join('');
+  const nodeRows = nodes.map(function(n){
+    const id = String(n.node_id || '');
+    const run = ran[id] || {};
+    return '<tr><td class="k">' + qoEsc(String(n.label || n.name || id)) + '<div class="qo-mono">' + qoEsc(id) + '</div></td>' +
+      '<td>' + qoEsc(String(n.node_kind || '')) + '</td>' +
+      '<td>' + qoEsc(String(n.stage || '')) + '</td>' +
+      '<td>' + qoText(n.timeout_seconds != null ? n.timeout_seconds : n.timeout) + '</td>' +
+      '<td>' + qoText(n.retry) + '</td>' +
+      '<td>' + qoEsc(String(n.failure_policy || '')) + '</td>' +
+      '<td>' + (n.implemented === false ? '<span class="qo-chip warn">占位</span>' : '<span class="qo-chip ok">已实现</span>') + '</td>' +
+      '<td>' + (run.node_id ? qoEsc(String(run.status || '')) + (run.latency_ms != null ? ' · ' + qoText(run.latency_ms) + 'ms' : '') : '<span class="qo-chip">未记账</span>') + '</td></tr>';
+  }).join('');
+  const edgeRows = edges.slice(0, 200).map(function(e){
+    return '<tr><td class="k">' + qoEsc(String(e.from || e.src || '')) + '</td>' +
+      '<td>' + qoEsc(String(e.to || e.dst || '')) + '</td>' +
+      '<td>' + qoEsc(String(e.kind || e.relation || '')) + '</td>' +
+      '<td class="d">' + qoEsc(String(e.note || e.reason || '')) + '</td></tr>';
+  }).join('');
+  host.innerHTML =
+    '<div class="qo-svg-wrap">' + svgRows + '</div>' +
+    '<div class="qo-legend">节点数 ' + nodes.length + ' / 依赖边 ' + edges.length +
+    '；"已运行"来自 `qa_stage_runs` 的节点运行行（开关默认关时显示"未记账"，不代表没运行）。</div>' +
+    '<div class="qo-sec-title">节点明细</div>' +
+    '<table class="qo-table"><thead><tr><th>节点</th><th>种类</th><th>阶段</th><th>超时(s)</th>' +
+    '<th>重试</th><th>失败策略</th><th>实现</th><th>运行</th></tr></thead><tbody>' +
+    (nodeRows || '<tr><td colspan="8" class="d">无节点</td></tr>') + '</tbody></table>' +
+    '<div class="qo-sec-title">依赖边</div>' +
+    '<table class="qo-table"><thead><tr><th>前置</th><th>后继</th><th>种类</th><th>说明</th></tr></thead><tbody>' +
+    (edgeRows || '<tr><td colspan="4" class="d">无依赖边（无依赖就不产生边）</td></tr>') + '</tbody></table>';
+}
+
+// ── P16-02 证据图 ─────────────────────────────────────────────────────────────
+function qoRenderEvidence(payload){
+  const host = qoById('qoBody-evidence');
+  const body = payload.payload || {};
+  const claims = body.claims || [];
+  const contradictions = body.contradictions || [];
+  if(!claims.length && !contradictions.length){
+    host.innerHTML = '<div class="qo-empty"><i class="fa fa-circle-nodes"></i>暂无证据图对象' +
+      '<div class="qo-legend">（空图不是"证据为零"，只表示本次没有已持久化的结论-证据关系）</div></div>';
+    return;
+  }
+  const claimRows = claims.map(function(c){
+    const rel = c.relation_counts || c.relations || {};
+    const dist = Object.keys(rel).map(function(k){ return '<span class="qo-chip">' + qoEsc(k) + ' ' + qoText(rel[k]) + '</span>'; }).join('');
+    return '<tr><td class="k">' + qoEsc(String(c.claim_id || c.canonical_id || '')) + '</td>' +
+      '<td>' + qoEsc(String(c.text || '').slice(0, 300)) + '</td>' +
+      '<td>' + qoEsc(String(c.verification_status || c.status || '')) + '</td>' +
+      '<td>' + qoText(c.verified_support_count) + '</td>' +
+      '<td>' + (dist || '<span class="qo-chip">无</span>') + '</td></tr>';
+  }).join('');
+  const conflictRows = contradictions.map(function(item){
+    return '<tr><td class="k">' + qoEsc(String(item.contradiction_id || '')) + '</td>' +
+      '<td>' + qoEsc(String(item.kind || '')) + '</td>' +
+      '<td>' + qoEsc(String(item.resolution || '')) + '</td>' +
+      '<td>' + qoEsc(String(item.reason_code || '')) + '</td>' +
+      '<td class="d">' + qoEsc(String(item.rationale || '')) + '</td></tr>';
+  }).join('');
+  host.innerHTML =
+    '<table class="qo-table"><thead><tr><th>结论</th><th>陈述</th><th>核验状态</th>' +
+    '<th>已核验支持数</th><th>关系分布</th></tr></thead><tbody>' +
+    (claimRows || '<tr><td colspan="5" class="d">无结论节点</td></tr>') + '</tbody></table>' +
+    '<div class="qo-sec-title">矛盾与裁决</div>' +
+    '<table class="qo-table"><thead><tr><th>矛盾</th><th>种类</th><th>裁决</th><th>理由码</th><th>依据</th></tr></thead><tbody>' +
+    (conflictRows || '<tr><td colspan="5" class="d">本 run 无矛盾（对象为 0 是真实结果）</td></tr>') + '</tbody></table>';
+}
+
+// ── P16-03 上下文检查器 ───────────────────────────────────────────────────────
+function qoOriginText(origin){
+  return {evidence: '证据', memory: '记忆', skill: '技能', task: '任务', context: '上下文'}[origin] || origin || '';
+}
+function qoRenderContext(payload){
+  const host = qoById('qoBody-context');
+  const body = payload.payload || {};
+  const items = body.items || [];
+  const dropped = body.dropped || [];
+  const gaps = body.context_gaps || [];
+  if(!items.length && !dropped.length && !gaps.length){
+    host.innerHTML = '<div class="qo-empty"><i class="fa fa-layer-group"></i>暂无上下文包明细' +
+      '<div class="qo-legend">（空态是合法结果：开关未开启，或该路径只在 SSE 事件里留下计数回执）</div></div>';
+    return;
+  }
+  const itemRows = items.map(function(item){
+    const flags = [];
+    flags.push('<span class="qo-chip' + (item.origin === 'memory' ? ' warn' : '') + '">' + qoEsc(qoOriginText(item.origin)) + '</span>');
+    if(item.grounded) flags.push('<span class="qo-chip ok">可回溯</span>');
+    else flags.push('<span class="qo-chip bad">无 span</span>');
+    if(item.revalidated) flags.push('<span class="qo-chip ok">已复验</span>');
+    else if(item.requires_revalidation) flags.push('<span class="qo-chip warn">需复验</span>');
+    return '<tr><td class="k">' + qoEsc(String(item.section || '')) + '<div class="qo-mono">' + qoEsc(String(item.item_id || '')) + '</div></td>' +
+      '<td>' + qoEsc(qoOriginText(item.origin)) + '</td>' +
+      '<td>' + qoText(item.tokens) + '</td>' +
+      '<td class="d">' + qoEsc(String(item.why_included || '')) + '</td>' +
+      '<td>' + flags.join(' ') + '</td>' +
+      '<td class="d">' + qoEsc(String(item.text || '').slice(0, 200)) + '</td></tr>';
+  }).join('');
+  const dropRows = dropped.map(function(item){
+    return '<tr><td class="k"><div class="qo-mono">' + qoEsc(String(item.item_id || '')) + '</div></td>' +
+      '<td>' + qoEsc(String(item.section || '')) + '</td>' +
+      '<td>' + qoEsc(qoOriginText(item.origin)) + '</td>' +
+      '<td>' + qoText(item.tokens) + '</td>' +
+      '<td>' + qoEsc(String(item.reason || '')) + '</td>' +
+      '<td class="d">' + qoEsc(String(item.detail || '')) + '</td></tr>';
+  }).join('');
+  const gapRows = gaps.map(function(gap){
+    return '<tr><td class="k">' + qoEsc(String(gap.context_gap_type || gap.type || '')) + '</td>' +
+      '<td>' + qoEsc(String(gap.action || '')) + '</td>' +
+      '<td>' + (gap.requires_retrieval ? '<span class="qo-chip warn">会触发新检索</span>' : '<span class="qo-chip ok">不触发检索</span>') + '</td>' +
+      '<td class="d">' + qoEsc(String(gap.detail || gap.reason || '')) + '</td></tr>';
+  }).join('');
+  host.innerHTML =
+    '<table class="qo-table"><thead><tr><th>段 / 条目</th><th>来自</th><th>token</th>' +
+    '<th>为何加入</th><th>标记</th><th>内容片段</th></tr></thead><tbody>' +
+    (itemRows || '<tr><td colspan="6" class="d">无入选条目</td></tr>') + '</tbody></table>' +
+    '<div class="qo-sec-title">被预算挤出的条目（' + dropped.length + '）</div>' +
+    '<table class="qo-table"><thead><tr><th>条目</th><th>段</th><th>来自</th><th>token</th><th>被裁原因</th><th>说明</th></tr></thead><tbody>' +
+    (dropRows || '<tr><td colspan="6" class="d">没有被裁条目</td></tr>') + '</tbody></table>' +
+    '<div class="qo-sec-title">上下文缺口（' + gaps.length + '）</div>' +
+    '<table class="qo-table"><thead><tr><th>缺口类型</th><th>动作</th><th>是否触发检索</th><th>说明</th></tr></thead><tbody>' +
+    (gapRows || '<tr><td colspan="4" class="d">无上下文缺口</td></tr>') + '</tbody></table>';
+}
+
+// ── P16-04 记忆视图 ───────────────────────────────────────────────────────────
+function qoRenderMemory(payload){
+  const host = qoById('qoBody-memory');
+  const body = payload.payload || {};
+  const items = body.items || [];
+  const chain = body.supersession_chain || [];
+  if(!items.length){
+    host.innerHTML = '<div class="qo-empty"><i class="fa fa-brain"></i>暂无记忆条目' +
+      '<div class="qo-legend">（记忆是 Research Accelerator，不是 Truth Oracle；没有记忆是正常状态）</div></div>';
+    return;
+  }
+  const rows = items.map(function(item){
+    const src = (item.sources || []).map(function(link){
+      return '<span class="qo-chip">' + qoEsc(String(link.route || link.stage || 'evidence')) + '</span>';
+    }).join('');
+    return '<tr><td class="k"><div class="qo-mono">' + qoEsc(String(item.memory_id || '')) + '</div></td>' +
+      '<td>' + qoEsc(String(item.memory_type || '')) + '</td>' +
+      '<td class="d">' + qoEsc(String(item.canonical_content || '').slice(0, 160)) + '</td>' +
+      '<td>' + qoText(item.confidence) + '</td>' +
+      '<td>' + qoEsc(String(item.freshness_class || '')) + ' / ' + qoText(item.decay_score) + '</td>' +
+      '<td>' + qoEsc(String(item.last_verified_at || '—')) + '</td>' +
+      '<td>' + qoText(item.reuse_count) + '</td>' +
+      '<td>' + qoEsc(String(item.status || '')) + '</td>' +
+      '<td class="d">' + qoEsc(String(item.scope || '')) + '<div class="qo-mono">' + qoEsc(String(item.scope_key || '')) + '</div></td>' +
+      '<td>' + (item.superseded_by ? '<span class="qo-chip warn">已被取代</span>' : '<span class="qo-chip ok">当前</span>') + '</td>' +
+      '<td>' + (src || '<span class="qo-chip">未绑定来源</span>') + '</td></tr>';
+  }).join('');
+  const chainRows = chain.map(function(hop){
+    return '<tr><td class="k">' + qoEsc(String(hop.from || '')) + '</td>' +
+      '<td>' + qoEsc(String(hop.relation || '')) + '</td>' +
+      '<td>' + qoEsc(String(hop.to || '')) + '</td>' +
+      '<td class="d">' + qoEsc(String(hop.rationale || '')) + '</td></tr>';
+  }).join('');
+  host.innerHTML =
+    '<table class="qo-table"><thead><tr><th>记忆</th><th>类型</th><th>内容</th><th>置信</th>' +
+    '<th>时效/衰减</th><th>最后复验</th><th>复用</th><th>状态</th><th>作用域</th><th>取代</th><th>来源</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="qo-sec-title">取代链（本 run 第一条记忆逐跳）</div>' +
+    '<table class="qo-table"><thead><tr><th>前</th><th>关系</th><th>后</th><th>依据</th></tr></thead><tbody>' +
+    (chainRows || '<tr><td colspan="4" class="d">无取代链</td></tr>') + '</tbody></table>';
+}
+
+// ── P16-05 检索轨迹 ───────────────────────────────────────────────────────────
+function qoRenderTrace(payload){
+  const body = payload.payload || {};
+  const additions = body.additions || {};
+  const meta = body.additions_meta || {};
+  const addHost = qoById('qoAdditions-search_trace');
+  const addKeys = Object.keys(additions);
+  addHost.innerHTML = addKeys.length ? addKeys.map(function(key){
+    const info = meta[key] || {};
+    return '<div class="qo-kpi"><div class="name">' + qoEsc(key) + '</div>' +
+      '<div class="val">' + qoText(additions[key]) + '</div>' +
+      '<div class="qo-src">' + qoEsc(String(info.source || '')) + '</div></div>';
+  }).join('') : '<div class="qo-empty"><i class="fa fa-plus"></i>暂无</div>';
+
+  const host = qoById('qoBody-search_trace');
+  const actions = body.actions || [];
+  if(!actions.length){
+    host.innerHTML = '<div class="qo-empty"><i class="fa fa-route"></i>暂无检索轨迹行' +
+      '<div class="qo-legend">（单跳快速路径不会产生轨迹行；§15 追加的六个字段仍在上方给出）</div>' +
+      (body.stop_reason ? '<div class="qo-legend">停止原因：' + qoEsc(String(body.stop_reason)) + '</div>' : '') +
+      '</div>';
+    return;
+  }
+  const rows = actions.map(function(a){
+    return '<tr><td class="k">轮 ' + qoText(a.round) + ' / 跳 ' + qoText(a.hop_index) + '</td>' +
+      '<td class="d">' + qoEsc(String(a.why_search || '')) + '</td>' +
+      '<td>' + qoEsc(String(a.query || '')) + '</td>' +
+      '<td>' + qoEsc(String(a.route || '')) + '</td>' +
+      '<td>' + qoText(a.results) + '</td>' +
+      '<td>' + qoText(a.accepted) + ' / ' + qoText(a.rejected) + '</td>' +
+      '<td>' + qoEsc(String(a.gap_id || '')) + '</td>' +
+      '<td>' + (a.resolved_gap ? '<span class="qo-chip ok">已消解</span>' : '<span class="qo-chip warn">未消解</span>') + '</td>' +
+      '<td>' + qoText(a.new_claims) + '</td>' +
+      '<td>' + qoText(a.latency_ms) + '</td>' +
+      '<td class="d">' + qoEsc(String(a.continue_reason || '')) + '</td></tr>';
+  }).join('');
+  host.innerHTML =
+    '<table class="qo-table"><thead><tr><th>轮/跳</th><th>为什么搜</th><th>搜了什么</th><th>通道</th>' +
+    '<th>命中</th><th>采纳/拒绝</th><th>Gap</th><th>Gap 结果</th><th>新增结论</th><th>耗时(ms)</th>' +
+    '<th>为什么继续</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="qo-legend">停止原因：' + qoEsc(String(body.stop_reason || '—')) +
+    '（来自 Phase 07 的唯一停止决策点）</div>';
+}
+
+// ── P16-06 看板 ───────────────────────────────────────────────────────────────
+function qoRenderDashboard(payload){
+  const host = qoById('qoKpi-dashboard');
+  const numbers = payload.numbers || {};
+  const wanted = ['runs', 'degraded_runs', 'worst_stage_p95_ms', 'tokens_total',
+                  'cache_entries', 'cache_live', 'skill_telemetry_rows', 'retrieval_evidence_adopted'];
+  const cards = wanted.filter(function(k){ return numbers[k]; }).map(function(key){
+    const item = numbers[key] || {};
+    const value = item.value;
+    return '<div class="qo-kpi"><div class="name">' + qoEsc(key) + '</div>' +
+      '<div class="val">' + (value === null || value === undefined ? '暂无数据' : qoText(value)) + '</div>' +
+      '<div class="qo-src">' + qoEsc(String(item.source || '')) + '</div></div>';
+  }).join('');
+  host.innerHTML = cards || '<div class="qo-empty"><i class="fa fa-gauge"></i>暂无数据</div>';
+
+  const body = qoById('qoBody-dashboard');
+  const numbers = payload.numbers || {};
+  const stages = (numbers.stage_p95_ms || {}).value || {};
+  const failures = (numbers.stage_failures || {}).value || {};
+  const stageRows = Object.keys(stages).sort().map(function(name){
+    return '<tr><td class="k">' + qoEsc(name) + '</td>' +
+      '<td>' + qoText(stages[name]) + '</td>' +
+      '<td>' + qoText(failures[name]) + '</td></tr>';
+  }).join('');
+  const skillRows = ((payload.payload || {}).skill_rows || []).map(function(row){
+    return '<tr><td class="k">' + qoEsc(String(row.skill_id || '')) + '</td>' +
+      '<td>' + qoEsc(String(row.stage_reached || '')) + '</td>' +
+      '<td>' + qoEsc(String(row.outcome || '')) + '</td>' +
+      '<td>' + qoText(row.latency_ms) + '</td>' +
+      '<td>' + qoText(row.wall_latency_ms) + '</td>' +
+      '<td class="d">' + qoEsc(String(row.run_id || '')) + '</td></tr>';
+  }).join('');
+  const cacheRows = Object.keys(numbers.cache_by_namespace ? numbers.cache_by_namespace.value || {} : {})
+    .map(function(name){
+      return '<tr><td class="k">' + qoEsc(name) + '</td><td>' +
+        qoText(numbers.cache_by_namespace.value[name]) + '</td></tr>';
+    }).join('');
+  body.innerHTML =
+    '<div class="qo-sec-title">各阶段延迟 p95 与失败数</div>' +
+    '<table class="qo-table"><thead><tr><th>阶段</th><th>p95(ms)</th><th>失败</th></tr></thead><tbody>' +
+    (stageRows || '<tr><td colspan="3" class="d">暂无阶段观测</td></tr>') + '</tbody></table>' +
+    '<div class="qo-sec-title">缓存（按 namespace）</div>' +
+    '<table class="qo-table"><thead><tr><th>namespace</th><th>条目</th></tr></thead><tbody>' +
+    (cacheRows || '<tr><td colspan="2" class="d">暂无缓存条目</td></tr>') + '</tbody></table>' +
+    '<div class="qo-sec-title">技能遥测行（申报延迟与墙上钟分列，互不顶替）</div>' +
+    '<table class="qo-table"><thead><tr><th>技能</th><th>到达阶段</th><th>结局</th>' +
+    '<th>申报延迟(ms)</th><th>墙上钟(ms)</th><th>run</th></tr></thead><tbody>' +
+    (skillRows || '<tr><td colspan="6" class="d">暂无技能遥测</td></tr>') + '</tbody></table>';
+}
+
+const QO_RENDERERS = {
+  execution: qoRenderExecution, evidence: qoRenderEvidence, context: qoRenderContext,
+  memory: qoRenderMemory, search_trace: qoRenderTrace, dashboard: qoRenderDashboard
+};
+
+function qoApplyView(view, payload){
+  qoSetState(view, payload);
+  qoRenderNumbers(view, payload);
+  const renderer = QO_RENDERERS[view];
+  if(renderer) renderer(payload);
+}
+
+function qoHandleHttp(status, body){
+  if(status === 401){
+    qoBanner('bad', '<i class="fa fa-lock"></i> 需要登录后才能查看可观测性视图（接口对未登录请求返回 401）。');
+    return;
+  }
+  if(status === 404){
+    qoBanner('warn', '<i class="fa fa-circle-question"></i> 找不到该问答运行，或它不属于当前账号。');
+    return;
+  }
+  const message = (body && body.error && (body.error.message || body.error.code)) || ('HTTP ' + status);
+  qoBanner('bad', '<i class="fa fa-triangle-exclamation"></i> 读取失败：' + qoEsc(String(message)));
+}
+
+async function qoFetchJson(url){
+  const response = await fetch(url, {method: 'GET', headers: {'Accept': 'application/json'},
+                                     credentials: 'same-origin'});
+  let body = null;
+  try { body = await response.json(); } catch (error) { body = null; }
+  return {status: response.status, ok: response.ok, body: body};
+}
+
+async function qoLoadRuns(){
+  const result = await qoFetchJson('/api/qa/v1/runs?limit=50');
+  const select = qoById('qoRunSelect');
+  if(result.status === 401){
+    select.innerHTML = '<option value="">未登录</option>';
+    return;
+  }
+  const runs = (result.body && result.body.runs) || [];
+  if(!runs.length){
+    select.innerHTML = '<option value="">暂无问答运行</option>';
+    qoBanner('info', '<i class="fa fa-circle-info"></i> 当前作用域内还没有问答运行 —— ' +
+      '这是全新部署的真实状态：run 级视图会显示空态，看板也会显示"暂无数据"。');
+    return;
+  }
+  select.innerHTML = runs.map(function(run){
+    const label = String(run.question || run.id || '').slice(0, 40) + ' · ' + String(run.id || '').slice(0, 8);
+    return '<option value="' + qoEsc(String(run.id || '')) + '">' + qoEsc(label) + '</option>';
+  }).join('');
+}
+
+function qoCurrentRunId(){
+  const typed = (qoById('qoRunInput').value || '').trim();
+  if(typed) return typed;
+  return (qoById('qoRunSelect').value || '').trim();
+}
+
+async function qoLoadRunViews(){
+  const runId = qoCurrentRunId();
+  if(!runId){
+    for(const view of QO_VIEWS){
+      if(view === 'dashboard') continue;
+      qoApplyView(view, {view: view, view_version: '', state: 'empty',
+        state_reason: 'NO_RUN_IN_SCOPE',
+        state_text: '请先选择或输入一个 run_id：run 级视图需要一个具体的问答运行。',
+        source: '', numbers: {}, notes: [], payload: {}});
+    }
+    return;
+  }
+  const result = await qoFetchJson('/api/qa/v1/runs/' + encodeURIComponent(runId) + '/observability');
+  if(!result.ok){ qoHandleHttp(result.status, result.body); return; }
+  qoClearBanner();
+  const views = ((result.body || {}).observability || {}).views || {};
+  QO_VIEWS.forEach(function(view){
+    if(view === 'dashboard') return;
+    qoApplyView(view, views[view] || {view: view, state: 'empty', state_reason: 'NO_STAGE_ARTIFACT',
+      state_text: '接口没有返回该视图。', source: '', numbers: {}, notes: [], payload: {}});
+  });
+}
+
+async function qoLoadDashboard(){
+  const result = await qoFetchJson('/api/qa/v1/observability/dashboard');
+  if(!result.ok){ qoHandleHttp(result.status, result.body); return; }
+  qoClearBanner();
+  const payload = ((result.body || {}).observability) || {};
+  qoApplyView('dashboard', payload);
+}
+
+function qoSwitchView(view){
+  document.querySelectorAll('#qoTabs .qo-tab').forEach(function(tab){
+    tab.classList.toggle('active', tab.dataset.view === view);
+  });
+  document.querySelectorAll('.qo-panel').forEach(function(panel){
+    panel.classList.toggle('active', panel.dataset.view === view);
+  });
+  if(view === 'dashboard') qoLoadDashboard(); 
+}
+
+function qoInit(){
+  qoById('qoTabs').addEventListener('click', function(event){
+    const tab = event.target.closest('.qo-tab');
+    if(tab) qoSwitchView(tab.dataset.view);
+  });
+  qoById('qoLoadBtn').addEventListener('click', function(){
+    qoLoadRunViews();
+    qoLoadDashboard();
+  });
+  qoById('qoRefreshBtn').addEventListener('click', function(){
+    qoLoadRuns().then(function(){ qoLoadRunViews(); qoLoadDashboard(); });
+  });
+  qoById('qoRunSelect').addEventListener('change', function(){
+    qoById('qoRunInput').value = '';
+    qoLoadRunViews();
+  });
+  const fromQuery = new URLSearchParams(window.location.search).get('run_id');
+  if(fromQuery) qoById('qoRunInput').value = fromQuery;
+  qoLoadRuns().then(function(){
+    if(!qoById('qoRunInput').value && qoById('qoRunSelect').value){
+      qoById('qoRunInput').value = qoById('qoRunSelect').value;
+    }
+    qoLoadRunViews();
+    qoLoadDashboard();
+  });
+}
+document.addEventListener('DOMContentLoaded', qoInit);
+</script>
+</body>
+</html>

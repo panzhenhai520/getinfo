@@ -272,3 +272,8 @@
 |P15-06|审计与回放|`python -m pytest tests/test_qa_phase15_audit.py -q`|四层链逐跳闭环、规则重放比对、篡改必检出|**13 passed**；本地真库 **20/20 run 闭环**；快照模式无事件时标「不可得」|PASS|`qa_memory_safety.py:1284`|
 |P15-A机|真机只读验证与收尾|`python tools/qa_phase15_real_probe.py` 与 `tools/qa_phase15_cleanup_check.py`|真连、短命命令、零写、无长事务|schema v11（Phase 14 已发布）、本阶段模块未在位（未发布）；runs 15 / claims 129 / evidence 93；**八张 memory 表 0 行**；收尾 `long_transactions=[]`、`idle_in_transaction=0`|PASS（记忆级数字为快照加同代码离线重建口径，已标注）|`baseline/qa-memory-safety-real-sample.json`|
 |P15-R1|跨阶段契约变更与冻结面|`python -m pytest tests/test_qa_phase15_contracts.py -q` 与全量|七指纹不变、版本断言仍是等值断言、零迁移|**16 passed**；全量 **3447 passed / 1 skipped / 0 failed**（Phase 14 基线 3324 未破，+123 例）|PASS|`qa_graph_contracts.py`|
+|P16-01/02|执行视图与证据视图|`python -m pytest tests -q -k phase16`|视图数据全部来自既有阶段回执、不在 UI 层另算；空态给原因码|**80 passed**；证据视图在真机真实数据上为 ok（15 run / 129 claim / 93 证据）|PASS|`qa_observability_ui.py`；`templates/qa_observability.html`|
+|P16-03/04/05|上下文检查器、记忆视图、检索轨迹|同上|空态必须给原因码并说明缺的是什么|上下文/执行空态为 SWITCH_OFF；记忆空态为 NO_MEMORY_IN_SCOPE（线上 0 行属真实状态）；轨迹空态为 NO_STAGE_ARTIFACT|PASS|同上|
+|P16-06|成本与延迟仪表盘|同上|缺失量写 null 而不是 0|真机真实数据：worst p95=76272ms、缓存 level1_retrieval=17、adopted=72、tokens 为 null（线上无用量记录）|PASS|同上|
+|P16-接口|只读 HTTP 面与登录态|A 机真 curl|未登录 302/401、路由只有 GET、界面只读|`GET /qa-observability` 未登录 **302** 跳登录；`GET /api/qa/v1/observability/views` 未登录 **401**；登录尝试用容器内默认口令返回 200 但 success=false（用户已改口令）→ **未取得登录态，如实记录且未猜改口令**|PASS（登录态为边界）|同上|
+|P16-R1|冻结契约与基线|`python -m pytest tests -q`|七指纹不变、不改冻结 schema|全量 **3527 passed / 1 skipped / 0 failed**（改动前先复跑基线 3447/1/0 逐字吻合，+80 为本阶段新增，零回归零删除跳过）|PASS|同上|

@@ -92,12 +92,12 @@
 |P15-04|SafetyCritical override| PASS | 安全硬触发与 D-052 的分界：**单个**安全词仍走既有软覆盖（口径未动）；**不同**危险信号成组（默认 ≥2）才硬触发——安全动作绕过负担上限与效用下限、把被忽略的 latency/cost/user_burden 逐条留痕，权限与来源与适用性三道闸门照旧，无安全动作如实记账；开关关闭逐字回到 Phase 14。真机 129 条缺口触发分布 NO_TRIGGER 105 / SOFT 24 / **HARD 0** → 硬触发真机无对象，能力证据来自构造注入（已标注）；12 例 | 2026-10-11 |
 |P15-05|privacy-minimal logs| PASS | 日志最小化：复用既有脱敏，补嵌套密钥整值脱敏、值级标识符、**正文只留指纹与长度**（字段名政策）、截断；`leaks` 独立复算必须为空。真机 50 条真实记忆正文 **50/50 只留指纹、leaks 0**；16 例 | 2026-10-11 |
 |P15-06|audit/replay| PASS | 审计与回放：事件落**既有审计表**（零迁移、种类六值闭集合、未知归一）；载荷先过最小化；每类取被检查过的前 N 条并携带**可重放输入**（当时的绑定轴加冻结时钟）；四层回放链逐跳闭环加规则重放比对（篡改必被检出，有反例用例）。本地真库 **20/20 run 闭环**、replay_matches 为真；**快照模式无审计事件时如实标「不可得」**；13 加 10 例 | 2026-10-11 |
-|P16-01|Execution View|NOT_STARTED|||
-|P16-02|Evidence View|NOT_STARTED|||
-|P16-03|Context Inspector|NOT_STARTED|||
-|P16-04|Memory View|NOT_STARTED|||
-|P16-05|Search Trace|NOT_STARTED|||
-|P16-06|cost/latency/token/cache/skill dashboard|NOT_STARTED|||
+|P16-01|Execution View| PASS | 新增 qa_observability_ui.py + templates/qa_observability.html：执行视图（节点/阶段/停止原因）只读投影，数据全部来自既有阶段回执；空态给出原因码 SWITCH_OFF（开关未开）而非空白 | 2026-10-11 |
+|P16-02|Evidence View| PASS | 证据视图（**真机真实数据 ok**）：真库只读导出 15 run / 129 claim / 57 边 / 93 证据，在本地用同一份投影代码离线复算；每条证据带来源与口径，不在 UI 层另算 | 2026-10-11 |
+|P16-03|Context Inspector| PASS | 上下文检查器：九段上下文包与引用索引的只读视图；空态给 SWITCH_OFF 并说明是开关未开而非无数据 | 2026-10-11 |
+|P16-04|Memory View| PASS | 记忆视图：作用域与状态只读投影；空态给 NO_MEMORY_IN_SCOPE（线上 memory 表 0 行，属真实状态） | 2026-10-11 |
+|P16-05|Search Trace| PASS | 检索轨迹视图：六字段齐备（memory_recalled / context_items / skills_loaded 等）；空态给 NO_STAGE_ARTIFACT 并说明缺的是哪份阶段产物 | 2026-10-11 |
+|P16-06|cost/latency/token/cache/skill dashboard| PASS | 成本与延迟仪表盘（**真机真实数据 ok**）：真实延迟 worst p95=76272ms、缓存 level1_retrieval=17、adopted=72；tokens 写 null 而不是 0（线上没有 token 用量记录，不假装为 0）；技能与缓存命中同一口径 | 2026-10-11 |
 |P17-01|E2E suite|NOT_STARTED|||
 |P17-02|ablation ladder|NOT_STARTED|||
 |P17-03|metric report|NOT_STARTED|||

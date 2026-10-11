@@ -63,6 +63,9 @@ from chat_api import chat_bp
 from intel_api import intel_bp
 # 统一 QA（AI 助手）网关蓝图：/api/qa/v1/*，见 qa_gateway.py
 from qa_gateway import qa_bp
+# 阶段 16（P16-01…P16-06）可观测性 UI 的**只读** API 蓝图：/api/qa/v1/observability/* 与
+# /api/qa/v1/runs/<id>/observability*，见 qa_observability_api.py（只注册 GET）。
+from qa_observability_api import observability_bp
 from user_database import UserDatabase
 try:
     import newspaper
@@ -737,6 +740,8 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(intel_bp)
 # 统一 QA（AI 助手）：/api/qa/v1/* 运行记录、事件流、设置与 bridge 会话
 app.register_blueprint(qa_bp)
+# 阶段 16（P16-01…P16-06）可观测性 UI：只读视图 API（全部 GET，无任何写路径）
+app.register_blueprint(observability_bp)
 # AI 周报（通用 LLM 总结 + 提示词设置 + 报告查看）
 from pack_report import pack_report_bp  # noqa: E402
 app.register_blueprint(pack_report_bp)
@@ -1457,6 +1462,22 @@ def url_management():
 def reports_page():
     """相关报告页：展示抓取/下载的报告（HTML 报告为主），按行业/年月/版本分层，右侧预览 + 下载。"""
     return render_template('reports.html', active_industry_pack=active_industry_identity())
+
+
+@app.route('/qa-observability')
+@login_required
+def qa_observability_page():
+    """阶段 16（P16-01…P16-06）可观测性 UI：六视图**只读**投影（执行图/证据图/上下文/
+    记忆/检索轨迹/成本延迟看板）。未登录由 `@login_required` 302 跳登录页。
+
+    页面本身不做任何业务计算：所有数字都由 `/api/qa/v1/.../observability*` 只读接口给出，
+    且每个数字带"来源阶段 + 口径"。页面上没有任何修改证据/结论/记忆的入口。
+    """
+    response = make_response(render_template(
+        'qa_observability.html', active_industry_pack=active_industry_identity()))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 @app.route('/source-management')
 @login_required
