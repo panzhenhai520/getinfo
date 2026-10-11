@@ -2546,5 +2546,126 @@ class QaStore:
             stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
         return stats
 
+    # ── 阶段 11（P11-06）：技能遥测（**复用 qa_stage_runs，零迁移**）─────────────
+    # 口径与 Phase 05 的 `record_node_runs` 完全一致：`stage="skill:<skill_id>"`、
+    # `node_kind="skill"`、`node_id=<skill_id>`。为什么不再建一张表：`qa_stage_runs` 已有
+    # latency/status/details/attempt 与 `UNIQUE(run_id, stage, attempt)`，正好是"每个 run 每个
+    # 技能每次尝试一行"；建新表要升 schema 版本并让老库补建，收益为零（MASTER_RULES 第 9 条）。
+    # 显式传入的 `latency_ms`/成本/证据产出写进 `details_json`（**可复算**，不吃墙上钟）；
+    # 列上的 `latency_ms` 仍由 `record_stage` 按真实起止时间算（两者用途不同，不互相顶替）。
+    def record_skill_load(self, run_id: str, record: Mapping) -> dict:
+        """把一个技能加载遥测记录落库。返回 `{ok, record_id, skill_id, stage, error}`。"""
+        record = record if isinstance(record, Mapping) else {}
+        skill_id = str(record.get("skill_id") or "")
+        if not skill_id:
+            return {"ok": False, "record_id": "", "skill_id": "", "stage": "", "error": "缺少 skill_id"}
+        outcome = str(record.get("outcome") or "skipped")
+        status = {"ok": "completed", "degraded": "degraded", "error": "failed",
+                  "skipped": "skipped"}.get(outcome, "skipped")
+        details = {
+            "skill_telemetry_version": str(record.get("telemetry_version") or ""),
+            "record_id": str(record.get("record_id") or ""),
+            "skill_id": skill_id,
+            "task_type": str(record.get("task_type") or ""),
+            "stage_reached": str(record.get("stage_reached") or ""),
+            "outcome": outcome,
+            "reason": str(record.get("reason") or ""),
+            "latency_ms": float(record.get("latency_ms") or 0.0),
+            "cost_units": float(record.get("cost_units") or 0.0),
+            "evidence_yield": int(record.get("evidence_yield") or 0),
+            "verified_yield": int(record.get("verified_yield") or 0),
+        }
+        try:
+            self.record_stage(
+                str(run_id), "skill:%s" % skill_id, status=status,
+                attempt=max(1, int(record.get("attempt") or 1)),
+                error_code="" if status == "completed" else outcome,
+                details=details, node_id=skill_id, node_kind="skill")
+            return {"ok": True, "record_id": details["record_id"], "skill_id": skill_id,
+                    "stage": "skill:%s" % skill_id, "error": ""}
+        except Exception as exc:  # noqa: BLE001 —— 遥测绝不能把主链路打断
+            return {"ok": False, "record_id": details["record_id"], "skill_id": skill_id,
+                    "stage": "skill:%s" % skill_id,
+                    "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+
+    def skill_load_rows(self, *, run_id: str = "", skill_ids: Sequence[str] = (),
+                        limit: int = 1000) -> list:
+        """读技能遥测行（`node_kind='skill'`）。
+
+        返回的每一行都把 `details_json` 里的**显式**遥测值提到顶层（`stage_reached`/
+        `outcome`/`latency_ms`/`cost_units`/`evidence_yield`/`task_type`），另外保留
+        列上的 `wall_latency_ms`（真实起止时长）与 `error_code`/`status`。
+        这样"服务商申报/显式观测的延迟"与"墙上钟"永远分得清。
+        """
+        rows: list = []
+        try:
+            self.ensure_schema()
+            where, params = ["node_kind='skill'"], []
+            if run_id:
+                where.append("run_id=?")
+                params.append(str(run_id))
+            clean_ids = [str(name) for name in (skill_ids or []) if str(name)]
+            if clean_ids:
+                where.append("node_id IN (%s)" % ",".join("?" for _ in clean_ids))
+                params.extend(clean_ids)
+            params.append(max(1, int(limit)))
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    raw = cursor.execute(
+                        "SELECT run_id,node_id,stage,attempt,status,error_code,latency_ms,"
+                        "details_json FROM qa_stage_runs WHERE %s "
+                        "ORDER BY started_at, stage, attempt LIMIT ?"
+                        % " AND ".join(where), tuple(params)).fetchall()
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001 —— 读不到就当没有遥测（不编数据）
+            return []
+        for row in raw:
+            value = _row_dict(row) or {}
+            try:
+                details = _decode_json(value.get("details_json"), {})
+            except Exception:  # noqa: BLE001
+                details = {}
+            details = details if isinstance(details, Mapping) else {}
+            rows.append({
+                "run_id": str(value.get("run_id") or ""),
+                "skill_id": str(value.get("node_id") or ""),
+                "stage": str(value.get("stage") or ""),
+                "attempt": int(value.get("attempt") or 1),
+                "status": str(value.get("status") or ""),
+                "error_code": str(value.get("error_code") or ""),
+                "telemetry_version": str(details.get("skill_telemetry_version") or ""),
+                "record_id": str(details.get("record_id") or ""),
+                "task_type": str(details.get("task_type") or ""),
+                "stage_reached": str(details.get("stage_reached") or "routed"),
+                "outcome": str(details.get("outcome") or "skipped"),
+                "reason": str(details.get("reason") or ""),
+                "latency_ms": float(details.get("latency_ms") or 0.0),
+                "cost_units": float(details.get("cost_units") or 0.0),
+                "evidence_yield": int(details.get("evidence_yield") or 0),
+                "verified_yield": int(details.get("verified_yield") or 0),
+                "wall_latency_ms": value.get("latency_ms"),
+            })
+        return rows
+
+    def skill_telemetry_stats(self, *, run_id: str = "") -> dict:
+        """技能遥测的分组统计（验收工具/运维自检；与 `memory_revalidation_stats` 同一风格）。"""
+        stats = {"records": 0, "by_skill": {}, "by_stage": {}, "by_outcome": {},
+                 "by_reason": {}, "success_definition": "", "error": ""}
+        rows = self.skill_load_rows(run_id=run_id)
+        stats["records"] = len(rows)
+        for row in rows:
+            for column, target in (("skill_id", "by_skill"), ("stage_reached", "by_stage"),
+                                   ("outcome", "by_outcome"), ("reason", "by_reason")):
+                key = str(row.get(column) or "")
+                stats[target][key] = stats[target].get(key, 0) + 1
+        try:
+            from qa_skills import performance_summary
+            stats["success_definition"] = performance_summary([])["success_definition"]
+        except Exception as exc:  # noqa: BLE001
+            stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return stats
+
 
 __all__ = ["QaStore"]

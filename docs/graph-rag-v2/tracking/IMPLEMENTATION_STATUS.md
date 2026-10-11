@@ -61,12 +61,12 @@
 |P10-04|MemoryContradiction| PASS | 记忆矛盾两族判定；裁决**完全复用 Phase 06 的规则裁决器**（理由码同一张表、decider=rule:qa-contradiction-resolver-v1）；四条前置条件（断言型类型白名单、实体键 Jaccard≥0.5、词面重叠≥0.5、Phase 03 否定极性）；真机断言型记忆 0 条真矛盾（与 qa_conflicts 0 行同口径），能力证据用真机素材构造注入（正例 2、负例控制组 0）；28+6 例 | 2026-10-11 |
 |P10-05|SUPERSEDED_BY| PASS | SUPERSEDED_BY 落成三件套：字段 + 状态 + （M2 到 M1 的）SUPERSEDES 边 + 版本行（不物理覆盖）；链单调（已指向别的后继不改写）、REVOKED 拒绝被取代、后继必须是记忆否则退化为 CONTRADICTED（永不悬空）；规范后继唯一（生效时间最晚，并列取 id 最小）；真机取代链 problems 为空；8 例 | 2026-10-11 |
 |P10-06|revoke/high-risk hook| PASS | 按来源、实体、会话、显式 id 四选择器撤销污染记忆（并集去重）+ REVOKE 版本行 + EXPIRED_BY 边（可追溯）；REVOKED 是终态不可复活；幂等；高危钩子给确定性动作映射，模型判定只留注入点（默认规则、零调用）；真机构造撤销 13 条；13 例 | 2026-10-11 |
-|P11-01|Skill schema/version|NOT_STARTED|||
-|P11-02|Registry|NOT_STARTED|||
-|P11-03|Router|NOT_STARTED|||
-|P11-04|permission/cost/latency|NOT_STARTED|||
-|P11-05|on-demand instruction|NOT_STARTED|||
-|P11-06|performance telemetry|NOT_STARTED|||
+|P11-01|Skill schema/version| PASS | 契约段新增技能注册表：11 个技能标识逐字入 SKILL_IDS、九个声明字段全部进 SKILL_SCHEMA.required；六个版本号；成本四档与延迟四档、权限六位、状态三值、来源二值、选择理由码 18 值、加载阶段四步、结局四值、遥测理由四值全部闭集合；通道与技能双向映射与 Phase 07 的 HUNTER_BY_ROUTE 同源；**交互类技能位只声明不实现并注明归 P14-07**；七契约指纹复算不变；33 例 | 2026-10-11 |
+|P11-02|Registry| PASS | 新增 qa_skills.py：SkillRegistry 加 11 条内置声明（每条都过 SKILL_SCHEMA）加内容寻址整表指纹加注册回执；五条失败路径全部拒收并记账（未知标识、缺字段、越界枚举、重名未显式替换、非法注册来源）；内置技能没有 unregister（停用只能改状态，可审计可回滚）；注册来源由注册动作决定、载荷自称无效；26 例 | 2026-10-11 |
+|P11-03|Router| PASS | 路由：三个输入（任务类型、缺口类型、Phase 08 的 LOAD_SKILL）全部接上；最小必要集合口径写死（一个 need 最多一个技能，跨 need 命中同一技能只加载一次且该 need 视为已满足）；历史成功率真参与（样本少于 3 不参与）；requires_retrieval 恒 False；真机 15 run / 244 need → 选中 38、命中率 0.155738、两次分析逐字相同；34 例 | 2026-10-11 |
+|P11-04|permission/cost/latency| PASS | SkillBudget：三个上限（条数、成本单位、申报延迟毫秒）加六个权限位；判据顺序写死（禁用→权限→去重→条数→成本→延迟），权限在预算之前所以被拒通道不消耗额度；默认拒绝 emr_read 与 patient_contact；非法权限位一律丢弃（拼错绝不提权）；真机默认预算下 web_search 因延迟超限被拦 12 次、成本上限拦 11 次；27 例 | 2026-10-11 |
+|P11-05|on-demand instruction| PASS | 按需指令：确定性模板拼装（零模型调用），每条恒 is_evidence=False、requires_revalidation=True、in_citation_map=False；Phase 08 的 skill_context 段由空段加 deferred_to 变为 implemented_by 加已加载技能加提示政策，技能条目一条都不进 citation_map；LOAD_SKILL 缺口真机 9 → 0；20 例 | 2026-10-11 |
+|P11-06|performance telemetry| PASS | 性能遥测：成功率口径写死（成功当且仅当结局 ok 且阶段属已进包或已执行）、样本少于 3 给空值加不足样本理由码；**零迁移**落既有 qa_stage_runs（stage=skill:<id>、node_kind=skill），显式观测延迟与墙上钟分列互不顶替；schema 仍 v9、未建表未加列；线上暂无遥测行（离线同代码重建 38 次加载）；37 例 | 2026-10-11 |
 |P12-01|episode summarizer from trace|NOT_STARTED|||
 |P12-02|Failure Memory|NOT_STARTED|||
 |P12-03|Strategy Memory|NOT_STARTED|||

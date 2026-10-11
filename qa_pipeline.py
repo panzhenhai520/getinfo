@@ -47,6 +47,9 @@ from qa_gap_analyzer import (
     plan_next_hops, review_graph as review_gap_graph,
 )
 from qa_context_pack import context_pack_enabled
+from qa_skills import (
+    SKILL_ROUTER_VERSION, skill_router_enabled,
+)
 from qa_memory import (
     MEMORY_GRAPH_VERSION, memory_context_items, memory_graph_enabled, memory_receipt,
     recall_from_run, write_gate_receipt, write_memories_from_graph,
@@ -744,7 +747,8 @@ def _build_evidence_graph_layer(graph: dict, *, plan: Mapping | None, run_meta: 
 
 def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
                               run_meta: Mapping, working_memory: Mapping | None = None,
-                              memory_items: Sequence[Mapping] = ()) -> dict:
+                              memory_items: Sequence[Mapping] = (),
+                              skill_items: Sequence[Mapping] = ()) -> dict:
     """阶段 08（P08-01…P08-06）：按任务组装最小有效 Context Pack。
 
     **只加不改**：结果挂在 `graph["context_pack"]` 这个兄弟键上（Phase 06 的
@@ -756,6 +760,9 @@ def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: 
     阶段 09（P09-04）：`memory_items` 是 Memory Graph 的 **MEMORY_HINT** 条目
     （口子在 `qa_memory.memory_context_items()`），只填空 `memory_context` 段；
     不传时该段仍是空段 + `deferred_to`（Phase 08 行为不变）。
+    阶段 11（P11-05）：`skill_items` 是 Skill Router 的 **SKILL_HINT** 指令条目
+    （口子在 `qa_skills.skill_context_items()`），只填空 `skill_context` 段；同样不传就
+    保持 Phase 08 的空段行为。
     """
     try:
         from qa_context_pack import build_context_pack, context_pack_receipt
@@ -763,7 +770,8 @@ def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: 
         pack = build_context_pack(graph=graph, plan=plan, request=request,
                                   working_memory=working_memory,
                                   run_id=str(run_meta.get("id") or ""),
-                                  memory_items=memory_items)
+                                  memory_items=memory_items,
+                                  skill_items=skill_items)
         pack["receipt"] = context_pack_receipt(pack)
         return pack
     except Exception as exc:  # noqa: BLE001
@@ -839,6 +847,154 @@ def _attach_memory_revalidation(graph: dict, *, recall: Mapping | None, run_meta
     except Exception as exc:  # noqa: BLE001
         return {"revalidation_version": "", "checked": 0, "gate_decisions": {}, "outcomes": {},
                 "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+
+# ── 阶段 11（P11-01…P11-06）：Skill Registry & Router 的接线 ──────────────────
+# 口径（与 Phase 09/10 同一手法）：默认**关**（`QA_SKILL_ROUTER=0`）→ 一个键都不新增、
+# 一行都不写库，行为逐字回到 Phase 10；打开后只加**兄弟键** `graph["skill_routing"]`，
+# 并把 SKILL_HINT 指令条目交给上下文包的 `skill_context` 段（Phase 08 九段之一）。
+# 遥测另有一个开关（`QA_SKILL_TELEMETRY`，默认关），落在既有的 `qa_stage_runs`（零迁移）。
+
+def _skill_gaps_from(context: Mapping | None, graph: Mapping | None,
+                     plan: Mapping | None = None) -> list:
+    """收集 Phase 07 的 Evidence Gap（**只读既有回执，绝不重算缺口**）。
+
+    三个来源按确定性顺序合并去重：多跳循环的 `stats.gap_loop.gaps`（运行期真实缺口）→
+    证据图复核的 `evidence_graph.gap_review.gaps` → 证据图层自己的 `gaps`。
+    哪里都没有就返回空列表（Router 照样能只按 task_type 工作）。
+    """
+    out: dict = {}
+    outputs = (context or {}).get("outputs") if isinstance(context, Mapping) else None
+    outputs = outputs if isinstance(outputs, Mapping) else {}
+    level1 = outputs.get("level1_retrieval") if isinstance(outputs.get("level1_retrieval"), Mapping) else {}
+    sources = [
+        ((level1.get("stats") or {}).get("gap_loop") or {}).get("gaps"),
+        ((graph or {}).get("evidence_graph") or {}).get("gap_review", {}).get("gaps")
+        if isinstance(((graph or {}).get("evidence_graph") or {}).get("gap_review"), Mapping) else None,
+        ((graph or {}).get("evidence_graph") or {}).get("gaps"),
+    ]
+    for rows in sources:
+        for row in (rows or []):
+            if not isinstance(row, Mapping):
+                continue
+            key = str(row.get("gap_id") or "")
+            if key and key not in out:
+                out[key] = dict(row)
+    return [out[key] for key in sorted(out)]
+
+
+def _skill_task_type(plan: Mapping | None) -> str:
+    """本轮任务的 `task_type`（§8 的 "task_type + gap_type" 输入）。
+
+    取值优先级：计划里的解释结果 `interpretation.intent` → `plan["intent"]` →
+    Phase 07 的 `category_of(plan)`（同一套问题类别）。**只做投影**，不重新分类：
+    认不出的取值由 Router 忽略（`SKILL_TASK_TYPE_RULES` 查不到就没有候选）。
+    """
+    plan = plan if isinstance(plan, Mapping) else {}
+    interpretation = plan.get("interpretation") if isinstance(plan.get("interpretation"), Mapping) else {}
+    for value in (interpretation.get("intent"), plan.get("intent")):
+        if str(value or ""):
+            return str(value)
+    try:
+        from qa_gap_analyzer import category_of
+        return str(category_of(plan) or "")
+    except Exception:      # noqa: BLE001 —— 分类不出来就当没有任务类型（不猜）
+        return ""
+
+
+def _skill_needed_skills(graph: Mapping, *, plan: Mapping | None,
+                         request: Mapping | None) -> list:
+    """任务级需要的 §8 能力（**与 Phase 08 的缺口检测共用同一判据**）。
+
+    为什么要这一步：Phase 08 的 `SKILL_NOT_AVAILABLE` 缺口是**打包之后**才知道的
+    （它读的是进包条目），而 `skill_context` 段又要靠这个结论去填 —— 直接读包就会
+    先有鸡还是先有蛋。所以路由侧走 `qa_context_pack.skill_context_needs()`（同一个函数、
+    同一条判据）在**打包前**问一次"本任务需要什么能力"，再把答案交给打包。
+    两边唯一可能的差别是：包里的结论被预算裁掉了（那属于 Context Gap 的账，见 P08-05）。
+    """
+    try:
+        from qa_context_pack import build_context_graph, skill_context_needs
+
+        context_graph = build_context_graph(graph=graph,
+                                           plan=(plan if isinstance(plan, Mapping) else {}),
+                                           run_id="")
+        needed = skill_context_needs(items=context_graph.get("items") or ())
+        return [needed] if needed else []
+    except Exception:      # noqa: BLE001 —— 算不出来就当不需要（不猜）
+        return []
+
+
+def _attach_skill_routing(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
+                          run_meta: Mapping, context: Mapping | None = None,
+                          performance: Mapping | None = None) -> dict:
+    """阶段 11（P11-03）：按任务选**最小必要集合**，结果挂兄弟键 `graph["skill_routing"]`。
+
+    任何异常都吞掉并记账：技能选择绝不能把出答案的链路打断。
+    `requires_retrieval` 恒 False —— 选技能不是发起新检索（MASTER_RULES 第 13 条）。
+    """
+    try:
+        from qa_skills import route_skills, skill_routing_receipt
+
+        routing = route_skills(gaps=_skill_gaps_from(context, graph, plan),
+                               context_gaps=((graph or {}).get("context_pack") or {}
+                                             ).get("context_gaps") or (),
+                               needed_skills=_skill_needed_skills(graph, plan=plan,
+                                                                  request=request),
+                               task_type=_skill_task_type(plan),
+                               performance=performance)
+        routing["receipt"] = skill_routing_receipt(routing)
+        return routing
+    except Exception as exc:      # noqa: BLE001
+        return {"router_version": SKILL_ROUTER_VERSION, "selected": [], "trace": [],
+                "budget": {}, "stats": {},
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+
+def _skill_items_from(routing: Mapping | None, *, limit: int = 4) -> list:
+    """把路由结果转成 `skill_context` 段的上下文条目（关掉开关时返回空列表）。"""
+    if not isinstance(routing, Mapping) or routing.get("error"):
+        return []
+    try:
+        from qa_skills import skill_context_items
+        return skill_context_items(routing, limit=limit)
+    except Exception:      # noqa: BLE001 —— 条目构造失败就当没有指令（不编内容）
+        return []
+
+
+def _attach_skill_telemetry(graph: dict, routing: Mapping | None, *, run_meta: Mapping,
+                            store, plan: Mapping | None = None) -> dict:
+    """阶段 11（P11-06）：把**真实结果**记成遥测并落库（默认关；只动既有 `qa_stage_runs`）。
+
+    `stage_reached`/`outcome`/`evidence_yield` 都从"真的发生了没有"推出来（指令进包了没有、
+    该通道这一轮到底产出了几条证据），不是声明值。调用点必须在 `graph["context_pack"]`
+    填好之后（遥测要读 `skill_context` 段的 `loaded_skills`）。
+    """
+    if store is None or not isinstance(routing, Mapping) or routing.get("error"):
+        return {}
+    try:
+        from qa_skills import skill_telemetry_enabled, telemetry_receipt, telemetry_records_from_routing
+    except Exception as exc:      # noqa: BLE001 —— 模块不可用时与本开关关闭同效
+        return {"telemetry_version": "", "records": 0,
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+    records = telemetry_records_from_routing(
+        routing, graph=graph, run_id=str((run_meta or {}).get("id") or ""),
+        task_type=_skill_task_type(plan))
+    report = telemetry_receipt(records, routing=routing)
+    report["persisted"] = 0
+    report["persist_errors"] = []
+    if not skill_telemetry_enabled():
+        return report
+    for record in records:
+        try:
+            result = store.record_skill_load(str((run_meta or {}).get("id") or ""), record)
+        except Exception as exc:      # noqa: BLE001 —— 遥测绝不能拖累主流程
+            result = {"ok": False, "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+        if result.get("ok"):
+            report["persisted"] += 1
+        else:
+            report["persist_errors"].append({"skill_id": record.get("skill_id"),
+                                             "error": str(result.get("error") or "")[:160]})
+    return report
 
 
 def _attach_memory_recall(graph: dict, *, plan: Mapping | None, request: Mapping | None,
@@ -2926,6 +3082,27 @@ def build_qa_stage_handlers(
         memory_revalidation = _attach_memory_revalidation(
             graph, recall=memory_recall, run_meta=context["run"], store=store,
             trace_id=str(context["run"].get("id") or ""))
+        # 阶段 11（P11-03）：Skill Router —— 默认关；打开后挂兄弟键 `graph["skill_routing"]`。
+        # 刻意放在 `context_pack_enabled()` **外面**（但**在总开关里面**）：两个开关是两件事，
+        # 关掉上下文包不该顺带把技能选择也关掉（Phase 09 的记忆召回同样待遇）；
+        # 关掉总开关时这里一个键都不新增（回滚口径）。
+        _skill_routing = _attach_skill_routing(
+            graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
+            request=context["request"], run_meta=context["run"], context=context) \
+            if skill_router_enabled() else {}
+        if _skill_routing:
+            graph["skill_routing"] = _skill_routing
+            if callable(emit_stage_event) and not _skill_routing.get("error"):
+                emit_stage_event("stage_progress", {
+                    "message": ("技能路由：选中 %s 个（%s），预算 %s/%s 条、成本 %.2f/%.2f"
+                                % (len(_skill_routing.get("selected") or []),
+                                   "、".join(_skill_routing.get("selected") or []) or "无",
+                                   (_skill_routing.get("budget") or {}).get("used_skills"),
+                                   (_skill_routing.get("budget") or {}).get("max_skills"),
+                                   (_skill_routing.get("budget") or {}).get("used_cost_units") or 0,
+                                   (_skill_routing.get("budget") or {}).get("max_total_cost_units") or 0)),
+                    "skill_routing": _skill_routing.get("receipt") or {},
+                })
         if memory_revalidation:
             graph["memory_revalidation"] = memory_revalidation
             if callable(emit_stage_event):
@@ -2945,7 +3122,14 @@ def build_qa_stage_handlers(
                 request=context["request"], run_meta=context["run"],
                 working_memory=_context_working_memory(context),
                 memory_items=_memory_items_from(
-                    memory_recall, revalidated_hints=memory_revalidation.get("hints") or ()))
+                    memory_recall, revalidated_hints=memory_revalidation.get("hints") or ()),
+                skill_items=_skill_items_from(_skill_routing))
+        # 阶段 11（P11-06）：遥测放在上下文包**之后**（它要读 `skill_context.loaded_skills`）
+        if skill_router_enabled() and _skill_routing:
+            _skill_telemetry = _attach_skill_telemetry(
+                graph, _skill_routing, run_meta=context["run"], store=store, plan=plan_output)
+            if _skill_telemetry:
+                graph["skill_telemetry"] = _skill_telemetry
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
             message = (f"证据图已建立：{len(graph.get('claims') or [])} 条结论、"
@@ -3003,6 +3187,13 @@ def build_qa_stage_handlers(
                 trace_id=str(run.get("id") or ""))
             if _fast_revalidation:
                 graph["memory_revalidation"] = _fast_revalidation
+            # 阶段 11（P11-03）：fast 路径同样做技能选择（口径与 standard/deep 一致）
+            _fast_skill_routing = _attach_skill_routing(
+                graph, plan=(context["outputs"].get("plan") or {}),
+                request=context["request"], run_meta=run, context=context) \
+                if skill_router_enabled() else {}
+            if _fast_skill_routing:
+                graph["skill_routing"] = _fast_skill_routing
             if context_pack_enabled():
                 # 阶段 08：fast 路径同样组装上下文包（口径与 standard/deep 一致，只是没有 level2 计划）
                 graph["context_pack"] = _build_context_pack_layer(
@@ -3010,7 +3201,15 @@ def build_qa_stage_handlers(
                     request=context["request"], run_meta=run,
                     working_memory=_context_working_memory(context),
                     memory_items=_memory_items_from(
-                        _fast_memory, revalidated_hints=_fast_revalidation.get("hints") or ()))
+                        _fast_memory, revalidated_hints=_fast_revalidation.get("hints") or ()),
+                    skill_items=_skill_items_from(_fast_skill_routing))
+            # 阶段 11（P11-06）：fast 路径同样记遥测（在上下文包之后）
+            if skill_router_enabled() and _fast_skill_routing:
+                _fast_skill_telemetry = _attach_skill_telemetry(
+                    graph, _fast_skill_routing, run_meta=run, store=store,
+                    plan=(context["outputs"].get("plan") or {}))
+                if _fast_skill_telemetry:
+                    graph["skill_telemetry"] = _fast_skill_telemetry
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])

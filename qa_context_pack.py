@@ -91,6 +91,7 @@ from qa_graph_contracts import (
     EVIDENCE_STATUS_SUPPORTED,
     EVIDENCE_STATUS_UNVERIFIED,
     GROUNDING_VERSION,
+    SKILL_HINT_POLICY,
     validate as validate_contract,
 )
 from qa_verifier import relevance_score, term_set, verification_of
@@ -1167,7 +1168,8 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
                        working_memory: Mapping | None = None, run_id: str = "",
                        budget_tokens: int | None = None,
                        reserve_ratio: float | None = None,
-                       memory_items: Sequence[Mapping] = ()) -> dict:
+                       memory_items: Sequence[Mapping] = (),
+                       skill_items: Sequence[Mapping] = ()) -> dict:
     """P08-03：组装 Context Pack（九段 + 引用索引 + 预算 + Context Gap + selection trace）。
 
     **不改任何既有结构**：只读 `graph` / `plan` / `request`，返回一个新字典；
@@ -1180,10 +1182,20 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
       · 传了但全被预算裁掉 → 段里写**裁剪说明**（不是 deferred，也不是编内容）；
       · 传了且入选 → 段里记 `implemented_by`/`hint_policy`，条目**不进 citation_map**
         （它们不是证据：MASTER_RULES 11 + §2.1）。
+
+    Phase 11（P11-05）接线：`skill_items` 是 Skill Router 按需加载的 **SKILL_HINT** 指令条目
+    （`kind="skill"` / `section="skill_context"`），由 Phase 11 侧构造（`qa_skills.
+    skill_context_items()`）后传进来。口径与记忆段**完全同构**：
+      · 不传（默认）→ `skill_context` 仍是**空段 + `deferred_to`**，Phase 08 行为逐字不变；
+      · 传了但全被裁掉 → 段里写**裁剪说明**，并记下"哪些技能没真的进包"；
+      · 传了且入选 → 段里记 `implemented_by`/`hint_policy` + 机器可读的
+        `loaded_skills` 清单（Phase 11 的遥测与 `SKILL_NOT_AVAILABLE` 缺口判定都读它），
+        条目**不进 citation_map**（技能指令不是证据）。
     """
     request = request if isinstance(request, Mapping) else {}
     plan = plan if isinstance(plan, Mapping) else {}
     supplied_memory = [item for item in (memory_items or []) if isinstance(item, Mapping)]
+    supplied_skills = [item for item in (skill_items or []) if isinstance(item, Mapping)]
     context_graph = build_context_graph(graph=graph, plan=plan, working_memory=working_memory,
                                         run_id=run_id)
     items = context_graph["items"]
@@ -1226,7 +1238,7 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
         if text:
             constraints.append(make_context_item(kind="constraint", section="constraints",
                                                  text=text, source_stage="request"))
-    candidates = list(items) + list(supplied_memory) + system_items + constraints
+    candidates = list(items) + list(supplied_memory) + list(supplied_skills) + system_items + constraints
 
     selection = select_context_items(
         candidates, task=task,
@@ -1263,8 +1275,32 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
             if str(item.get("section")) == "memory_context"
             and bool((item.get("grounding") or {}).get("requires_revalidation"))])
     if not sections["skill_context"]["count"]:
-        sections["skill_context"]["deferred_to"] = "Phase 11（Skill Registry & Router）"
-        sections["skill_context"]["note"] = "本阶段不实现 Skill 注册表：空段"
+        if supplied_skills:
+            # Phase 11 接线上线后：候选给了但全被裁 —— 这是**裁剪**，不是"没实现"
+            sections["skill_context"]["note"] = (
+                "候选 %d 条技能指令全部被预算裁掉（不是空段）" % len(supplied_skills))
+            sections["skill_context"]["supplied"] = len(supplied_skills)
+            sections["skill_context"]["trimmed"] = len(supplied_skills)
+            sections["skill_context"]["hint_policy"] = SKILL_HINT_POLICY
+            sections["skill_context"]["loaded_skills"] = []
+            sections["skill_context"]["supplied_skills"] = sorted(
+                str((item.get("metadata") or {}).get("skill_id") or "")
+                for item in supplied_skills)
+        else:
+            sections["skill_context"]["deferred_to"] = "Phase 11（Skill Registry & Router）"
+            sections["skill_context"]["note"] = "本阶段不实现 Skill 注册表：空段"
+    else:
+        # Phase 11（P11-05）：技能指令进段 —— 记清"谁提供的/什么政策"，且**不算引用**
+        loaded = sorted({str((item.get("metadata") or {}).get("skill_id") or "")
+                         for item in selected
+                         if str(item.get("section")) == "skill_context"})
+        sections["skill_context"]["implemented_by"] = "Phase 11（Skill Registry & Router）"
+        sections["skill_context"]["hint_policy"] = SKILL_HINT_POLICY
+        # 机器可读的"真的进包了哪些技能"：Phase 11 的遥测与 SKILL_NOT_AVAILABLE 缺口判定读它
+        # （不要从正文前缀反解析技能名）。
+        sections["skill_context"]["loaded_skills"] = [name for name in loaded if name]
+        sections["skill_context"]["is_evidence"] = False
+        sections["skill_context"]["requires_revalidation"] = True
 
     # `budget` 段是**预算回执本身**（§4 的九段之一）：它是裁剪之后才算出来的，
     # 所以不参与竞争、也不占预算——只把"花了多少、裁了多少、为什么"写进包里给生成端看。
@@ -1361,11 +1397,50 @@ def build_context_pack(*, graph: Mapping, plan: Mapping | None = None, request: 
         "memory_requires_revalidation": len([
             item for item in selected if str(item.get("section")) == "memory_context"
             and bool((item.get("grounding") or {}).get("requires_revalidation"))]),
+        # Phase 11（P11-05）：技能指令的计数单列（同样不改 `sections_filled` 的既有语义），
+        # 且技能条目**不参与 citation_map**（它们不是证据）。
+        "skill_items": len([item for item in selected
+                            if str(item.get("section")) == "skill_context"]),
+        "skill_supplied": len(supplied_skills),
+        "skill_in_citation_map": len([item for item in selected
+                                      if str(item.get("section")) == "skill_context"
+                                      and str(item.get("evidence_ref") or "") in set(citation_map.values())]),
     })
     return pack
 
 
 # ── P08-05：Context Gap（§6，**默认不得触发新检索**）────────────────────────
+
+SKILL_NEED_CLAIM_THRESHOLD = 3
+""""需要引用校验能力"的 claim 数门槛（Phase 08 的原始判定就是 3，这里提成常量）。
+
+为什么提出来：Phase 11 的 Skill Router 也要问同一个问题（"本任务需要哪个 §8 能力"）。
+把判定写成 `skill_context_needs()` 这个**单一真源**，路由与缺口检测就不可能各算一套。
+"""
+
+SKILL_NEED_REASONING = "contradiction_resolution"
+"""包里有反证 → 需要矛盾消解能力（§8）。"""
+
+SKILL_NEED_CITATION = "citation_verification"
+"""包里有 ≥ `SKILL_NEED_CLAIM_THRESHOLD` 条结论 → 需要引用校验能力（§8）。"""
+
+
+def skill_context_needs(*, items: Sequence[Mapping] = ()) -> str:
+    """本任务需要哪个 §8 能力（**单一真源**：Phase 08 的缺口检测与 Phase 11 的路由共用）。
+
+    判据（先判先返回，与 Phase 08 原实现逐字一致）：
+      1. 有 `counter_evidence` 条目 → `contradiction_resolution`（反证要有裁决，光看不够）；
+      2. 有 ≥ `SKILL_NEED_CLAIM_THRESHOLD` 条 `claim` 条目 → `citation_verification`
+         （结论一多，引用就必须逐条对上 span）；
+      3. 否则空串（**不需要任何 §8 能力就如实返回空**，不许为了"看起来有产出"硬凑）。
+    """
+    rows = [item for item in (items or ()) if isinstance(item, Mapping)]
+    if any(str(item.get("kind")) == "counter_evidence" for item in rows):
+        return SKILL_NEED_REASONING
+    if len([item for item in rows if str(item.get("kind")) == "claim"]) >= SKILL_NEED_CLAIM_THRESHOLD:
+        return SKILL_NEED_CITATION
+    return ""
+
 
 def _gap_id(*parts) -> str:
     return "CG" + _digest("|".join(str(part) for part in parts), 20)
@@ -1522,12 +1597,20 @@ def detect_context_gaps(*, pack: Mapping, graph: Mapping, task: Mapping | None =
 
     # ⑥ LOAD_SKILL：§8 的能力（contradiction_resolution / citation_verification）属 Phase 11，
     #     本阶段 skill_context 是空段 —— 需要时只**标注**这个动作，绝不假装已加载。
-    need_skill = ""
-    if any(str(item.get("kind")) == "counter_evidence" for item in (pack.get("items") or [])):
-        need_skill = "contradiction_resolution"
-    elif len([item for item in (pack.get("items") or []) if str(item.get("kind")) == "claim"]) >= 3:
-        need_skill = "citation_verification"
-    if need_skill:
+    # Phase 11（P11-05）接线：技能**真的进包**之后，这条缺口就不再成立（能力已经拿到手了）；
+    # 只有当需要的能力**没**进包时才继续标注 `LOAD_SKILL`，并给出机器可读的 `skill_id`
+    # 与"为什么没加载"（避免下游去解析中文 detail）。
+    need_skill = skill_context_needs(items=pack.get("items") or ())
+    loaded_skills = {str(name) for name in
+                     ((pack.get("sections") or {}).get("skill_context") or {}).get("loaded_skills") or []}
+    if need_skill and need_skill not in loaded_skills:
+        section = (pack.get("sections") or {}).get("skill_context") or {}
+        if section.get("supplied"):
+            why = "候选 %d 条技能指令全部被预算裁掉（不是没实现）" % int(section.get("supplied") or 0)
+        elif section.get("deferred_to"):
+            why = "skill_context 本次为空段（Phase 11 未提供指令）"
+        else:
+            why = "Skill Router 本次没有选中这个能力"
         gaps.append({
             "gap_id": _gap_id("SKILL", need_skill, pack.get("pack_id")),
             "context_gap_type": "SKILL_NOT_AVAILABLE",
@@ -1535,9 +1618,10 @@ def detect_context_gaps(*, pack: Mapping, graph: Mapping, task: Mapping | None =
             "evidence_ref": "",
             "section": "skill_context",
             "action": "LOAD_SKILL",
+            "skill_id": need_skill,
             "requires_retrieval": False,
-            "detail": "本任务需要 %s 能力（§8），skill_context 由 Phase 11 提供、本阶段为空段"
-                      % need_skill,
+            "detail": "本任务需要 %s 能力（§8），skill_context 由 Phase 11（Skill Registry & Router）"
+                      "按需提供；本次未加载：%s" % (need_skill, why),
             "tokens_recoverable": 0,
         })
 
@@ -1833,5 +1917,6 @@ __all__ = [
     "counter_reserve_ratio", "detect_context_gaps", "estimate_tokens", "evidence_strength",
     "freshness_factor", "grounding_gate_enabled", "make_context_item",
     "mark_ungrounded_answer", "normalize_evidence_layer", "output_reserve_tokens",
-    "select_context_items", "selection_summary", "span_min_chars", "total_token_budget",
+    "select_context_items", "selection_summary", "skill_context_needs", "span_min_chars",
+    "total_token_budget",
 ]

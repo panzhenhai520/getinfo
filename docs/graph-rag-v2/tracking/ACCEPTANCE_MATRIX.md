@@ -238,3 +238,11 @@
 |P10-05/06|取代与撤销|`python -m pytest tests/test_qa_phase10_revoke.py -q`|字段加边加版本行三件套、链单调、终态不可复活|**13 passed**；真机取代链 problems 为空；构造撤销 13 条；四选择器并集去重|PASS|同上|
 |P10-R1|P09 验收工具时钟修复|`python -m pytest tests/test_qa_phase09_acceptance_clock.py -q`|产物可复现：两个不同假现在产出逐字相同|**5 passed**；变异性证明——把时钟改回墙上时间后守门用例立刻变红（3!=2 与 1 failed）；刷新后的基线与原基线数字一致（0.218473）|PASS|`tools/qa_phase09_memory_acceptance.py`|
 |P10-R2|冻结契约与基线|`python -m pytest tests/test_qa_phase10_contracts.py -q`|七指纹不变、版本断言同步不放宽|**17 passed**；全量 2725 passed / 1 skipped / 0 failed（Phase 09 基线 2573+1 未破）；11 处版本断言同步为 v9 且仍为等值断言|PASS|同上|
+|P11-01|技能契约与目录树|`python -m pytest tests/test_qa_phase11_contracts.py -q`|11 个标识与九个字段全部 required、枚举闭集合、七指纹不变|**33 passed**；SKILL_IDS 与规格逐字相等；通道映射与 Phase 07 同源；交互位 mounted=False 且注明归 P14-07|PASS|`qa_graph_contracts.py:1918-2259`|
+|P11-02|技能注册表|`python -m pytest tests/test_qa_phase11_registry.py -q`|非法声明拒收记账、内置技能删不掉、来源不可伪造|**26 passed**；五条失败路径全部拒收且不改动原声明；无 unregister；内容寻址指纹可复算|PASS|`qa_skills.py`|
+|P11-03|技能路由与最小必要集合|`python -m pytest tests/test_qa_phase11_router.py -q`|一个 need 一个技能、同输入同输出、历史成功率真参与|**34 passed**；真机 244 need → 选中 38、命中率 0.155738；两次分析逐字相同；去重 206|PASS|`baseline/qa-skill-acceptance.json`|
+|P11-04|权限、成本与延迟闸门|`python -m pytest tests/test_qa_phase11_budget.py -q`|三个上限各自能单独拦下、默认拒绝、被拒不消耗额度|**27 passed**；真机延迟闸门拦 12 次、成本上限拦 11 次；非法权限位丢弃不提权|PASS|`qa_skills.py`|
+|P11-05|按需指令与 skill_context|`python -m pytest tests/test_qa_phase11_instruction.py -q`|指令进包、缺口消解、绝不进 citation_map|**20 passed**；LOAD_SKILL 缺口真机 9 → 0；技能条目进 citation_map 数 0；不给技能时逐字保留 Phase 08 空段|PASS|`qa_context_pack.py`；`qa_skills.py`|
+|P11-06|技能遥测（零迁移）|`python -m pytest tests/test_qa_phase11_telemetry.py -q`|成功率口径写死、样本不足不给率、只写既有表|**37 passed**；只被路由选中不算成功（有专门用例）；落库往返逐字一致且幂等；零新表（sqlite_master 断言）|PASS|`qa_skills.py`；`qa_storage.py`|
+|P11-R1|管线接线（两开关默认关）|`python -m pytest tests/test_qa_phase11_pipeline.py -q`|默认关零行为变化、打开只加兄弟键、两开关独立|**20 passed**；默认关时图键集与写库行数逐字不变；路由抛错只记账不阻断答案|PASS|`qa_pipeline.py`|
+|P11-R2|冻结契约与验收工具可复算|`python -m pytest tests/test_qa_phase11_acceptance_tool.py -q` 与全量|七指纹不变、落盘报告与现跑一致|**19 passed**；时钟只取自快照抓取时刻（改时钟不改判定）；全量 **2941 passed / 1 skipped / 0 failed**（Phase 10 基线未破）|PASS|`baseline/qa-skill-acceptance.json`|

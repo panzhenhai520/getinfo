@@ -79,10 +79,17 @@ class FrozenContractTests(unittest.TestCase):
     def test_context_contracts_are_untouched_and_sources_are_additive(self):
         self.assertEqual(len(contracts.CONTEXT_SECTIONS), 9)
         self.assertEqual(len(contracts.CONTEXT_ITEM_KINDS), 10)
-        for name in ("evidence_graph", "evidence", "plan", "verification", "gap_analyzer",
-                     "request", "config"):
-            self.assertIn(name, contracts.CONTEXT_ITEM_SOURCES)
-        self.assertEqual(contracts.CONTEXT_ITEM_SOURCES[-1], "memory_graph")
+        # Phase 08 的 7 个取值必须**逐字且逐位**不变（原来只断言"这 7 个名字出现在列表里"，
+        # 顺序与位置都没钉住）。Phase 11 追加 `skill_registry` 之后这条断言**更强**而不是更弱：
+        # 前 7 位就是 Phase 08 的原值，第 8 位就是 Phase 09 追加的 `memory_graph`。
+        phase08_sources = ("evidence_graph", "evidence", "plan", "verification", "gap_analyzer",
+                           "request", "config")
+        self.assertEqual(contracts.CONTEXT_ITEM_SOURCES[:7], phase08_sources)
+        self.assertEqual(contracts.CONTEXT_ITEM_SOURCES[7], "memory_graph")
+        # 追加语义：列表只变长，不出现重复取值
+        self.assertGreaterEqual(len(contracts.CONTEXT_ITEM_SOURCES), 8)
+        self.assertEqual(len(set(contracts.CONTEXT_ITEM_SOURCES)),
+                         len(contracts.CONTEXT_ITEM_SOURCES))
 
     def test_memory_contract_version_constants(self):
         self.assertEqual(contracts.MEMORY_GRAPH_VERSION, "qa-memory-graph-v1")

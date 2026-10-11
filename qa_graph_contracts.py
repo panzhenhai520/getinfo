@@ -1090,11 +1090,16 @@ CONTEXT_ITEM_KINDS: Tuple[str, ...] = (
 
 CONTEXT_ITEM_SOURCES: Tuple[str, ...] = (
     "evidence_graph", "evidence", "plan", "verification", "gap_analyzer", "request", "config",
-    "memory_graph",
+    "memory_graph", "skill_registry",
 )
 """ContextItem 的**来源**（provenance 的可读形态）：每一条都必须是上游阶段真实产出物，
 禁止"凭空造一条上下文"。`memory_graph` 是 Phase 09 的 Memory Graph 召回产物
-（只在 `memory_context` 段出现，且恒为 MEMORY_HINT）。"""
+（只在 `memory_context` 段出现，且恒为 MEMORY_HINT）；`skill_registry` 是 Phase 11 的
+Skill Router 产物（只在 `skill_context` 段出现，且恒为 SKILL_HINT，**不是证据**）。
+
+来源列表**只做追加**（不改既有取值）：Phase 09 追加 `memory_graph`、Phase 11 追加
+`skill_registry`；`tests/test_qa_phase09_contracts.py` 的位置断言已同步强化为
+"Phase 08 的前 7 个取值逐字不变 + Phase 09 的追加在第 8 位"，比原来的"最后一个是谁"更强。"""
 
 CONTEXT_DECISIONS: Tuple[str, ...] = ("included", "excluded")
 """selection trace 的两种决策。"""
@@ -1888,17 +1893,384 @@ MEMORY_REVALIDATION_REPORT_SCHEMA = {
 """Phase 10 总回执（真跑分布的证据口径）：闸门判定、复验出口、矛盾裁决、取代与撤销计数。"""
 
 
+# ── Phase 11（P11-01…P11-06）：Skill Registry & Router ─────────────────────────
+# 边界：**按任务加载最小必要能力**（§8）。本阶段只做"技能目录 + 选择 + 指令按需加载 +
+# 效果遥测"，**不新增任何检索/核验/生成能力**，也**不调用任何模型或嵌入端点**。
+# 契约设计口径（与 Phase 04~10 一致，逐字对齐 01_V2_ARCHITECTURE）：
+#   1. §8 的目录树（`skills/` 下 11 个技能目录）**逐字**入 `SKILL_IDS`，缺一个就有守例挂；
+#      §8 的九个声明字段（skill_id/description/input_schema/output_schema/preconditions/
+#      cost_class/latency_class/permissions/version）**全部进 `SKILL_SCHEMA.required`** ——
+#      技能是"可被机器校验的能力声明"，少一个字段就不该被注册进注册表。
+#   2. **与既有阶段口径统一，不另造一套**：
+#      · 技能的检索落点只吃 Phase 01 冻结的 `QA_RETRIEVAL_ROUTES` 七个通道值
+#        （`SKILL_ROUTE_BY_ID`，与 `qa_gap_analyzer.HUNTER_BY_ROUTE` 同源）；
+#      · Phase 07 的 `suggested_routes` 就是"缺口需要哪些能力"的单一真源：Router 按通道
+#        反查技能（`SKILL_FOR_ROUTE`），所以"Gap → 能力"这条链子 Phase 07 已经定过，
+#        Phase 11 只是把它翻译成技能，不重新发明一套 gap→skill 表；
+#      · Phase 08 的 Context Gap `SKILL_NOT_AVAILABLE` 与动作 `LOAD_SKILL` 是**同一个东西
+#        的上游标注**，Phase 11 负责把它真的加载掉（加载后该缺口不再成立）。
+#   3. **MASTER_RULES 第 11 条写成机器可校验形态**：技能条目是**提示**不是已验证证据 ——
+#      `SKILL_INSTRUCTION_SCHEMA` 的 `is_evidence` 恒 False、`requires_revalidation` 恒 True、
+#      `in_citation_map` 恒 False；`skill_context` 段只承载"怎么做"，不承载"事实是什么"。
+#   4. **谁能产出谁负责**：`SKILL_ROUTE_BY_ID` 里空串 = 本部署没有这条通道（EMR / 问诊 /
+#      推理型技能）。这类技能**可以被选中当指令**（它们教 Agent 怎么处理），但绝不被
+#      记成"检索通道"（否则 SearchTrace 的 route 会开始接受冻结枚举外的取值）。
+SKILL_SCHEMA_VERSION = "qa-skill-schema-v1"
+"""Skill 声明 schema 版本（§8 的九个字段）：字段增删/语义变更都要换版本号。"""
+
+SKILL_REGISTRY_VERSION = "qa-skill-registry-v1"
+"""注册表版本（换目录=换版本）：整表指纹与注册回执都可复算到这个版本号。"""
+
+SKILL_ROUTER_VERSION = "qa-skill-router-v1"
+"""Skill Router 版本（§8 的选择口径）：选择规则/理由码/排序键变更都要换版本号。"""
+
+SKILL_BUDGET_VERSION = "qa-skill-budget-v1"
+"""permission/cost/latency 闸门版本（P11-04）：判据与理由码变更都要换版本号。"""
+
+SKILL_INSTRUCTION_VERSION = "qa-skill-instruction-v1"
+"""按需指令版本（P11-05）：指令文本模板/标记/接地口径变更都要换版本号。"""
+
+SKILL_TELEMETRY_VERSION = "qa-skill-telemetry-v1"
+"""效果遥测版本（P11-06）：成功率/延迟/成本/证据产出的口径变更都要换版本号。"""
+
+SKILL_IDS: Tuple[str, ...] = (
+    "bm25_search", "semantic_search", "graph_traversal", "sql_query", "emr_search",
+    "web_search", "causal_reasoning", "clinical_evidence", "contradiction_resolution",
+    "citation_verification", "patient_inquiry",
+)
+"""§8 的 11 个技能标识（**逐字**取自目录树）：前 6 个是检索型，后 5 个是推理/交互型。
+
+医疗语义技能（`emr_search` / `clinical_evidence` / `patient_inquiry`）按 D-002 的中性映射
+在本仓库落地为"内部证据库检索 / 领域知识核验 / 用户澄清"；**取值逐字保留**，映射只写在
+`qa_skills.DOMAIN_MAPPING_NOTE` 里（与 Phase 09 的 `MEMORY_SCOPES` 同一处置口径）。"""
+
+SKILL_KINDS: Tuple[str, ...] = ("retrieval", "reasoning")
+"""两类技能：`retrieval` 会产出证据（但**只有 Phase 03 核验过的才算已验证证据**）；
+`reasoning` 只产出"怎么做"的指令，恒不产证据。"""
+
+SKILL_COST_CLASSES: Tuple[str, ...] = ("free", "cheap", "moderate", "expensive")
+"""成本档四值（§8 的 `cost_class`）：`free` = 纯本地计算/组装，不花检索或模型预算。"""
+
+SKILL_LATENCY_CLASSES: Tuple[str, ...] = ("instant", "fast", "normal", "slow")
+"""延迟档四值（§8 的 `latency_class`）：`instant` < 100ms、`fast` < 1s、`normal` < 8s、`slow` ≥ 8s。"""
+
+SKILL_PERMISSIONS: Tuple[str, ...] = (
+    "corpus_read", "graph_read", "db_read", "emr_read", "web_access", "patient_contact",
+)
+"""权限位六值（§8 的 `permissions`）：本仓库的落地映射见 `qa_skills.PERMISSION_NOTE`。
+
+Router 的权限闸门是**默认拒绝**：`permissions` 里出现调用方没被授予的位 → 该技能
+`PERMISSION_DENIED`（§6 的 `ASK_PATIENT` 与 §21 的安全关键缺口都靠这条兜住）。"""
+
+SKILL_STATUSES: Tuple[str, ...] = ("active", "deprecated", "disabled")
+"""技能生命周期：`deprecated` 仍可被显式指名加载（但要记账），`disabled` 一律不加载。"""
+
+SKILL_SOURCES: Tuple[str, ...] = ("builtin", "injected")
+"""注册来源：`builtin` = 本仓库内置的 §8 目录；`injected` = 部署方注册的实现（可插拔）。"""
+
+SKILL_ROUTE_BY_ID: Mapping[str, str] = {
+    "bm25_search": QA_ROUTE_KEYWORD,
+    "semantic_search": QA_ROUTE_SEMANTIC,
+    "graph_traversal": QA_ROUTE_GRAPH,
+    "sql_query": QA_ROUTE_POLICY_EXACT,
+    "emr_search": "",                 # 本部署没有 EMR 通道（D-002 中性映射）
+    "web_search": QA_ROUTE_WEB,
+    "causal_reasoning": "",           # 推理型：不检索
+    "clinical_evidence": "",          # 推理型：不检索
+    "contradiction_resolution": "",   # 推理型：不检索
+    "citation_verification": "",      # 推理型：不检索
+    "patient_inquiry": "",            # §6 的 ASK_PATIENT 不是检索通道（本仓库无该 route 值）
+}
+"""技能 → 检索通道（**空串 = 本部署没有这条通道**；取值只允许 `QA_RETRIEVAL_ROUTES` 或空）。
+
+空串**不是**"未实现"的搪塞：它意味着"这个技能不通过检索通道干活"，所以它既不会被
+记进 SearchTrace 的 route，也不会被当成"检索能力"统计。"""
+
+SKILL_FOR_ROUTE: Mapping[str, str] = {
+    QA_ROUTE_KEYWORD: "bm25_search",
+    QA_ROUTE_PAGE_CONTEXT: "bm25_search",          # 与 `qa_gap_analyzer.HUNTER_BY_ROUTE` 同源
+    QA_ROUTE_SEMANTIC: "semantic_search",
+    QA_ROUTE_GRAPH: "graph_traversal",
+    QA_ROUTE_GRAPH_ATTRIBUTE: "graph_traversal",   # 属性边也是图遍历
+    QA_ROUTE_POLICY_EXACT: "sql_query",            # 政策登记表 = 结构化查询
+    QA_ROUTE_WEB: "web_search",
+}
+"""检索通道 → 执行它的技能（Phase 07 的 `suggested_routes` 反查技能，**七个通道全覆盖**）。
+
+为什么是反查而不是 `gap_type → skill` 新表：§13 的 "Gap → Best Retrieval Action" 在 Phase 07
+已经落成 `GAP_ROUTE_RULES` + `routes_for()`。再写一张 gap→skill 表就会出现两个真源，
+迟早打架（Phase 06/07 的教训）。"""
+
+SKILL_GAP_TYPE_RULES: Mapping[str, Tuple[str, ...]] = {
+    QA_GAP_CONTRADICTION: ("contradiction_resolution",),
+    QA_GAP_AMBIGUOUS_ENTITY: ("patient_inquiry", "graph_traversal"),
+    QA_GAP_MISSING_CAUSAL_BRIDGE: ("causal_reasoning",),
+}
+"""缺口类型 → **推理型**技能的补充规则（检索型一律走 `SKILL_FOR_ROUTE` 反查）。
+
+为什么只有三条：其余七种缺口（缺证据/低相关/低权威/单源/缺实体链/缺时间链/缺反证）
+都是"再去拿证据"的活，Phase 07 的 `GAP_ROUTE_RULES` 已经把通道定死；只有这三条
+（矛盾消解、实体歧义、因果桥）是"换个方式想"而不是"再搜一次"。"""
+
+SKILL_TASK_TYPE_RULES: Mapping[str, Tuple[str, ...]] = {
+    "CAUSAL": ("causal_reasoning",),
+    "MECHANISM": ("causal_reasoning",),
+    "DIAGNOSTIC": ("clinical_evidence",),
+    "COMPARISON": ("citation_verification",),
+    "SYNTHESIS": ("citation_verification",),
+    "MULTI_HOP": ("citation_verification",),
+}
+"""`task_type`（Phase 05 的 `QUERY_INTENTS` 值）→ 推理型技能（§8 的 "task_type + gap_type"）。"""
+
+SKILL_SELECTION_REASONS: Tuple[str, ...] = (
+    "GAP_ROUTE_MATCH", "GAP_TYPE_MATCH", "TASK_TYPE_MATCH", "CONTEXT_GAP_LOAD_SKILL",
+    "MANDATORY_SKILL", "PERFORMANCE_BOOST", "MINIMAL_SET_DEDUPE",
+    "PERMISSION_DENIED", "OVER_COST_BUDGET", "OVER_LATENCY_BUDGET", "OVER_SKILL_COUNT",
+    "DISABLED", "DEPRECATED_SKIPPED", "LOW_SUCCESS_RATE", "NOT_TASK_RELEVANT",
+    "NO_ROUTE_IN_DEPLOYMENT", "UNKNOWN_SKILL", "MINIMAL_SET_SATISFIED",
+)
+"""选择/淘汰理由码：**每一条决策必须带一个**，否则"为什么没加载这个技能"无法回答。
+
+`MINIMAL_SET_DEDUPE` 是"最小必要集合"的核心证据：同一能力被多条缺口/多个任务同时需要时
+只加载一次；`MINIMAL_SET_SATISFIED` 是"预算还有但没必要再加载"的正面理由。"""
+
+SKILL_ROUTER_DECISIONS: Tuple[str, ...] = ("selected", "skipped")
+"""Router 对每个候选技能的两个决策（与 Phase 08 的 `CONTEXT_DECISIONS` 同构）。"""
+
+SKILL_LOAD_STAGES: Tuple[str, ...] = ("routed", "instruction_built", "included_in_pack", "executed")
+"""一次技能加载的生命周期四步：路由选中 → 指令成形 → 真的进包 → 真的被执行。
+
+为什么要把 `included_in_pack` 单列：被 Router 选中**不等于**生成端真的看得见
+（它还要过 ContextUtility 与 token 预算）。遥测里这两个数分开记，才不会有"加载成功率"
+这种把两件事混在一起的指标。"""
+
+SKILL_LOAD_OUTCOMES: Tuple[str, ...] = ("ok", "degraded", "error", "skipped")
+"""单次技能加载的结果四值（遥测的成功率分子分母口径见 `qa_skills.performance_summary`）。
+
+`degraded` = 跑到了但降级（例如该通道无候选）；`error` = 抛错；两者都**不算成功**。"""
+
+SKILL_TELEMETRY_REASONS: Tuple[str, ...] = (
+    "INSUFFICIENT_SAMPLES", "NO_TASK_TYPE", "UNKNOWN_SKILL", "EMPTY_RECORDS",
+)
+"""遥测侧的诚实标记：样本不足时**不给成功率**（`INSUFFICIENT_SAMPLES`），而不是拿 1 次当 100%。"""
+
+SKILL_HINT_POLICY = (
+    "SKILL_HINT：技能指令**不是证据**（§8 + MASTER_RULES 11）——它只说明「该怎么做」，"
+    "事实仍然只能来自 Phase 03 核验过的证据；指令条目恒 `is_evidence=False`、"
+    "`requires_revalidation=True`、`in_citation_map=False`。"
+)
+"""技能指令的统一政策说明（**唯一定义在这里**，避免上下文包与技能模块各写一份而漂移）。
+
+`qa_context_pack`（`skill_context` 段）与 `qa_skills`（指令条目 metadata / 回执）都从这里取。"""
+
+SKILL_INTERACTION_SLOT_OWNER = "P14-07"
+"""交互类技能的**归属声明**：`patient_inquiry` 是 §8 里唯一的"与用户交互"技能位。
+
+它的取值**逐字保留**（§8 目录树），但"同一问题被问两次以上 → 判定为对上次答案不满意 →
+主动给出可选思路（换通道/调时间窗/改权威要求/调证据门槛/换分析口径/保持原思路）并落成会话级
+配置"这一整块能力是 **P14-07（重复提问识别与思路调整确认）** 的账。
+Phase 11 **只声明这个技能位、不实现它的交互逻辑、也不填任何内容**（越界会被判 FAIL）。"""
+
+SKILL_INTERACTION_SLOT = {
+    "skill_id": "patient_inquiry",
+    "owner_phase": SKILL_INTERACTION_SLOT_OWNER,
+    "mounted": False,
+    "capabilities_reserved": ("clarification",),
+    "capabilities_not_implemented_here": ("repeat_question_detection",
+                                          "strategy_change_confirmation"),
+    "note": ("本阶段只把 `patient_inquiry` 当成一个「需要 patient_contact 权限、默认被拒」的"
+             "技能位登记进注册表；交互流程（重复提问识别 → 给出可选思路 → 落会话级配置 →"
+             "写进 SearchTrace）归 P14-07，Phase 11 不实现。"),
+}
+"""可挂载位（**预留，不填充**）：Phase 14 的 P14-07 直接挂到这里，不必改注册表结构。"""
+
+DEFAULT_SKILL_MIN_SAMPLES = 3
+"""给出成功率所需的最小样本数（`success_rate` 的分母下限）。
+
+为什么是 3：成功率是给 Router 学习用的（§3.6 Skill Performance Memory），一次成功写 1.0
+会让 Router 永久偏袒某个技能。低于门槛时遥测**如实返回 None + `INSUFFICIENT_SAMPLES`**，
+Router 侧也就不会拿它当 `PERFORMANCE_BOOST` 的依据。"""
+
+SKILL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "skill_id": {"type": "string", "enum": list(SKILL_IDS)},
+        "description": {"type": "string"},
+        "kind": {"type": "string", "enum": list(SKILL_KINDS)},
+        "input_schema": {"type": "object"},
+        "output_schema": {"type": "object"},
+        "preconditions": {"type": "array", "items": {"type": "string"}},
+        "cost_class": {"type": "string", "enum": list(SKILL_COST_CLASSES)},
+        "latency_class": {"type": "string", "enum": list(SKILL_LATENCY_CLASSES)},
+        "permissions": {"type": "array",
+                        "items": {"type": "string", "enum": list(SKILL_PERMISSIONS)}},
+        "version": {"type": "string"},
+        # 本仓库扩展（§8 之外的登记字段，全部可选）：通道落点/状态/来源/能力标签
+        "route": {"type": "string", "enum": list(QA_RETRIEVAL_ROUTES) + [""]},
+        "capabilities": {"type": "array", "items": {"type": "string"}},
+        "status": {"type": "string", "enum": list(SKILL_STATUSES)},
+        "source": {"type": "string", "enum": list(SKILL_SOURCES)},
+        "produces_evidence": {"type": "boolean"},
+        "instruction_template": {"type": "string"},
+    },
+    "required": ["skill_id", "description", "input_schema", "output_schema",
+                 "preconditions", "cost_class", "latency_class", "permissions", "version"],
+    "additionalProperties": True,
+}
+"""§8 的技能声明（九个字段**全部 required**）：少任何一个字段的技能都注册不进去。"""
+
+SKILL_SELECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "router_version": {"type": "string"},
+        "skill_id": {"type": "string", "enum": list(SKILL_IDS)},
+        "decision": {"type": "string", "enum": list(SKILL_ROUTER_DECISIONS)},
+        "reason": {"type": "string", "enum": list(SKILL_SELECTION_REASONS)},
+        "need": {"type": "string"},
+        "source": {"type": "string"},
+        "cost_class": {"type": "string", "enum": list(SKILL_COST_CLASSES) + [""]},
+        "latency_class": {"type": "string", "enum": list(SKILL_LATENCY_CLASSES) + [""]},
+        "rank": {"type": "integer", "minimum": 0},
+        "detail": {"type": "string"},
+    },
+    "required": ["router_version", "skill_id", "decision", "reason"],
+    "additionalProperties": True,
+}
+"""选择 trace 单条（P11-03）：`reason` 必须来自 `SKILL_SELECTION_REASONS`，同输入同输出。"""
+
+SKILL_ROUTING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "router_version": {"type": "string"},
+        "registry_version": {"type": "string"},
+        "budget_version": {"type": "string"},
+        "task_type": {"type": "string"},
+        "needs": {"type": "array", "items": {"type": "object"}},
+        "selected": {"type": "array", "items": {"type": "string", "enum": list(SKILL_IDS)}},
+        "selected_detail": {"type": "array", "items": {"type": "object"}},
+        "trace": {"type": "array", "items": SKILL_SELECTION_SCHEMA},
+        "skipped": {"type": "object"},
+        "budget": {"type": "object"},
+        "permissions": {"type": "object"},
+        "requires_retrieval": {"type": "boolean"},
+        "stats": {"type": "object"},
+    },
+    "required": ["router_version", "selected", "trace", "budget"],
+    "additionalProperties": True,
+}
+"""Skill Router 回执（P11-03 + P11-04）：最小必要集合 + 逐条理由 + 预算/权限闸门账面。"""
+
+SKILL_INSTRUCTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "instruction_version": {"type": "string"},
+        "skill_id": {"type": "string", "enum": list(SKILL_IDS)},
+        "section": {"type": "string", "enum": ["skill_context"]},
+        "text": {"type": "string"},
+        "tokens": {"type": "integer", "minimum": 0},
+        "is_evidence": {"type": "boolean"},
+        "requires_revalidation": {"type": "boolean"},
+        "in_citation_map": {"type": "boolean"},
+        "preconditions_met": {"type": "boolean"},
+        "route": {"type": "string", "enum": list(QA_RETRIEVAL_ROUTES) + [""]},
+        "metadata": {"type": "object"},
+    },
+    "required": ["instruction_version", "skill_id", "text", "is_evidence",
+                 "requires_revalidation", "in_citation_map"],
+    "additionalProperties": True,
+}
+"""按需指令（P11-05）：`is_evidence` 恒 False、`requires_revalidation` 恒 True、
+`in_citation_map` 恒 False —— **技能指令永远是提示，不是已验证证据**（MASTER_RULES 11）。"""
+
+SKILL_BUDGET_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "budget_version": {"type": "string"},
+        "max_skills": {"type": "integer", "minimum": 0},
+        "max_total_cost_units": {"type": "number", "minimum": 0},
+        "max_total_latency_ms": {"type": "number", "minimum": 0},
+        "granted_permissions": {"type": "array",
+                                "items": {"type": "string", "enum": list(SKILL_PERMISSIONS)}},
+        "denied_permissions": {"type": "array",
+                               "items": {"type": "string", "enum": list(SKILL_PERMISSIONS)}},
+        "used_skills": {"type": "integer", "minimum": 0},
+        "used_cost_units": {"type": "number", "minimum": 0},
+        "used_latency_ms": {"type": "number", "minimum": 0},
+        "exhausted": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["budget_version", "max_skills", "granted_permissions"],
+    "additionalProperties": True,
+}
+"""技能预算与权限账面（P11-04）：三个上限（条数/成本/延迟）+ 权限授予/拒绝集合。"""
+
+SKILL_LOAD_RECORD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "telemetry_version": {"type": "string"},
+        "record_id": {"type": "string"},
+        "run_id": {"type": "string"},
+        "skill_id": {"type": "string", "enum": list(SKILL_IDS)},
+        "task_type": {"type": "string"},
+        "stage_reached": {"type": "string", "enum": list(SKILL_LOAD_STAGES)},
+        "outcome": {"type": "string", "enum": list(SKILL_LOAD_OUTCOMES)},
+        "reason": {"type": "string"},
+        "latency_ms": {"type": "number", "minimum": 0},
+        "cost_units": {"type": "number", "minimum": 0},
+        "evidence_yield": {"type": "integer", "minimum": 0},
+        # Phase 03 对齐：取回的候选里有几条真的被判 SUPPORTED（"产出证据"与"产出**已验证**
+        # 证据"是两件事，分开记才不会把"取回了 5 条"说成"验过了 5 条"）。
+        "verified_yield": {"type": "integer", "minimum": 0},
+        "attempt": {"type": "integer", "minimum": 1},
+        "recorded_at": {"type": "string"},
+    },
+    "required": ["telemetry_version", "record_id", "skill_id", "stage_reached", "outcome"],
+    "additionalProperties": True,
+}
+"""一次技能加载的遥测记录（P11-06）：落 `qa_stage_runs`（`node_kind='skill'`，**零迁移**）。"""
+
+SKILL_PERFORMANCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "telemetry_version": {"type": "string"},
+        # `skill_id` **可空**：跨技能聚合行（`telemetry_receipt.overall`）不属于任何单个技能，
+        # 如实给空串而不是硬塞一个；单技能行仍然必须是 §8 的合法取值。
+        "skill_id": {"type": "string", "enum": list(SKILL_IDS) + [""]},
+        "task_type": {"type": "string"},
+        "attempts": {"type": "integer", "minimum": 0},
+        "successes": {"type": "integer", "minimum": 0},
+        "degraded": {"type": "integer", "minimum": 0},
+        "errors": {"type": "integer", "minimum": 0},
+        "success_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "latency_ms": {"type": "object"},
+        "cost_units": {"type": "number", "minimum": 0},
+        "evidence_yield": {"type": "integer", "minimum": 0},
+        "verified_yield": {"type": "integer", "minimum": 0},
+        "reason": {"type": "string", "enum": list(SKILL_TELEMETRY_REASONS) + [""]},
+        "min_samples": {"type": "integer", "minimum": 0},
+    },
+    "required": ["telemetry_version", "attempts", "successes", "success_rate"],
+    "additionalProperties": True,
+}
+"""聚合后的技能表现（§3.6 的 `skill_id/task_type/success_rate/latency/cost/evidence_yield`）。
+
+样本不足时 `qa_skills.performance_summary` 的 `success_rate` 返回 `None` 并带
+`reason=INSUFFICIENT_SAMPLES` —— 这一条由**用例**钉住（不许把 1 次成功当 100%）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
-    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s："
+    return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s / "
+            "技能注册表 %s / 技能路由 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
             "缺口类型 %d / 优先级分档 %d / Context 段 %d / ContextItem 种类 %d / Context Gap 动作 %d / "
             "记忆类型 %d / 记忆状态 %d / 记忆关系 %d / "
-            "时效闸门出口 %d / 复验出口 %d / 记忆矛盾种类 %d / 撤销理由 %d"
+            "时效闸门出口 %d / 复验出口 %d / 记忆矛盾种类 %d / 撤销理由 %d / "
+            "技能 %d / 技能种类 %d / 成本档 %d / 延迟档 %d / 权限位 %d / 选择理由码 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
+               SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
@@ -1909,7 +2281,10 @@ def describe() -> str:
                len(CONTEXT_SECTIONS), len(CONTEXT_ITEM_KINDS), len(CONTEXT_GAP_ACTIONS),
                len(MEMORY_TYPES), len(MEMORY_STATUSES), len(MEMORY_RELATIONS),
                len(MEMORY_FRESHNESS_DECISIONS), len(MEMORY_REVALIDATION_OUTCOMES),
-               len(MEMORY_CONTRADICTION_KINDS), len(MEMORY_REVOKE_REASONS)))
+               len(MEMORY_CONTRADICTION_KINDS), len(MEMORY_REVOKE_REASONS),
+               len(SKILL_IDS), len(SKILL_KINDS), len(SKILL_COST_CLASSES),
+               len(SKILL_LATENCY_CLASSES), len(SKILL_PERMISSIONS),
+               len(SKILL_SELECTION_REASONS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -2003,6 +2378,14 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "memory_supersession": MEMORY_SUPERSESSION_SCHEMA,
         "memory_revoke_receipt": MEMORY_REVOKE_RECEIPT_SCHEMA,
         "memory_revalidation_report": MEMORY_REVALIDATION_REPORT_SCHEMA,
+        # Phase 11（P11-01…P11-06）
+        "skill": SKILL_SCHEMA,
+        "skill_selection": SKILL_SELECTION_SCHEMA,
+        "skill_routing": SKILL_ROUTING_SCHEMA,
+        "skill_instruction": SKILL_INSTRUCTION_SCHEMA,
+        "skill_budget": SKILL_BUDGET_SCHEMA,
+        "skill_load_record": SKILL_LOAD_RECORD_SCHEMA,
+        "skill_performance": SKILL_PERFORMANCE_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:
