@@ -136,6 +136,76 @@ def _json_value(value, default):
         return default
 
 
+# 分类回写护栏（反向缺口修复，2026-10-12）：与 intel_topics._write_topic_assignments 同一套手法。
+# 背景：upsert_classification 原来是「INSERT … ON CONFLICT DO UPDATE 整块替换」，
+# score_details_json 连带它自己算的 topic_assignments 一起整块 upsert。生产库是 PostgreSQL
+# READ COMMITTED + 连接 autocommit，同一事务里每条语句各取一次新快照，事务保护不了这份读-改-写。
+# 于是分类作业会用「本作业算出的 score_details」覆盖主题聚类作业刚写入的 topic_assignments。
+# 修复：写前在同一事务内重读该行最新副本 → 只在最新副本上改本作业拥有的键 →
+# UPDATE 带乐观并发校验 → rowcount=0 则重读重试（次数受下面的常量约束）。
+_CLASSIFICATION_WRITE_CONFLICT_RETRIES = 3
+
+# score_details_json 里由「主题聚类作业」拥有的键：分类回写必须原样保留对方（可能更晚写入）的值。
+# 注意 topic_tagging_version 也由分类器自己写入（intel_classifier.py:524/538），两个作业共用同一个
+# 键名；本作业无法判定谁更晚，因此选择「不回退对方」——少写一次优于覆盖别人的新证据。
+_TOPIC_OWNED_DETAIL_KEYS = ("topic_assignments", "topic_tagging_version")
+
+# article_intel_classifications 里由分类作业拥有、可被整行替换的列（顺序即写入顺序）。
+# 刻意不含主键列（article_id / industry_pack_id）——它们只用于定位与并发校验。
+_CLASSIFICATION_MUTABLE_COLUMNS = (
+    "activation_id",
+    "industry_pack_version",
+    "classifier_version",
+    "article_content_hash",
+    "rule_category",
+    "rule_confidence",
+    "rule_reason",
+    "score_details_json",
+    "matched_keywords_json",
+    "llm_category",
+    "llm_confidence",
+    "llm_reason",
+    "why_important",
+    "trend_summary",
+    "topic_tags_json",
+    "final_category",
+    "final_confidence",
+    "final_reason",
+    "result_source",
+    "fusion_version",
+    "llm_model_id",
+    "llm_prompt_version",
+    "llm_error",
+    "classified_at",
+    "updated_at",
+)
+
+_CLASSIFICATION_KEY_COLUMNS = ("article_id", "industry_pack_id")
+
+# 每次写入当下都要重新赋值的槽位（不能复用作业开始时缓存的时间）。
+_SD_IDX = _CLASSIFICATION_MUTABLE_COLUMNS.index("score_details_json")
+_TAGS_IDX = _CLASSIFICATION_MUTABLE_COLUMNS.index("topic_tags_json")
+_CLASSIFIED_AT_IDX = _CLASSIFICATION_MUTABLE_COLUMNS.index("classified_at")
+_UPDATED_AT_IDX = _CLASSIFICATION_MUTABLE_COLUMNS.index("updated_at")
+
+_CLASSIFICATION_INSERT_SQL = (
+    "INSERT INTO article_intel_classifications ("
+    + ", ".join(_CLASSIFICATION_KEY_COLUMNS + _CLASSIFICATION_MUTABLE_COLUMNS)
+    + ") VALUES ("
+    + ", ".join("?" for _ in _CLASSIFICATION_KEY_COLUMNS + _CLASSIFICATION_MUTABLE_COLUMNS)
+    # 并发插入时不报错、不覆盖：rowcount=0 让调用方下一轮改走「重读 + 合并更新」。
+    + ") ON CONFLICT(article_id, industry_pack_id) DO NOTHING"
+)
+
+# 乐观并发校验：以「写前重读到的两列原文」为条件，重读后被改写则 rowcount=0 → 重读重试。
+_CLASSIFICATION_UPDATE_SQL = (
+    "UPDATE article_intel_classifications SET "
+    + ", ".join(f"{column}=?" for column in _CLASSIFICATION_MUTABLE_COLUMNS)
+    + " WHERE article_id=? AND industry_pack_id=?"
+      " AND COALESCE(score_details_json,'')=? AND COALESCE(topic_tags_json,'')=?"
+)
+
+
 class IntelRepository:
     def __init__(self, database=None):
         self.db = database or sqlite_db
@@ -3072,9 +3142,15 @@ class IntelRepository:
         )
         category = normalize_internal_category(result.get("final_category") or result.get("rule_category"))
         rule_category = normalize_internal_category(result.get("rule_category") or category)
-        values = (
-            coerce_int(result.get("article_id"), 0),
-            str(result.get("industry_pack_id") or DEFAULT_INDUSTRY_PACK_ID),
+        article_id = coerce_int(result.get("article_id"), 0)
+        industry_pack_id = str(result.get("industry_pack_id") or DEFAULT_INDUSTRY_PACK_ID)
+        # 分类作业拥有的 score_details 键（不含主题聚类拥有的那两个，见 _TOPIC_OWNED_DETAIL_KEYS）
+        incoming_details = _json_value(result.get("score_details"), {})
+        if not isinstance(incoming_details, dict):
+            incoming_details = {}
+        incoming_tags_json = _json_text(result.get("topic_tags") or [], [])
+        # 除「写库当下才取的时刻」与「需与最新副本合并的两个 JSON 列」外，其余列一次算好。
+        values = [
             str(result.get("activation_id") or ""),
             str(result.get("industry_pack_version") or ""),
             str(result.get("classifier_version") or ""),
@@ -3082,14 +3158,14 @@ class IntelRepository:
             rule_category,
             float(result.get("rule_confidence") or 0),
             str(result.get("rule_reason") or ""),
-            _json_text(result.get("score_details") or {}, {}),
+            "",  # score_details_json：每轮按最新副本合并后填
             _json_text(result.get("matched_keywords") or [], []),
             result.get("llm_category"),
             result.get("llm_confidence"),
             str(result.get("llm_reason") or ""),
             str(result.get("why_important") or ""),
             str(result.get("trend_summary") or ""),
-            _json_text(result.get("topic_tags") or [], []),
+            "",  # topic_tags_json：与上面的 score_details 成对决定
             category,
             float(result.get("final_confidence") or result.get("rule_confidence") or 0),
             str(result.get("final_reason") or result.get("rule_reason") or ""),
@@ -3098,88 +3174,108 @@ class IntelRepository:
             str(result.get("llm_model_id") or ""),
             str(result.get("llm_prompt_version") or ""),
             str(result.get("llm_error") or "")[:2000],
-            now_text,
-            now_text,
-        )
+            now_text,  # classified_at：本次分类结论产出的时刻
+            now_text,  # updated_at：每轮写入当下重取（见下）
+        ]
+        # 前两槽 = 主键列，其余 = _CLASSIFICATION_MUTABLE_COLUMNS（顺序一致）
+        key_values = (article_id, industry_pack_id)
         with self.db.lock:
             cursor = self.db.connection.cursor()
             try:
-                # A handler claimed before a switch may finish afterwards.
-                # Preserve its job result for audit, but never let that stale
-                # write replace a classification already produced by the new
-                # current activation for the same article/pack identity.
-                if (
-                    incoming_activation_id
-                    and current_activation_id
-                    and incoming_activation_id != current_activation_id
-                ):
-                    existing = cursor.execute(
+                written = False
+                for _ in range(_CLASSIFICATION_WRITE_CONFLICT_RETRIES):
+                    # 写前重读该行最新副本：作业启动时的快照一律不用。
+                    fresh = cursor.execute(
                         """
-                        SELECT id, activation_id
+                        SELECT id, activation_id, score_details_json, topic_tags_json
                         FROM article_intel_classifications
                         WHERE article_id=? AND industry_pack_id=?
                         """,
-                        (values[0], values[1]),
+                        (article_id, industry_pack_id),
                     ).fetchone()
-                    if existing and str(existing["activation_id"] or "") == current_activation_id:
-                        return int(existing["id"])
-                cursor.execute(
-                    """
-                    INSERT INTO article_intel_classifications (
-                        article_id, industry_pack_id, activation_id, industry_pack_version,
-                        classifier_version, article_content_hash,
-                        rule_category, rule_confidence, rule_reason,
-                        score_details_json, matched_keywords_json,
-                        llm_category, llm_confidence, llm_reason,
-                        why_important, trend_summary, topic_tags_json,
-                        final_category, final_confidence, final_reason,
-                        result_source, fusion_version, llm_model_id,
-                        llm_prompt_version, llm_error, classified_at, updated_at
-                    ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    write_time = utc_text()
+                    if fresh is None:
+                        # 该行尚不存在（首次分类，或刚被并发删除）：直接插入。
+                        # 若并发插入抢先，rowcount=0 —— 不报错、不覆盖，下一轮改走「重读 + 合并更新」。
+                        attempt = list(values)
+                        attempt[_SD_IDX] = _json_text(incoming_details, {})
+                        attempt[_TAGS_IDX] = incoming_tags_json
+                        attempt[_UPDATED_AT_IDX] = write_time
+                        cursor.execute(
+                            _CLASSIFICATION_INSERT_SQL, key_values + tuple(attempt)
+                        )
+                        if cursor.rowcount:
+                            written = True
+                            break
+                        continue
+                    # A handler claimed before a switch may finish afterwards.
+                    # Preserve its job result for audit, but never let that stale
+                    # write replace a classification already produced by the new
+                    # current activation for the same article/pack identity.
+                    if (
+                        incoming_activation_id
+                        and current_activation_id
+                        and incoming_activation_id != current_activation_id
+                        and str(fresh["activation_id"] or "") == current_activation_id
+                    ):
+                        return int(fresh["id"])
+                    fresh_details = _json_value(fresh["score_details_json"], {})
+                    if not isinstance(fresh_details, dict):
+                        fresh_details = {}
+                    # 只更新本作业拥有的键：先把「主题聚类作业拥有的两个键」从最新副本里留出来，
+                    # 再叠加本作业的 score_details —— 本作业不认识的键一律不删、不覆盖。
+                    merged_details = {
+                        key: fresh_details[key]
+                        for key in _TOPIC_OWNED_DETAIL_KEYS
+                        if key in fresh_details
+                    }
+                    merged_details.update(incoming_details)
+                    merged_tags_json = incoming_tags_json
+                    if any(key in fresh_details for key in _TOPIC_OWNED_DETAIL_KEYS):
+                        # topic_tags_json 是同一份 topic_assignments 的「名字列表」投影，
+                        # 必须与 details 里保留的归属成对，否则列与 details 会自相矛盾。
+                        merged_tags_json = str(fresh["topic_tags_json"] or "[]")
+                    attempt = list(values)
+                    attempt[_SD_IDX] = _json_text(merged_details, {})
+                    attempt[_TAGS_IDX] = merged_tags_json
+                    attempt[_UPDATED_AT_IDX] = write_time
+                    cursor.execute(
+                        _CLASSIFICATION_UPDATE_SQL,
+                        tuple(attempt)
+                        + (
+                            article_id,
+                            industry_pack_id,
+                            fresh["score_details_json"] or "",
+                            fresh["topic_tags_json"] or "",
+                        ),
                     )
-                    ON CONFLICT(article_id, industry_pack_id) DO UPDATE SET
-                        activation_id = excluded.activation_id,
-                        industry_pack_version = excluded.industry_pack_version,
-                        classifier_version = excluded.classifier_version,
-                        article_content_hash = excluded.article_content_hash,
-                        rule_category = excluded.rule_category,
-                        rule_confidence = excluded.rule_confidence,
-                        rule_reason = excluded.rule_reason,
-                        score_details_json = excluded.score_details_json,
-                        matched_keywords_json = excluded.matched_keywords_json,
-                        llm_category = excluded.llm_category,
-                        llm_confidence = excluded.llm_confidence,
-                        llm_reason = excluded.llm_reason,
-                        why_important = excluded.why_important,
-                        trend_summary = excluded.trend_summary,
-                        topic_tags_json = excluded.topic_tags_json,
-                        final_category = excluded.final_category,
-                        final_confidence = excluded.final_confidence,
-                        final_reason = excluded.final_reason,
-                        result_source = excluded.result_source,
-                        fusion_version = excluded.fusion_version,
-                        llm_model_id = excluded.llm_model_id,
-                        llm_prompt_version = excluded.llm_prompt_version,
-                        llm_error = excluded.llm_error,
-                        classified_at = excluded.classified_at,
-                        updated_at = excluded.updated_at
-                    """,
-                    values,
-                )
-                cursor.execute(
+                    if cursor.rowcount:
+                        written = True
+                        break
+                row = cursor.execute(
                     """
                     SELECT id FROM article_intel_classifications
                     WHERE article_id = ? AND industry_pack_id = ?
                     """,
-                    (values[0], values[1]),
-                )
-                row = cursor.fetchone()
+                    (article_id, industry_pack_id),
+                ).fetchone()
+                if not written:
+                    # 重试用尽（或该行被并发删除）：本次分类结论不落库，绝不拿陈旧副本覆盖别人的新证据。
+                    # 不抛异常 —— 该行的内容哈希/包版本/激活仍与当前不一致，
+                    # 下一轮 list_unclassified_articles 会重新领取它；抛出会因单行争用打断整个分类作业。
+                    print(
+                        f"⚠️ 分类回写冲突重试用尽，本次未写入 article={article_id} "
+                        f"pack={industry_pack_id}（保留并发写入者的最新证据，等待下轮重分类）"
+                    )
+                if row is None:
+                    raise RuntimeError(
+                        f"分类行写入失败且该行不存在: article={article_id} pack={industry_pack_id}"
+                    )
                 # 按用户物化可见性（叠加语义）：只对有个人门禁设置的用户写行。
                 # 用同一个 cursor、在同一事务内完成；失败只忽略，绝不影响分类结果。
                 try:
                     from pack_user_gate import materialize_visibility
-                    materialize_visibility(cursor, int(values[0]), str(values[1]))
+                    materialize_visibility(cursor, int(article_id), str(industry_pack_id))
                 except Exception as materialize_exc:
                     print(f"⚠️ 个人可见性物化失败（不影响分类）: {materialize_exc}")
                 self.db.connection.commit()
