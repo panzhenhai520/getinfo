@@ -2383,5 +2383,157 @@ class IntelPackKeywordQualityTests(unittest.TestCase):
         self.assertFalse(m._is_entity_term("私募股权"))
 
 
+FIXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
+
+
+def _fixture_text(name: str) -> str:
+    """读离线夹具（真实抓下来的响应体，用例一律不联网）。"""
+    with open(os.path.join(FIXTURE_DIR, name), "r", encoding="utf-8") as handle:
+        return handle.read()
+
+
+class _FakeHTTPResponse:
+    """SafeHTTPClient.get 的最小替身。"""
+
+    def __init__(self, *, text: str, url: str, content_type: str = "text/html"):
+        self.text = text
+        self.url = url
+        self.status_code = 200
+        self.content_type = content_type
+        self.content = text.encode("utf-8")
+        self.encoding = "utf-8"
+        self.headers = {}
+
+
+class _ScriptedHTTPClient:
+    """按 URL 剧本返回离线响应；没编排到的 URL 直接失败。
+
+    这样"兜底路径多打了一次请求"会以断言失败暴露出来，而不是悄悄联网。
+    """
+
+    def __init__(self, script: dict):
+        self.script = dict(script)
+        self.calls = []
+
+    def get(self, url, *, headers=None, timeout=None):
+        self.calls.append(str(url))
+        if str(url) not in self.script:
+            raise AssertionError(f"用例未编排该 URL（禁止联网）：{url}")
+        planned = self.script[str(url)]
+        if isinstance(planned, Exception):
+            raise planned
+        return planned
+
+
+class SfcSpaContentFallbackTest(unittest.TestCase):
+    """香港证监会 e-Distribution 这类 JS 单页应用信源的正文兜底（离线夹具，不联网）。
+
+    病灶（2026-10 真机探针）：文章页静态 HTML 是 create-react-app 空壳，body 里只有
+    ``<noscript>You need to enable JavaScript to run this app.</noscript>`` 和 ``<div id="root">``；
+    容器里装了 trafilatura，它把这句 noscript 当正文吐出来，于是 content 恰好 46 字 < 80，
+    整源被判"正文过短"。但正文并不需要浏览器：站点自己的公开 JSON 接口直出 ``html`` 字段。
+    """
+
+    DOC = "https://apps.sfc.hk/edistributionWeb/gateway/EN/news-and-announcements/news/doc?refNo=26PR164"
+    DOC_TC = "https://apps.sfc.hk/edistributionWeb/gateway/TC/news-and-announcements/news/doc?refNo=26PR164"
+    CIRCULAR = "https://apps.sfc.hk/edistributionWeb/gateway/EN/circular/doc?refNo=26EC61"
+    API = "https://apps.sfc.hk/edistributionWeb/api/news/content?refNo=26PR164&lang=EN"
+
+    # ── ① 夹具必须钉住病灶本身 ──
+    def test_shell_fixture_is_the_js_shell_without_any_article_body(self):
+        shell = _fixture_text("sfc_edistribution_shell.html")
+        # CRA 空壳的标志：挂载点 + noscript 提示语，两者都是整篇文档里唯一的"文本"
+        self.assertIn('id="root"', shell)
+        self.assertIn("You need to enable JavaScript to run this app.", shell)
+        # 这页没有任何正文可抽：既没有条目号，也没有新闻稿正文
+        self.assertNotIn("refNo", shell)
+        self.assertNotIn("<p>", shell)
+        # 抽取结果必然远低于阈值（容器里 trafilatura 会回吐那句 46 字的 noscript，本机无
+        # trafilatura 时退化成 BeautifulSoup 分支拿到 0 字——两种情况都必须触发兜底）
+        content = m._probe_extract_text(shell, self.DOC)
+        self.assertLess(len(content), m.PROBE_MIN_CONTENT_CHARS)
+
+    # ── ② 文档 URL → 同源 JSON 接口的映射 ──
+    def test_spa_api_url_maps_sfc_doc_shapes(self):
+        self.assertEqual(m._probe_spa_content_api_url(self.DOC), self.API)
+        self.assertEqual(
+            m._probe_spa_content_api_url(self.DOC_TC),
+            "https://apps.sfc.hk/edistributionWeb/api/news/content?refNo=26PR164&lang=TC",
+        )
+        self.assertEqual(
+            m._probe_spa_content_api_url(self.CIRCULAR),
+            "https://apps.sfc.hk/edistributionWeb/api/circular/content?refNo=26EC61&lang=EN",
+        )
+
+    def test_spa_api_url_ignores_other_hosts_paths_and_missing_refno(self):
+        for url in (
+            "https://www.sfc.hk/en/RSS-Feeds/Press-releases",  # RSS 源站，不是 SPA 文档页
+            "https://apps.sfc.hk/edistributionWeb/gateway/EN/news-and-announcements/news/doc",  # 缺 refNo
+            "https://example.com/edistributionWeb/gateway/EN/news-and-announcements/news/doc?refNo=26PR164",
+            "https://evil-apps.sfc.hk/edistributionWeb/gateway/EN/news-and-announcements/news/doc?refNo=26PR164",
+            "",
+        ):
+            self.assertEqual(m._probe_spa_content_api_url(url), "", f"不该命中：{url}")
+
+    # ── ③ 兜底真能从 JSON 里拿到正文 ──
+    def test_fallback_pulls_body_from_same_host_json_api(self):
+        shell = _fixture_text("sfc_edistribution_shell.html")
+        api_json = _fixture_text("sfc_news_content_api.json")
+        client = _ScriptedHTTPClient(
+            {
+                self.DOC: _FakeHTTPResponse(text=shell, url=self.DOC),
+                self.API: _FakeHTTPResponse(text=api_json, url=self.API, content_type="application/json"),
+            }
+        )
+        with patch("intel_http.SafeHTTPClient", lambda *a, **k: client):
+            article, error = m._probe_fetch_content(
+                {"url": self.DOC, "title": "New speech by Julia Leung", "published_at": "2026-10-09"},
+                timeout_seconds=15,
+            )
+        self.assertEqual(error, "")
+        self.assertIsNotNone(article)
+        self.assertGreaterEqual(len(article["content"]), m.PROBE_MIN_CONTENT_CHARS)
+        # 拿到的是正文，不是那句 noscript 提示
+        self.assertNotIn("enable JavaScript", article["content"])
+        self.assertIn("Project Liquidity", article["content"])
+        self.assertEqual(article["title"], "New speech by Julia Leung")
+        self.assertEqual(article["url"], self.DOC)
+        # 只多打一次同源接口，绝不额外乱发请求
+        self.assertEqual(client.calls, [self.DOC, self.API])
+
+    def test_spa_json_extraction_tolerates_bad_payloads(self):
+        self.assertEqual(m._probe_extract_spa_json("not json"), ("", ""))
+        self.assertEqual(m._probe_extract_spa_json("[1, 2]"), ("", ""))
+        self.assertEqual(m._probe_extract_spa_json(""), ("", ""))
+        # 有标题但 html 为空 → 正文空串（调用方据此保持原判）
+        self.assertEqual(m._probe_extract_spa_json('{"title": "只有标题", "html": ""}')[1], "")
+
+    # ── ④ 兜底失败必须 fail-closed：错误原因仍是原来那一条 ──
+    def test_fallback_failure_keeps_the_original_short_content_error(self):
+        shell = _fixture_text("sfc_edistribution_shell.html")
+        client = _ScriptedHTTPClient(
+            {
+                self.DOC: _FakeHTTPResponse(text=shell, url=self.DOC),
+                self.API: RuntimeError("接口不可达"),
+            }
+        )
+        with patch("intel_http.SafeHTTPClient", lambda *a, **k: client):
+            article, error = m._probe_fetch_content({"url": self.DOC}, timeout_seconds=15)
+        self.assertIsNone(article)
+        expected_chars = len(m._probe_extract_text(shell, self.DOC))
+        self.assertEqual(error, f"正文过短（{expected_chars} 字 < {m.PROBE_MIN_CONTENT_CHARS}）")
+
+    # ── ⑤ 普通站点不受影响：不给非 SPA 源多打请求 ──
+    def test_ordinary_source_still_takes_exactly_one_request(self):
+        doc = "https://offline.example.com/a"
+        body = "<html><body><article><p>" + "固态电池产线动态纪要。" * 20 + "</p></article></body></html>"
+        client = _ScriptedHTTPClient({doc: _FakeHTTPResponse(text=body, url=doc)})
+        with patch("intel_http.SafeHTTPClient", lambda *a, **k: client):
+            article, error = m._probe_fetch_content({"url": doc, "title": "普通文章"}, timeout_seconds=15)
+        self.assertEqual(error, "")
+        self.assertIsNotNone(article)
+        self.assertEqual(client.calls, [doc])
+
+
 if __name__ == "__main__":
     unittest.main()

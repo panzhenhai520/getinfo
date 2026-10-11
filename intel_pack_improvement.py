@@ -33,6 +33,7 @@ import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from industry_packs import (
     IndustryPackLoader,
@@ -72,6 +73,33 @@ CRAWL_PROBE_PER_SOURCE = 3
 CRAWL_PROBE_TIMEOUT_SECONDS = 90
 # 单篇文章正文少于该字数视为"解析失败"（计入 parse_failed，绝不当作"准入率 0"）。
 PROBE_MIN_CONTENT_CHARS = 80
+
+# JS 单页应用（SPA）信源的正文兜底表。
+# 病灶（2026-10 实测：香港证监会 apps.sfc.hk/e-Distribution，source_id=72/73/74）：
+#   文章页的静态 HTML 只是一个 React/CRA 空壳，body 里除了
+#   <noscript>You need to enable JavaScript to run this app.</noscript> 和 <div id="root"></div>
+#   什么都没有。trafilatura/BeautifulSoup 只能拿到那句 46 字的提示语，于是整源被判"正文过短"。
+# 但这**不需要浏览器**：同一个站点自己提供了公开、同源、无需鉴权的 JSON 正文接口，页面自己的
+# JS 也是打它拿正文的（接口路径见 /edistributionWeb/static/js/main.*.chunk.js）。所以这里按
+# "文档 URL 形状 → JSON 接口"登记一张表：静态抽取不达标时，再补一次普通 HTTP GET 抽 JSON。
+# 命中口径（三条同时满足）：host 命中 host_suffix、路径含 path_marker、query 带 ref_param。
+# 注意 path_marker 是按**文档 URL**而不是按信源匹配的：实测源 74（咨询及结论）的条目链接落在
+# news-and-announcements 下，正是靠这一步自动挑对了 news 接口。
+PROBE_SPA_CONTENT_APIS = (
+    {   # 新闻稿／咨询结论：/gateway/<lang>/news-and-announcements/news/doc?refNo=26PR164
+        "host_suffix": "apps.sfc.hk",
+        "path_marker": "/news-and-announcements/news/doc",
+        "api_path": "/edistributionWeb/api/news/content",
+    },
+    {   # 通函：/gateway/<lang>/circular/doc?refNo=26EC61
+        "host_suffix": "apps.sfc.hk",
+        "path_marker": "/circular/doc",
+        "api_path": "/edistributionWeb/api/circular/content",
+    },
+)
+PROBE_SPA_REF_PARAM = "refNo"
+PROBE_SPA_LANGS = ("EN", "TC")
+PROBE_SPA_DEFAULT_LANG = "EN"
 
 # ─────────────────────────── 候选词挖掘口径 ───────────────────────────
 DEFAULT_TOP_N = 20
@@ -2120,6 +2148,70 @@ def _probe_extract_text(html: str, url: str) -> str:
         return text[:SAMPLE_CONTENT_CHARS]
 
 
+def _probe_spa_content_api_url(url: str) -> str:
+    """命中 ``PROBE_SPA_CONTENT_APIS`` 就返回正文 JSON 接口 URL，否则返回空串。"""
+    try:
+        parsed = urlsplit(str(url or "").strip())
+    except ValueError:
+        return ""
+    host = (parsed.hostname or "").casefold()
+    path = parsed.path or ""
+    for adapter in PROBE_SPA_CONTENT_APIS:
+        # 按点边界比对，避免 evil-apps.sfc.hk 这类"后缀相同其实不是本站"的域名被误命中。
+        suffix = str(adapter["host_suffix"]).casefold()
+        if host != suffix and not host.endswith("." + suffix):
+            continue
+        if str(adapter["path_marker"]) not in path:
+            continue
+        ref_no = (parse_qs(parsed.query).get(PROBE_SPA_REF_PARAM) or [""])[0].strip()
+        if not ref_no:
+            continue
+        lang = PROBE_SPA_DEFAULT_LANG
+        for segment in path.split("/"):
+            if segment.upper() in PROBE_SPA_LANGS:
+                lang = segment.upper()
+                break
+        query = urlencode({PROBE_SPA_REF_PARAM: ref_no, "lang": lang})
+        return "%s://%s%s?%s" % (parsed.scheme or "https", parsed.netloc, adapter["api_path"], query)
+    return ""
+
+
+def _probe_extract_spa_json(text: str) -> Tuple[str, str]:
+    """从兜底接口的 JSON 里取 (标题, 正文纯文本)；结构不符就返回空串，让调用方保持原判。"""
+    try:
+        payload = json.loads(str(text or ""))
+    except (TypeError, ValueError):
+        return "", ""
+    if not isinstance(payload, dict):
+        return "", ""
+    body_html = str(payload.get("html") or "")
+    if not body_html.strip():
+        return _truncate(payload.get("title")), ""
+    return _truncate(payload.get("title")), _probe_extract_text(body_html, "")
+
+
+def _probe_fetch_spa_content(client, url: str, timeout_seconds: float) -> Tuple[str, str]:
+    """SPA 空壳兜底：打一次站点自己的 JSON 正文接口，返回 (标题, 正文)。
+
+    未登记、网络失败、JSON 结构不符一律吞掉返回空串——兜底路径自身出错不能把
+    "正文过短"换成另一个错误原因，主判仍然由调用方按原口径给出。
+    """
+    from intel_light_scanner import USER_AGENT
+
+    api_url = _probe_spa_content_api_url(url)
+    if not api_url:
+        return "", ""
+    try:
+        response = client.get(
+            api_url,
+            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+            timeout=_probe_request_timeout(timeout_seconds),
+        )
+    except Exception:  # noqa: BLE001 — 兜底失败不影响主判
+        return "", ""
+    return _probe_extract_spa_json(response.text)
+
+
 def _probe_extract_title(html: str) -> str:
     try:
         from bs4 import BeautifulSoup
@@ -2150,6 +2242,12 @@ def _probe_fetch_content(item: Dict, *, timeout_seconds: float) -> Tuple[Optiona
     html = response.text
     content = _probe_extract_text(html, url)
     title = _truncate(item.get("title")) or _probe_extract_title(html)
+    if len(content) < PROBE_MIN_CONTENT_CHARS:
+        # 静态 HTML 只是 JS 单页应用空壳时，正文在站点自己的 JSON 接口里（仍走 HTTP，不启浏览器）。
+        api_title, api_content = _probe_fetch_spa_content(client, url, timeout_seconds)
+        if len(api_content) > len(content):
+            content = api_content
+            title = title or api_title
     if len(content) < PROBE_MIN_CONTENT_CHARS:
         return None, f"正文过短（{len(content)} 字 < {PROBE_MIN_CONTENT_CHARS}）"
     return {
