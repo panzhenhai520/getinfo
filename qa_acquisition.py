@@ -797,13 +797,21 @@ def context_gap_no_repeat(candidates: Sequence[Mapping], *, context_gaps: Sequen
 # ── P14-01/P14-02/P14-03：候选与获取计划 ────────────────────────────────────
 def _candidate(action: str, gap: Mapping, *, sources: Mapping, permissions: Mapping,
                asked_ids: Sequence[str], resolved_claims: Sequence[str],
-               writer: str = "") -> dict:
-    """构造一条动作候选（**先算效用，再逐道闸门**；每个决策都带理由码）。"""
+               writer: str = "", hard_safety: bool = False) -> dict:
+    """构造一条动作候选（**先算效用，再逐道闸门**；每个决策都带理由码）。
+
+    `hard_safety=True`（P15-04 的**硬触发**：危险信号成组出现）时，**安全动作**
+    （直接问当事者 / 查内部登记）不再吃"追问负担上限"与"效用下限"两道闸门 ——
+    这正是 §22 那句"不能因为 UserBurden 高就降低追问优先级"的机器形态。
+    权限、来源可用性、适用性三道闸门**照旧生效**（安全不能凭空变出权限或数据源）。
+    """
     egr = expected_gap_reduction(action, gap)
     clinical = clinical_weights(gap)
     safety_critical = bool(clinical["safety_weight"] > 0)
-    utility = action_utility(action, gap, safety_override=safety_critical)
+    utility = action_utility(action, gap, safety_override=safety_critical or hard_safety)
     source = action_source(action)
+    safety_action = bool(action_kind(action) == "interaction" or source in ("db", "emr"))
+    bypass_cost_gates = bool(hard_safety and safety_action)
     item = {
         "action_version": ACQUISITION_ACTION_SCHEMA_VERSION,
         "action_id": "AC" + _digest("%s|%s" % (str((gap or {}).get("gap_id") or ""), action), 18),
@@ -820,6 +828,8 @@ def _candidate(action: str, gap: Mapping, *, sources: Mapping, permissions: Mapp
         "factors": utility["factors"],
         "clinical": clinical,
         "safety_critical": safety_critical,
+        "hard_safety_trigger": bool(hard_safety),
+        "cost_gates_bypassed": bypass_cost_gates,
         "expected_gap_reduction": float(egr["value"]),
         "gap": dict(gap) if isinstance(gap, Mapping) else {},
     }
@@ -837,12 +847,12 @@ def _candidate(action: str, gap: Mapping, *, sources: Mapping, permissions: Mapp
     if float(egr["value"]) <= 0.0:
         item.update({"decision": "skipped", "skip_reason": "NOT_APPLICABLE_TO_GAP"})
         return item
-    if action_kind(action) == "interaction" and \
+    if action_kind(action) == "interaction" and not bypass_cost_gates and \
             BURDEN_ORDER.index(str(item["factors"]["user_burden_label"])) > \
             BURDEN_ORDER.index(max_user_burden()):
         item.update({"decision": "skipped", "skip_reason": "OVER_USER_BURDEN"})
         return item
-    if float(utility["utility"]) < utility_floor():
+    if float(utility["utility"]) < utility_floor() and not bypass_cost_gates:
         item.update({"decision": "skipped", "skip_reason": "UTILITY_FLOOR"})
         return item
     return item
@@ -882,6 +892,16 @@ def plan_acquisition(gaps: Sequence[Mapping], *, sources: Mapping | None = None,
         return (-float(item.get("utility") or 0.0), -preferred, order)
 
     candidates: list = []
+    hard_receipts: list = []
+    # P15-04：安全硬触发（危险信号**成组**出现）。延迟导入：记忆安全模块依赖 qa_memory，
+    # 模块级导入会把整条链拉进 qa_acquisition 的 import 图（本函数只在运行期用一次）。
+    try:
+        from qa_memory_safety import (hard_trigger_active, safety_enforcement_receipt,
+                                      plan_safety_receipt)
+
+        _hard_available = True
+    except Exception:      # noqa: BLE001 —— 安全模块不可用时逐字回到 Phase 14 行为
+        _hard_available = False
     no_repeat_total: dict = {"gaps": 0, "in_graph": 0, "in_pack": 0, "suppressed": 0,
                              "suppressed_by_reason": {}, "reason_hits": {},
                              "suppressed_actions": {}, "kept_actions": {},
@@ -902,6 +922,7 @@ def plan_acquisition(gaps: Sequence[Mapping], *, sources: Mapping | None = None,
     for gap in list(gaps or ())[:max(1, int(max_gaps))]:
         if not isinstance(gap, Mapping):
             continue
+        hard_safety = bool(_hard_available and hard_trigger_active(gap))
         made: list = []
         seen: set = set()
         for action in action_list:
@@ -922,7 +943,7 @@ def plan_acquisition(gaps: Sequence[Mapping], *, sources: Mapping | None = None,
             seen.add(action)
             made.append(_candidate(action, gap, sources=sources_map, permissions=permissions_map,
                                    asked_ids=asked_ids, resolved_claims=resolved_claims,
-                                   writer=writer))
+                                   writer=writer, hard_safety=hard_safety))
         made, _no_repeat = context_gap_no_repeat(
             made, context_gaps=context_gaps, acquired_evidence=acquired_evidence,
             resolved_claims=resolved_claims, asked_ids=asked_ids)
@@ -951,6 +972,45 @@ def plan_acquisition(gaps: Sequence[Mapping], *, sources: Mapping | None = None,
                                              "safety_override": True,
                                              "replaced_by": str(safety.get("action") or "")}
                         winner = safety
+            # ── P15-04：**硬触发**（§22 的 Hard Safety Trigger）────────────────
+            # §22 原话的结构是"硬触发 → 高风险缺口 → 优先获取关键安全证据"，并且
+            # "不能因为 UserBurden 高就降低追问优先级"。与上面 P14-06 的软覆盖分开：
+            #   · 软覆盖（一个安全词）：带 0.6 的效用比门槛（D-052），口径一个字不动；
+            #   · 硬触发（危险信号**成组**）：不谈效用比、直接忽略延迟/成本/追问负担，
+            #     并把忽略的三项逐条写进回执（`ignored_cost_terms`）。
+            if hard_safety and _hard_available:
+                pool = [item for item in viable
+                        if str(item.get("kind")) == "interaction"
+                        or str(item.get("source")) in ("db", "emr")]
+                safety_pick = sorted(pool, key=_rank_key)[0] if pool else None
+                overrode = False
+                if safety_pick is None:
+                    hard_receipts.append(safety_enforcement_receipt(
+                        gap, winner_before=str(winner.get("action") or ""),
+                        reason="NO_SAFETY_ACTION",
+                        basis={"note": "危险信号成组，但本轮没有可用的安全动作（来源/权限/适用性拦下）"}))
+                elif safety_pick is winner:
+                    hard_receipts.append(safety_enforcement_receipt(
+                        gap, winner_before=str(winner.get("action") or ""),
+                        winner_after=str(safety_pick.get("action") or ""),
+                        reason="ALREADY_SAFETY_ACTION",
+                        basis={"note": "普通效用赢家本身就是安全动作，无需覆盖"}))
+                else:
+                    overrode = True
+                    winner_before = str(winner.get("action") or "")
+                    winner["decision"] = "skipped"
+                    winner["skip_reason"] = "SAFETY_OVERRIDE"
+                    winner["factors"] = {**dict(winner.get("factors") or {}),
+                                         "safety_override": True,
+                                         "safety_override_kind": "HARD_SAFETY_TRIGGER",
+                                         "replaced_by": str(safety_pick.get("action") or "")}
+                    winner = safety_pick
+                    hard_receipts.append(safety_enforcement_receipt(
+                        gap, winner_before=winner_before,
+                        winner_after=str(winner.get("action") or ""),
+                        reason="DANGER_SIGN_COMBINATION", overrode_utility=True,
+                        basis={"note": "§22：安全规则压过普通效用；忽略延迟/成本/追问负担",
+                               "winner_utility": float(safety_pick.get("utility") or 0.0)}))
             for loser in ranked:
                 if loser is winner or loser.get("decision") != "selected":
                     continue
@@ -990,6 +1050,8 @@ def plan_acquisition(gaps: Sequence[Mapping], *, sources: Mapping | None = None,
         "utility_factors": list(ACQUISITION_UTILITY_FACTORS),
         "preferred_routes": list(prefer),
         "settings": acquisition_settings(),
+        # P15-04：硬触发回执（没有硬触发时为空字典 → 一个键都不新增）
+        "safety_enforcement": plan_safety_receipt(hard_receipts) if _hard_available else {},
         "stats": {
             "gaps": len({str(item.get("gap_id") or "") for item in candidates}),
             "candidates": len(candidates),
@@ -1002,6 +1064,11 @@ def plan_acquisition(gaps: Sequence[Mapping], *, sources: Mapping | None = None,
             "inquiries": len([item for item in candidates
                               if str(item.get("action")) == "ask_patient"
                               and item.get("decision") == "selected"]),
+            # P15-04：安全硬触发的两个计数（为 0 时也如实给 0，便于验收对比）
+            "hard_safety_triggers": len([row for row in hard_receipts
+                                         if row.get("trigger") == "HARD_SAFETY_TRIGGER"]),
+            "hard_safety_overrides": len([row for row in hard_receipts
+                                          if row.get("overrode_utility")]),
         },
     }
     ok, note = validate_contract("acquisition_plan", dict(plan))
@@ -1062,6 +1129,9 @@ def acquisition_receipt(plan: Mapping, *, no_repeat: Mapping | None = None,
         "inquiries": inquiries,
         "stats": stats,
         "no_repeat": dict(no_repeat or plan.get("no_repeat") or {}),
+        "route_guidance": dict(guidance or {}),
+        # P15-04：安全硬触发回执（空字典 = 本轮没有硬触发，老回执键一字不差）
+        "safety_enforcement": dict(plan.get("safety_enforcement") or {}),
         "route_guidance": dict(guidance or {}),
         "session_config": dict(config or {}),
         "settings": dict(plan.get("settings") or acquisition_settings()),

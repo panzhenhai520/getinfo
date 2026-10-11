@@ -1413,6 +1413,10 @@ MEMORY_WRITE_REASONS: Tuple[str, ...] = (
     "NO_EVIDENCE_LINK",
     # 通过
     "UTILITY_ABOVE_FLOOR", "TTL_REQUIRED_BY_FRESHNESS",
+    # Phase 15（P15-01）：作用域强制**拒收**时的出口理由码（**只追加、不改既有取值**）。
+    # 判定层给出"为什么"（`SCOPE_ENFORCEMENT_REASONS`），写门给出"出口"（这一条），
+    # 具体的判定理由码落在决策行的 `metadata.scope_enforcement` 里（可审计、可复算）。
+    "SCOPE_ENFORCEMENT_REJECTED",
 )
 """写决策的理由码（每条决策必须带一个，可复算"为什么这条没被记住"）。"""
 
@@ -1550,11 +1554,17 @@ MEMORY_RECALL_RECEIPT_SCHEMA = {
         "stats": {"type": "object"},
         "scope": {"type": "object"},
         "trace_id": {"type": "string"},
+        # Phase 15（P15-01/P15-02/P15-03）：记忆安全的**子回执**（作用域判定 + 轮次隔离 +
+        # 长期时效）。做成**嵌套子键**而不是新的顶层兄弟键：`QA_MEMORY_GRAPH=0` 时一次召回
+        # 都不发生 → 一个键都不新增，回滚口径与 Phase 09 逐字一致（有守门用例）。
+        "memory_safety": {"type": "object"},
     },
     "required": ["recall_version", "mode", "channels", "hits", "counts"],
     "additionalProperties": True,
 }
-"""召回回执（P09-04）：命中清单 + 各通道计数 + 边界原因（无向量/无种子/非 ACTIVE 被排除）。"""
+"""召回回执（P09-04）：命中清单 + 各通道计数 + 边界原因（无向量/无种子/非 ACTIVE 被排除）。
+
+P15 起多一个**可选**子键 `memory_safety`（作用域强制 + 轮次隔离 + 长期时效的回执）。"""
 
 MEMORY_LIFECYCLE_REPORT_SCHEMA = {
     "type": "object",
@@ -3288,12 +3298,292 @@ REALIGNMENT_RECEIPT_SCHEMA = {
 （与 `ACQUISITION_ACTION_SCHEMA` 的 `route` 同一处置口径）。"""
 
 
+# ── Phase 15（P15-01…P15-06）：记忆安全与作用域隔离 ─────────────────────────
+# 本段的边界（一律按 D-002 的中性映射，医疗词只留在注释里）：
+#   1. §14 的**记忆边界**：五个作用域 + "当前状态不得无条件跨轮次/跨会话当事实"。
+#      P15-01 把"内容种类 × 作用域"变成可判定的规则（越界**收窄**，破坏作用域键完整性**拒收**）；
+#      P15-02 把"轮次"变成作用域键的**显式一维**（`encounter_id`），并给出隔离回执；
+#      P15-03 把"长期记忆使用时检查时间"落到 Phase 10 的**同一个**时效闸门上（不另造第二套）。
+#   2. §21/§22 的**安全覆盖**：Phase 07 已把 `SafetyCritical` 抬到优先级下界、Phase 14 已把
+#      安全动作按"效用比"换掉普通赢家。P15-04 只补**硬触发**那一档（危险信号**组合**）：
+#      组合命中时忽略成本/延迟/追问负担，并把覆盖逐条留痕。
+#   3. MASTER_RULES 18（日志不得泄露密钥与不必要的敏感信息）：P15-05 复用 `qa_security`
+#      既有的密钥/令牌脱敏，补上**值级**的标识符最小化与"记忆正文只留指纹"的日志政策。
+#   4. §15/§17 的**可 replay**：P15-06 给出"执行 → 证据 → 上下文 → 记忆"四层回放链，
+#      审计事件落**既有** `qa_audit_events` 表（零迁移），回放比对同一份输入与同一份代码。
+MEMORY_SAFETY_VERSION = "qa-memory-safety-v1"
+"""记忆安全与作用域隔离的总口径版本（P15-01…P15-06 的公共锚点）。"""
+
+SCOPE_ENFORCEMENT_VERSION = "qa-scope-enforcement-v1"
+"""P15-01 作用域强制（规则表 + 收窄/拒收判定）的口径版本。"""
+
+ENCOUNTER_ISOLATION_VERSION = "qa-encounter-isolation-v1"
+"""P15-02 轮次隔离（作用域键的 encounter 维 + 隔离回执）的口径版本。"""
+
+LONGITUDINAL_FRESHNESS_VERSION = "qa-longitudinal-freshness-v1"
+"""P15-03 长期记忆时效（复用 P10 闸门 + 长期窗口）的口径版本。"""
+
+SAFETY_CRITICAL_OVERRIDE_VERSION = "qa-safety-critical-override-v1"
+"""P15-04 安全硬触发的口径版本。"""
+
+PRIVACY_MINIMAL_LOG_VERSION = "qa-privacy-minimal-log-v1"
+"""P15-05 日志最小化的口径版本。"""
+
+MEMORY_AUDIT_REPLAY_VERSION = "qa-memory-audit-replay-v1"
+"""P15-06 记忆审计与回放的口径版本。"""
+
+SCOPE_DECISIONS: Tuple[str, ...] = ("ALLOW", "NARROW", "REJECT")
+"""作用域判定的三个出口：**放行 / 收窄到更严作用域 / 拒收**。
+
+刻意没有"放宽"这一档：作用域判定**只能不变或变严**（§14 的安全方向）。
+"""
+
+SCOPE_CONTENT_KINDS: Tuple[str, ...] = (
+    "KNOWLEDGE", "RULE", "ENVIRONMENT", "SUBJECT_FACT", "CURRENT_STATE",
+)
+"""记忆**内容种类**（P15-01 判定的横轴；与作用域正交）：
+
+`KNOWLEDGE`=跨主体通用知识（§14 "指南知识可为 GLOBAL_KNOWLEDGE"）；
+`RULE`=本部署的组织规则（§14 "医院规则为 ORGANIZATION"）；
+`ENVIRONMENT`=检索环境经验（策略/失败/查询形态/来源可靠性/技能表现，P12 六类）；
+`SUBJECT_FACT`=关于某个主体的**非当前**事实（长期病史 → PATIENT_LONGITUDINAL）；
+`CURRENT_STATE`=主体的**当前状态**（症状/生命体征/用药状态/实时指标 —— §14 硬规则的落点）。"""
+
+SCOPE_BREADTH = {
+    "GLOBAL_KNOWLEDGE": 4, "ORGANIZATION": 3, "PATIENT_LONGITUDINAL": 2,
+    "ENCOUNTER": 1, "SESSION": 0,
+}
+"""五个作用域的**广度序**（越大越"通用"、越小越"贴身"）。
+
+§14 的安全方向是**单调的**：把内容放进更窄的作用域永远安全（只是少复用），
+放进更宽的作用域才可能污染（拿别的主体的当前状态当事实）。所以判定只需要
+"内容种类允许的最大广度"这一个数，不需要逐对枚举。"""
+
+CONTENT_KIND_MAX_BREADTH = {
+    "KNOWLEDGE": 4,        # 通用知识可以进 GLOBAL_KNOWLEDGE（§14 明说）
+    "RULE": 3,             # 组织规则最多到 ORGANIZATION（写进更窄的作用域只是少复用）
+    "ENVIRONMENT": 3,      # 检索环境经验是**本部署**的知识，不得升格成通用知识
+    "SUBJECT_FACT": 2,     # 关于某个主体的事实最多到主体长期（不得进 GLOBAL/ORGANIZATION）
+    "CURRENT_STATE": 1,    # 当前状态最多到轮次（§14 硬规则：不得无条件跨轮次/跨会话）
+}
+"""每种内容种类**允许的最大作用域广度**（P15-01 的唯一判据来源）。"""
+
+SCOPE_ALLOWED_CONTENT_KINDS = {
+    scope: tuple(kind for kind, cap in CONTENT_KIND_MAX_BREADTH.items() if cap >= breadth)
+    for scope, breadth in SCOPE_BREADTH.items()
+}
+"""由上面两张表**派生**的"作用域 → 允许的内容种类"视图（守门用例断言派生结果与之一致）。
+
+派生而不是手写：两张表写死、视图算出来，就不存在"改了一张忘改另一张"的漂移
+（与 Phase 12 的 `MEMORY_PRODUCIBLE_TYPES_BY_PHASE` 同一手法，见 D-044）。"""
+
+SCOPE_ENFORCEMENT_REASONS: Tuple[str, ...] = (
+    # 放行
+    "SCOPE_AND_CONTENT_ALIGNED",
+    # 放行但记账（组织绑定缺失：收窄到"本部署"而不是某个组织；不是跨主体泄漏）
+    "ORGANIZATION_BINDING_DEGRADED",
+    # 收窄（§14：当前状态不得无条件跨轮次/跨会话）
+    "CURRENT_STATE_NARROWED_TO_ENCOUNTER",
+    # 收窄（非当前状态类越界：维度允许内**收到该类允许的最宽作用域**，而不是丢数据）
+    "CONTENT_KIND_NARROWED_TO_ALLOWED_SCOPE",
+    # 拒收（作用域键完整性 / 内容与作用域不匹配）
+    "SCOPE_MISSING", "SCOPE_UNKNOWN", "SCOPE_KEY_MISMATCH", "SCOPE_CONTENT_MISMATCH",
+    "SUBJECT_SCOPE_NEEDS_SUBJECT", "SESSION_SCOPE_NEEDS_SESSION", "ENCOUNTER_SCOPE_NEEDS_ENCOUNTER",
+)
+"""作用域判定的理由码（闭集合，**每条都必须可达**，有守门用例逐条覆盖）。
+
+`SCOPE_MISSING` 与 Phase 09 写门的同名理由码**同一个意思**（这里只是把它提前到判定层，
+写门仍然保留自己的分支，两处不冲突：判定层给出"为什么"，写门给出"出口"）。"""
+
+SCOPE_ENFORCEMENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "enforcement_version": {"type": "string", "enum": [SCOPE_ENFORCEMENT_VERSION]},
+        "memory_id": {"type": "string"},
+        "memory_type": {"type": "string", "enum": list(MEMORY_TYPES) + [""]},
+        "scope": {"type": "string", "enum": list(MEMORY_SCOPES) + [""]},
+        "scope_key": {"type": "string"},
+        "expected_scope_key": {"type": "string"},
+        "content_kind": {"type": "string", "enum": list(SCOPE_CONTENT_KINDS)},
+        "decision": {"type": "string", "enum": list(SCOPE_DECISIONS)},
+        "reason": {"type": "string", "enum": list(SCOPE_ENFORCEMENT_REASONS)},
+        "narrowed_from": {"type": "string", "enum": list(MEMORY_SCOPES) + [""]},
+        "narrowed_to": {"type": "string", "enum": list(MEMORY_SCOPES) + [""]},
+        "binding": {"type": "object"},
+        "allowed_kinds": {"type": "array", "items": {"type": "string",
+                                                     "enum": list(SCOPE_CONTENT_KINDS)}},
+        "basis": {"type": "object"},
+    },
+    "required": ["enforcement_version", "content_kind", "decision", "reason", "binding"],
+    "additionalProperties": True,
+}
+"""P15-01 的单条判定：决策 + 理由码 + 内容种类 + 绑定证据（**逐项可复算**）。"""
+
+ENCOUNTER_ISOLATION_REASONS: Tuple[str, ...] = (
+    "SAME_ENCOUNTER", "SAME_SESSION", "SAME_SUBJECT", "SAME_ORGANIZATION", "GLOBAL",
+    "OTHER_ENCOUNTER", "OTHER_SESSION", "OTHER_SUBJECT", "OTHER_ORGANIZATION",
+)
+"""一条记忆在本轮次上下文里"为什么可见/为什么被隔离"（闭集合）。
+
+前五个是**可见**理由，后四个是**隔离**理由：轮次/会话不同一律隔离（§14 硬规则）；
+主体长期记忆跨轮次**允许**（但要在使用时过 P15-03 的时效窗口）；组织规则跨轮次允许；
+通用知识处处可见。"""
+
+CROSS_ENCOUNTER_POLICIES: Tuple[str, ...] = ("BLOCK", "REVALIDATE_ON_USE", "ALLOW")
+"""跨轮次使用一条记忆的三种处置：隔离 / 允许但要复验 / 直接允许。"""
+
+ENCOUNTER_ISOLATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "isolation_version": {"type": "string", "enum": [ENCOUNTER_ISOLATION_VERSION]},
+        "context": {"type": "object"},
+        "visible_scope_keys": {"type": "array", "items": {"type": "string"}},
+        "checked": {"type": "integer", "minimum": 0},
+        "visible": {"type": "integer", "minimum": 0},
+        "isolated": {"type": "integer", "minimum": 0},
+        "isolated_by_reason": {"type": "object"},
+        "isolated_refs": {"type": "array", "items": {"type": "object"}},
+        "cross_encounter": {"type": "array", "items": {"type": "object"}},
+        "leaks": {"type": "array", "items": {"type": "string"}},
+        "settings": {"type": "object"},
+    },
+    "required": ["isolation_version", "checked", "visible", "isolated", "isolated_by_reason"],
+    "additionalProperties": True,
+}
+"""P15-02 的隔离回执：**被隔离的是哪些**（只留引用与指纹，不留正文）+ 跨轮次放行的那些。"""
+
+LONGITUDINAL_FRESHNESS_REASONS: Tuple[str, ...] = (
+    "NOT_LONGITUDINAL",             # 非长期作用域：原样透传 P10 闸门结论
+    "AGE_BEYOND_LONGITUDINAL_WINDOW",   # 长期记忆超窗口 → 复验
+    "VALID_FROM_IN_FUTURE",         # 尚未生效（时间点还没到）→ 不可当当前事实用
+    "GATE_UNAVAILABLE",             # P10 闸门不可用（模块缺席/抛错）→ 保守判复验并记账
+)
+"""P15-03 在 Phase 10 闸门之外**唯一**新增的这几条理由码（其余理由码一律原样来自闸门）。
+
+这样"为什么这条长期记忆要复验"永远只有一个权威出口（P10 的 `reason`），
+本阶段只补"长期"这一档的窗口、"尚未生效"这一条时间方向，以及"闸门不可用"的保守出口
+（安全方向：拿不到闸门结论时判复验，绝不判 ALLOW）。"""
+
+LONGITUDINAL_FRESHNESS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "longitudinal_version": {"type": "string", "enum": [LONGITUDINAL_FRESHNESS_VERSION]},
+        "memory_id": {"type": "string"},
+        "scope": {"type": "string", "enum": list(MEMORY_SCOPES) + [""]},
+        "longitudinal": {"type": "boolean"},
+        "decision": {"type": "string", "enum": list(MEMORY_FRESHNESS_DECISIONS)},
+        "gate_reason": {"type": "string", "enum": list(MEMORY_FRESHNESS_REASONS) + [""]},
+        "reason": {"type": "string", "enum": list(LONGITUDINAL_FRESHNESS_REASONS)
+                   + list(MEMORY_FRESHNESS_REASONS)},
+        "age_days": {"type": "number"},
+        "window_days": {"type": "number"},
+        "valid_from": {"type": "string"},
+        "gate": {"type": "object"},
+        "settings": {"type": "object"},
+    },
+    "required": ["longitudinal_version", "decision", "reason", "longitudinal"],
+    "additionalProperties": True,
+}
+"""P15-03 的单条结论：`decision` 三值**逐字复用** `MEMORY_FRESHNESS_DECISIONS`（不另造枚举），
+`reason` 的取值域 = Phase 10 的 `MEMORY_FRESHNESS_REASONS` **并上**本阶段新增的三条。"""
+
+SAFETY_TRIGGER_KINDS: Tuple[str, ...] = ("HARD_SAFETY_TRIGGER", "SOFT_SAFETY_TRIGGER", "NO_TRIGGER")
+"""§22 的安全触发三档：**危险信号组合**（硬）/ 单个安全词（软，走 P14 的效用比覆盖）/ 无。"""
+
+SAFETY_TRIGGER_REASONS: Tuple[str, ...] = (
+    "DANGER_SIGN_COMBINATION", "SINGLE_SAFETY_TERM", "NO_SAFETY_TERM", "NO_SAFETY_ACTION",
+    "BELOW_SAFETY_RATIO", "ALREADY_SAFETY_ACTION",
+)
+"""安全触发与覆盖的理由码（闭集合）：**硬触发必须能解释"是哪几个信号凑成的"**。"""
+
+SAFETY_ENFORCEMENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "override_version": {"type": "string", "enum": [SAFETY_CRITICAL_OVERRIDE_VERSION]},
+        "gap_id": {"type": "string"},
+        "trigger": {"type": "string", "enum": list(SAFETY_TRIGGER_KINDS)},
+        "reason": {"type": "string", "enum": list(SAFETY_TRIGGER_REASONS)},
+        "danger_signs": {"type": "array", "items": {"type": "string"}},
+        "sign_count": {"type": "integer", "minimum": 0},
+        "min_signs": {"type": "integer", "minimum": 1},
+        "ignored_cost_terms": {"type": "array", "items": {"type": "string"}},
+        "winner_before": {"type": "string", "enum": list(ACQUISITION_ACTIONS) + [""]},
+        "winner_after": {"type": "string", "enum": list(ACQUISITION_ACTIONS) + [""]},
+        "overrode_utility": {"type": "boolean"},
+        "basis": {"type": "object"},
+    },
+    "required": ["override_version", "trigger", "reason", "danger_signs", "sign_count", "min_signs"],
+    "additionalProperties": True,
+}
+"""P15-04 的硬触发回执：**触发信号逐条列出**、覆盖前的赢家与覆盖后的赢家都可追溯。
+
+`ignored_cost_terms` 就是 §22 那句"不能因为 UserBurden 高就降低追问优先级"的机器形态：
+硬触发时把成本/延迟/负担三项显式列出来，说明**它们被忽略了**（而不是假装它们不存在）。"""
+
+PRIVACY_MINIMAL_RULES: Tuple[str, ...] = (
+    "SECRET_KEY",            # 键名本身敏感（复用 qa_security.SENSITIVE_KEYS）
+    "BEARER_TOKEN",          # 值里出现 bearer/令牌形态
+    "KEY_VALUE_SECRET",      # 值里出现 key=value 形态的密钥
+    "EMAIL", "PHONE", "IDENTIFIER_RUN",   # 值级标识符（复用 qa_memory 的敏感串口径）
+    "CONTENT_FINGERPRINTED", # 记忆/证据正文只留指纹与长度
+    "TRUNCATED",             # 超长字段截断
+)
+"""P15-05 的最小化规则（闭集合）：每条都必须可单独验证（有守例逐条覆盖）。"""
+
+PRIVACY_MINIMAL_LOG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "policy_version": {"type": "string", "enum": [PRIVACY_MINIMAL_LOG_VERSION]},
+        "rule_hits": {"type": "object"},
+        "redacted_fields": {"type": "integer", "minimum": 0},
+        "fingerprinted_fields": {"type": "integer", "minimum": 0},
+        "leaks": {"type": "array", "items": {"type": "string"}},
+        "content_policy": {"type": "string"},
+        "purpose": {"type": "string"},
+    },
+    "required": ["policy_version", "rule_hits", "leaks", "content_policy"],
+    "additionalProperties": True,
+}
+"""P15-05 的最小化回执：`leaks` **必须为空数组**才算通过（可复算、可断言）。"""
+
+MEMORY_AUDIT_EVENT_KINDS: Tuple[str, ...] = (
+    "SCOPE_ENFORCED", "ENCOUNTER_ISOLATED", "LONGITUDINAL_CHECKED",
+    "SAFETY_CRITICAL_OVERRIDDEN", "LOG_MINIMIZED", "REPLAY_VERIFIED",
+)
+"""P15-06 落进**既有** `qa_audit_events` 表的六种事件（`event_type` 取值，闭集合）。"""
+
+AUDIT_REPLAY_LAYERS: Tuple[str, ...] = ("execution", "evidence", "context", "memory")
+"""可回放的四层链（§17 追加验收项："可 replay 任意回答：执行 → 证据 → 上下文 → 记忆"）。"""
+
+AUDIT_REPLAY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "replay_version": {"type": "string", "enum": [MEMORY_AUDIT_REPLAY_VERSION]},
+        "run_id": {"type": "string"},
+        "layers": {"type": "array", "items": {"type": "string", "enum": list(AUDIT_REPLAY_LAYERS)}},
+        "counts": {"type": "object"},
+        "hops": {"type": "array", "items": {"type": "object"}},
+        "missing": {"type": "array", "items": {"type": "string"}},
+        "replay_matches": {"type": "boolean"},
+        "mismatches": {"type": "array", "items": {"type": "object"}},
+        "redacted": {"type": "boolean"},
+        "idempotent": {"type": "boolean"},
+        "settings": {"type": "object"},
+    },
+    "required": ["replay_version", "run_id", "layers", "counts", "replay_matches", "redacted"],
+    "additionalProperties": True,
+}
+"""P15-06 的回放链：四层各自的条数 + 层间引用是否闭环 + **重放是否逐字复现**。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s / "
             "技能注册表 %s / 技能路由 %s / 经验记忆 %s / 答案组装 %s / 终验 %s / 局部重试 %s / "
             "证据不足输出 %s / 获取动作 %s / 获取效用 %s / 问诊 %s / 上下文不重复追问 %s / "
-            "临床安全权重 %s / 重复提问重对齐 %s："
+            "临床安全权重 %s / 重复提问重对齐 %s / "
+            "记忆安全 %s / 作用域强制 %s / 轮次隔离 %s / 长期时效 %s / "
+            "安全硬触发 %s / 日志最小化 %s / 审计回放 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
@@ -3304,7 +3594,10 @@ def describe() -> str:
             "剧集要素 %d / 失败种类 %d / 重试出口 %d / 来源档 %d / "
             "终验检查 %d / 局部重试作用域 %d / 证据不足判据 %d / "
             "获取动作 %d / 获取来源 %d / 淘汰理由码 %d / 上下文抑制理由码 %d / "
-            "重复提问触发判据 %d / 不满意依据 %d / 思路选项 %d / 会话配置键 %d"
+            "重复提问触发判据 %d / 不满意依据 %d / 思路选项 %d / 会话配置键 %d / "
+            "作用域决策 %d / 作用域理由码 %d / 内容种类 %d / 轮次隔离理由 %d / "
+            "跨轮次策略 %d / 长期时效理由 %d / 安全触发档 %d / 安全触发理由 %d / "
+            "日志最小化规则 %d / 审计事件种类 %d / 回放层 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION, EXPERIENCE_MEMORY_VERSION,
@@ -3313,6 +3606,9 @@ def describe() -> str:
                ACQUISITION_UTILITY_VERSION, PATIENT_INQUIRY_VERSION,
                CONTEXT_GAP_NO_REPEAT_VERSION, CLINICAL_SAFETY_WEIGHTS_VERSION,
                REALIGNMENT_VERSION,
+               MEMORY_SAFETY_VERSION, SCOPE_ENFORCEMENT_VERSION, ENCOUNTER_ISOLATION_VERSION,
+               LONGITUDINAL_FRESHNESS_VERSION, SAFETY_CRITICAL_OVERRIDE_VERSION,
+               PRIVACY_MINIMAL_LOG_VERSION, MEMORY_AUDIT_REPLAY_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
@@ -3334,7 +3630,13 @@ def describe() -> str:
                len(ACQUISITION_ACTIONS), len(ACQUISITION_SOURCES),
                len(ACQUISITION_SKIP_REASONS), len(CONTEXT_GAP_NO_REPEAT_REASONS),
                len(REALIGNMENT_TRIGGERS), len(REALIGNMENT_DISSATISFACTION_REASONS),
-               len(REALIGNMENT_OPTION_IDS), len(REALIGNMENT_CONFIG_KEYS)))
+                len(REALIGNMENT_OPTION_IDS), len(REALIGNMENT_CONFIG_KEYS),
+                len(SCOPE_DECISIONS), len(SCOPE_ENFORCEMENT_REASONS),
+                len(SCOPE_CONTENT_KINDS), len(ENCOUNTER_ISOLATION_REASONS),
+                len(CROSS_ENCOUNTER_POLICIES), len(LONGITUDINAL_FRESHNESS_REASONS),
+                len(SAFETY_TRIGGER_KINDS), len(SAFETY_TRIGGER_REASONS),
+                len(PRIVACY_MINIMAL_RULES), len(MEMORY_AUDIT_EVENT_KINDS),
+                len(AUDIT_REPLAY_LAYERS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -3460,6 +3762,13 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "realignment_interaction": REALIGNMENT_INTERACTION_SCHEMA,
         "realignment_config": REALIGNMENT_CONFIG_SCHEMA,
         "realignment_receipt": REALIGNMENT_RECEIPT_SCHEMA,
+        # Phase 15（P15-01…P15-06）
+        "scope_enforcement": SCOPE_ENFORCEMENT_SCHEMA,
+        "encounter_isolation": ENCOUNTER_ISOLATION_SCHEMA,
+        "longitudinal_freshness": LONGITUDINAL_FRESHNESS_SCHEMA,
+        "safety_enforcement": SAFETY_ENFORCEMENT_SCHEMA,
+        "privacy_minimal_log": PRIVACY_MINIMAL_LOG_SCHEMA,
+        "audit_replay": AUDIT_REPLAY_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

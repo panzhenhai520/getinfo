@@ -811,6 +811,26 @@ def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: 
 # 行为逐字回到 Phase 08；打开后只加**兄弟键** `graph["memory"]`（召回回执），
 # 写入侧只动 Phase 09 自己的八张 memory_* 表（不碰任何冻结结构）。
 
+def _apply_recall_safety(store, receipt: Mapping, *, run_meta: Mapping) -> dict:
+    """阶段 15（P15-01/P15-02/P15-03）：召回命中过一遍**记忆安全**。
+
+    三件事，全部**只减不增**（安全方向单调）：作用域完整性复核（越界行隔离）、
+    轮次隔离（跨轮次/跨会话的当前状态隔离）、长期时效（尚未生效或终态的行隔离）。
+    结果写成召回回执的**嵌套子键** `memory_safety`（不新增 graph 顶层键 → `QA_MEMORY_GRAPH=0`
+    时一次召回都不发生，回滚口径与 Phase 09 逐字一致）。失败一律降级成"不过滤 + 记账"。
+    """
+    try:
+        from qa_memory_safety import apply_recall_safety
+
+        return apply_recall_safety(store, receipt, run_meta=run_meta,
+                                   trace_id=str((run_meta or {}).get("id") or ""))
+    except Exception as exc:  # noqa: BLE001 —— 记忆安全绝不能把建立证据图/出答案的链路打断
+        out = dict(receipt) if isinstance(receipt, Mapping) else {}
+        out["memory_safety"] = {"version": "", "error": "%s: %s" % (type(exc).__name__,
+                                                                  str(exc)[:160])}
+        return out
+
+
 def _build_memory_recall_layer(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
                                run_meta: Mapping, store, vectors=None) -> dict:
     """阶段 09（P09-04）：按 run 的作用域召回记忆（恒为 MEMORY_HINT），失败只记账。"""
@@ -819,6 +839,7 @@ def _build_memory_recall_layer(graph: Mapping, *, plan: Mapping | None, request:
                        or (plan or {}).get("question") or (plan or {}).get("standalone_question") or "")
         receipt = recall_from_run(store, run_meta=run_meta, graph=graph, question=question,
                                   mode="evidence", vectors=vectors)
+        receipt = _apply_recall_safety(store, receipt, run_meta=run_meta)
         receipt["receipt"] = memory_receipt(receipt)
         return receipt
     except Exception as exc:  # noqa: BLE001 —— 召回绝不能把建立证据图/出答案打断

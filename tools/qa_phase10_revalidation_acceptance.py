@@ -397,39 +397,61 @@ def _construct_conflict_phase(pairs: list, snapshot: dict) -> dict:
                     str(row.get("entity_key") or ""))
         except Exception:      # noqa: BLE001
             entities = {}
-        source = next((item for item in claims
-                       if entities.get(str(item.get("memory_id")) or "")), claims[0])
-        text = str(source.get("canonical_content") or "")
-        source_entities = entities.get(str(source.get("memory_id")) or []) or []
-        older_text = _negate_text(text, source_entities)
-        # 构造对必须用**独立作用域键**：真机素材的内容指纹已被原记忆占用，
-        # `UNIQUE(scope_key, memory_type, content_fingerprint)` 会把同作用域的重写顶掉
-        scope_key = "%s|P10-CONSTRUCTED" % str(source.get("scope_key") or "")
-        base = {
-            "memory_id": "MEM-constructed-old", "memory_type": "VERIFIED_CLAIM",
-            "canonical_content": text,
-            "content_fingerprint": memory.content_fingerprint(text),
-            "confidence": 0.8, "freshness_class": str(source.get("freshness_class") or "MEDIUM"),
-            "status": "ACTIVE", "scope": str(source.get("scope") or "PATIENT_LONGITUDINAL"),
-            "scope_key": scope_key, "valid_from": "2026-01-01", "valid_until": "",
-            "last_verified_at": frozen.isoformat(timespec="seconds"),
-            "created_at": frozen.isoformat(timespec="seconds"), "version": 1, "decay_score": 0.5,
-            "entity_ids": entities.get(str(source.get("memory_id")) or []) or [],
-            "metadata": {"claim_type": "policy", "valid_from": "2026-01-01"},
-        }
-        twin = dict(base)
-        twin.update({"memory_id": "MEM-constructed-new", "canonical_content": older_text,
-                     "content_fingerprint": memory.content_fingerprint(older_text),
-                     "valid_from": "2026-09-01",
-                     "metadata": {"claim_type": "policy", "valid_from": "2026-09-01"}})
-        saved = [store.save_memory_item(base), store.save_memory_item(twin)]
-        sample["save_errors"] = [row.get("error") for row in saved if row.get("error")]
-        report = mr.detect_memory_contradictions(store, run_id="acceptance-constructed",
-                                                now=frozen)
+        # 挑素材：**逐个候选试到能配对为止**（Phase 15 的真机复算暴露的问题 —— 构造注入
+        # 依赖"素材能被否定短语翻出反证 + 过完所有配对前置条件"，而否定是词面操作，
+        # 不是每条真机断言都翻得动；此前只要第一条带实体的断言恰好翻不动，正例就恒为 0）。
+        # 循环只影响**挑哪条素材**，不放宽任何判据：找到的构造对仍要过完整的前置条件。
+        candidates = [item for item in claims
+                      if entities.get(str(item.get("memory_id")) or "")] or list(claims)
+        text = older_text = ""
+        found: list = []
+        attempts: list = []
+        source: dict = {}
         constructed_ids = {"MEM-constructed-old", "MEM-constructed-new"}
-        found = [row for row in report["contradictions"]
-                 if {str(row.get("left_memory_id")), str(row.get("right_memory_id"))}
-                 & constructed_ids]
+        for source in candidates[:12]:
+            text = str(source.get("canonical_content") or "")
+            source_entities = entities.get(str(source.get("memory_id")) or []) or []
+            older_text = _negate_text(text, source_entities)
+            # 构造对必须用**独立作用域键**：真机素材的内容指纹已被原记忆占用，
+            # `UNIQUE(scope_key, memory_type, content_fingerprint)` 会把同作用域的重写顶掉
+            scope_key = "%s|P10-CONSTRUCTED" % str(source.get("scope_key") or "")
+            base = {
+                "memory_id": "MEM-constructed-old", "memory_type": "VERIFIED_CLAIM",
+                "canonical_content": text,
+                "content_fingerprint": memory.content_fingerprint(text),
+                "confidence": 0.8,
+                "freshness_class": str(source.get("freshness_class") or "MEDIUM"),
+                "status": "ACTIVE", "scope": str(source.get("scope") or "PATIENT_LONGITUDINAL"),
+                "scope_key": scope_key, "valid_from": "2026-01-01", "valid_until": "",
+                "last_verified_at": frozen.isoformat(timespec="seconds"),
+                "created_at": frozen.isoformat(timespec="seconds"), "version": 1,
+                "decay_score": 0.5,
+                "entity_ids": entities.get(str(source.get("memory_id")) or []) or [],
+                "metadata": {"claim_type": "policy", "valid_from": "2026-01-01"},
+            }
+            twin = dict(base)
+            twin.update({"memory_id": "MEM-constructed-new", "canonical_content": older_text,
+                         "content_fingerprint": memory.content_fingerprint(older_text),
+                         "valid_from": "2026-09-01",
+                         "metadata": {"claim_type": "policy", "valid_from": "2026-09-01"}})
+            saved = [store.save_memory_item(base), store.save_memory_item(twin)]
+            sample["save_errors"] = [row.get("error") for row in saved if row.get("error")]
+            report = mr.detect_memory_contradictions(store, run_id="acceptance-constructed",
+                                                     now=frozen)
+            found = [row for row in report["contradictions"]
+                     if {str(row.get("left_memory_id")), str(row.get("right_memory_id"))}
+                     & constructed_ids]
+            attempts.append({"memory_id": str(source.get("memory_id") or ""),
+                             "scope": str(source.get("scope") or ""),
+                             "candidates": len(found)})
+            if found:
+                break
+        sample["attempts"] = attempts
+        sample["source"] = {"memory_id": str(source.get("memory_id") or ""),
+                            "scope": str(source.get("scope") or ""),
+                            "scope_key": str(source.get("scope_key") or ""),
+                            "entities": entities.get(str(source.get("memory_id")) or []) or [],
+                            "tried": len(attempts)}
         sample.update({"candidates": len(found),
                        "by_reason_code": _counter(row.get("reason_code") for row in found),
                        "by_resolution": _counter(row.get("resolution") for row in found),

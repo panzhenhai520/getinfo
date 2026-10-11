@@ -2066,6 +2066,9 @@ class QaStore:
                 value = _row_dict(row) or {}
                 value["factors"] = _decode_json(value.get("factors_json"), {})
                 value["evidence_refs"] = _decode_json(value.get("evidence_refs_json"), [])
+                # P15-01：决策的元数据（含作用域强制回执）在 payload_json 里，
+                # 按 `load_memory_items` 的同一约定暴露成 `metadata`（只加键，不改既有键）。
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
                 out.append(value)
             return out
         except Exception:  # noqa: BLE001

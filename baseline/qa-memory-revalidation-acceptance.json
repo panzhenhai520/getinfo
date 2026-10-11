@@ -1,6 +1,6 @@
 {
  "report_version": "qa-memory-revalidation-acceptance-v1",
- "generated_at_utc": "2026-10-11T00:31:02Z",
+ "generated_at_utc": "2026-10-11T08:20:55Z",
  "snapshot": {
   "path": "baseline\\qa-memory-revalidation-real-sample.json",
   "captured_at_utc": "2026-10-10T23:16:06Z",
@@ -501,26 +501,26 @@
    },
    "revalidated": 26,
    "revalidated_ids": [
-    "MEM04032bb832bfda5f79396346",
     "MEM08299cfafcd062bfdc8814c8",
     "MEM0909eb19dc8e67dc7c18741f",
     "MEM0965e4d2a7eb3881687a81d6",
-    "MEM11cb9ec767686687a78cb5ea",
+    "MEM22e9b9d1485a177c88594b20",
     "MEM3a4b4c0785ca9450c8712025",
+    "MEM3ffd46522f96864a337e5b3c",
     "MEM41ab674d715d7f342c7dbbd0",
     "MEM432ab21eaf1e952a1f372177",
+    "MEM4e55a9ad941274bb6c4a53a0",
     "MEM69381cdb0ff614182129c335",
-    "MEM6f05b4fd9bc26dce5b84fb81",
     "MEM6f4e879865baaf1690abbfe8",
     "MEM74a71f297f8cdb0329cfc4ea",
-    "MEM8d0a4615f50c15761e2f1c9c",
+    "MEM7d4d3eac2fb3dd2d9de32e1b",
     "MEM947372cd6eab2292bf95a55c",
+    "MEM973b8b0fca777d645bd7454c",
+    "MEM98788c64646d073d67eab5fb",
     "MEMab536a9eed9738ee4d253d99",
-    "MEMb2e5d8d302af1e99e0c0f5d2",
     "MEMb61a29ab5525726424dee6f9",
     "MEMcf5b261e4e86d8b74ce7f451",
-    "MEMd01ffc4519999bd168a7304d",
-    "MEMd41ff2fdd58f1f7067e2679c"
+    "MEMd01ffc4519999bd168a7304d"
    ],
    "revalidation_pass_rate": 0.742857,
    "status_transitions": {
@@ -599,15 +599,6 @@
      "age_days": 0.0
     },
     {
-     "memory_id": "MEM04032bb832bfda5f79396346",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.66005,
-     "age_days": 0.0
-    },
-    {
      "memory_id": "MEM0490362adad8b28a7a8307d8",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -671,21 +662,21 @@
      "age_days": 0.0
     },
     {
-     "memory_id": "MEM11cb9ec767686687a78cb5ea",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.79025,
-     "age_days": 0.0
-    },
-    {
      "memory_id": "MEM1273ca319c1b491bb5b25684",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM22e9b9d1485a177c88594b20",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.79025,
      "age_days": 0.0
     },
     {
@@ -770,6 +761,15 @@
      "age_days": 0.0
     },
     {
+     "memory_id": "MEM3ffd46522f96864a337e5b3c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.6963,
+     "age_days": 0.0
+    },
+    {
      "memory_id": "MEM41ab674d715d7f342c7dbbd0",
      "decision": "REVALIDATE",
      "reason": "HIGH_STAKES_DEFAULT",
@@ -830,6 +830,15 @@
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM4e55a9ad941274bb6c4a53a0",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.84025,
      "age_days": 0.0
     },
     {
@@ -905,15 +914,6 @@
      "age_days": 0.0
     },
     {
-     "memory_id": "MEM6f05b4fd9bc26dce5b84fb81",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "VERSION_SENSITIVE",
-     "status": "ACTIVE",
-     "decay_score": 0.84025,
-     "age_days": 0.0
-    },
-    {
      "memory_id": "MEM6f4e879865baaf1690abbfe8",
      "decision": "REVALIDATE",
      "reason": "FRESHNESS_REQUIRED",
@@ -968,6 +968,15 @@
      "age_days": 0.0
     },
     {
+     "memory_id": "MEM7d4d3eac2fb3dd2d9de32e1b",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.84025,
+     "age_days": 0.0
+    },
+    {
      "memory_id": "MEM82796e9bdce520eea1c7e203",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -995,15 +1004,6 @@
      "age_days": 0.0
     },
     {
-     "memory_id": "MEM8d0a4615f50c15761e2f1c9c",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.6963,
-     "age_days": 0.0
-    },
-    {
      "memory_id": "MEM8e03d16184c7881ad65cf9c8",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -1019,6 +1019,24 @@
      "freshness_class": "VERSION_SENSITIVE",
      "status": "ACTIVE",
      "decay_score": 0.62355,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM973b8b0fca777d645bd7454c",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.79025,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM98788c64646d073d67eab5fb",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.66005,
      "age_days": 0.0
     },
     {
@@ -1082,15 +1100,6 @@
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.9,
-     "age_days": 0.0
-    },
-    {
-     "memory_id": "MEMb2e5d8d302af1e99e0c0f5d2",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.79025,
      "age_days": 0.0
     },
     {
@@ -1175,15 +1184,6 @@
      "age_days": 0.0
     },
     {
-     "memory_id": "MEMd41ff2fdd58f1f7067e2679c",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.84025,
-     "age_days": 0.0
-    },
-    {
      "memory_id": "MEMdd801f4447b2e82e59b10e39",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -1193,21 +1193,21 @@
      "age_days": 0.0
     },
     {
+     "memory_id": "MEMdf275e4dc586bb5d716acf96",
+     "decision": "REVALIDATE",
+     "reason": "VALID_UNTIL_PASSED",
+     "freshness_class": "SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.0,
+     "age_days": 0.0
+    },
+    {
      "memory_id": "MEMe43cd4d6f2b548839b31585a",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.9,
-     "age_days": 0.0
-    },
-    {
-     "memory_id": "MEMe48a6cad656287e12a8b2592",
-     "decision": "REVALIDATE",
-     "reason": "VALID_UNTIL_PASSED",
-     "freshness_class": "SHORT",
-     "status": "EXPIRED",
-     "decay_score": 0.0,
      "age_days": 0.0
     },
     {
@@ -1814,25 +1814,25 @@
    },
    "revalidated": 25,
    "revalidated_ids": [
-    "MEM04032bb832bfda5f79396346",
     "MEM0909eb19dc8e67dc7c18741f",
     "MEM0965e4d2a7eb3881687a81d6",
-    "MEM11cb9ec767686687a78cb5ea",
+    "MEM22e9b9d1485a177c88594b20",
     "MEM3a4b4c0785ca9450c8712025",
+    "MEM3ffd46522f96864a337e5b3c",
     "MEM41ab674d715d7f342c7dbbd0",
     "MEM432ab21eaf1e952a1f372177",
+    "MEM4e55a9ad941274bb6c4a53a0",
     "MEM69381cdb0ff614182129c335",
-    "MEM6f05b4fd9bc26dce5b84fb81",
     "MEM6f4e879865baaf1690abbfe8",
     "MEM74a71f297f8cdb0329cfc4ea",
-    "MEM8d0a4615f50c15761e2f1c9c",
+    "MEM7d4d3eac2fb3dd2d9de32e1b",
     "MEM947372cd6eab2292bf95a55c",
+    "MEM973b8b0fca777d645bd7454c",
+    "MEM98788c64646d073d67eab5fb",
     "MEMab536a9eed9738ee4d253d99",
-    "MEMb2e5d8d302af1e99e0c0f5d2",
     "MEMb61a29ab5525726424dee6f9",
     "MEMcf5b261e4e86d8b74ce7f451",
-    "MEMd01ffc4519999bd168a7304d",
-    "MEMd41ff2fdd58f1f7067e2679c"
+    "MEMd01ffc4519999bd168a7304d"
    ],
    "revalidation_pass_rate": 0.735294,
    "status_transitions": {
@@ -1911,15 +1911,6 @@
      "age_days": 90.0
     },
     {
-     "memory_id": "MEM04032bb832bfda5f79396346",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.330025,
-     "age_days": 90.0
-    },
-    {
      "memory_id": "MEM0490362adad8b28a7a8307d8",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -1983,21 +1974,21 @@
      "age_days": 90.0
     },
     {
-     "memory_id": "MEM11cb9ec767686687a78cb5ea",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.395125,
-     "age_days": 90.0
-    },
-    {
      "memory_id": "MEM1273ca319c1b491bb5b25684",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM22e9b9d1485a177c88594b20",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.395125,
      "age_days": 90.0
     },
     {
@@ -2082,6 +2073,15 @@
      "age_days": 90.0
     },
     {
+     "memory_id": "MEM3ffd46522f96864a337e5b3c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.34815,
+     "age_days": 90.0
+    },
+    {
      "memory_id": "MEM41ab674d715d7f342c7dbbd0",
      "decision": "REVALIDATE",
      "reason": "HIGH_STAKES_DEFAULT",
@@ -2142,6 +2142,15 @@
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM4e55a9ad941274bb6c4a53a0",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.420125,
      "age_days": 90.0
     },
     {
@@ -2217,15 +2226,6 @@
      "age_days": 90.0
     },
     {
-     "memory_id": "MEM6f05b4fd9bc26dce5b84fb81",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "VERSION_SENSITIVE",
-     "status": "ACTIVE",
-     "decay_score": 0.74857765,
-     "age_days": 90.0
-    },
-    {
      "memory_id": "MEM6f4e879865baaf1690abbfe8",
      "decision": "REVALIDATE",
      "reason": "FRESHNESS_REQUIRED",
@@ -2280,6 +2280,15 @@
      "age_days": 90.0
     },
     {
+     "memory_id": "MEM7d4d3eac2fb3dd2d9de32e1b",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.74857765,
+     "age_days": 90.0
+    },
+    {
      "memory_id": "MEM82796e9bdce520eea1c7e203",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -2307,15 +2316,6 @@
      "age_days": 90.0
     },
     {
-     "memory_id": "MEM8d0a4615f50c15761e2f1c9c",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.34815,
-     "age_days": 90.0
-    },
-    {
      "memory_id": "MEM8e03d16184c7881ad65cf9c8",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -2331,6 +2331,24 @@
      "freshness_class": "VERSION_SENSITIVE",
      "status": "ACTIVE",
      "decay_score": 0.5555199,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM973b8b0fca777d645bd7454c",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.395125,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM98788c64646d073d67eab5fb",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.330025,
      "age_days": 90.0
     },
     {
@@ -2394,15 +2412,6 @@
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.75860541,
-     "age_days": 90.0
-    },
-    {
-     "memory_id": "MEMb2e5d8d302af1e99e0c0f5d2",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.395125,
      "age_days": 90.0
     },
     {
@@ -2487,15 +2496,6 @@
      "age_days": 90.0
     },
     {
-     "memory_id": "MEMd41ff2fdd58f1f7067e2679c",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "ACTIVE",
-     "decay_score": 0.420125,
-     "age_days": 90.0
-    },
-    {
      "memory_id": "MEMdd801f4447b2e82e59b10e39",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
@@ -2505,21 +2505,21 @@
      "age_days": 90.0
     },
     {
+     "memory_id": "MEMdf275e4dc586bb5d716acf96",
+     "decision": "REVALIDATE",
+     "reason": "VALID_UNTIL_PASSED",
+     "freshness_class": "SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.0,
+     "age_days": 90.0
+    },
+    {
      "memory_id": "MEMe43cd4d6f2b548839b31585a",
      "decision": "ALLOW",
      "reason": "FRESH_AND_VERIFIED",
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.75860541,
-     "age_days": 90.0
-    },
-    {
-     "memory_id": "MEMe48a6cad656287e12a8b2592",
-     "decision": "REVALIDATE",
-     "reason": "VALID_UNTIL_PASSED",
-     "freshness_class": "SHORT",
-     "status": "EXPIRED",
-     "decay_score": 0.0,
      "age_days": 90.0
     },
     {
@@ -3003,9 +3003,9 @@
     "MEM432ab21eaf1e952a1f372177",
     "MEM5aedef1ed7356e40c41af9de",
     "MEM69381cdb0ff614182129c335",
-    "MEM6f05b4fd9bc26dce5b84fb81",
     "MEM74a71f297f8cdb0329cfc4ea",
     "MEM7d194d0fec260583f45a046a",
+    "MEM7d4d3eac2fb3dd2d9de32e1b",
     "MEM85d6dbfb5f6ab947c32894e7",
     "MEM947372cd6eab2292bf95a55c",
     "MEMcf5b261e4e86d8b74ce7f451",
@@ -3088,15 +3088,6 @@
      "age_days": 365.0
     },
     {
-     "memory_id": "MEM04032bb832bfda5f79396346",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "STALE",
-     "decay_score": 0.03969474,
-     "age_days": 365.0
-    },
-    {
      "memory_id": "MEM0490362adad8b28a7a8307d8",
      "decision": "REVALIDATE",
      "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
@@ -3160,21 +3151,21 @@
      "age_days": 365.0
     },
     {
-     "memory_id": "MEM11cb9ec767686687a78cb5ea",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "SHORT",
-     "status": "STALE",
-     "decay_score": 0.04752484,
-     "age_days": 365.0
-    },
-    {
      "memory_id": "MEM1273ca319c1b491bb5b25684",
      "decision": "REVALIDATE",
      "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM22e9b9d1485a177c88594b20",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.04752484,
      "age_days": 365.0
     },
     {
@@ -3259,6 +3250,15 @@
      "age_days": 365.0
     },
     {
+     "memory_id": "MEM3ffd46522f96864a337e5b3c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.04187478,
+     "age_days": 365.0
+    },
+    {
      "memory_id": "MEM41ab674d715d7f342c7dbbd0",
      "decision": "REVALIDATE",
      "reason": "HIGH_STAKES_DEFAULT",
@@ -3319,6 +3319,15 @@
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM4e55a9ad941274bb6c4a53a0",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.05053179,
      "age_days": 365.0
     },
     {
@@ -3394,15 +3403,6 @@
      "age_days": 365.0
     },
     {
-     "memory_id": "MEM6f05b4fd9bc26dce5b84fb81",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "VERSION_SENSITIVE",
-     "status": "ACTIVE",
-     "decay_score": 0.52593799,
-     "age_days": 365.0
-    },
-    {
      "memory_id": "MEM6f4e879865baaf1690abbfe8",
      "decision": "REVALIDATE",
      "reason": "FRESHNESS_REQUIRED",
@@ -3457,6 +3457,15 @@
      "age_days": 365.0
     },
     {
+     "memory_id": "MEM7d4d3eac2fb3dd2d9de32e1b",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.52593799,
+     "age_days": 365.0
+    },
+    {
      "memory_id": "MEM82796e9bdce520eea1c7e203",
      "decision": "REVALIDATE",
      "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
@@ -3484,15 +3493,6 @@
      "age_days": 365.0
     },
     {
-     "memory_id": "MEM8d0a4615f50c15761e2f1c9c",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "STALE",
-     "decay_score": 0.04187478,
-     "age_days": 365.0
-    },
-    {
      "memory_id": "MEM8e03d16184c7881ad65cf9c8",
      "decision": "REVALIDATE",
      "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
@@ -3508,6 +3508,24 @@
      "freshness_class": "VERSION_SENSITIVE",
      "status": "ACTIVE",
      "decay_score": 0.39029888,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM973b8b0fca777d645bd7454c",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.04752484,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM98788c64646d073d67eab5fb",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03969474,
      "age_days": 365.0
     },
     {
@@ -3571,15 +3589,6 @@
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.45,
-     "age_days": 365.0
-    },
-    {
-     "memory_id": "MEMb2e5d8d302af1e99e0c0f5d2",
-     "decision": "REVALIDATE",
-     "reason": "HIGH_STAKES_DEFAULT",
-     "freshness_class": "SHORT",
-     "status": "STALE",
-     "decay_score": 0.04752484,
      "age_days": 365.0
     },
     {
@@ -3664,15 +3673,6 @@
      "age_days": 365.0
     },
     {
-     "memory_id": "MEMd41ff2fdd58f1f7067e2679c",
-     "decision": "REVALIDATE",
-     "reason": "FRESHNESS_REQUIRED",
-     "freshness_class": "SHORT",
-     "status": "STALE",
-     "decay_score": 0.05053179,
-     "age_days": 365.0
-    },
-    {
      "memory_id": "MEMdd801f4447b2e82e59b10e39",
      "decision": "REVALIDATE",
      "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
@@ -3682,21 +3682,21 @@
      "age_days": 365.0
     },
     {
+     "memory_id": "MEMdf275e4dc586bb5d716acf96",
+     "decision": "REVALIDATE",
+     "reason": "VALID_UNTIL_PASSED",
+     "freshness_class": "SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.0,
+     "age_days": 365.0
+    },
+    {
      "memory_id": "MEMe43cd4d6f2b548839b31585a",
      "decision": "REVALIDATE",
      "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
      "freshness_class": "MEDIUM",
      "status": "ACTIVE",
      "decay_score": 0.45,
-     "age_days": 365.0
-    },
-    {
-     "memory_id": "MEMe48a6cad656287e12a8b2592",
-     "decision": "REVALIDATE",
-     "reason": "VALID_UNTIL_PASSED",
-     "freshness_class": "SHORT",
-     "status": "EXPIRED",
-     "decay_score": 0.0,
      "age_days": 365.0
     },
     {
@@ -3888,8 +3888,7 @@
  "constructed_conflict": {
   "candidates": 2,
   "by_reason_code": {
-   "AUTHORITY_ADVANTAGE": 1,
-   "NEWER_VERSION_PRECEDES": 1
+   "NEWER_VERSION_PRECEDES": 2
   },
   "by_resolution": {
    "resolved": 2
@@ -3897,17 +3896,44 @@
   "status_action": "",
   "control_candidates": 0,
   "example": {
-   "text": "电池消费税新规实施导致行业集体涨价，宁德时代等头部企业上调售价，显示其具备成本传导能力。",
-   "negated": "电池消费税新规实施导致行业集体涨价，宁德时代不予等头部企业上调售价，显示其具备成本传导能力。",
+   "text": "已检索到参考资料《中国证券投资基金业协会》，其内容载明：1. 协会发布2026年8月私募基金管理人登记及产品备案月报，并",
+   "negated": "已检索到参考资料《中国证券投资基金业协会》，其内容载明：1. 协会发布2026年8月私募不予基金管理人登记及产品备案月报",
    "older_status": "SUPERSEDED",
    "superseded_by": "MEM-constructed-new"
   },
   "save_errors": [],
-  "by_status_action": {
-   "CONTRADICT": 1,
-   "SUPERSEDE": 1
+  "attempts": [
+   {
+    "memory_id": "MEM08299cfafcd062bfdc8814c8",
+    "scope": "PATIENT_LONGITUDINAL",
+    "candidates": 0
+   },
+   {
+    "memory_id": "MEM0909eb19dc8e67dc7c18741f",
+    "scope": "PATIENT_LONGITUDINAL",
+    "candidates": 2
+   }
+  ],
+  "source": {
+   "memory_id": "MEM0909eb19dc8e67dc7c18741f",
+   "scope": "PATIENT_LONGITUDINAL",
+   "scope_key": "subject:invest_mgmt",
+   "entities": [
+    "募资",
+    "基金管理",
+    "基金管理人",
+    "并购",
+    "投资管理",
+    "私募基金",
+    "管理人登记",
+    "耐心资本"
+   ],
+   "tried": 2
   },
-  "supersessions": 1,
+  "by_status_action": {
+   "SUPERSEDE": 2
+  },
+  "supersessions": 2,
   "control_eligible_types": [
    "VERIFIED_CLAIM"
   ]
@@ -3979,7 +4005,7 @@
   {
    "name": "contradiction_verdicts_use_phase06_codes",
    "passed": true,
-   "detail": "三个时钟上的裁决理由码：[{}, {}, {}]；**真机素材构造注入**（正例/负例控制）：{\"candidates\": 2, \"by_reason_code\": {\"AUTHORITY_ADVANTAGE\": 1, \"NEWER_VERSION_PRECEDES\": 1}, \"by_resolution\": {\"resolved\": 2}, \"by_status_action\": {\"CONTRADICT\": 1, \"SUPERSEDE\": 1}, \"supersessions\": 1, \"control_candidates\": 0}"
+   "detail": "三个时钟上的裁决理由码：[{}, {}, {}]；**真机素材构造注入**（正例/负例控制）：{\"candidates\": 2, \"by_reason_code\": {\"NEWER_VERSION_PRECEDES\": 2}, \"by_resolution\": {\"resolved\": 2}, \"by_status_action\": {\"SUPERSEDE\": 2}, \"supersessions\": 2, \"control_candidates\": 0}"
   },
   {
    "name": "supersession_chain_has_no_problems",

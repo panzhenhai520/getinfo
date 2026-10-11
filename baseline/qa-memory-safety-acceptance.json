@@ -1,0 +1,755 @@
+{
+ "report_version": "qa-memory-safety-acceptance-v1",
+ "source": {
+  "snapshot": "baseline\\qa-memory-safety-real-sample.json",
+  "snapshot_version": "qa-memory-safety-real-sample-v1",
+  "host": "117.50.211.93",
+  "captured_at_utc": "2026-10-11T08:46:42Z",
+  "baseline_clock": "2026-10-11T08:46:42+00:00",
+  "access": "readonly (BEGIN READ ONLY + statement_timeout=25s + LIMIT)",
+  "note": "快照模式：无运行期记忆安全审计事件 → 回放一节标记不可得，不编数字；两个口径用同一份代码、同一份真实数据，唯一差别是作用域强制与轮次维。"
+ },
+ "params": {
+  "memory_safety_version": "qa-memory-safety-v1",
+  "scope_enforcement": true,
+  "encounter_isolation": true,
+  "longitudinal_freshness": true,
+  "safety_hard_trigger": true,
+  "privacy_minimal_log": true,
+  "audit": true,
+  "longitudinal_window_days": 365.0,
+  "danger_sign_min_terms": 2,
+  "safety_override_priority": 0.95,
+  "replay_max_rows": 500,
+  "log_text_limit": 240
+ },
+ "rebuild": {
+  "before_phase14_scope": {
+   "candidates": 278,
+   "persisted": 203,
+   "dropped": 75,
+   "enforcement_decisions": {},
+   "enforcement_reasons": {},
+   "narrowed": 0,
+   "rejected": 0,
+   "scope_keys": {
+    "subject:invest_mgmt": 49,
+    "subject:automotive_industry": 22,
+    "subject:healthcare_news": 11
+   },
+   "by_scope_decision": {},
+   "narrow_pairs": [],
+   "per_run": [
+    {
+     "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+     "candidates": 3,
+     "persisted": 0,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "candidates": 37,
+     "persisted": 37,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "candidates": 26,
+     "persisted": 15,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "48855683e91d48b6b213e8aa8195df50",
+     "candidates": 29,
+     "persisted": 25,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "candidates": 19,
+     "persisted": 12,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "candidates": 20,
+     "persisted": 19,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+     "candidates": 0,
+     "persisted": 0,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+     "candidates": 23,
+     "persisted": 19,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "candidates": 6,
+     "persisted": 0,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+     "candidates": 34,
+     "persisted": 27,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "a419bd545c70440ea78f24eaaa884b76",
+     "candidates": 0,
+     "persisted": 0,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "candidates": 19,
+     "persisted": 10,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "candidates": 23,
+     "persisted": 18,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "c3fd469f115d4002bd2824b397425756",
+     "candidates": 24,
+     "persisted": 10,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "candidates": 15,
+     "persisted": 11,
+     "narrowed": 0,
+     "rejected": 0
+    }
+   ],
+   "memories": 82,
+   "by_scope": {
+    "PATIENT_LONGITUDINAL": 82
+   },
+   "by_type": {
+    "ENTITY": 58,
+    "VERIFIED_CLAIM": 24
+   },
+   "encounter_keys_with_axis": 0
+  },
+  "after_phase15_scope": {
+   "candidates": 278,
+   "persisted": 203,
+   "dropped": 75,
+   "enforcement_decisions": {
+    "NARROW": 33,
+    "ALLOW": 245
+   },
+   "enforcement_reasons": {
+    "CURRENT_STATE_NARROWED_TO_ENCOUNTER": 33,
+    "SCOPE_AND_CONTENT_ALIGNED": 245
+   },
+   "narrowed": 33,
+   "rejected": 0,
+   "scope_keys": {
+    "subject:invest_mgmt": 44,
+    "subject:automotive_industry": 20,
+    "subject:healthcare_news": 11,
+    "encounter:invest_mgmt:3685cb6c8c764ed3992a184070dbc0f9:b76aa77a29c046fa84d55e7db517e810": 5,
+    "encounter:automotive_industry:ae2dccecb10949c4a1bd0a49249be759:c3fd469f115d4002bd2824b397425756": 2
+   },
+   "by_scope_decision": {},
+   "narrow_pairs": [
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    },
+    {
+     "from": "PATIENT_LONGITUDINAL",
+     "to": "ENCOUNTER",
+     "content_kind": "CURRENT_STATE"
+    }
+   ],
+   "per_run": [
+    {
+     "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+     "candidates": 3,
+     "persisted": 0,
+     "narrowed": 3,
+     "rejected": 0
+    },
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "candidates": 37,
+     "persisted": 37,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "candidates": 26,
+     "persisted": 15,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "48855683e91d48b6b213e8aa8195df50",
+     "candidates": 29,
+     "persisted": 25,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "candidates": 19,
+     "persisted": 12,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "candidates": 20,
+     "persisted": 19,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+     "candidates": 0,
+     "persisted": 0,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+     "candidates": 23,
+     "persisted": 19,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "candidates": 6,
+     "persisted": 0,
+     "narrowed": 3,
+     "rejected": 0
+    },
+    {
+     "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+     "candidates": 34,
+     "persisted": 27,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "a419bd545c70440ea78f24eaaa884b76",
+     "candidates": 0,
+     "persisted": 0,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "candidates": 19,
+     "persisted": 10,
+     "narrowed": 0,
+     "rejected": 0
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "candidates": 23,
+     "persisted": 18,
+     "narrowed": 15,
+     "rejected": 0
+    },
+    {
+     "run_id": "c3fd469f115d4002bd2824b397425756",
+     "candidates": 24,
+     "persisted": 10,
+     "narrowed": 12,
+     "rejected": 0
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "candidates": 15,
+     "persisted": 11,
+     "narrowed": 0,
+     "rejected": 0
+    }
+   ],
+   "memories": 82,
+   "by_scope": {
+    "PATIENT_LONGITUDINAL": 75,
+    "ENCOUNTER": 7
+   },
+   "by_type": {
+    "ENTITY": 58,
+    "VERIFIED_CLAIM": 24
+   },
+   "encounter_keys_with_axis": 7
+  },
+  "delta": {
+   "memories": 0,
+   "narrowed": 33,
+   "rejected": 0,
+   "narrow_pairs": {
+    "PATIENT_LONGITUDINAL→ENCOUNTER": 33
+   },
+   "encounter_keys_with_axis": 7,
+   "scope_distribution_before": {
+    "PATIENT_LONGITUDINAL": 82
+   },
+   "scope_distribution_after": {
+    "PATIENT_LONGITUDINAL": 75,
+    "ENCOUNTER": 7
+   }
+  }
+ },
+ "isolation": {
+  "runs": 15,
+  "rows": [
+   {
+    "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 44
+   },
+   {
+    "run_id": "162612f141e84ead98c36047f4dfd64b",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 15
+   },
+   {
+    "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 32
+   },
+   {
+    "run_id": "48855683e91d48b6b213e8aa8195df50",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 32
+   },
+   {
+    "run_id": "613514876a1e40698cb1e1e636a0c21b",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 20,
+    "isolated": 62,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 55,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 12
+   },
+   {
+    "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 11,
+    "isolated": 71,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 64,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 0
+   },
+   {
+    "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 0,
+    "isolated": 82,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 75,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 0
+   },
+   {
+    "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 32
+   },
+   {
+    "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 44
+   },
+   {
+    "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 32
+   },
+   {
+    "run_id": "a419bd545c70440ea78f24eaaa884b76",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 44,
+    "isolated": 38,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 32
+   },
+   {
+    "run_id": "adebd40548d343eda11e765cdbaede3f",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 20,
+    "isolated": 62,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 55,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 14
+   },
+   {
+    "run_id": "b76aa77a29c046fa84d55e7db517e810",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 49,
+    "isolated": 33,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 31,
+     "OTHER_ENCOUNTER": 2
+    },
+    "cross_encounter": 41
+   },
+   {
+    "run_id": "c3fd469f115d4002bd2824b397425756",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 22,
+    "isolated": 60,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 55,
+     "OTHER_ENCOUNTER": 5
+    },
+    "cross_encounter": 16
+   },
+   {
+    "run_id": "e280beda3f7b48a596293c032f6a15e2",
+    "visible_keys": 6,
+    "checked": 82,
+    "visible": 20,
+    "isolated": 62,
+    "isolated_by_reason": {
+     "OTHER_SUBJECT": 55,
+     "OTHER_ENCOUNTER": 7
+    },
+    "cross_encounter": 18
+   }
+  ],
+  "isolated_by_reason": {
+   "OTHER_SUBJECT": 638,
+   "OTHER_ENCOUNTER": 98
+  },
+  "cross_encounter_revalidations": 364,
+  "leaks": []
+ },
+ "longitudinal": {
+  "longitudinal_version": "qa-longitudinal-freshness-v1",
+  "checked": 82,
+  "longitudinal": 75,
+  "decisions": {
+   "ALLOW": 61,
+   "REVALIDATE": 21
+  },
+  "reasons": {
+   "FRESH_AND_VERIFIED": 61,
+   "HIGH_STAKES_DEFAULT": 12,
+   "NOT_LONGITUDINAL": 7,
+   "FRESHNESS_REQUIRED": 2
+  },
+  "longitudinal_decisions": {
+   "ALLOW": 61,
+   "REVALIDATE": 14
+  },
+  "needs_revalidation": 14,
+  "blocked": 0,
+  "beyond_window": 0,
+  "not_yet_effective": 0,
+  "stale_rate": 0.186667,
+  "settings": {
+   "window_days": 365.0
+  }
+ },
+ "privacy": {
+  "sampled": 50,
+  "rule_hits": {
+   "CONTENT_FINGERPRINTED": 50
+  },
+  "leaks": [],
+  "fingerprinted_fields": 50,
+  "note": "真机记忆正文只以指纹与长度进载荷（字段名政策），逐条复核 leaks 必须为空"
+ },
+ "replay": {
+  "available": false,
+  "note": "快照里没有运行期审计事件（`qa_audit_events` 是本地库才有的运行期产物）→ 回放一节**不可得**，如实留空，绝不编一个数字出来"
+ },
+ "contracts": {
+  "fingerprints": {
+   "EVIDENCE_SCHEMA": "370301331c02c738",
+   "CLAIM_SCHEMA": "06fcdb02441248b2",
+   "CONFLICT_SCHEMA": "aabd3259b07f9a3e",
+   "LEVEL1_RESULT_SCHEMA": "7e864764429db111",
+   "LEVEL2_RESULT_SCHEMA": "a0484f894e7bc9d6",
+   "FINAL_ANSWER_SCHEMA": "4d1efa54ca1cbc1a",
+   "QA_EVENT_SCHEMA": "59358bfa88a6c6af"
+  },
+  "expected": {
+   "EVIDENCE_SCHEMA": "370301331c02c738",
+   "CLAIM_SCHEMA": "06fcdb02441248b2",
+   "CONFLICT_SCHEMA": "aabd3259b07f9a3e",
+   "LEVEL1_RESULT_SCHEMA": "7e864764429db111",
+   "LEVEL2_RESULT_SCHEMA": "a0484f894e7bc9d6",
+   "FINAL_ANSWER_SCHEMA": "4d1efa54ca1cbc1a",
+   "QA_EVENT_SCHEMA": "59358bfa88a6c6af"
+  },
+  "schema_version": "unified-qa-schema-v11",
+  "memory_safety_version": "qa-memory-safety-v1",
+  "scope_enforcement_version": "qa-scope-enforcement-v1",
+  "encounter_isolation_version": "qa-encounter-isolation-v1",
+  "longitudinal_freshness_version": "qa-longitudinal-freshness-v1",
+  "safety_override_version": "qa-safety-critical-override-v1",
+  "privacy_minimal_version": "qa-privacy-minimal-log-v1",
+  "audit_replay_version": "qa-memory-audit-replay-v1"
+ },
+ "acceptance": {
+  "ran_on_real_data": true,
+  "enforcement_decisions_recorded": true,
+  "narrowing_never_loses_memories": true,
+  "narrowing_always_goes_stricter": true,
+  "narrowing_reasons_are_contract_codes": true,
+  "isolation_has_no_leaks": true,
+  "longitudinal_window_reported": true,
+  "privacy_minimal_leaks_empty": true,
+  "contracts_frozen": true,
+  "schema_version_unchanged": true,
+  "passed": true
+ }
+}

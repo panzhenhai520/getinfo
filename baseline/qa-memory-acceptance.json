@@ -1,6 +1,6 @@
 {
  "report_version": "qa-memory-acceptance-v1",
- "generated_at_utc": "2026-10-11T00:59:34Z",
+ "generated_at_utc": "2026-10-11T08:20:41Z",
  "clock": {
   "baseline_clock": "2026-10-10T22:23:32+00:00",
   "baseline_clock_source": "snapshot.captured_at_utc",
@@ -350,7 +350,8 @@
    "VERY_SHORT": 1
   },
   "by_scope": {
-   "PATIENT_LONGITUDINAL": 82
+   "ENCOUNTER": 7,
+   "PATIENT_LONGITUDINAL": 75
   },
   "links": {
    "evidence": 122,
@@ -562,8 +563,8 @@
     "vector": 96
    },
    "by_type": {
-    "ENTITY": 43,
-    "VERIFIED_CLAIM": 53
+    "ENTITY": 44,
+    "VERIFIED_CLAIM": 52
    },
    "hint_violations": 0,
    "non_active_hits": 0,
@@ -579,7 +580,7 @@
     0.6111,
     0.5258,
     0.3334,
-    0.5905
+    0.5949
    ],
    "boundaries": {
     "no_lexical_seed": 3
@@ -728,7 +729,7 @@
     0.611052,
     0.52583,
     0.333422,
-    0.590452
+    0.59494
    ],
    "scores": {
     "runs": 15,
@@ -751,7 +752,7 @@
      0.611052,
      0.52583,
      0.333422,
-     0.590452
+     0.59494
     ]
    },
    "threshold_sensitivity": {
@@ -777,7 +778,8 @@
      "VERY_SHORT": 1
     },
     "by_scope": {
-     "PATIENT_LONGITUDINAL": 82
+     "ENCOUNTER": 7,
+     "PATIENT_LONGITUDINAL": 75
     },
     "links": {
      "evidence": 122,

@@ -357,17 +357,23 @@ def content_fingerprint(text) -> str:
 
 
 def scope_key(scope: str, *, owner_user_id: str = "", session_id: str = "",
-              industry_pack_id: str = "") -> str:
+              industry_pack_id: str = "", encounter_id: str = "") -> str:
     """把 §14 的作用域 + 作用域主体编码成**一个可精确匹配的键**（P09-01）。
 
     §14 最后一段是硬规则："当前状态类记忆（`SESSION` / `ENCOUNTER_BOUND`）不得无条件
     跨会话当成当前事实"。所以把会话/轮次**编进键里**：作用域键不同 = 互不可见，
     这条规则就变成数据库层面的精确匹配，而不是靠调用方自觉。
+
+    P15-02（轮次隔离）**追加**可选参数 `encounter_id`：给了它，`ENCOUNTER` 作用域的键多一维
+    （`encounter:<主体>:<会话>:<轮次>`）；**不给就逐字保持 Phase 09 的键**
+    （`encounter:<主体>:<会话>`）—— 既有调用点、既有数据、既有断言一个字节都不变。
+    这样"同一会话里的两次不同轮次"才真的能互相隔离（此前它们共用同一个键）。
     """
     scope = str(scope or "SESSION")
     owner = str(owner_user_id or "")
     session = str(session_id or "")
     pack = str(industry_pack_id or "")
+    encounter = str(encounter_id or "")
     if scope == "GLOBAL_KNOWLEDGE":
         return "global"
     if scope == "ORGANIZATION":
@@ -376,34 +382,52 @@ def scope_key(scope: str, *, owner_user_id: str = "", session_id: str = "",
         # D-002 中性映射：跨会话长期主体记忆 = 绑行业包 + 主体实体（不含会话）
         return "subject:%s" % pack
     if scope == "ENCOUNTER":
+        if encounter:
+            return "encounter:%s:%s:%s" % (pack, session, encounter)
         return "encounter:%s:%s" % (pack, session)
     return "session:%s:%s:%s" % (owner, session, pack)
 
 
 def visible_scope_keys(*, owner_user_id: str = "", session_id: str = "",
-                       industry_pack_id: str = "") -> list:
+                       industry_pack_id: str = "", encounter_id: str = "") -> list:
     """一次召回能看见的作用域键（顺序固定，便于复算）：
-    全局知识 + 组织规则 + 主体长期 + 本次轮次 + 本会话。"""
-    return [
+    全局知识 + 组织规则 + 主体长期 + 本次轮次 + 本会话。
+
+    `encounter_id` 与 `scope_key` 同一口径（P15-02）：不给 = 逐字回到 Phase 09 的行为。
+
+    **兼容适配器（MASTER RULES 8）**：给了 `encounter_id` 时，末尾**追加**"会话级轮次桶"
+    那个老键 —— 本阶段之前写入的 `ENCOUNTER` 记忆（以及被 P15-01 收窄后按老键落库的那些）
+    都在那个桶里，不追加就会让它们从召回里彻底消失（实测：Phase 09 的跨会话召回从 96 条
+    掉到 96 条但类型分布变了、成对的 ENTITY/CLAIM 命中被换掉）。老键可见 ≠ 不隔离：
+    真正的逐轮次隔离由**新写入**用的带轮次键承担，而老键在隔离回执里被标
+    `REVALIDATE_ON_USE`（用前必须复验）。
+    """
+    keys = [
         scope_key("GLOBAL_KNOWLEDGE", owner_user_id=owner_user_id, session_id=session_id,
-                  industry_pack_id=industry_pack_id),
+                  industry_pack_id=industry_pack_id, encounter_id=encounter_id),
         scope_key("ORGANIZATION", owner_user_id=owner_user_id, session_id=session_id,
-                  industry_pack_id=industry_pack_id),
+                  industry_pack_id=industry_pack_id, encounter_id=encounter_id),
         scope_key("PATIENT_LONGITUDINAL", owner_user_id=owner_user_id, session_id=session_id,
-                  industry_pack_id=industry_pack_id),
+                  industry_pack_id=industry_pack_id, encounter_id=encounter_id),
         scope_key("ENCOUNTER", owner_user_id=owner_user_id, session_id=session_id,
-                  industry_pack_id=industry_pack_id),
+                  industry_pack_id=industry_pack_id, encounter_id=encounter_id),
         scope_key("SESSION", owner_user_id=owner_user_id, session_id=session_id,
-                  industry_pack_id=industry_pack_id),
+                  industry_pack_id=industry_pack_id, encounter_id=encounter_id),
     ]
+    if encounter_id:
+        legacy = scope_key("ENCOUNTER", owner_user_id=owner_user_id, session_id=session_id,
+                           industry_pack_id=industry_pack_id)
+        if legacy and legacy not in keys:
+            keys.append(legacy)
+    return keys
 
 
 def memory_id_for(*, scope: str, memory_type: str, canonical_content: str,
                   owner_user_id: str = "", session_id: str = "",
-                  industry_pack_id: str = "") -> str:
+                  industry_pack_id: str = "", encounter_id: str = "") -> str:
     """内容寻址的记忆 id：同作用域 + 同类型 + 同内容 → 恒等 id（幂等写的前提）。"""
     key = scope_key(scope, owner_user_id=owner_user_id, session_id=session_id,
-                    industry_pack_id=industry_pack_id)
+                    industry_pack_id=industry_pack_id, encounter_id=encounter_id)
     return "MEM" + _digest("%s|%s|%s" % (key, memory_type, content_fingerprint(canonical_content)))
 
 
@@ -593,7 +617,8 @@ def memory_candidates_from_graph(graph: Mapping, *, scope: str = "PATIENT_LONGIT
                                  owner_user_id: str = "", session_id: str = "",
                                  industry_pack_id: str = "", run_id: str = "",
                                  stage: str = "", route: str = "", corpus_version: str = "",
-                                 max_entities: int = 12, now=None) -> list:
+                                 max_entities: int = 12, now=None,
+                                 encounter_id: str = "") -> list:
     """从**已核验的证据图**构造记忆候选（P09-02/P09-03 的输入）。
 
     只做两件事，且都要求可回溯证据：
@@ -655,7 +680,7 @@ def memory_candidates_from_graph(graph: Mapping, *, scope: str = "PATIENT_LONGIT
             "evidence": [row for row in links if row.get("evidence_ref")],
             "supporting": len([row for row in links if row.get("evidence_ref")]),
             "scope": scope, "owner_user_id": owner_user_id, "session_id": session_id,
-            "industry_pack_id": industry_pack_id,
+            "industry_pack_id": industry_pack_id, "encounter_id": str(encounter_id or ""),
             "metadata": {"claim_id": claim_id, "claim_type": str(claim.get("claim_type") or ""),
                          "verified_evidence": len(links)},
         })
@@ -675,7 +700,7 @@ def memory_candidates_from_graph(graph: Mapping, *, scope: str = "PATIENT_LONGIT
             "evidence": links[:max_entities],
             "supporting": len(links),
             "scope": scope, "owner_user_id": owner_user_id, "session_id": session_id,
-            "industry_pack_id": industry_pack_id,
+            "industry_pack_id": industry_pack_id, "encounter_id": str(encounter_id or ""),
             "metadata": {"entity_key": key, "mentions": len(links)},
         })
     return candidates
@@ -878,7 +903,9 @@ def build_memory_item(candidate: Mapping, *, decision: str, factors: Mapping,
             scope=scope_value, memory_type=str(candidate.get("memory_type") or "VERIFIED_CLAIM"),
             canonical_content=body, owner_user_id=str(candidate.get("owner_user_id") or ""),
             session_id=str(candidate.get("session_id") or ""),
-            industry_pack_id=str(candidate.get("industry_pack_id") or "")),
+            industry_pack_id=str(candidate.get("industry_pack_id") or ""),
+            # P15-02：候选给了轮次就以它入键（逐轮次隔离）；不给则逐字保持 Phase 09 的键
+            encounter_id=str(candidate.get("encounter_id") or "")),
         "memory_type": str(candidate.get("memory_type") or "VERIFIED_CLAIM"),
         "canonical_content": body,
         "content_fingerprint": content_fingerprint(body),
@@ -892,10 +919,13 @@ def build_memory_item(candidate: Mapping, *, decision: str, factors: Mapping,
         "scope_key": scope_key(scope_value,
                                owner_user_id=str(candidate.get("owner_user_id") or ""),
                                session_id=str(candidate.get("session_id") or ""),
-                               industry_pack_id=str(candidate.get("industry_pack_id") or "")),
+                               industry_pack_id=str(candidate.get("industry_pack_id") or ""),
+                               encounter_id=str(candidate.get("encounter_id") or "")),
         "owner_user_id": str(candidate.get("owner_user_id") or ""),
         "session_id": str(candidate.get("session_id") or ""),
         "industry_pack_id": str(candidate.get("industry_pack_id") or ""),
+        # P15-02：轮次维原样落进元数据（回放/审计要用它重算作用域键）
+        "encounter_id": str(candidate.get("encounter_id") or ""),
         "entity_ids": list(candidate.get("entity_ids") or []),
         "source_evidence_ids": [str(row.get("evidence_ref") or "") for row in evidence
                                 if row.get("evidence_ref")],
@@ -926,6 +956,21 @@ def build_memory_item(candidate: Mapping, *, decision: str, factors: Mapping,
     }
 
 
+def _scope_enforce(candidate: Mapping) -> tuple:
+    """P15-01（作用域强制）：在写门之前把候选的作用域判一遍。
+
+    返回 `(调整后的候选, 判定回执)`。**延迟导入**（qa_memory_safety 依赖本模块的
+    `scope_key`/`content_fingerprint`，模块级导入会成环）；模块不可用时退化为
+    "一个字段都不动 + 空回执"，与开关关闭同效 —— 写门绝不因为安全模块缺席而停摆。
+    """
+    try:
+        from qa_memory_safety import apply_scope_enforcement
+
+        return apply_scope_enforcement(candidate)
+    except Exception:      # noqa: BLE001
+        return dict(candidate) if isinstance(candidate, Mapping) else {}, {}
+
+
 def apply_write_gate(store, candidates: Sequence[Mapping], *, run_id: str = "",
                      trace_id: str = "", now=None, audit=None) -> dict:
     """P09-03：对候选记忆跑一次写门，落决策留痕并按决策写库。
@@ -934,6 +979,11 @@ def apply_write_gate(store, candidates: Sequence[Mapping], *, run_id: str = "",
     `memory_write_decision`（含被 DROP 的），这是"为什么没记住"的唯一权威来源。
     写入侧顺序固定：memory_item → memory_evidence_link → memory_entity_link →
     memory_relation（ABOUT 实体 / DERIVED_FROM 证据 / APPLIES_TO 作用域）。
+
+    P15-01 起，在跑写门之前先过**作用域强制**（`qa_memory_safety.enforce_scope`）：
+    越界的候选被收窄到更严的作用域（`scope` 与 `scope_key` 一起改），收窄不了的候选
+    以 `SCOPE_ENFORCEMENT_REJECTED` 拒收并逐条记账。判定结果落进决策行的
+    `metadata.scope_enforcement`（这是"为什么这条记忆换了作用域/没被记住"的权威来源）。
     """
     candidates = [item for item in (candidates or []) if isinstance(item, Mapping)]
     moment = _now_dt(now)
@@ -941,13 +991,20 @@ def apply_write_gate(store, candidates: Sequence[Mapping], *, run_id: str = "",
     batch: dict = {}
     decisions: list = []
     persisted: list = []
+    enforcements: list = []
     for candidate in candidates:
+        candidate, enforcement = _scope_enforce(candidate)
+        if enforcement:
+            enforcements.append(enforcement)
         body = canonicalize(candidate.get("canonical_content"))
         fingerprint = content_fingerprint(body)
         existing = index.get(fingerprint) or []
         factors = write_utility(candidate, existing=existing, batch_seen=batch,
                                 claim_type=str(candidate.get("claim_type") or ""))
-        decision, reason = decide_write(candidate, factors=factors, has_existing=bool(existing))
+        if enforcement.get("decision") == "REJECT":
+            decision, reason = "DROP", "SCOPE_ENFORCEMENT_REJECTED"
+        else:
+            decision, reason = decide_write(candidate, factors=factors, has_existing=bool(existing))
         item = build_memory_item(candidate, decision=decision, factors=factors, now=moment) \
             if decision in ("PERSIST", "PERSIST_WITH_TTL") else {}
         decision_row = {
@@ -968,7 +1025,9 @@ def apply_write_gate(store, candidates: Sequence[Mapping], *, run_id: str = "",
             "gate_version": MEMORY_WRITE_GATE_VERSION,
             "metadata": {"freshness_class": factors.get("freshness_class"),
                          "supporting_evidence": factors.get("supporting_evidence"),
-                         "claim_type": factors.get("claim_type")},
+                         "claim_type": factors.get("claim_type"),
+                         # P15-01：作用域判定的完整回执（无判定时为 None，老口径不受影响）
+                         "scope_enforcement": enforcement or None},
         }
         decisions.append(decision_row)
         batch[fingerprint] = int(batch.get(fingerprint) or 0) + 1
@@ -1053,6 +1112,15 @@ def apply_write_gate(store, candidates: Sequence[Mapping], *, run_id: str = "",
         "dropped": len([row for row in decisions if row["decision"] == "DROP"]),
         "min_utility": write_min_utility(),
         "memory_ids": persisted,
+        # P15-01：作用域强制的分布（只有真的做了判定才有这个键的内容）
+        "scope_enforcement": {
+            "checked": len(enforcements),
+            "decisions": _count(row.get("decision") for row in enforcements),
+            "reasons": _count(row.get("reason") for row in enforcements),
+            "narrowed": len([row for row in enforcements if row.get("decision") == "NARROW"]),
+            "rejected": len([row for row in enforcements if row.get("decision") == "REJECT"]),
+            "version": str((enforcements[0].get("enforcement_version") if enforcements else "") or ""),
+        },
     }
     if audit is not None:
         try:
@@ -1352,7 +1420,7 @@ def recall(store, *, mode: str = "evidence", query: str = "", terms: Iterable | 
            min_score: float | None = None, memory_types: Iterable = (),
            include_all_scopes: bool = False, vectors=None, now=None,
            usage: Mapping | None = None, store_log: bool = True,
-           graph_expansion: bool = True) -> dict:
+           graph_expansion: bool = True, encounter_id: str = "") -> dict:
     """P09-04：Recall API（§11 的 MemoryRecallScore + §2.1 的 hint 语义）。
 
     四通道（P09-06）：`relational`（作用域+状态过滤）→ `lexical`（词面覆盖）→
@@ -1370,7 +1438,7 @@ def recall(store, *, mode: str = "evidence", query: str = "", terms: Iterable | 
     limit = recall_limit() if limit is None else max(1, min(int(limit), 50))
     min_score = recall_min_score() if min_score is None else float(min_score)
     keys = visible_scope_keys(owner_user_id=owner_user_id, session_id=session_id,
-                              industry_pack_id=industry_pack_id)
+                              industry_pack_id=industry_pack_id, encounter_id=encounter_id)
     types = [str(item).upper() for item in (memory_types or []) if str(item or "")]
     planning_filter = False
     if mode == "planning" and not types:
@@ -1936,6 +2004,8 @@ def recall_from_run(store, *, run_meta: Mapping, graph: Mapping | None = None,
 
     作用域三键一律取 run 自己的（`owner_user_id` / `session_id` / `industry_pack_id`），
     调用方不许改写 —— 跨会话串味是这一层最危险的错（§14）。
+    P15-02 起多一个**轮次维**（`encounter_id` = run id）：写侧用 `encounter_id` 入键之后，
+    读侧必须用同一个轴才看得见自己那一轮（否则新写入的轮次记忆谁也召不回）。
     """
     run_meta = run_meta if isinstance(run_meta, Mapping) else {}
     graph = graph if isinstance(graph, Mapping) else {}
@@ -1955,6 +2025,9 @@ def recall_from_run(store, *, run_meta: Mapping, graph: Mapping | None = None,
                   session_id=str(run_meta.get("session_id") or ""),
                   industry_pack_id=str(run_meta.get("industry_pack_id") or ""),
                   run_id=str(run_meta.get("id") or ""), trace_id=str(trace_id or run_meta.get("id") or ""),
+                  # P15-02：轮次维 = run id（"一次 run 就是一次轮次"，与 qa_orchestrator
+                  # 的既有语义一致：一次 run 就是一条研究轨迹）
+                  encounter_id=str(run_meta.get("id") or ""),
                   vectors=vectors, now=now, store_log=store_log)
 
 
@@ -1969,20 +2042,30 @@ def load_vectors(database=None):
 
 
 def write_memories_from_graph(store, *, graph: Mapping, run_meta: Mapping, trace_id: str = "",
-                              scope: str = "PATIENT_LONGITUDINAL", now=None, audit=None) -> dict:
+                              scope: str = "PATIENT_LONGITUDINAL", now=None, audit=None,
+                              encounter_id: str | None = None) -> dict:
     """管线入口（P09-02 + P09-03）：把本轮**已核验**的结论/实体写进记忆图。
 
     §9 主执行流里 Write Gate 在 Final Answer 之后；本函数只吃证据图（已核验结论 +
     被核验证据），**不吃最终答案文本** —— 生成端自由生成的内容永远不进货（MASTER_RULES 11）。
+
+    P15-02：`encounter_id` 默认取 run id（"一次 run 就是一次轮次"），于是写侧与读侧
+    （`recall_from_run` 同样用 run id）用**同一个轴**，逐轮次隔离才真的成立；
+    显式传空串即回到 Phase 09 的"会话级轮次桶"口径（兼容与回滚都靠它）。
     """
     run_meta = run_meta if isinstance(run_meta, Mapping) else {}
+    run_key = str(run_meta.get("id") or "")
+    # P15-02：轮次维默认取 run id（"一次 run 就是一次轮次"）—— 写侧与读侧
+    # （`recall_from_run` 同样用 run id）用同一个轴，逐轮次隔离才成立；
+    # 显式传空串即回到 Phase 09 的"会话级轮次桶"口径（兼容与回滚都靠它）。
+    axis = run_key if encounter_id is None else str(encounter_id or "")
     candidates = memory_candidates_from_graph(
         graph, scope=scope, owner_user_id=str(run_meta.get("owner_user_id") or ""),
         session_id=str(run_meta.get("session_id") or ""),
         industry_pack_id=str(run_meta.get("industry_pack_id") or ""),
-        run_id=str(run_meta.get("id") or ""), stage="memory_write_gate", now=now)
-    return apply_write_gate(store, candidates, run_id=str(run_meta.get("id") or ""),
-                            trace_id=str(trace_id or run_meta.get("id") or ""), now=now,
+        run_id=run_key, stage="memory_write_gate", now=now, encounter_id=axis)
+    return apply_write_gate(store, candidates, run_id=run_key,
+                            trace_id=str(trace_id or run_key), now=now,
                             audit=audit)
 
 
