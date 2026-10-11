@@ -27,12 +27,87 @@ from utils import coerce_int
 TOPIC_CLUSTER_VERSION = "fixed-topic-cluster-v2"
 TOPIC_SUMMARY_VERSION = "topic-rule-summary-v1"
 
+# 回写护栏（并发丢数据修复，2026-10-11）：本作业是「作业开始时读一遍快照 → 逐行整块回写」
+# 的读-改-写，而生产库是 PostgreSQL READ COMMITTED（postgres_compat 把 SQLite 的
+# BEGIN IMMEDIATE 翻译成 BEGIN，连接又是 autocommit），同一事务里每条语句各取一次新快照，
+# 事务并不能把这份读-改-写保护住。实测：另一路 classification 作业在 18:1x 写入的 282 行中，
+# 有 258 行的 score_details.rule_signal 被本作业的陈旧副本抹掉（只剩主题归属）。
+# 因此回写改成三步：
+#   1) 写前在同一事务内重读该行最新副本（不是作业启动时的快照）；
+#   2) 只改本作业拥有的两个键（topic_tagging_version / topic_assignments），
+#      其余字段（hits/rule_signal/final_category…）原样保留、绝不整块覆盖；
+#   3) 带乐观并发校验（UPDATE … WHERE score_details_json=? AND topic_tags_json=?）：
+#      若重读后又被改写则 rowcount=0 → 重读重试；重试用尽就跳过该行回写。
+#      宁可少写一次，也绝不拿陈旧副本覆盖别人的新证据。
+# 另：updated_at 改用「回写当下」的时间，不再用作业启动时缓存的 now —— 否则被回写的行
+# 会显示成作业开始的时刻，掩盖真正的新鲜度。
+_TOPIC_WRITE_CONFLICT_RETRIES = 3
+
 
 def _json_value(value, default):
     try:
         return json.loads(value or "")
     except (TypeError, ValueError, json.JSONDecodeError):
         return default
+
+
+def _latest_classification_copy(cursor, article_id: int, industry_pack_id: str):
+    """写回前重读该行最新已提交副本（score_details_json / topic_tags_json 原文）。"""
+    cursor.execute(
+        """
+        SELECT score_details_json, topic_tags_json
+        FROM article_intel_classifications
+        WHERE article_id=? AND industry_pack_id=?
+        """,
+        (int(article_id), industry_pack_id),
+    )
+    return cursor.fetchone()
+
+
+def _write_topic_assignments(
+    cursor,
+    *,
+    article_id: int,
+    industry_pack_id: str,
+    assignments: List[Dict],
+    retries: int = _TOPIC_WRITE_CONFLICT_RETRIES,
+) -> str:
+    """把主题归属合并写回分类行，返回 ok / missing / conflict。
+
+    ok       = 已按最新副本合并写入；
+    missing  = 该行已被并发删除（重跑/换激活/人工删除），不再写回；
+    conflict = 重读后被连续改写，重试用尽，放弃本次 score_details 回写。
+    """
+    tags_json = json.dumps(
+        [item["name"] for item in assignments], ensure_ascii=False
+    )
+    for _ in range(max(1, int(retries))):
+        fresh = _latest_classification_copy(cursor, article_id, industry_pack_id)
+        if fresh is None:
+            return "missing"
+        fresh_details = _json_value(fresh["score_details_json"], {})
+        fresh_details["topic_tagging_version"] = TOPIC_TAGGING_VERSION
+        fresh_details["topic_assignments"] = assignments
+        cursor.execute(
+            """
+            UPDATE article_intel_classifications
+            SET topic_tags_json=?, score_details_json=?, updated_at=?
+            WHERE article_id=? AND industry_pack_id=?
+              AND COALESCE(score_details_json,'')=? AND COALESCE(topic_tags_json,'')=?
+            """,
+            (
+                tags_json,
+                json.dumps(fresh_details, ensure_ascii=False, sort_keys=True),
+                utc_text(),
+                int(article_id),
+                industry_pack_id,
+                fresh["score_details_json"] or "",
+                fresh["topic_tags_json"] or "",
+            ),
+        )
+        if cursor.rowcount:
+            return "ok"
+    return "conflict"
 
 
 def _classification_admitted(score_details: Dict) -> bool:
@@ -87,6 +162,9 @@ class IntelTopicService:
             "category_counts": {"trend": 0, "event": 0, "other": 0},
             "associations": 0,
             "summaries_updated": 0,
+            # 回写时因并发冲突（重试用尽）或该行已被删除而放弃 score_details 回写的行数。
+            # 正常情况下为 0；非 0 说明本轮有行保留了并发写入者的新证据（预期行为，不是失败）。
+            "write_conflicts": 0,
             "cluster_version": TOPIC_CLUSTER_VERSION,
         }
         with self.db.lock:
@@ -338,26 +416,16 @@ class IntelTopicService:
                             }
                         )
                         stats["associations"] += 1
-                    score_details = article["score_details"]
-                    score_details["topic_tagging_version"] = TOPIC_TAGGING_VERSION
-                    score_details["topic_assignments"] = persisted_assignments
-                    cursor.execute(
-                        """
-                        UPDATE article_intel_classifications
-                        SET topic_tags_json=?, score_details_json=?, updated_at=?
-                        WHERE article_id=? AND industry_pack_id=?
-                        """,
-                        (
-                            json.dumps(
-                                [item["name"] for item in persisted_assignments],
-                                ensure_ascii=False,
-                            ),
-                            json.dumps(score_details, ensure_ascii=False, sort_keys=True),
-                            now,
-                            int(article["article_id"]),
-                            industry_pack_id,
-                        ),
+                    write_state = _write_topic_assignments(
+                        cursor,
+                        article_id=article["article_id"],
+                        industry_pack_id=industry_pack_id,
+                        assignments=persisted_assignments,
                     )
+                    if write_state != "ok":
+                        # 并发冲突（重试用尽）或该行已被删除：本次不回写 score_details，
+                        # 保留对方的新证据；主题关联本身已在上面的 intel_topic_articles 落盘。
+                        stats["write_conflicts"] += 1
 
                 for topic in topic_rows.values():
                     cursor.execute(
