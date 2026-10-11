@@ -16,8 +16,8 @@
 |11|Skill Registry & Router|按任务加载最小必要能力|10|
 |12|Episodic Failure Strategy Memory|学习成功和失败检索经验|11|
 |13|Answer Composer & Final Verifier|只用当前已验证证据回答|12|
-|14|SAGE-RAG Unified Acquisition|统一 KB/EMR/DB/Web/患者追问|13|
-|15|Clinical Memory Safety|医疗 Memory scope 与 encounter 边界|14|
+|14|SAGE-RAG Unified Acquisition|统一 KB/结构化业务库/内部证据库/Web/用户追问（含 P14-07 重复提问识别与思路调整确认：同一会话内同题被问两次以上→交互一次确认是否换思路）|13|
+|15|Clinical Memory Safety|记忆安全与作用域隔离（记忆作用域边界与会话/轮次隔离）|14|
 |16|Observability UI|四图和决策全过程可解释|15|
 |17|E2E Ablation Release|证明收益、兼容、可回滚发布|16|
 
