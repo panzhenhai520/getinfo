@@ -120,24 +120,37 @@ class FrozenContractTests(unittest.TestCase):
             ok, note = contracts.validate(name, payload)
             self.assertTrue(ok, "%s: %s" % (name, note))
 
-    def test_schema_version_is_v9_with_zero_added_columns(self):
+    def test_schema_version_is_v10_with_zero_added_columns(self):
         # Phase 09 钉死的是"八张表 + 零 ADD COLUMN"；Phase 10（D-037）在 v9 里补了
-        # §12 的最后两张表（memory_validation / memory_contradiction），因此本条的
-        # 字面量随跨阶段契约变更为 v9，但**强度不变**：仍是等值断言 + 零 ADD COLUMN。
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v9")
+        # §12 的两张复验/矛盾表；Phase 12（D-044）在 v10 里补了 §12 **刻意留给它**的
+        # 最后两张表（skill_performance_memory / source_reliability_memory）。
+        # 字面量随跨阶段契约变更，但**强度不变、并且更强**：等值断言 + 零 ADD COLUMN +
+        # 逐张点名"哪些表必须在、哪些表不许有"。
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V8, ())
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V9, (), "Phase 10 也只许新建表")
+        self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V10, (), "Phase 12 也只许新建表")
         blob = " ".join(qa_schema.QA_TABLE_DDL)
         for table in ("memory_item", "memory_version", "memory_entity_link",
                       "memory_evidence_link", "memory_relation", "memory_recall_log",
                       "memory_write_decision", "memory_usage_stat"):
             self.assertIn("CREATE TABLE IF NOT EXISTS %s " % table, blob)
-        # Phase 10 的两张表（D-033 明确留给 P10 的账）现在必须存在
+        # Phase 10 的两张表（D-033 明确留给 P10 的账）必须存在
         for added in ("memory_validation", "memory_contradiction"):
             self.assertIn("CREATE TABLE IF NOT EXISTS %s " % added, blob)
-        # Phase 12 的两张表仍然不许提前建（本阶段边界的机器校验）
-        for deferred in ("skill_performance_memory", "source_reliability_memory"):
-            self.assertNotIn(deferred, blob, "%s 属后续 Phase，本阶段不许建" % deferred)
+        # Phase 12 落地后，§12 里留给它的那两张表**必须存在**（P09 时期这里断言的是
+        # "不许提前建"；边界随阶段推进而移动，断言随之反向 —— 强度不降反升：
+        # 现在两张表必须真的在 DDL 里，且 memory_* 家族一张不多一张不少）。
+        for added in ("skill_performance_memory", "source_reliability_memory"):
+            self.assertIn("CREATE TABLE IF NOT EXISTS %s " % added, blob)
+        declared = set(qa_schema.QA_REQUIRED_TABLES)
+        self.assertTrue({"skill_performance_memory", "source_reliability_memory"} <= declared)
+        self.assertEqual(sorted(name for name in declared if name.startswith("memory_")),
+                         ["memory_contradiction", "memory_entity_link", "memory_evidence_link",
+                          "memory_item", "memory_recall_log", "memory_relation",
+                          "memory_usage_stat", "memory_validation", "memory_version",
+                          "memory_write_decision"],
+                         "记忆家族的表清单必须逐字固定（不许悄悄多一张少一张）")
 
 
 class DefaultFlagTests(unittest.TestCase):

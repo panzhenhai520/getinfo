@@ -68,12 +68,15 @@ from qa_evidence import (
     source_fingerprint,
 )
 from qa_graph_contracts import (
+    EXPERIENCE_PRODUCER_PHASES,
     MEMORY_FRESHNESS_CLASSES,
     MEMORY_GRAPH_VERSION,
     MEMORY_LIFECYCLE_REPORT_SCHEMA,
     MEMORY_LIFECYCLE_TRANSITIONS,
     MEMORY_LIFECYCLE_VERSION,
     MEMORY_PRODUCIBLE_TYPES,
+    MEMORY_PRODUCIBLE_TYPES_BY_PHASE,
+    MEMORY_PRODUCER_PHASES_ENV,
     MEMORY_PROVENANCE_VERSION,
     MEMORY_RECALL_CHANNELS,
     MEMORY_RECALL_FACTORS,
@@ -210,6 +213,12 @@ _FRESHNESS_RULES = (
 _REUSABLE_CLAIM_TYPES = ("policy", "background", "definition", "regulation", "current_fact")
 """这些 claim 类型天然可复用（写门给 ReuseProbability 的额外加成）；其余不加成。"""
 
+EXPERIENCE_CLAIM_TYPES = ("episode", "failure", "strategy", "query_pattern", "source",
+                          "skill_performance")
+"""Phase 12（P12-01…P12-05）经验类候选的 `claim_type`：它们**本身就是可复用的经验**，
+因此与 `_REUSABLE_CLAIM_TYPES` 走**同一处公式**拿 +0.05 的 ReuseProbability 加成
+（不是第二套效用函数，只是一个名字集合的追加）。"""
+
 
 def _env_flag(name: str, default: bool) -> bool:
     raw = str(os.environ.get(name, "") or "").strip().casefold()
@@ -254,6 +263,36 @@ def recall_min_score() -> float:
 def recall_counts_reuse() -> bool:
     """召回是否直接计 `reuse_count`（默认**关**：召回只是"给过提示"，用过才算复用）。"""
     return _env_flag("QA_MEMORY_RECALL_COUNTS_REUSE", False)
+
+
+def active_producer_phases() -> tuple:
+    """当前**已激活的产出方 Phase**（P12 起，写门用它决定"这类记忆能不能产"）。
+
+    口径（**单一真源**）：
+      · 类型 → 产出方 Phase 的唯一映射是契约里的 `MEMORY_TYPE_OWNER_PHASE`；
+      · 产出方"落地了没有"由本函数决定：`QA_MEMORY_PRODUCER_PHASES`（逗号分隔）
+        缺省 = `EXPERIENCE_PRODUCER_PHASES`（P09,P12）；
+      · 未登记的 Phase 名一律忽略（拼错的名字不会凭空激活一个产出方）。
+    这样"六类经验记忆由 P12 产"与"P15 的规则类仍然被拒收"就是同一个判定的两个结果，
+    **不存在第二套类型判定**。
+    """
+    raw = str(os.environ.get(MEMORY_PRODUCER_PHASES_ENV, "") or "").strip()
+    names = [item.strip().upper() for item in raw.split(",")] if raw else \
+        [str(item).upper() for item in EXPERIENCE_PRODUCER_PHASES]
+    known = {str(value).upper() for value in MEMORY_PRODUCIBLE_TYPES_BY_PHASE}
+    return tuple(sorted({name for name in names if name in known}))
+
+
+def producible_types(*, phases: Iterable | None = None) -> tuple:
+    """当前可产出的记忆类型（= 激活产出方声明的类型的并集，顺序按契约声明顺序）。"""
+    active = {str(item).upper() for item in (phases if phases is not None
+                                             else active_producer_phases())}
+    out: list = []
+    for name in MEMORY_TYPES:
+        owner = str(MEMORY_TYPE_OWNER_PHASE.get(name, "") or "").upper()
+        if owner in active and name in (MEMORY_PRODUCIBLE_TYPES_BY_PHASE.get(owner) or ()):
+            out.append(name)
+    return tuple(out)
 
 
 def _clamp(value, low: float = 0.0, high: float = 1.0) -> float:
@@ -405,18 +444,31 @@ def classify_freshness(*, claim_type: str = "", text: str = "") -> str:
 
 
 def type_policy(memory_type: str) -> dict:
-    """类型策略：归属 Phase、本阶段能否产出、为什么（可复算的拒绝理由）。"""
+    """类型策略：归属 Phase、**当前能不能产出**、为什么（可复算的拒绝理由）。
+
+    P12 起口径统一到**一个判定**（见 D-044）：
+      · `owner_phase` 只来自 `MEMORY_TYPE_OWNER_PHASE`（唯一真源）；
+      · `producible` = 该类型在 `MEMORY_PRODUCIBLE_TYPES_BY_PHASE[owner]` 里
+        **且** owner 在 `active_producer_phases()` 里；
+      · 产出方没激活 → `TYPE_DEFERRED_TO_PHASE_xx`（可审计：不是"不支持"，是"还没轮到它"）；
+      · `MEMORY_ITEM`（记忆条目节点本身）与没登记的类型 → `TYPE_NOT_SUPPORTED`。
+    """
     kind = str(memory_type or "").strip().upper()
-    owner = MEMORY_TYPE_OWNER_PHASE.get(kind, "")
-    producible = kind in MEMORY_PRODUCIBLE_TYPES
+    owner = str(MEMORY_TYPE_OWNER_PHASE.get(kind, "") or "").upper()
+    declared = tuple(MEMORY_PRODUCIBLE_TYPES_BY_PHASE.get(owner) or ())
+    active = kind in producible_types() if owner else False
+    producible = bool(owner) and kind in declared and active
     reason = ""
-    if not owner:
+    if not owner or not declared:
         reason = "TYPE_NOT_SUPPORTED"
-    elif not producible:
-        reason = "TYPE_DEFERRED_TO_PHASE_%s" % owner[1:] if owner.startswith("P") else "TYPE_NOT_SUPPORTED"
+    elif not active:
+        # 产出方没落地/没激活：理由码必须是契约里的取值（P15 未落地时同理；
+        # "P09 未激活"这种非契约取值会在下面的兜底里收敛成 TYPE_NOT_SUPPORTED）
+        reason = "TYPE_DEFERRED_TO_PHASE_%s" % owner[1:]
     if reason and reason not in MEMORY_WRITE_REASONS:      # 兜底：理由码必须是契约里的取值
         reason = "TYPE_NOT_SUPPORTED"
-    return {"memory_type": kind, "owner_phase": owner, "producible": producible, "reason": reason}
+    return {"memory_type": kind, "owner_phase": owner, "producible": producible, "reason": reason,
+            "producer_phases": list(active_producer_phases())}
 
 
 def sensitive_hits(text) -> int:
@@ -676,13 +728,20 @@ def write_utility(candidate: Mapping, *, existing: Sequence[Mapping] = (),
                 if isinstance(row, Mapping)]
     claim_confidence = float(candidate.get("claim_confidence") or 0)
     kind = str(claim_type or candidate.get("claim_type") or "")
-    if candidate.get("memory_type") == "ENTITY":
+    # 经验类记忆（P12 的六类）**自带统计置信**（样本量/成功率/可靠性算出来的），
+    # 它们没有"核验分"可用；显式传 `confidence` 的候选一律以它为准（同输入同输出）。
+    explicit = candidate.get("confidence")
+    if explicit is not None and str(candidate.get("memory_type") or "") not in \
+            MEMORY_PRODUCIBLE_TYPES:
+        confidence = _clamp(explicit)
+    elif candidate.get("memory_type") == "ENTITY":
         # 实体记忆没有"核验分"：用出现次数当置信（统计口径，逐项可复算）
         confidence = _clamp(0.30 + 0.20 * min(supporting, 3))
     else:
         confidence = _clamp(0.5 * (max(positive) if positive else 0.0) + 0.5 * claim_confidence)
     reuse = _clamp(REUSE_BASE.get(freshness, 0.5) * (0.6 + 0.4 * min(1.0, supporting / 2.0))
-                   + (0.05 if kind in _REUSABLE_CLAIM_TYPES else 0.0))
+                   + (0.05 if kind in _REUSABLE_CLAIM_TYPES
+                      or kind in EXPERIENCE_CLAIM_TYPES else 0.0))
     stability = _clamp(STABILITY_BASE.get(freshness, 0.5)
                        * (1.0 if (candidate.get("valid_from") or candidate.get("valid_until")) else 0.9))
     info = information_value(body)
@@ -690,28 +749,34 @@ def write_utility(candidate: Mapping, *, existing: Sequence[Mapping] = (),
     staleness = _clamp(STALENESS_BASE.get(freshness, 0.1))
     duplication = 0.0
     same_source = False
+    experience = str(candidate.get("memory_type") or "") not in MEMORY_PRODUCIBLE_TYPES
     if existing:
         fingerprints = {str(row.get("content_fingerprint") or "") for row in existing}
         if str(candidate.get("content_fingerprint") or content_fingerprint(body)) in fingerprints:
-            duplication = 0.5
-            incoming_sources = {str(row.get("source_fingerprint") or "")
-                                for row in (candidate.get("evidence") or [])
-                                if isinstance(row, Mapping)}
-            for row in existing:
-                links = row.get("metadata") or {}
-                known = set()
-                if isinstance(links, Mapping):
-                    known = {str(item) for item in (links.get("source_fingerprints") or [])}
-                if known and incoming_sources and known & incoming_sources:
-                    same_source = True
-                    duplication = 1.0
-                    break
-            if duplication == 0.5 and not same_source and existing:
+            if experience:
+                # P12：经验类记忆是**对多来源的统计聚合**，"同内容不同来源"对它不成立
+                # （它不是某一篇文档里的事实）；同内容 = 同一批观测 → 合并刷新。
+                duplication = 1.0
+            else:
                 duplication = 0.5
+                incoming_sources = {str(row.get("source_fingerprint") or "")
+                                    for row in (candidate.get("evidence") or [])
+                                    if isinstance(row, Mapping)}
+                for row in existing:
+                    links = row.get("metadata") or {}
+                    known = set()
+                    if isinstance(links, Mapping):
+                        known = {str(item) for item in (links.get("source_fingerprints") or [])}
+                    if known and incoming_sources and known & incoming_sources:
+                        same_source = True
+                        duplication = 1.0
+                        break
+                if duplication == 0.5 and not same_source and existing:
+                    duplication = 0.5
     if batch_seen:
         key = str(candidate.get("content_fingerprint") or content_fingerprint(body))
         if batch_seen.get(key):
-            duplication = max(duplication, 0.15)
+            duplication = max(duplication, 1.0 if experience else 0.15)
     total = _clamp(reuse * confidence * stability * info - privacy - staleness - duplication,
                    -1.0, 1.0)
     return {
@@ -725,36 +790,55 @@ def write_utility(candidate: Mapping, *, existing: Sequence[Mapping] = (),
 
 
 def decide_write(candidate: Mapping, *, factors: Mapping, has_existing: bool = False) -> tuple:
-    """§2.2 四出口的**唯一决策点**（P09-03）：返回 (decision, reason)。
+    """§2.2 四出口的**唯一决策点**（P09-03；P12 追加两条经验类硬规则）：返回 (decision, reason)。
 
-    判定顺序写死（先硬规则、再归属、再效用、最后 TTL），因此同样输入必然同样输出：
+    判定顺序写死（先硬规则、再归属、再证据/绑定、再效用、最后 TTL），因此同样输入必然同样输出：
       1) 空正文 → DROP/EMPTY_CONTENT；
       2) 外部指令性内容 → DROP/EXTERNAL_INSTRUCTION_NOT_A_RULE（MASTER_RULES 16）；
-      3) 类型不在本阶段可产清单 → DROP/TYPE_DEFERRED_TO_PHASE_xx（不提前实现后续 Phase）；
-      4) 没有通过核验的支撑证据 → DROP/NO_VERIFIED_EVIDENCE（MASTER_RULES 11）；
-      5) 隐私风险 ≥1.0 → DROP/SENSITIVE_CONTENT；≥0.5 → SESSION_ONLY/PRIVACY_RISK；
-      6) 完全重复（同内容同来源）→ PERSIST/DUPLICATE_MERGED（幂等：只刷新，不新增版本语义）；
-      7) 作用域是 SESSION/ENCOUNTER_BOUND → SESSION_ONLY/SESSION_SCOPE_ONLY；
-      8) 效用低于下限 → DROP/UTILITY_BELOW_FLOOR；
-      9) 时效档要求 TTL（TTL_DAYS>0 且没有显式 valid_until）→ PERSIST_WITH_TTL；
-     10) 否则 → PERSIST。
+      3) 类型不在**已激活产出方**的可产清单 → DROP/TYPE_DEFERRED_TO_PHASE_xx；
+      4) 经验类记忆（§3.2~§3.6 六类）没有 trace 绑定 → DROP/NO_TRACE_BINDING
+         （P12：经验是"对 trace 的归纳"，没有 trace 就只能是编造）；
+      5) 经验类记忆样本低于下限 → DROP/BELOW_SAMPLE_FLOOR（不许拿一次观测当规律）；
+      6) 经验类记忆没有任何**真实证据出处** → DROP/NO_EVIDENCE_LINK
+         （P09 的 provenance 硬规则对经验类一视同仁）；
+      7) 结论/实体类没有通过核验的支撑证据 → DROP/NO_VERIFIED_EVIDENCE（MASTER_RULES 11）；
+      8) 隐私风险 ≥1.0 → DROP/SENSITIVE_CONTENT；≥0.5 → SESSION_ONLY/PRIVACY_RISK；
+      9) 完全重复（同内容同来源）→ PERSIST/DUPLICATE_MERGED（幂等：只刷新，不新增版本语义）；
+     10) 作用域是 SESSION/ENCOUNTER_BOUND → SESSION_ONLY/SESSION_SCOPE_ONLY；
+     11) 效用低于下限 → DROP/UTILITY_BELOW_FLOOR；
+     12) 时效档要求 TTL（TTL_DAYS>0 且没有显式 valid_until）→ PERSIST_WITH_TTL；
+     13) 否则 → PERSIST。
     """
     candidate = candidate if isinstance(candidate, Mapping) else {}
     factors = factors if isinstance(factors, Mapping) else {}
     body = canonicalize(candidate.get("canonical_content"))
     policy = type_policy(candidate.get("memory_type"))
+    memory_type = str(candidate.get("memory_type") or "")
     if not body:
         return "DROP", "EMPTY_CONTENT"
     if external_instruction(body):
         return "DROP", "EXTERNAL_INSTRUCTION_NOT_A_RULE"
     if not policy["producible"]:
         return "DROP", policy["reason"]
+    if memory_type not in MEMORY_PRODUCIBLE_TYPES:
+        # 经验类记忆：必须有 trace 绑定（run_id 非空即"这是某一次真实研究留下的记录"）
+        if not str(candidate.get("trace_ref") or candidate.get("run_id") or ""):
+            return "DROP", "NO_TRACE_BINDING"
+        floor = int(candidate.get("sample_floor") or 0)
+        if floor > 0 and int(candidate.get("samples") or 0) < floor:
+            return "DROP", "BELOW_SAMPLE_FLOOR"
+        # provenance 硬规则（P09）：经验记忆也要能回到**真实证据**。零证据轮（一条证据都
+        # 没取到）连经验都记不下来 —— 拒收本身留在写决策里（可审计），
+        # 但落库的每一条经验都查得到出处（验收里 provenance 100% 是这么来的）。
+        if not [row for row in (candidate.get("evidence") or [])
+                if isinstance(row, Mapping) and row.get("evidence_ref")]:
+            return "DROP", "NO_EVIDENCE_LINK"
     verified = [row for row in (candidate.get("evidence") or [])
                 if isinstance(row, Mapping) and row.get("evidence_ref")
                 and str(row.get("verdict") or "") == EVIDENCE_STATUS_SUPPORTED]
-    if not verified and candidate.get("memory_type") == "VERIFIED_CLAIM":
+    if not verified and memory_type == "VERIFIED_CLAIM":
         return "DROP", "NO_VERIFIED_EVIDENCE"
-    if not verified and candidate.get("memory_type") == "ENTITY":
+    if not verified and memory_type == "ENTITY":
         return "DROP", "NO_VERIFIED_EVIDENCE"
     privacy = float(factors.get("privacy_risk") or 0)
     if privacy >= SENSITIVE_DROP_RISK:
@@ -824,6 +908,10 @@ def build_memory_item(candidate: Mapping, *, decision: str, factors: Mapping,
         "change": "CREATE" if decision == "PERSIST" else "CREATE_WITH_TTL",
         "change_reason": "",
         "metadata": {
+            # 候选自带的 metadata 先铺底（P12 的经验类记忆把 kind/combination/domain 等
+            # **结构化事实**放这里，便于按失败种类/来源域检索与审计），
+            # 门算出来的键一律覆盖它 —— 候选不许用自带 metadata 顶替门的记账。
+            **dict(candidate.get("metadata") or {}),
             "gate_version": MEMORY_WRITE_GATE_VERSION,
             "graph_version": MEMORY_GRAPH_VERSION,
             "utility": float(factors.get("utility") or 0),
@@ -918,6 +1006,23 @@ def apply_write_gate(store, candidates: Sequence[Mapping], *, run_id: str = "",
         relations.append({"memory_id": item["memory_id"], "relation": "ABOUT",
                           "target_kind": "scope", "target_ref": str(item.get("scope_key") or ""),
                           "weight": 1.0, "run_id": run_id})
+        # P12（§1.4）：经验类记忆还要写 `HELPED_RESOLVE`（它真的解决过什么）与
+        # `FAILED_ON`（它栽在哪条通道/来源上）—— 候选显式给出，门不替它编。
+        for extra in (candidate.get("relations") or []):
+            if not isinstance(extra, Mapping):
+                continue
+            name = str(extra.get("relation") or "").upper()
+            if name not in MEMORY_RELATIONS or name in ("ABOUT", "DERIVED_FROM", "APPLIES_TO"):
+                continue
+            relations.append({
+                "memory_id": item["memory_id"], "relation": name,
+                "target_kind": str(extra.get("target_kind") or "memory"),
+                "target_ref": str(extra.get("target_ref") or ""),
+                "target_memory_id": str(extra.get("target_memory_id") or ""),
+                "weight": float(extra.get("weight") or 0.5),
+                "rationale": str(extra.get("rationale") or ""),
+                "run_id": str(extra.get("run_id") or run_id),
+            })
         store.add_memory_relation(relations)
         persisted.append(item["memory_id"])
         index.setdefault(fingerprint, []).append({

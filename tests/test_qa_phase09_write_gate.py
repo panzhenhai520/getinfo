@@ -155,10 +155,21 @@ class DecisionTests(unittest.TestCase):
         item["canonical_content"] = "   "
         factors = memory.write_utility(item)
         self.assertEqual(memory.decide_write(item, factors=factors), ("DROP", "EMPTY_CONTENT"))
-        item = candidate(memory_type="EPISODIC_RESEARCH")
-        factors = memory.write_utility(item)
-        self.assertEqual(memory.decide_write(item, factors=factors),
-                         ("DROP", "TYPE_DEFERRED_TO_PHASE_12"))
+        # 产出方限回 P09 时，经验类记忆仍被"归属 Phase"拦下（Phase 09 的原始口径）。
+        # 默认（P09+P12）下它由 Phase 12 产出，且**没有 trace 绑定**一样被拒
+        # （见 tests/test_qa_phase12_gate.py：NO_TRACE_BINDING）。
+        saved = os.environ.get("QA_MEMORY_PRODUCER_PHASES")
+        os.environ["QA_MEMORY_PRODUCER_PHASES"] = "P09"
+        try:
+            item = candidate(memory_type="EPISODIC_RESEARCH")
+            factors = memory.write_utility(item)
+            self.assertEqual(memory.decide_write(item, factors=factors),
+                             ("DROP", "TYPE_DEFERRED_TO_PHASE_12"))
+        finally:
+            if saved is None:
+                os.environ.pop("QA_MEMORY_PRODUCER_PHASES", None)
+            else:
+                os.environ["QA_MEMORY_PRODUCER_PHASES"] = saved
 
     def test_duplicate_merge_is_a_persist_with_a_marker(self):
         decision, reason, _factors = self._decide(candidate(), existing=[{

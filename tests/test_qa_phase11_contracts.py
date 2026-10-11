@@ -317,15 +317,24 @@ class FrozenContractTests(unittest.TestCase):
         self.assertEqual(contracts.CONTEXT_ITEM_SOURCES[8], "skill_registry")
 
     def test_no_schema_version_bump_and_no_new_tables(self):
-        # Phase 11 **不建表、不加列**：遥测复用既有 `qa_stage_runs`
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v9")
+        # Phase 11 **不建表、不加列**：遥测复用既有 `qa_stage_runs`。
+        # Phase 12（D-044）把 v9 升到 v10 并建了 §12 留给它的两张表，所以这里把
+        # "不许有 skill_* 表"的断言精确化为：**Phase 11 自己引入的表 = 0**
+        # （`skill_performance_memory` 是 Phase 12 建的投影表，不是 Phase 11 建的遥测表）。
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V10, (), "Phase 12 也只许新建表")
         joined = " ".join(qa_schema.QA_TABLE_DDL).casefold()
-        for name in ("skill_performance_memory", "skill_load_log", "skill_registry",
-                     "skill_performance"):
+        for name in ("skill_load_log", "skill_registry", "skill_performance",
+                     "skill_telemetry", "skill_load_record"):
             self.assertNotIn("create table if not exists %s " % name, joined)
             self.assertNotIn("create table if not exists %s(" % name, joined)
-        for table in qa_schema.QA_REQUIRED_TABLES:
-            self.assertFalse(table.startswith("skill"), "不许新增 skill_* 表：%s" % table)
+        phase12_tables = {"skill_performance_memory", "source_reliability_memory"}
+        self.assertEqual(
+            sorted(name for name in qa_schema.QA_REQUIRED_TABLES
+                   if name.startswith("skill") and name not in phase12_tables), [],
+            "Phase 11 不许新增任何 skill_* 表（Phase 12 的投影表不算它建的）")
+        self.assertTrue(phase12_tables <= set(qa_schema.QA_REQUIRED_TABLES),
+                        "Phase 12 的两张投影表必须在 v10 里真实存在")
 
     def test_switches_default_off(self):
         for name in ("QA_SKILL_ROUTER", "QA_SKILL_TELEMETRY"):

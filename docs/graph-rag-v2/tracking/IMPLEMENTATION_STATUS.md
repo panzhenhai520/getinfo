@@ -67,12 +67,12 @@
 |P11-04|permission/cost/latency| PASS | SkillBudget：三个上限（条数、成本单位、申报延迟毫秒）加六个权限位；判据顺序写死（禁用→权限→去重→条数→成本→延迟），权限在预算之前所以被拒通道不消耗额度；默认拒绝 emr_read 与 patient_contact；非法权限位一律丢弃（拼错绝不提权）；真机默认预算下 web_search 因延迟超限被拦 12 次、成本上限拦 11 次；27 例 | 2026-10-11 |
 |P11-05|on-demand instruction| PASS | 按需指令：确定性模板拼装（零模型调用），每条恒 is_evidence=False、requires_revalidation=True、in_citation_map=False；Phase 08 的 skill_context 段由空段加 deferred_to 变为 implemented_by 加已加载技能加提示政策，技能条目一条都不进 citation_map；LOAD_SKILL 缺口真机 9 → 0；20 例 | 2026-10-11 |
 |P11-06|performance telemetry| PASS | 性能遥测：成功率口径写死（成功当且仅当结局 ok 且阶段属已进包或已执行）、样本少于 3 给空值加不足样本理由码；**零迁移**落既有 qa_stage_runs（stage=skill:<id>、node_kind=skill），显式观测延迟与墙上钟分列互不顶替；schema 仍 v9、未建表未加列；线上暂无遥测行（离线同代码重建 38 次加载）；37 例 | 2026-10-11 |
-|P12-01|episode summarizer from trace|NOT_STARTED|||
-|P12-02|Failure Memory|NOT_STARTED|||
-|P12-03|Strategy Memory|NOT_STARTED|||
-|P12-04|Source reliability|NOT_STARTED|||
-|P12-05|Skill performance memory|NOT_STARTED|||
-|P12-06|version-aware retry|NOT_STARTED|||
+|P12-01|episode summarizer from trace| PASS | 新 qa_memory_experience.py：trace 八段装配 + 规则版剧集归纳（五要素逐字入契约）+ 可插拔归纳后端（未注册/抛错/非法载荷/空载荷四条失败路径全回落并记账）；真机 15 轮重建 15 候选 → 12 落库（3 条零证据轮被 NO_EVIDENCE_LINK 拒收），缺段如实记；19 例 | 2026-10-11 |
+|P12-02|Failure Memory| PASS | 四类失败判定 + 五个绑定（MASTER_RULES 15；语料轴取 run.corpus_version，空则退到真实观测的 cache.kb_version，binding_source 写明来路）+ FAILED_ON 关系 + 证据出处；真机 27 候选 → 21 落库（SEMANTIC_DRIFT 15 / FAILED_ROUTE 5 / FALSE_POSITIVE_SOURCE 1；INVALID_QUERY 4 条属零采纳轮、无出处被如实拒收）；22 例 | 2026-10-11 |
+|P12-03|Strategy Memory| PASS | 通道有效率 + 组合口径（组合样本 = 有效通道全被试过的轮）+ QUERY_PATTERN；门限 MIN_SAMPLES=2 / ROUTE_SUCCESS_FLOOR=0.60；真机 1 条策略（SYNTHESIS 下的 keyword，7 次可比较观测）+ 2 条查询形态；留一法前后对比：77 个真实缺口里 16 条首选通道被改（逐条 from/to/reason）；12 例 | 2026-10-11 |
+|P12-04|Source reliability| PASS | 来源可靠性六因子逐项可复算、权重写死、样本不足一律 UNKNOWN、跨轮用总计数重算率；真机 32 个域入投影表（UNKNOWN 17 / MEDIUM 12 / HIGH 2 / LOW 1）；QaStore 两个新方法；14 例 | 2026-10-11 |
+|P12-05|Skill performance memory| PASS | 技能表现记忆口径**零重定义**：直接调 qa_skills.performance_table，success_definition 逐字抄 Phase 11；真机 node_kind=skill 为 0 行 → 记录沿用 Phase 11 的离线重建 38 条，落库 1 条记忆 + 3 行投影；样本不足走 BELOW_SAMPLE_FLOOR；14 例 | 2026-10-11 |
+|P12-06|version-aware retry| PASS | 版本感知重试：六理由码全可达，**唯一能压制的理由只有 SAME_ENVIRONMENT**，且要求记录侧每条轴都被当前环境确认，证明不了就一律放行（MASTER_RULES 15 的安全方向）；缺口循环钩子缺省时行为与 Phase 07 逐字相同；真机 53 次跨版本压制被拦、12 次同环境压制、建议集合里被避免通道 17 → 0；6 + 23 例 | 2026-10-11 |
 |P13-01|claim-aware composer|NOT_STARTED|||
 |P13-02|citation binding|NOT_STARTED|||
 |P13-03|counter-evidence/unresolved gaps|NOT_STARTED|||

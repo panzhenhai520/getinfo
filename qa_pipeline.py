@@ -1037,6 +1037,118 @@ def _write_memories_after_answer(graph: Mapping, *, run_meta: Mapping, store,
                 "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
+def _experience_loop_enabled(*, store=None) -> bool:
+    """阶段 12（P12-03/P12-06）的**规划期**经验开关：默认关（`QA_EXPERIENCE_MEMORY`）。
+
+    关掉时缺口循环里一个回调都不传、一个键都不新增 → 逐字回到 Phase 11 行为。
+    记忆库不可用（store 为 None）时也不启用：没有记忆可召回，接线只是空跑。
+    """
+    try:
+        from qa_memory_experience import experience_memory_enabled
+
+        return bool(experience_memory_enabled()) and store is not None
+    except Exception:  # noqa: BLE001 —— 经验模块不可用就当开关没开（不影响主链路）
+        return False
+
+
+def _planning_guidance(*, run_meta: Mapping, plan: Mapping | None, store, question: str,
+                       corpus_version: str, retrieval_config_version: str) -> dict:
+    """阶段 12（§10 planning recall）：召回失败/策略记忆 → 通道偏好 + 提前提示。
+
+    只读、零模型、零端点；召回坏掉一律返回空指导（**不改变**缺口的建议通道）。
+    `corpus_version` / `retrieval_config_version` 取**本轮真实绑定**（`qa_pipeline` 的
+    `corpus_version` 与检索配置令牌），交给 P12-06 判定"同一环境才压制"。
+    """
+    try:
+        from qa_memory_experience import planning_hint
+
+        task_type = _gap_loop_category(plan)
+        entities = _plan_entities(plan)
+        hint = planning_hint(store, run_meta=run_meta, task_type=task_type,
+                             question=question, corpus_version=corpus_version,
+                             retrieval_config_version=retrieval_config_version,
+                             extra_terms=[task_type, *entities])
+        guidance = hint.get("guidance") or {}
+        if not (guidance.get("prefer_routes") or guidance.get("avoid_routes")
+                or guidance.get("warnings")):
+            return {}
+        return guidance
+    except Exception:  # noqa: BLE001 —— 经验指导坏掉绝不能挡住检索
+        return {}
+
+
+def _experience_trace(context: Mapping, *, graph: Mapping, run_meta: Mapping,
+                      store=None, retrieval_config_version: str = "") -> dict:
+    """阶段 12（P12-01）：把这一轮的**既有回执**装配成 trace（只读，不新增事实）。"""
+    from qa_memory_experience import build_trace
+
+    outputs = context.get("outputs") if isinstance(context, Mapping) else {}
+    outputs = outputs if isinstance(outputs, Mapping) else {}
+    level1 = outputs.get("level1_retrieval") if isinstance(outputs.get("level1_retrieval"),
+                                                          Mapping) else {}
+    plan_output = outputs.get("plan") if isinstance(outputs.get("plan"), Mapping) else {}
+    stats = level1.get("stats") if isinstance(level1.get("stats"), Mapping) else {}
+    gap_receipt = stats.get("gap_loop") if isinstance(stats.get("gap_loop"), Mapping) else {}
+    stage_rows: list = []
+    records: list = []
+    if store is not None:
+        try:
+            for row in store.stage_runs(str(run_meta.get("id") or "")) or []:
+                stage_rows.append(dict(row) if isinstance(row, Mapping) else {})
+        except Exception:  # noqa: BLE001 —— 读不到阶段行就少一段（如实记 missing）
+            stage_rows = []
+        try:
+            records = list(store.skill_load_rows(run_id=str(run_meta.get("id") or "")) or [])
+        except Exception:  # noqa: BLE001
+            records = []
+    return build_trace(
+        run_meta=run_meta, plan=plan_output or {"entities": _plan_entities(plan_output)},
+        graph=graph, level1=level1, gap_receipt=gap_receipt, stage_rows=stage_rows,
+        skill_records=records,
+        stop_reason=str((gap_receipt or {}).get("stop_reason") or ""),
+        task_type=_gap_loop_category(plan_output),
+        retrieval_config_version=str(retrieval_config_version or ""))
+
+
+def _write_experience_after_answer(context: Mapping, *, graph: Mapping, run_meta: Mapping,
+                                   store, database=None, audit=None,
+                                   retrieval_config_version: str = "") -> dict:
+    """阶段 12（P12-01…P12-05）：出答案之后归纳经验并过**同一个写门**。
+
+    只吃本轮 trace（阶段回执 + 证据图 + 缺口回执），**不吃答案文本**；失败只记账。
+    """
+    if not _experience_loop_enabled(store=store):
+        return {}
+    try:
+        from qa_memory_experience import experience_receipt, write_experience_memories
+
+        trace = _experience_trace(context, graph=graph, run_meta=run_meta, store=store,
+                                  retrieval_config_version=retrieval_config_version)
+        receipt = write_experience_memories(
+            store, traces=[trace], run_meta=run_meta,
+            audit=audit if audit is not None else _memory_audit_logger(database))
+        return {"receipt": experience_receipt(receipt), "trace": {
+            "trace_fingerprint": str(trace.get("trace_fingerprint") or ""),
+            "missing_sections": list(trace.get("missing_sections") or []),
+            "task_type": str(trace.get("task_type") or ""),
+            "routes": {route: {"adopted": int((row or {}).get("adopted") or 0),
+                               "verified": int((row or {}).get("verified") or 0),
+                               "attempted": bool((row or {}).get("attempted"))}
+                       for route, row in ((trace.get("retrieval") or {}).get("routes") or {}).items()},
+            "corpus_binding": _trace_binding(trace)}, "raw": receipt}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+
+
+def _trace_binding(trace: Mapping) -> dict:
+    try:
+        from qa_memory_experience import corpus_binding, retrieval_config_token
+
+        return {"corpus": corpus_binding(trace), "config": retrieval_config_token(trace)}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _attach_gap_review(graph: Mapping, layer: dict, *, plan: Mapping | None,
                        previous_stop_reason: str = "") -> dict:
     """阶段 07（P07-06）：在证据图上做一次缺口复核，结果挂 `layer["gap_review"]`。
@@ -1320,6 +1432,37 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             category=_gap_loop_category(retrieval_plan), plan=retrieval_plan,
             corpus_version=corpus_version, retrieval_config=retrieval_config_version)
 
+    # ── 阶段 12（P12-03/P12-06）：经验指导真的改变缺口的通道次序（默认关）──
+    experience_guidance: dict = {}
+    experience_wired = bool(gap_state is not None and _experience_loop_enabled(store=store))
+    if experience_wired:
+        # 规划期召回（§10）：召回失败/策略类记忆 → 通道偏好 + 提前提示。
+        # 只读、恒为 MEMORY_HINT；召回或判定坏掉一律不改变缺口的建议通道（原行为）。
+        from qa_memory_experience import apply_route_guidance, guidance_receipt
+
+        def _route_guidance(gaps: list) -> tuple:
+            guidance = _planning_guidance(run_meta=run_meta, plan=retrieval_plan, store=store,
+                                          question=question, corpus_version=corpus_version,
+                                          retrieval_config_version=retrieval_config_version)
+            if not guidance:
+                return gaps, {}
+            adjusted, receipt = apply_route_guidance(gaps, guidance)
+            receipt["warnings"] = list(guidance.get("warnings") or [])
+            receipt["guidance"] = guidance_receipt(guidance)
+            experience_guidance.update({"guidance": guidance_receipt(guidance),
+                                        "applied": {key: receipt.get(key) for key in
+                                                    ("gaps", "changed", "changed_by_reason")},
+                                        "route_changes": list(receipt.get("route_changes") or [])})
+            for warning in (guidance.get("warnings") or [])[:4]:
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": str(warning.get("text") or ""),
+                        "experience_memory": {"code": warning.get("code"),
+                                              "route": warning.get("route"),
+                                              "routes": warning.get("routes"),
+                                              "failure_id": warning.get("failure_id")}})
+            return adjusted, receipt
+
     def _observe_gap_round(round_no: int, *, new_refs=()) -> dict:
         """跑一轮缺口分析（**异常一律吞掉**：缺口分析绝不能把检索阶段打断）。"""
         if gap_state is None:
@@ -1589,7 +1732,9 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             if len([item for item in receipts if str(item.get("status")) != "skipped_budget"]) >= hard_cap:
                 break
             try:
-                planned = gap_state.next_hops(plan=retrieval_plan, limit=1)
+                planned = gap_state.next_hops(plan=retrieval_plan, limit=1,
+                                              route_guidance=_route_guidance
+                                              if experience_wired else None)
             except Exception as exc:      # noqa: BLE001 —— 规划器坏掉不许把检索打断
                 gap_state.record_error("next_hops", "%s: %s" % (type(exc).__name__,
                                                                 str(exc)[:120]))
@@ -1702,6 +1847,20 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
         receipt["stage"] = "multi_hop"
         receipt["next_hops_used"] = gap_next_used
         merged["gap_loop"] = receipt
+        if experience_guidance:
+            # 阶段 12：经验指导的回执走**兄弟键**（既有 gap_loop 键集一个字不动）。
+            merged["experience_memory"] = {
+                **experience_guidance,
+                "stop_reason_after": str(decision.get("stop_reason") or ""),
+            }
+            if callable(emit_stage_event) and experience_guidance.get("applied", {}).get("changed"):
+                emit_stage_event("stage_progress", {
+                    "message": ("经验记忆改变了 %d 条缺口的通道选择（%s）。"
+                                % (int(experience_guidance["applied"].get("changed") or 0),
+                                   "、".join("%s→%s" % (row.get("from"), row.get("to"))
+                                             for row in (experience_guidance.get("route_changes")
+                                                         or [])[:3]))),
+                    "experience_memory": experience_guidance.get("applied")})
         merged["multi_hop"]["gap_stop_reason"] = str(decision.get("stop_reason") or "")
         merged["multi_hop"]["gap_loop_version"] = GAP_ANALYZER_VERSION
         if callable(emit_stage_event):
@@ -2619,6 +2778,20 @@ def build_qa_stage_handlers(
                                             "open_gaps") or 0))
                 except Exception:
                     pass
+        # 阶段 12（P12-03/P12-06）：经验记忆的指导回执同样走**兄弟键**
+        # （`stats["experience_memory"]`；开关关着时这个键根本不存在 → 逐字回到 Phase 11）。
+        _experience_receipt = local.get("experience_memory")
+        if isinstance(_experience_receipt, Mapping) and _experience_receipt:
+            stats["experience_memory"] = dict(_experience_receipt)
+            if callable(emit_stage_event):
+                emit_stage_event("stage_progress", {
+                    "message": ("经验记忆：避开 %s；优先 %s；改通道 %d 条。"
+                                % ("、".join((_experience_receipt.get("guidance") or {}).get(
+                                    "avoid_routes") or []) or "无",
+                                   "、".join((_experience_receipt.get("guidance") or {}).get(
+                                       "prefer_routes") or []) or "无",
+                                   int((_experience_receipt.get("applied") or {}).get("changed") or 0))),
+                    "experience_memory": dict(_experience_receipt.get("guidance") or {})})
         result = {
             "queries": list(retrieval_plan.get("queries") or []),
             "evidence": evidence,
@@ -3299,6 +3472,25 @@ def build_qa_stage_handlers(
                                    _memory_write.get("dropped"))),
                     "memory": _memory_write,
                 })
+            # 阶段 12（P12-01…P12-05）：经验类记忆（剧集/失败/策略/查询形态/来源/技能表现）
+            # 同样在**最终答案之后**归纳，并且走**同一个写门**；开关默认关。
+            _experience_write = _write_experience_after_answer(
+                context, graph=graph if isinstance(graph, Mapping) else {}, run_meta=run,
+                store=store, database=database,
+                retrieval_config_version="qa-retrieval-v3-policy-exact")
+            if _experience_write:
+                graph["experience_memory"] = _experience_write.get("receipt") or {}
+                if callable(emit_stage_event):
+                    _exp_receipt = _experience_write.get("receipt") or {}
+                    emit_stage_event("stage_progress", {
+                        "message": ("经验记忆：候选 %s 条，落库 %s 条（各类 %s；投影 来源 %s / 技能 %s）"
+                                    % (_exp_receipt.get("candidates"),
+                                       _exp_receipt.get("persisted"),
+                                       _exp_receipt.get("persisted_by_type"),
+                                       (_exp_receipt.get("projections") or {}).get("source"),
+                                       (_exp_receipt.get("projections") or {}).get("skill"))),
+                        "experience_memory": _exp_receipt,
+                    })
             return result
         except Exception as exc:
             if "profile" in locals():

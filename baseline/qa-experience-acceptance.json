@@ -1,0 +1,1766 @@
+{
+  "report_version": "qa-experience-acceptance-v1",
+  "clock": {
+    "source": "snapshot.captured_at_utc（显式基准，绝不用墙上钟）",
+    "baseline_utc": "2026-10-11T04:01:14Z"
+  },
+  "snapshot": {
+    "snapshot_version": "qa-experience-real-sample-v1",
+    "captured_at_utc": "2026-10-11T04:01:14Z",
+    "catalog": {
+      "qa_runs": 15,
+      "qa_claims": 129,
+      "qa_claim_evidence": 57,
+      "qa_evidence": 93,
+      "qa_conflicts": 0,
+      "qa_reasoning_traces": 0,
+      "qa_stage_runs": 118,
+      "memory_item": 0,
+      "memory_version": 0,
+      "memory_entity_link": 0,
+      "memory_evidence_link": 0,
+      "memory_relation": 0,
+      "memory_recall_log": 0,
+      "memory_write_decision": 0,
+      "memory_usage_stat": 0,
+      "memory_validation": 0,
+      "memory_contradiction": 0
+    },
+    "missing_tables": [
+      "source_reliability_memory",
+      "skill_performance_memory"
+    ],
+    "memory_tables_present": [
+      "memory_item",
+      "memory_version",
+      "memory_entity_link",
+      "memory_evidence_link",
+      "memory_relation",
+      "memory_recall_log",
+      "memory_write_decision",
+      "memory_usage_stat",
+      "memory_validation",
+      "memory_contradiction"
+    ],
+    "phase12_tables_present": [],
+    "errors": [],
+    "stage_projection_keys": [
+      "performance",
+      "stats",
+      "queries",
+      "excluded",
+      "search_status",
+      "cache",
+      "search_errors"
+    ]
+  },
+  "experience_version": "qa-experience-memory-v1",
+  "corpus": {
+    "traces": 15,
+    "skill_records": 38,
+    "skill_record_skills": {
+      "citation_verification": 13,
+      "semantic_search": 13,
+      "sql_query": 12
+    },
+    "produced": {
+      "EPISODIC_RESEARCH": 15,
+      "FAILURE": 27,
+      "STRATEGY": 1,
+      "QUERY_PATTERN": 2,
+      "SOURCE": 32,
+      "SKILL_PERFORMANCE": 3
+    },
+    "candidates": 80,
+    "persisted_by_type": {
+      "EPISODIC_RESEARCH": 13,
+      "FAILURE": 21,
+      "QUERY_PATTERN": 2,
+      "SKILL_PERFORMANCE": 1,
+      "SOURCE": 15,
+      "STRATEGY": 1
+    },
+    "gate": {
+      "persisted": 53,
+      "merged": 1,
+      "session_only": 0,
+      "dropped": 27,
+      "decision_counts": {
+        "PERSIST_WITH_TTL": 52,
+        "DROP": 27,
+        "PERSIST": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 52,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 10,
+        "DUPLICATE_MERGED": 1
+      },
+      "min_utility": 0.05
+    },
+    "memory_rows": 52,
+    "by_type": {
+      "FAILURE": 21,
+      "SOURCE": 15,
+      "EPISODIC_RESEARCH": 12,
+      "QUERY_PATTERN": 2,
+      "SKILL_PERFORMANCE": 1,
+      "STRATEGY": 1
+    },
+    "statuses": {
+      "ACTIVE": 52
+    },
+    "scopes": {
+      "ORGANIZATION": 52
+    },
+    "decisions": {
+      "PERSIST_WITH_TTL": 52,
+      "DROP": 27,
+      "PERSIST": 1
+    },
+    "reasons": {
+      "TTL_REQUIRED_BY_FRESHNESS": 52,
+      "BELOW_SAMPLE_FLOOR": 17,
+      "NO_EVIDENCE_LINK": 10,
+      "DUPLICATE_MERGED": 1
+    },
+    "by_type_decision": {
+      "EPISODIC_RESEARCH/PERSIST_WITH_TTL": 12,
+      "EPISODIC_RESEARCH/DROP": 2,
+      "EPISODIC_RESEARCH/PERSIST": 1,
+      "FAILURE/PERSIST_WITH_TTL": 21,
+      "FAILURE/DROP": 6,
+      "STRATEGY/PERSIST_WITH_TTL": 1,
+      "QUERY_PATTERN/PERSIST_WITH_TTL": 2,
+      "SOURCE/DROP": 17,
+      "SOURCE/PERSIST_WITH_TTL": 15,
+      "SKILL_PERFORMANCE/DROP": 2,
+      "SKILL_PERFORMANCE/PERSIST_WITH_TTL": 1
+    },
+    "six_type_counts": {
+      "EPISODIC_RESEARCH": 12,
+      "FAILURE": 21,
+      "STRATEGY": 1,
+      "QUERY_PATTERN": 2,
+      "SOURCE": 15,
+      "SKILL_PERFORMANCE": 1
+    },
+    "episodes": {
+      "rows": 12,
+      "summarizers": {
+        "rule:trace-v1": 12
+      },
+      "missing_sections": {
+        "gaps": 12,
+        "planning": 12,
+        "skills": 12,
+        "stop": 12
+      }
+    },
+    "failures": {
+      "rows": 21,
+      "kinds": {
+        "SEMANTIC_DRIFT": 15,
+        "FAILED_ROUTE": 5,
+        "FALSE_POSITIVE_SOURCE": 1
+      },
+      "routes": {
+        "keyword": 14,
+        "": 5,
+        "graph": 2
+      },
+      "bound_corpus": 21,
+      "bound_config": 21
+    },
+    "strategies": {
+      "rows": 1,
+      "combinations": {
+        "keyword": 1
+      },
+      "samples": [
+        7
+      ]
+    },
+    "query_patterns": {
+      "rows": 2,
+      "patterns": {
+        "entity=1|time=1|question=1|compare=0|len=MEDIUM|terms=4": 1,
+        "entity=1|time=1|question=1|compare=0|len=MEDIUM|terms=7": 1
+      }
+    },
+    "sources": {
+      "rows": 32,
+      "bands": {
+        "UNKNOWN": 17,
+        "MEDIUM": 12,
+        "HIGH": 2,
+        "LOW": 1
+      },
+      "top": [
+        {
+          "domain": "baike.baidu.com",
+          "reliability": 0.9330011,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "deloitte.com",
+          "reliability": 0.8979721,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "59697.com",
+          "reliability": 0.89491315,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "zgylbx.com",
+          "reliability": 0.85851805,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "ylbz.henan.gov.cn",
+          "reliability": 0.85768855,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "nhsa.gov.cn",
+          "reliability": 0.85741315,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "embodiedglobal.com",
+          "reliability": 0.85495735,
+          "band": "UNKNOWN",
+          "observations": 1,
+          "verified": 1
+        },
+        {
+          "domain": "amac.org.cn",
+          "reliability": 0.84332535,
+          "band": "HIGH",
+          "observations": 5,
+          "verified": 4
+        }
+      ]
+    },
+    "skills": {
+      "rows": 3,
+      "table": [
+        {
+          "skill_id": "citation_verification",
+          "attempts": 13,
+          "successes": 13,
+          "success_rate": 1.0,
+          "min_samples": 3
+        },
+        {
+          "skill_id": "semantic_search",
+          "attempts": 13,
+          "successes": 13,
+          "success_rate": 1.0,
+          "min_samples": 3
+        },
+        {
+          "skill_id": "sql_query",
+          "attempts": 12,
+          "successes": 12,
+          "success_rate": 1.0,
+          "min_samples": 3
+        }
+      ]
+    },
+    "provenance": {
+      "checked": 52,
+      "traceable": 52,
+      "untraceable": 0,
+      "untraceable_by_type": {},
+      "untraceable_reasons": {}
+    },
+    "hint_violations": 0,
+    "projections": {
+      "source": 32,
+      "skill": 3,
+      "errors": []
+    },
+    "experience_version": "qa-experience-memory-v1"
+  },
+  "leave_one_out": {
+    "runs": 15,
+    "gaps": 77,
+    "changed": 16,
+    "baseline_routes": {
+      "semantic": 43,
+      "policy_exact": 33,
+      "graph": 1
+    },
+    "after_routes": {
+      "semantic": 27,
+      "keyword": 16,
+      "policy_exact": 33,
+      "graph": 1
+    },
+    "changed_by_reason": {
+      "STRATEGY_PREFERRED": 16
+    },
+    "failure_records": 73,
+    "repeat_before": 0,
+    "repeat_after": 0,
+    "avoided_in_baseline": 17,
+    "avoided_after": 0,
+    "warnings": 59,
+    "warning_codes": {
+      "FAILURE_MEMORY_RETRY_ALLOWED": 42,
+      "FAILURE_MEMORY_AVOID": 10,
+      "STRATEGY_MEMORY_PREFER": 7
+    },
+    "retry_reasons": {
+      "CORPUS_VERSION_CHANGED": 52,
+      "SAME_ENVIRONMENT": 12,
+      "RETRIEVAL_CONFIG_CHANGED": 1
+    },
+    "per_run": [
+      {
+        "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+        "question": "最近融资近3亿元的公司是哪个公司",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 1,
+        "hits": 8,
+        "avoid_routes": [
+          "keyword"
+        ],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 0,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 5,
+          "SAME_ENVIRONMENT": 1
+        },
+        "warnings": 6,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 26,
+          "STRATEGY": 2,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 20,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 15,
+          "STRATEGY": 2
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 49,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "162612f141e84ead98c36047f4dfd64b",
+        "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+        "task_type": "SYNTHESIS",
+        "gaps": 7,
+        "hits": 8,
+        "avoid_routes": [],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 4,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 6
+        },
+        "warnings": 5,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 27,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 31,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 13,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 48,
+          "BELOW_SAMPLE_FLOOR": 18,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+        "question": "最近一周最重要的技术进展是什么",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 3,
+        "hits": 8,
+        "avoid_routes": [
+          "keyword"
+        ],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 5,
+          "SAME_ENVIRONMENT": 2
+        },
+        "warnings": 6,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 27,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 50,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "48855683e91d48b6b213e8aa8195df50",
+        "question": "帮我总结一下当前行业的主要风险",
+        "task_type": "SYNTHESIS",
+        "gaps": 5,
+        "hits": 8,
+        "avoid_routes": [],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 3,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 6
+        },
+        "warnings": 5,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 27,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 51,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8
+        }
+      },
+      {
+        "run_id": "613514876a1e40698cb1e1e636a0c21b",
+        "question": "出货量超1.9万台，占全球约77.9%的是什么",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 8,
+        "hits": 4,
+        "avoid_routes": [
+          "keyword"
+        ],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "SAME_ENVIRONMENT": 3,
+          "CORPUS_VERSION_CHANGED": 1
+        },
+        "warnings": 3,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 25,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 19,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 48,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+        "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+        "task_type": "SYNTHESIS",
+        "gaps": 8,
+        "hits": 4,
+        "avoid_routes": [],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 4,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 2
+        },
+        "warnings": 3,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 22,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 22,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 16,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 14,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 44,
+          "BELOW_SAMPLE_FLOOR": 8,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+        "question": "这个行业最近最大的一笔融资是多少",
+        "task_type": "SYNTHESIS",
+        "gaps": 0,
+        "hits": 8,
+        "avoid_routes": [],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 0,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 5
+        },
+        "warnings": 5,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 25,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 13,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 50,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 5,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+        "question": "这个行业最近最大的一笔融资是多少",
+        "task_type": "SYNTHESIS",
+        "gaps": 4,
+        "hits": 8,
+        "avoid_routes": [],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 2,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 5
+        },
+        "warnings": 5,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 27,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 49,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+        "question": "特斯拉无人驾驶出租车已经在运行了吗",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 4,
+        "hits": 6,
+        "avoid_routes": [
+          "keyword"
+        ],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 5,
+          "SAME_ENVIRONMENT": 1
+        },
+        "warnings": 5,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 26,
+          "STRATEGY": 2,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 20,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 15,
+          "STRATEGY": 2
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 50,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+        "question": "行业里排名靠前的公司最近有什么动作",
+        "task_type": "SYNTHESIS",
+        "gaps": 5,
+        "hits": 8,
+        "avoid_routes": [],
+        "prefer_routes": [
+          "keyword"
+        ],
+        "changed": 3,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 4
+        },
+        "warnings": 4,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 27,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 51,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8
+        }
+      },
+      {
+        "run_id": "a419bd545c70440ea78f24eaaa884b76",
+        "question": "最近有哪些值得关注的政策变化",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 0,
+        "hits": 8,
+        "avoid_routes": [],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 5,
+          "RETRIEVAL_CONFIG_CHANGED": 1
+        },
+        "warnings": 5,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 23,
+          "STRATEGY": 2,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 13,
+          "FAILURE": 21,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 15,
+          "STRATEGY": 2
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 52,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 3,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "adebd40548d343eda11e765cdbaede3f",
+        "question": "最近融资近3亿元的公司是哪个公司",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 8,
+        "hits": 6,
+        "avoid_routes": [
+          "keyword"
+        ],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "SAME_ENVIRONMENT": 3,
+          "CORPUS_VERSION_CHANGED": 2
+        },
+        "warnings": 4,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 25,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 32,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 19,
+          "QUERY_PATTERN": 1,
+          "SOURCE": 15,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 47,
+          "BELOW_SAMPLE_FLOOR": 17,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "b76aa77a29c046fa84d55e7db517e810",
+        "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+        "task_type": "SYNTHESIS",
+        "gaps": 8,
+        "hits": 1,
+        "avoid_routes": [],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "CORPUS_VERSION_CHANGED": 1
+        },
+        "warnings": 1,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 25,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 26,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 19,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 11,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 44,
+          "BELOW_SAMPLE_FLOOR": 15,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "c3fd469f115d4002bd2824b397425756",
+        "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+        "task_type": "CAUSAL",
+        "gaps": 8,
+        "hits": 0,
+        "avoid_routes": [],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {},
+        "warnings": 0,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 20,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 30,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 14,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 12,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 40,
+          "BELOW_SAMPLE_FLOOR": 18,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      },
+      {
+        "run_id": "e280beda3f7b48a596293c032f6a15e2",
+        "question": "最近工信部在人形机器人领域有什么动态",
+        "task_type": "SIMPLE_FACT",
+        "gaps": 8,
+        "hits": 2,
+        "avoid_routes": [
+          "keyword"
+        ],
+        "prefer_routes": [],
+        "changed": 0,
+        "retry_reasons": {
+          "SAME_ENVIRONMENT": 2
+        },
+        "warnings": 2,
+        "produced": {
+          "EPISODIC_RESEARCH": 14,
+          "FAILURE": 26,
+          "STRATEGY": 1,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 30,
+          "SKILL_PERFORMANCE": 0
+        },
+        "persisted_by_type": {
+          "EPISODIC_RESEARCH": 12,
+          "FAILURE": 20,
+          "QUERY_PATTERN": 2,
+          "SOURCE": 14,
+          "STRATEGY": 1
+        },
+        "reason_counts": {
+          "TTL_REQUIRED_BY_FRESHNESS": 48,
+          "BELOW_SAMPLE_FLOOR": 16,
+          "NO_EVIDENCE_LINK": 8,
+          "DUPLICATE_MERGED": 1
+        }
+      }
+    ],
+    "route_changes": [
+      {
+        "gap_id": "G4d9264ed5d",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "162612f141e84ead98c36047f4dfd64b"
+      },
+      {
+        "gap_id": "G509e4cecc5",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "162612f141e84ead98c36047f4dfd64b"
+      },
+      {
+        "gap_id": "G7685b5be96",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "162612f141e84ead98c36047f4dfd64b"
+      },
+      {
+        "gap_id": "G8d0b0b2c41",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "162612f141e84ead98c36047f4dfd64b"
+      },
+      {
+        "gap_id": "G509e4cecc5",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "48855683e91d48b6b213e8aa8195df50"
+      },
+      {
+        "gap_id": "G7685b5be96",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "48855683e91d48b6b213e8aa8195df50"
+      },
+      {
+        "gap_id": "G8d0b0b2c41",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "48855683e91d48b6b213e8aa8195df50"
+      },
+      {
+        "gap_id": "G4d9264ed5d",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "64f12a4adc7f4f67b589871f4eb5d54d"
+      },
+      {
+        "gap_id": "G509e4cecc5",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "64f12a4adc7f4f67b589871f4eb5d54d"
+      },
+      {
+        "gap_id": "G7685b5be96",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "64f12a4adc7f4f67b589871f4eb5d54d"
+      },
+      {
+        "gap_id": "G8d0b0b2c41",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "64f12a4adc7f4f67b589871f4eb5d54d"
+      },
+      {
+        "gap_id": "G509e4cecc5",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b"
+      },
+      {
+        "gap_id": "G7685b5be96",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b"
+      },
+      {
+        "gap_id": "G509e4cecc5",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "a1a9563809084b73b3c49b4e6e9d1940"
+      },
+      {
+        "gap_id": "G7685b5be96",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "a1a9563809084b73b3c49b4e6e9d1940"
+      },
+      {
+        "gap_id": "G8d0b0b2c41",
+        "gap_type": "LOW_RELEVANCE",
+        "from": "semantic",
+        "to": "keyword",
+        "reason": "STRATEGY_PREFERRED",
+        "original": [
+          "semantic",
+          "keyword",
+          "page_context"
+        ],
+        "applied": [
+          "keyword",
+          "semantic",
+          "page_context"
+        ],
+        "run_id": "a1a9563809084b73b3c49b4e6e9d1940"
+      }
+    ],
+    "blocked_by_version": 53,
+    "failure_repetition_before": 0.0,
+    "failure_repetition_after": 0.0
+  },
+  "determinism": {
+    "same_six_type_counts": true,
+    "same_gate": true,
+    "same_failure_kinds": true,
+    "same_loop": true
+  },
+  "acceptance": {
+    "six_types_produced": true,
+    "episodes_persisted": true,
+    "failures_persisted": true,
+    "strategies_persisted": true,
+    "query_patterns_persisted": true,
+    "sources_persisted": true,
+    "source_projection_rows": true,
+    "no_hint_violations": true,
+    "provenance_complete": true,
+    "guidance_changed_routes": true,
+    "avoided_channels_removed": true,
+    "version_gate_blocks_cross_version_suppression": true,
+    "failure_repetition_dropped": true,
+    "determinism": true
+  },
+  "notes": [
+    "A 机的 `memory_item` 与本工具读到的十张 memory_* 表都是 **0 行**、`source_reliability_memory` / `skill_performance_memory` **根本不存在**：Phase 12 未发布（本阶段不部署）。所以「六类记忆统计」来自**同一份代码在真实数据上的离线重建**，口径与 Phase 04/09/10/11 相同。",
+    "真机没有 `qa_reasoning_traces` 行（0 行）与 `node_kind='skill'` 遥测行（0 行）：所以「逐查询/逐通道归因」只能落到「该查询所在的一轮」这一粒度，技能表现记忆的记录沿用 Phase 11 的离线重建，两处边界都如实标注。",
+    "`qa_runs.corpus_version` 在 A 机 15 行里全为空 → 失败绑定退到检索回执里**真实观测到的** `cache.kb_version`（`binding_source` 写明来路）；`config_hash` 同样全空 → 配置轴用运行期真值 `qa-retrieval-v3-policy-exact`。",
+    "前后对比用**留一法**：给某一轮的建议只由其它轮的失败/策略经验得出，自己不许教自己；`changed` = 首选通道被改的缺口数，`avoided_in_baseline` → `avoided_after` = 建议集合里还留着「被避免通道」的缺口数。",
+    "**边界（如实说）**：`failure_repetition_*` 在这一份真机数据上是**退化指标** —— Phase 07 的规则首选项是 semantic / policy_exact，而真机记录到的失败通道是 keyword / web / graph（两者不相交），所以「按首选通道算的重复踩坑率」恒为 0，它证明不了什么（验收闸门里那条因此是空真）；有信息量的是 `changed`（16 条）与 `avoided_*`（17 → 0）。"
+  ],
+  "per_run": [
+    {
+      "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+      "question": "最近融资近3亿元的公司是哪个公司",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 1,
+      "hits": 8,
+      "avoid_routes": [
+        "keyword"
+      ],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 0,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 5,
+        "SAME_ENVIRONMENT": 1
+      },
+      "warnings": 6,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 26,
+        "STRATEGY": 2,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 20,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 15,
+        "STRATEGY": 2
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 49,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "162612f141e84ead98c36047f4dfd64b",
+      "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+      "task_type": "SYNTHESIS",
+      "gaps": 7,
+      "hits": 8,
+      "avoid_routes": [],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 4,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 6
+      },
+      "warnings": 5,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 27,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 31,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 13,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 48,
+        "BELOW_SAMPLE_FLOOR": 18,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+      "question": "最近一周最重要的技术进展是什么",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 3,
+      "hits": 8,
+      "avoid_routes": [
+        "keyword"
+      ],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 5,
+        "SAME_ENVIRONMENT": 2
+      },
+      "warnings": 6,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 27,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 50,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "48855683e91d48b6b213e8aa8195df50",
+      "question": "帮我总结一下当前行业的主要风险",
+      "task_type": "SYNTHESIS",
+      "gaps": 5,
+      "hits": 8,
+      "avoid_routes": [],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 3,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 6
+      },
+      "warnings": 5,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 27,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 51,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8
+      }
+    },
+    {
+      "run_id": "613514876a1e40698cb1e1e636a0c21b",
+      "question": "出货量超1.9万台，占全球约77.9%的是什么",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 8,
+      "hits": 4,
+      "avoid_routes": [
+        "keyword"
+      ],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "SAME_ENVIRONMENT": 3,
+        "CORPUS_VERSION_CHANGED": 1
+      },
+      "warnings": 3,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 25,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 19,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 48,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+      "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+      "task_type": "SYNTHESIS",
+      "gaps": 8,
+      "hits": 4,
+      "avoid_routes": [],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 4,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 2
+      },
+      "warnings": 3,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 22,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 22,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 16,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 14,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 44,
+        "BELOW_SAMPLE_FLOOR": 8,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+      "question": "这个行业最近最大的一笔融资是多少",
+      "task_type": "SYNTHESIS",
+      "gaps": 0,
+      "hits": 8,
+      "avoid_routes": [],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 0,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 5
+      },
+      "warnings": 5,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 25,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 13,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 50,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 5,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+      "question": "这个行业最近最大的一笔融资是多少",
+      "task_type": "SYNTHESIS",
+      "gaps": 4,
+      "hits": 8,
+      "avoid_routes": [],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 2,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 5
+      },
+      "warnings": 5,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 27,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 49,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+      "question": "特斯拉无人驾驶出租车已经在运行了吗",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 4,
+      "hits": 6,
+      "avoid_routes": [
+        "keyword"
+      ],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 5,
+        "SAME_ENVIRONMENT": 1
+      },
+      "warnings": 5,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 26,
+        "STRATEGY": 2,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 20,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 15,
+        "STRATEGY": 2
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 50,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+      "question": "行业里排名靠前的公司最近有什么动作",
+      "task_type": "SYNTHESIS",
+      "gaps": 5,
+      "hits": 8,
+      "avoid_routes": [],
+      "prefer_routes": [
+        "keyword"
+      ],
+      "changed": 3,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 4
+      },
+      "warnings": 4,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 27,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 51,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8
+      }
+    },
+    {
+      "run_id": "a419bd545c70440ea78f24eaaa884b76",
+      "question": "最近有哪些值得关注的政策变化",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 0,
+      "hits": 8,
+      "avoid_routes": [],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 5,
+        "RETRIEVAL_CONFIG_CHANGED": 1
+      },
+      "warnings": 5,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 23,
+        "STRATEGY": 2,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 13,
+        "FAILURE": 21,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 15,
+        "STRATEGY": 2
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 52,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 3,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "adebd40548d343eda11e765cdbaede3f",
+      "question": "最近融资近3亿元的公司是哪个公司",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 8,
+      "hits": 6,
+      "avoid_routes": [
+        "keyword"
+      ],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "SAME_ENVIRONMENT": 3,
+        "CORPUS_VERSION_CHANGED": 2
+      },
+      "warnings": 4,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 25,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 32,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 19,
+        "QUERY_PATTERN": 1,
+        "SOURCE": 15,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 47,
+        "BELOW_SAMPLE_FLOOR": 17,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "b76aa77a29c046fa84d55e7db517e810",
+      "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+      "task_type": "SYNTHESIS",
+      "gaps": 8,
+      "hits": 1,
+      "avoid_routes": [],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "CORPUS_VERSION_CHANGED": 1
+      },
+      "warnings": 1,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 25,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 26,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 19,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 11,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 44,
+        "BELOW_SAMPLE_FLOOR": 15,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "c3fd469f115d4002bd2824b397425756",
+      "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+      "task_type": "CAUSAL",
+      "gaps": 8,
+      "hits": 0,
+      "avoid_routes": [],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {},
+      "warnings": 0,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 20,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 30,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 14,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 12,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 40,
+        "BELOW_SAMPLE_FLOOR": 18,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    },
+    {
+      "run_id": "e280beda3f7b48a596293c032f6a15e2",
+      "question": "最近工信部在人形机器人领域有什么动态",
+      "task_type": "SIMPLE_FACT",
+      "gaps": 8,
+      "hits": 2,
+      "avoid_routes": [
+        "keyword"
+      ],
+      "prefer_routes": [],
+      "changed": 0,
+      "retry_reasons": {
+        "SAME_ENVIRONMENT": 2
+      },
+      "warnings": 2,
+      "produced": {
+        "EPISODIC_RESEARCH": 14,
+        "FAILURE": 26,
+        "STRATEGY": 1,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 30,
+        "SKILL_PERFORMANCE": 0
+      },
+      "persisted_by_type": {
+        "EPISODIC_RESEARCH": 12,
+        "FAILURE": 20,
+        "QUERY_PATTERN": 2,
+        "SOURCE": 14,
+        "STRATEGY": 1
+      },
+      "reason_counts": {
+        "TTL_REQUIRED_BY_FRESHNESS": 48,
+        "BELOW_SAMPLE_FLOOR": 16,
+        "NO_EVIDENCE_LINK": 8,
+        "DUPLICATE_MERGED": 1
+      }
+    }
+  ]
+}

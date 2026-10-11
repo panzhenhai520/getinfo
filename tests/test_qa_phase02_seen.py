@@ -58,7 +58,7 @@ Phase 10 起为 **v9**（再新增 memory_validation / memory_contradiction）�
         断言仍是**字面量钉死**（不是"大于等于"）：版本漂移必须当场红；
         本条只做版本同步，v7 的列清单断言一条都没放松。
         """
-        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v9")
+        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v10")
 
     def test_v6_columns_are_still_declared(self):
         """v6 → v7 只是新增一张表：Phase 01 的 ADD COLUMN 清单一个都不能少。"""

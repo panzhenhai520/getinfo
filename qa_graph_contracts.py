@@ -1340,10 +1340,18 @@ MEMORY_TYPE_OWNER_PHASE = {
 }
 """每类记忆的**产出归属 Phase**（`P09` 是本阶段；`P12` = Episodic/Failure/Strategy/Source/
 Skill performance；`P15` = 作用域与规则类记忆的安全边界）。
-Write Gate 对非本阶段类型一律拒收并记账 —— 这是"不提前实现后续 Phase"的机器可校验形态。"""
+
+**这是类型归属的唯一真源**（Phase 12 起）：Write Gate 用"产出方 Phase 是否已激活"
+决定拒收还是放行 —— `P12` 落地后那六类由 `qa_memory_experience` 产出；
+`P15` 未落地，仍然拒收并记 `TYPE_DEFERRED_TO_PHASE_15`（不提前实现后续 Phase）。
+派生视图见 `MEMORY_PRODUCIBLE_TYPES_BY_PHASE`（守门用例断言两者逐键一致）。"""
 
 MEMORY_PRODUCIBLE_TYPES: Tuple[str, ...] = ("VERIFIED_CLAIM", "ENTITY")
-"""本阶段（P09）**真的能产出**的两类记忆：都要求可回溯到 Phase 02 证据 + Phase 03 核验结论。"""
+"""Phase 09 落地时**真的能产出**的两类记忆：都要求可回溯到 Phase 02 证据 + Phase 03 核验结论。
+
+Phase 12 起，写门的"能不能产"不再只读这一个元组，而是读
+`MEMORY_PRODUCIBLE_TYPES_BY_PHASE` × 激活的产出方（`EXPERIENCE_PRODUCER_PHASES`）；
+本元组保留为 **P09 产出方的声明**（历史口径，仍被 P09 用例引用）。"""
 
 MEMORY_SCOPES: Tuple[str, ...] = (
     "GLOBAL_KNOWLEDGE", "ORGANIZATION", "PATIENT_LONGITUDINAL", "ENCOUNTER", "SESSION",
@@ -1376,8 +1384,9 @@ MEMORY_RELATIONS: Tuple[str, ...] = (
     "HELPED_RESOLVE", "FAILED_ON", "APPLIES_TO",
 )
 """§1.4 的九个关系**逐字**。P09 只**写** `ABOUT`/`DERIVED_FROM`/`VALIDATED_BY`/`APPLIES_TO`，
-`SUPERSEDES`/`CONTRADICTS`/`EXPIRED_BY` 的写入属 Phase 10、`HELPED_RESOLVE`/`FAILED_ON`
-属 Phase 12；契约先把取值域定死，免得到时候各写各的字符串。"""
+`SUPERSEDES`/`CONTRADICTS`/`EXPIRED_BY` 的写入属 Phase 10；
+`HELPED_RESOLVE`（剧集/策略 → 它真的解决过的缺口或结论）与 `FAILED_ON`（失败记忆 → 它
+栽过的那条通道/来源）由 **Phase 12** 写入（契约取值域早就定死，免得到时候各写各的字符串）。"""
 
 MEMORY_WRITE_DECISIONS: Tuple[str, ...] = ("DROP", "SESSION_ONLY", "PERSIST", "PERSIST_WITH_TTL")
 """§2.2 Memory Write Gate 的四个出口**逐字**。"""
@@ -1391,6 +1400,17 @@ MEMORY_WRITE_REASONS: Tuple[str, ...] = (
     # 效用与去重
     "UTILITY_BELOW_FLOOR", "DUPLICATE_MERGED", "SESSION_SCOPE_ONLY", "STALENESS_RISK",
     "PRIVACY_RISK",
+    # Phase 12（P12-02/P12-03/P12-04/P12-05）：经验类记忆的两条硬规则
+    # （**只追加、不改既有取值**，见 DECISION_LOG D-044）：
+    #   · `NO_TRACE_BINDING`：经验类记忆是"对 trace 的归纳"，没有 trace 绑定就只能是编造；
+    #   · `BELOW_SAMPLE_FLOOR`：样本少于下限不许成记忆（与 Phase 11 的 min_samples 同源，
+    #     不许拿一次观测当规律）。
+    "NO_TRACE_BINDING", "BELOW_SAMPLE_FLOOR",
+    #   · `NO_EVIDENCE_LINK`（P12-04 起）：经验记忆也必须能回到**真实证据**（P09 的
+    #     provenance 硬规则）。零证据轮（那一轮一条证据都没取到）连经验都记不下来 ——
+    #     代价是"这条轮次的信息丢了"，但换来的是"落库的每一条经验都查得到出处"，
+    #     并且**拒收本身留在写决策里**（可审计）。
+    "NO_EVIDENCE_LINK",
     # 通过
     "UTILITY_ABOVE_FLOOR", "TTL_REQUIRED_BY_FRESHNESS",
 )
@@ -2257,20 +2277,340 @@ SKILL_PERFORMANCE_SCHEMA = {
 `reason=INSUFFICIENT_SAMPLES` —— 这一条由**用例**钉住（不许把 1 次成功当 100%）。"""
 
 
+# ── Phase 12（P12-01…P12-06）：Episodic / Failure / Strategy / Source / Skill memory ──
+# 边界：**经验类记忆**（学习成功与失败的检索经验），不含事实类记忆（那是 P09/P10 的账）。
+# 契约设计口径（全部逐字对齐 01_V2_ARCHITECTURE §1.4/§3/§10/§11/§12/§14 + MASTER_RULES 11/12/15）：
+#   1. §3 的六类记忆逐字对号：`EPISODIC_RESEARCH`（§3.2 问题类型/成功拆解/关键 Gap/有效
+#      检索路径/停止原因 → `EPISODE_SECTIONS` 五要素）、`FAILURE`（§3.3 无效 query/失败
+#      route/false-positive source/语义漂移扩展 → `FAILURE_KINDS` 四值 + `FAILURE_BINDING_FIELDS`
+#      的 corpus/config/version 绑定）、`STRATEGY`（§3.4 某类问题哪些检索组合更有效）、
+#      `SOURCE`（§3.5 authority/domain/update_frequency/reliability/known limitations）、
+#      `SKILL_PERFORMANCE`（§3.6 skill_id/task_type/success_rate/latency/cost/evidence_yield）。
+#      `QUERY_PATTERN` 没有独立小节，但它由 `MEMORY_TYPE_OWNER_PHASE` 归属本阶段（D-034），
+#      因此同样在本阶段产出（有效 query 形态 = 无效 query 的对偶）。
+#   2. **谁能产出谁负责（单一真源）**：`MEMORY_PRODUCIBLE_TYPES_BY_PHASE` 是
+#      `MEMORY_TYPE_OWNER_PHASE` 的**派生视图**（守门用例断言两者逐键一致），
+#      `qa_memory.type_policy` 只读它 —— 写门不允许出现第二套类型判定。
+#   3. **MASTER_RULES 11/12**：经验类记忆全部由**规则与统计**从 trace 归纳（零模型、零嵌入
+#      端点），且恒为提示：`EXPERIENCE_GUIDANCE_SCHEMA.requires_revalidation` 恒 True、
+#      `verified_evidence` 恒 False —— 经验永远进不了 citation_map。
+#   4. **MASTER_RULES 15**：失败记忆必须绑定 corpus/检索配置/时间，**版本变化后允许重试**：
+#      `RETRY_DECISIONS` + `RETRY_REASONS` 把"为什么这次允许重试"写成闭集合。
+EXPERIENCE_MEMORY_VERSION = "qa-experience-memory-v1"
+"""Phase 12 经验类记忆的总口径版本（类型/归纳规则/门/指导/重试的总版本）。"""
+
+EPISODE_MEMORY_VERSION = "qa-episode-summary-v1"
+"""剧集归纳口径版本（§3.2 的五要素与"只总结 trace、不制造事实"的实现变更要换这个号）。"""
+
+FAILURE_MEMORY_VERSION = "qa-failure-memory-v1"
+"""失败记忆口径版本（四类失败的判定规则变更要换这个号）。"""
+
+STRATEGY_MEMORY_VERSION = "qa-strategy-memory-v1"
+"""策略记忆口径版本（检索组合聚合与成功的判据变更要换这个号）。"""
+
+SOURCE_MEMORY_VERSION = "qa-source-reliability-v1"
+"""来源可靠性口径版本（§3.5 六因子的权重变更要换这个号）。"""
+
+SKILL_PERFORMANCE_MEMORY_VERSION = "qa-skill-performance-memory-v1"
+"""技能表现记忆口径版本（**成功率口径不在本阶段重定义**：直接引 Phase 11 的
+`SKILL_TELEMETRY_VERSION` 与 `qa_skills.performance_summary`，见 D-042）。"""
+
+RETRY_POLICY_VERSION = "qa-version-aware-retry-v1"
+"""版本感知重试口径版本（MASTER_RULES 15 的落地变更要换这个号）。"""
+
+EXPERIENCE_GUIDANCE_VERSION = "qa-experience-guidance-v1"
+"""经验指导（下一轮通道路由偏好 + 提前提示）口径版本：它**改变后续行为**，必须可复算。"""
+
+MEMORY_PRODUCIBLE_TYPES_BY_PHASE = {
+    "P09": ("VERIFIED_CLAIM", "ENTITY"),
+    "P12": ("EPISODIC_RESEARCH", "STRATEGY", "FAILURE", "QUERY_PATTERN", "SOURCE",
+            "SKILL_PERFORMANCE"),
+    "P15": ("USER_APPROVED_DOMAIN_RULE",),
+}
+"""**每类记忆由哪个 Phase 产出** —— `MEMORY_TYPE_OWNER_PHASE` 的派生视图（单一真源的镜像）。
+
+Phase 12 落地后，`MEMORY_TYPE_OWNER_PHASE` 里标 `P12` 的六类**不再被写门拒收**，
+而是由 `qa_memory_experience` 依据 trace 产出（`TYPE_DEFERRED_TO_PHASE_12` 只在
+产出方 Phase 未激活时出现，见 `MEMORY_PRODUCER_PHASES_ENV`）。
+
+**唯一被排除的是 `MEMORY_ITEM`**：它是"记忆条目"这个节点本身（§1.4 的第一个节点类型），
+不是可写的内容类型 —— 它仍在 `MEMORY_TYPE_OWNER_PHASE` 里（owner=P09），
+但**永远不可产出**（写门对它给 `TYPE_NOT_SUPPORTED`，与 Phase 09 行为逐字相同）。
+守门用例断言：`set(本表所有取值) ∪ {"MEMORY_ITEM"} == set(MEMORY_TYPE_OWNER_PHASE)`
+且本表里的每个取值与 `MEMORY_TYPE_OWNER_PHASE` **同值**（多一个键、少一个键都挂）。"""
+
+MEMORY_PRODUCER_PHASES_ENV = "QA_MEMORY_PRODUCER_PHASES"
+"""激活的产出方 Phase 列表（逗号分隔；缺省 = `EXPERIENCE_PRODUCER_PHASES`）。
+
+口径：写门只让"已经落地的产出方"产它的类型。默认值随 Phase 推进而增长，
+但**类型 → 产出方**的映射始终只有 `MEMORY_TYPE_OWNER_PHASE` 一份。"""
+
+EXPERIENCE_PRODUCER_PHASES: Tuple[str, ...] = ("P09", "P12")
+"""缺省激活的产出方：P09（事实类两类，Phase 09 已落地）+ P12（经验类六类，本阶段落地）。
+`P15` 未落地，所以 `USER_APPROVED_DOMAIN_RULE` 仍然被拒收并记 `TYPE_DEFERRED_TO_PHASE_15`。"""
+
+EPISODE_SECTIONS: Tuple[str, ...] = (
+    "task_type", "decomposition", "key_gaps", "effective_paths", "stop_reason",
+)
+"""§3.2 Episodic Research Memory 的五个要素**逐字**：问题类型 / 成功拆解 / 关键 Gap /
+有效检索路径 / 停止原因。缺一个就有守例挂。"""
+
+FAILURE_KINDS: Tuple[str, ...] = (
+    "INVALID_QUERY", "FAILED_ROUTE", "FALSE_POSITIVE_SOURCE", "SEMANTIC_DRIFT",
+)
+"""§3.3 Failure Memory 的四类**逐字**：无效 query / 失败 route / false-positive source /
+语义漂移扩展（本项目按 D-002 中性映射为"扩展词把检索带偏"）。"""
+
+FAILURE_BINDING_FIELDS: Tuple[str, ...] = (
+    "corpus_version", "retrieval_config_version", "route", "query_fingerprint", "observed_at",
+)
+"""§3.3 + MASTER_RULES 15 要求的**失败绑定**：corpus 版本 / 检索配置版本 / 通道 /
+查询指纹 / 观测时间。**五件全空 = VERSION_UNBOUND**（重试策略一律放行，绝不凭空压制）。"""
+
+RETRY_DECISIONS: Tuple[str, ...] = ("ALLOW_RETRY", "SUPPRESS")
+"""版本感知重试的两个出口（MASTER_RULES 15）：版本没变才允许压制，变了必须允许重试。"""
+
+RETRY_REASONS: Tuple[str, ...] = (
+    "NO_FAILURE_RECORD", "SAME_ENVIRONMENT", "CORPUS_VERSION_CHANGED",
+    "RETRIEVAL_CONFIG_CHANGED", "VERSION_UNBOUND", "FAILURE_AGED_OUT",
+)
+"""重试判定的理由码（闭集合，可复算"为什么这次允许/压制"）：
+`NO_FAILURE_RECORD` 无失败记录；`SAME_ENVIRONMENT` 语料与配置都没变（唯一能压制的理由）；
+`CORPUS_VERSION_CHANGED` / `RETRIEVAL_CONFIG_CHANGED` 环境变了（MASTER_RULES 15 要求放行）；
+`VERSION_UNBOUND` 失败记录没有版本绑定（不许拿它压制）；`FAILURE_AGED_OUT` 超出时效。"""
+
+SOURCE_RELIABILITY_BANDS: Tuple[str, ...] = ("HIGH", "MEDIUM", "LOW", "UNKNOWN")
+"""§3.5 来源可靠性的四档（`UNKNOWN` 给"样本不足"的来源，不猜）。"""
+
+SOURCE_RELIABILITY_FACTORS: Tuple[str, ...] = (
+    "authority", "verified_yield", "rejection_rate", "recency", "corroboration", "volume",
+)
+"""§3.5 的六个可复算因子：权威性 / 被核验产出率 / 被拒率 / 时效 / 多来源印证 / 样本量。
+全部来自真实证据行（零模型、零端点）。"""
+
+EXPERIENCE_RECALL_TYPES: Tuple[str, ...] = (
+    "STRATEGY", "FAILURE", "QUERY_PATTERN", "EPISODIC_RESEARCH",
+)
+"""规划期召回的类型（§10 "Planning Recall 在 Research Planner 前优先召回
+Strategy/Failure/QueryPattern Memory"）：本阶段把 `EPISODIC_RESEARCH` 一并纳入 ——
+剧集是策略与失败的原始素材，且同样不含事实断言（不会被当成事实污染规划）。"""
+
+EXPERIENCE_TRACE_SECTIONS: Tuple[str, ...] = (
+    "run", "retrieval", "verification", "gaps", "stop", "sources", "skills", "planning",
+)
+"""trace 的八个来源段（**每一段都可以缺席**，缺席的段名进 `missing_sections`，绝不编造）。
+`run` = run 元信息；`retrieval` = 检索回执/证据产出；`verification` = Phase 03 核验分布；
+`gaps` = Phase 07 缺口与下一跳；`stop` = 停止原因；`sources` = 证据来源；`skills` = Phase 11
+技能遥测；`planning` = 计划与问题类型。"""
+
+EXPERIENCE_MEMORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "experience_version": {"type": "string"},
+        "trace_version": {"type": "string"},
+        "run_id": {"type": "string"},
+        "task_type": {"type": "string"},
+        "corpus_version": {"type": "string"},
+        "retrieval_config_version": {"type": "string"},
+        "missing_sections": {"type": "array",
+                             "items": {"type": "string", "enum": list(EXPERIENCE_TRACE_SECTIONS)}},
+        "produced": {"type": "object"},
+        "decisions": {"type": "array", "items": {"type": "object"}},
+        "counts": {"type": "object"},
+        "note": {"type": "string"},
+    },
+    "required": ["experience_version", "run_id", "produced", "decisions"],
+    "additionalProperties": True,
+}
+"""经验归纳回执（P12-01…P12-05 的公共出口）：`produced` = 各类候选条数，
+`decisions` = 写门逐条决策（含被拒的），`missing_sections` = trace 缺了哪几段。"""
+
+EPISODE_MEMORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "episode_version": {"type": "string"},
+        "run_id": {"type": "string"},
+        "sections": {"type": "object"},
+        "summary": {"type": "string"},
+        "task_type": {"type": "string"},
+        "effective_routes": {"type": "array", "items": {"type": "string"}},
+        "key_gaps": {"type": "array", "items": {"type": "object"}},
+        "stop_reason": {"type": "string", "enum": list(QA_STOP_REASONS) + [""]},
+        "trace_fingerprint": {"type": "string"},
+        "summarizer": {"type": "string"},
+        "missing_sections": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["episode_version", "run_id", "sections", "summary", "summarizer"],
+    "additionalProperties": True,
+}
+"""§3.2 剧集记忆：五要素齐全（`sections` 的键集必须等于 `EPISODE_SECTIONS`），
+`stop_reason` 只吃 Phase 01 冻结的五值（**空串 = 这一轮没有停止原因**，如实空而不是编一个），
+`summarizer` 记"谁写的"（默认 `rule:trace-v1`；LLM 归纳只留注入点且**默认不调用**）。"""
+
+FAILURE_MEMORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "failure_version": {"type": "string"},
+        "kind": {"type": "string", "enum": list(FAILURE_KINDS)},
+        "route": {"type": "string"},
+        "query": {"type": "string"},
+        "query_fingerprint": {"type": "string"},
+        "corpus_version": {"type": "string"},
+        "retrieval_config_version": {"type": "string"},
+        "binding_source": {"type": "string"},
+        "observed_at": {"type": "string"},
+        "task_type": {"type": "string"},
+        "gap_type": {"type": "string"},
+        "domain": {"type": "string"},
+        "adopted": {"type": "integer", "minimum": 0},
+        "rejected": {"type": "integer", "minimum": 0},
+        "verified": {"type": "integer", "minimum": 0},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "detail": {"type": "string"},
+    },
+    "required": ["failure_version", "kind", "route", "corpus_version",
+                 "retrieval_config_version", "observed_at"],
+    "additionalProperties": True,
+}
+"""§3.3 失败记忆：四类 + 五个绑定字段（corpus/config/route/query 指纹/时间）。
+`binding_source` 记"版本号是从哪儿读到的"（**不编版本**）。"""
+
+STRATEGY_MEMORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "strategy_version": {"type": "string"},
+        "task_type": {"type": "string"},
+        "combination": {"type": "array", "items": {"type": "string"}},
+        "observations": {"type": "integer", "minimum": 0},
+        "successes": {"type": "integer", "minimum": 0},
+        "success_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "verified_yield": {"type": "integer", "minimum": 0},
+        "min_samples": {"type": "integer", "minimum": 0},
+        "run_ids": {"type": "array", "items": {"type": "string"}},
+        "success_definition": {"type": "string"},
+    },
+    "required": ["strategy_version", "task_type", "combination", "observations", "successes",
+                 "min_samples", "success_definition"],
+    "additionalProperties": True,
+}
+"""§3.4 策略记忆：**某类问题的检索组合**（通道集合）在真实 run 上的成功率。
+组合只吃 Phase 01 冻结的七个通道值（与 Phase 07 的 `suggested_routes` 同源）。"""
+
+SOURCE_MEMORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "source_version": {"type": "string"},
+        "domain": {"type": "string"},
+        "authority_level": {"type": "integer"},
+        "reliability": {"type": "number", "minimum": 0, "maximum": 1},
+        "band": {"type": "string", "enum": list(SOURCE_RELIABILITY_BANDS)},
+        "factors": {"type": "object"},
+        "known_limitations": {"type": "array", "items": {"type": "string"}},
+        "observations": {"type": "integer", "minimum": 0},
+        "verified": {"type": "integer", "minimum": 0},
+        "rejected": {"type": "integer", "minimum": 0},
+        "update_frequency": {"type": "string"},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["source_version", "domain", "reliability", "band", "factors", "observations"],
+    "additionalProperties": True,
+}
+"""§3.5 来源记忆：authority/domain/update_frequency/reliability/known limitations，
+六因子逐项可复算，样本不足一律 `UNKNOWN`。"""
+
+SKILL_PERFORMANCE_MEMORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "skill_memory_version": {"type": "string"},
+        "telemetry_version": {"type": "string"},
+        "skill_id": {"type": "string", "enum": list(SKILL_IDS)},
+        "task_type": {"type": "string"},
+        "attempts": {"type": "integer", "minimum": 0},
+        "successes": {"type": "integer", "minimum": 0},
+        "success_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "latency_ms": {"type": "object"},
+        "cost_units": {"type": "number", "minimum": 0},
+        "evidence_yield": {"type": "integer", "minimum": 0},
+        "verified_yield": {"type": "integer", "minimum": 0},
+        "min_samples": {"type": "integer", "minimum": 0},
+        "success_definition": {"type": "string"},
+        "source": {"type": "string"},
+        "run_ids": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["skill_memory_version", "skill_id", "attempts", "successes", "min_samples",
+                 "success_definition", "source"],
+    "additionalProperties": True,
+}
+"""§3.6 技能表现记忆：字段与 Phase 11 的 `SKILL_PERFORMANCE_SCHEMA` **同源**，
+成功率口径**不重定义**（`success_definition` 直接抄 Phase 11 的那一句），
+`source` 记数据从哪来（`qa_stage_runs:skill:<id>` 或离线重建）。"""
+
+RETRY_DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "retry_version": {"type": "string"},
+        "failure_id": {"type": "string"},
+        "kind": {"type": "string", "enum": list(FAILURE_KINDS) + [""]},
+        "route": {"type": "string"},
+        "decision": {"type": "string", "enum": list(RETRY_DECISIONS)},
+        "reason": {"type": "string", "enum": list(RETRY_REASONS)},
+        "corpus_version_recorded": {"type": "string"},
+        "corpus_version_current": {"type": "string"},
+        "config_version_recorded": {"type": "string"},
+        "config_version_current": {"type": "string"},
+        "age_days": {"type": "number", "minimum": 0},
+        "max_age_days": {"type": "number", "minimum": 0},
+    },
+    "required": ["retry_version", "decision", "reason"],
+    "additionalProperties": True,
+}
+"""版本感知重试判定（P12-06）：唯一能压制的是 `SAME_ENVIRONMENT`；
+版本变了 / 没绑定 / 过期一律 `ALLOW_RETRY`（MASTER_RULES 15）。"""
+
+EXPERIENCE_GUIDANCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "guidance_version": {"type": "string"},
+        "hint_version": {"type": "string"},
+        "task_type": {"type": "string"},
+        "corpus_version": {"type": "string"},
+        "retrieval_config_version": {"type": "string"},
+        "prefer_routes": {"type": "array", "items": {"type": "string"}},
+        "avoid_routes": {"type": "array", "items": {"type": "string"}},
+        "retry_decisions": {"type": "array", "items": RETRY_DECISION_SCHEMA},
+        "warnings": {"type": "array", "items": {"type": "object"}},
+        "route_changes": {"type": "array", "items": {"type": "object"}},
+        "stats": {"type": "object"},
+        "hint": {"type": "boolean"},
+        "requires_revalidation": {"type": "boolean"},
+        "verified_evidence": {"type": "boolean"},
+    },
+    "required": ["guidance_version", "prefer_routes", "avoid_routes", "warnings",
+                 "requires_revalidation", "verified_evidence"],
+    "additionalProperties": True,
+}
+"""经验指导（P12-02/P12-03/P12-06 的**行为出口**）：给下一轮的通道路由偏好 + 提前提示。
+
+硬规则（MASTER_RULES 11/12）：`requires_revalidation` 恒 True、`verified_evidence` 恒 False ——
+它是**提示**，不是证据，永远不进 citation_map。`avoid_routes` 里的通道一定是按 P12-06
+判定为 `SUPPRESS` 的（版本一变就自动从里面消失）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s / "
-            "技能注册表 %s / 技能路由 %s："
+            "技能注册表 %s / 技能路由 %s / 经验记忆 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
             "缺口类型 %d / 优先级分档 %d / Context 段 %d / ContextItem 种类 %d / Context Gap 动作 %d / "
             "记忆类型 %d / 记忆状态 %d / 记忆关系 %d / "
             "时效闸门出口 %d / 复验出口 %d / 记忆矛盾种类 %d / 撤销理由 %d / "
-            "技能 %d / 技能种类 %d / 成本档 %d / 延迟档 %d / 权限位 %d / 选择理由码 %d"
+            "技能 %d / 技能种类 %d / 成本档 %d / 延迟档 %d / 权限位 %d / 选择理由码 %d / "
+            "剧集要素 %d / 失败种类 %d / 重试出口 %d / 来源档 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
-               SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION,
+               SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION, EXPERIENCE_MEMORY_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
@@ -2284,7 +2624,9 @@ def describe() -> str:
                len(MEMORY_CONTRADICTION_KINDS), len(MEMORY_REVOKE_REASONS),
                len(SKILL_IDS), len(SKILL_KINDS), len(SKILL_COST_CLASSES),
                len(SKILL_LATENCY_CLASSES), len(SKILL_PERMISSIONS),
-               len(SKILL_SELECTION_REASONS)))
+               len(SKILL_SELECTION_REASONS),
+               len(EPISODE_SECTIONS), len(FAILURE_KINDS), len(RETRY_DECISIONS),
+               len(SOURCE_RELIABILITY_BANDS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -2386,6 +2728,15 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "skill_budget": SKILL_BUDGET_SCHEMA,
         "skill_load_record": SKILL_LOAD_RECORD_SCHEMA,
         "skill_performance": SKILL_PERFORMANCE_SCHEMA,
+        # Phase 12（P12-01…P12-06）
+        "experience_memory": EXPERIENCE_MEMORY_SCHEMA,
+        "episode_memory": EPISODE_MEMORY_SCHEMA,
+        "failure_memory": FAILURE_MEMORY_SCHEMA,
+        "strategy_memory": STRATEGY_MEMORY_SCHEMA,
+        "source_memory": SOURCE_MEMORY_SCHEMA,
+        "skill_performance_memory": SKILL_PERFORMANCE_MEMORY_SCHEMA,
+        "retry_decision": RETRY_DECISION_SCHEMA,
+        "experience_guidance": EXPERIENCE_GUIDANCE_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

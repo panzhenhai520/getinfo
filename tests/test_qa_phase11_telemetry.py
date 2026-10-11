@@ -326,11 +326,14 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(row["evidence_yield"], 4)
             self.assertEqual(row["task_type"], "COMPARISON")
             self.assertEqual(row["status"], "completed")
-            # 只有既有表：一行新表都没建
+            # 只有既有表：Phase 11 自己一行新表都没建
+            # （`skill_performance_memory` 是 Phase 12/D-044 建的投影表，不是遥测载体）
             tables = {str(item[0]) for item in database.connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
             self.assertTrue({"qa_stage_runs"} <= tables if tables else True)
-            self.assertFalse([name for name in tables if name.startswith("skill")])
+            self.assertEqual([name for name in tables
+                              if name.startswith("skill") and name != "skill_performance_memory"],
+                             [])
 
     def test_status_mapping_covers_all_outcomes(self):
         expected = {"ok": "completed", "degraded": "degraded", "error": "failed",

@@ -227,7 +227,11 @@ class TelemetryOnTests(_Base):
                              True)
         tables = {str(item[0]) for item in self.db.connection.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-        self.assertFalse([name for name in tables if name.startswith("skill")])
+        # Phase 12（D-044）建的 `skill_performance_memory` 是投影表，不是遥测载体；
+        # Phase 11 自己的遥测**一行都不落新表**。
+        self.assertEqual([name for name in tables
+                          if name.startswith("skill") and name != "skill_performance_memory"],
+                         [])
 
     def test_round_trip_rate_matches_the_records(self):
         handlers = self._handlers(gaps=[fx.gap("G1", routes=("keyword",))])

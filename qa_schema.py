@@ -47,7 +47,20 @@ import hashlib
 #   · 回滚：`DROP TABLE memory_contradiction, memory_validation;` + 本常量改回 v8；
 #     代码侧 `QA_MEMORY_REVALIDATION=0`（默认）与 `QA_MEMORY_GRAPH=0`（默认）即回到
 #     Phase 09/08 行为（Phase 10 的写入只落在自己的两张新表 + 既有记忆状态的合法迁移）。
-QA_SCHEMA_VERSION = "unified-qa-schema-v9"
+# v9 → v10（graph-rag-v2 通用包 Phase 12 · P12-01…P12-06）：
+#   · 新增 **两张表**（§12 里 Phase 09 **刻意留给 Phase 12** 的那两张，见 D-033）：
+#     source_reliability_memory（§3.5 来源可靠性：domain/authority/update_frequency/
+#     reliability/known limitations + 六因子 + 观测计数）与
+#     skill_performance_memory（§3.6 技能表现：skill_id/task_type/success_rate/latency/
+#     cost/evidence_yield，成功率口径**直接引 Phase 11 的遥测**，见 D-042）；
+#   · **没有新增列、没有改既有列语义**：经验类记忆本体仍写在 v8 的 memory_item 里
+#     （六类是 `memory_type` 的取值，表结构一行都不用改），这两张表只是它们的
+#     **可查询投影**（按 domain / skill 反查），所以本次一行 ADD COLUMN 都不需要
+#     （`QA_ADDED_COLUMNS_V10` 为空元组，与 v7/v8/v9 同一手法）；
+#   · 回滚：`DROP TABLE skill_performance_memory, source_reliability_memory;` + 本常量改回 v9；
+#     代码侧 `QA_EXPERIENCE_MEMORY=0`（默认）即回到 Phase 11 行为（经验写入只落在
+#     既有 memory_* 表 + 这两张新表）。
+QA_SCHEMA_VERSION = "unified-qa-schema-v10"
 
 QA_TABLE_DDL = (
     """
@@ -613,6 +626,59 @@ QA_TABLE_DDL = (
         UNIQUE(contradiction_id)
     )
     """,
+    # ── Phase 12（P12-01…P12-06）：经验类记忆的两张投影表（§12 里 P09 留给 P12 的那两张）──
+    """
+    CREATE TABLE IF NOT EXISTS source_reliability_memory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        domain TEXT NOT NULL,
+        scope_key TEXT NOT NULL DEFAULT '',
+        industry_pack_id TEXT NOT NULL DEFAULT '',
+        authority_level INTEGER,
+        reliability REAL NOT NULL DEFAULT 0,
+        band TEXT NOT NULL DEFAULT 'UNKNOWN',
+        observations INTEGER NOT NULL DEFAULT 0,
+        verified INTEGER NOT NULL DEFAULT 0,
+        rejected INTEGER NOT NULL DEFAULT 0,
+        update_frequency TEXT NOT NULL DEFAULT '',
+        known_limitations_json TEXT NOT NULL DEFAULT '[]',
+        factors_json TEXT NOT NULL DEFAULT '{}',
+        evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+        run_id TEXT NOT NULL DEFAULT '',
+        memory_id TEXT NOT NULL DEFAULT '',
+        source_version TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(scope_key, domain)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS skill_performance_memory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        skill_id TEXT NOT NULL,
+        task_type TEXT NOT NULL DEFAULT '',
+        scope_key TEXT NOT NULL DEFAULT '',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        successes INTEGER NOT NULL DEFAULT 0,
+        success_rate REAL,
+        latency_p50_ms REAL,
+        latency_p90_ms REAL,
+        cost_units REAL NOT NULL DEFAULT 0,
+        evidence_yield INTEGER NOT NULL DEFAULT 0,
+        verified_yield INTEGER NOT NULL DEFAULT 0,
+        min_samples INTEGER NOT NULL DEFAULT 0,
+        success_definition TEXT NOT NULL DEFAULT '',
+        telemetry_version TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL DEFAULT '',
+        run_ids_json TEXT NOT NULL DEFAULT '[]',
+        memory_id TEXT NOT NULL DEFAULT '',
+        skill_memory_version TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(scope_key, skill_id, task_type)
+    )
+    """,
 )
 
 QA_INDEX_DDL = (
@@ -660,6 +726,15 @@ QA_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_memory_contradiction_left"
     " ON memory_contradiction(left_memory_id, resolution)",
     "CREATE INDEX IF NOT EXISTS idx_memory_contradiction_run ON memory_contradiction(run_id, resolution)",
+    # Phase 12（P12-04/P12-05）：来源按"域 / 档位"查、技能表现按"技能 / 任务类型"查。
+    "CREATE INDEX IF NOT EXISTS idx_source_reliability_domain"
+    " ON source_reliability_memory(domain, band)",
+    "CREATE INDEX IF NOT EXISTS idx_source_reliability_scope"
+    " ON source_reliability_memory(scope_key, reliability)",
+    "CREATE INDEX IF NOT EXISTS idx_skill_performance_skill"
+    " ON skill_performance_memory(skill_id, task_type)",
+    "CREATE INDEX IF NOT EXISTS idx_skill_performance_scope"
+    " ON skill_performance_memory(scope_key, success_rate)",
 )
 
 QA_REQUIRED_TABLES = frozenset(
@@ -700,6 +775,10 @@ QA_REQUIRED_TABLES = frozenset(
         # Phase 10（v9）：复验留痕与记忆矛盾（§12 的最后两张）
         "memory_validation",
         "memory_contradiction",
+        # Phase 12（v10）：经验类记忆的两张投影表（§12 的 skill_performance_memory /
+        # source_reliability_memory，Phase 09 刻意留给本阶段）
+        "source_reliability_memory",
+        "skill_performance_memory",
     }
 )
 
@@ -745,6 +824,14 @@ v9 只新增两张表（memory_validation / memory_contradiction）。
 Phase 10 要写的记忆字段（`superseded_by` / `last_verified_at` / `valid_until` / `confidence`）
 在 v8 的 memory_item 里**已经全部存在**，所以一行 ADD COLUMN 都不需要 ——
 `tests/test_qa_phase10_schema.py` 断言本元组为空，防止后续有人借"复验"往老表加列。"""
+
+QA_ADDED_COLUMNS_V10 = ()
+"""Phase 12（v9 → v10）新增列清单：**空**。
+
+v10 只新增两张投影表（`source_reliability_memory` / `skill_performance_memory`）。
+经验类记忆本体写在 v8 的 `memory_item` 里（六类只是 `memory_type` 的取值），
+§12 那两段要写的字段在新表里一次给全，所以一行 ADD COLUMN 都不需要 ——
+`tests/test_qa_phase12_schema.py` 断言本元组为空，防止有人借"经验记忆"往老表加列。"""
 
 
 def _existing_columns(cursor, table_name: str) -> set:
@@ -819,6 +906,7 @@ __all__ = [
     "QA_ADDED_COLUMNS_V6",
     "QA_ADDED_COLUMNS_V8",
     "QA_ADDED_COLUMNS_V9",
+    "QA_ADDED_COLUMNS_V10",
     "QA_INDEX_DDL",
     "QA_REQUIRED_TABLES",
     "QA_SCHEMA_VERSION",

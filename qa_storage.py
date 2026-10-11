@@ -2667,5 +2667,216 @@ class QaStore:
             stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
         return stats
 
+    # ── Phase 12（P12-04/P12-05）：经验类记忆的两张投影表仓储 ───────────────────
+    # 口径：这两张表是**记忆的可查询投影**（按 domain / skill 反查），不是第二套真源 ——
+    # 记忆本体一律写在 memory_item（memory_type=SOURCE / SKILL_PERFORMANCE）；
+    # `success_definition` / `telemetry_version` 逐字抄 Phase 11，本层不重定义成功率。
+
+    def save_source_reliability(self, rows: list) -> int:
+        """写来源可靠性投影（`source_reliability_memory`），按 (scope_key, domain) upsert。"""
+        written = 0
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows or []:
+                        if not isinstance(row, Mapping):
+                            continue
+                        domain = str(row.get("domain") or "")
+                        if not domain:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO source_reliability_memory(
+                                domain,scope_key,industry_pack_id,authority_level,reliability,
+                                band,observations,verified,rejected,update_frequency,
+                                known_limitations_json,factors_json,evidence_refs_json,run_id,
+                                memory_id,source_version,payload_json,created_at,updated_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(scope_key, domain) DO UPDATE SET
+                                reliability=excluded.reliability, band=excluded.band,
+                                observations=excluded.observations, verified=excluded.verified,
+                                rejected=excluded.rejected,
+                                authority_level=excluded.authority_level,
+                                update_frequency=excluded.update_frequency,
+                                known_limitations_json=excluded.known_limitations_json,
+                                factors_json=excluded.factors_json,
+                                evidence_refs_json=excluded.evidence_refs_json,
+                                run_id=excluded.run_id, memory_id=excluded.memory_id,
+                                source_version=excluded.source_version,
+                                payload_json=excluded.payload_json, updated_at=excluded.updated_at
+                            """,
+                            (
+                                domain, str(row.get("scope_key") or ""),
+                                str(row.get("industry_pack_id") or ""),
+                                row.get("authority_level"), float(row.get("reliability") or 0),
+                                str(row.get("band") or "UNKNOWN"),
+                                int(row.get("observations") or 0), int(row.get("verified") or 0),
+                                int(row.get("rejected") or 0),
+                                str(row.get("update_frequency") or ""),
+                                _json(row.get("known_limitations") or []),
+                                _json(row.get("factors") or {}),
+                                _json(row.get("evidence_refs") or []),
+                                str(row.get("run_id") or ""), str(row.get("memory_id") or ""),
+                                str(row.get("source_version") or ""),
+                                _json(row.get("metadata") or {}), now, now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001 —— 投影写失败不冒泡（记忆本体已经落库）
+            return 0
+        return written
+
+    def source_reliability(self, *, scope_keys=(), domains=(), bands=(), limit: int = 1000) -> list[dict]:
+        """读来源可靠性投影（按域/档位过滤；读不到就如实返回空）。"""
+        result: list[dict] = []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            keys = [str(item) for item in (scope_keys or []) if str(item or "")]
+            if keys:
+                where.append("scope_key IN (%s)" % ",".join("?" for _ in keys))
+                params.extend(keys)
+            picked = [str(item) for item in (domains or []) if str(item or "")]
+            if picked:
+                where.append("domain IN (%s)" % ",".join("?" for _ in picked))
+                params.extend(picked)
+            values = [str(item) for item in (bands or []) if str(item or "")]
+            if values:
+                where.append("band IN (%s)" % ",".join("?" for _ in values))
+                params.extend(values)
+            sql = "SELECT * FROM source_reliability_memory"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY reliability DESC, domain LIMIT ?"
+            params.append(max(1, min(int(limit), 5000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                value = _row_dict(row) or {}
+                for column, target, fallback in (
+                    ("known_limitations_json", "known_limitations", []),
+                    ("factors_json", "factors", {}),
+                    ("evidence_refs_json", "evidence_refs", []),
+                    ("payload_json", "metadata", {}),
+                ):
+                    value[target] = _decode_json(value.get(column), fallback)
+                result.append(value)
+            return result
+        except Exception:  # noqa: BLE001
+            return result
+
+    def save_skill_performance(self, rows: list) -> int:
+        """写技能表现投影（`skill_performance_memory`），按 (scope_key, skill_id, task_type) upsert。"""
+        written = 0
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows or []:
+                        if not isinstance(row, Mapping):
+                            continue
+                        skill_id = str(row.get("skill_id") or "")
+                        if not skill_id:
+                            continue
+                        latency = row.get("latency_ms") if isinstance(row.get("latency_ms"),
+                                                                     Mapping) else {}
+                        cursor.execute(
+                            """
+                            INSERT INTO skill_performance_memory(
+                                skill_id,task_type,scope_key,attempts,successes,success_rate,
+                                latency_p50_ms,latency_p90_ms,cost_units,evidence_yield,
+                                verified_yield,min_samples,success_definition,telemetry_version,
+                                source,run_ids_json,memory_id,skill_memory_version,payload_json,
+                                created_at,updated_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(scope_key, skill_id, task_type) DO UPDATE SET
+                                attempts=excluded.attempts, successes=excluded.successes,
+                                success_rate=excluded.success_rate,
+                                latency_p50_ms=excluded.latency_p50_ms,
+                                latency_p90_ms=excluded.latency_p90_ms,
+                                cost_units=excluded.cost_units,
+                                evidence_yield=excluded.evidence_yield,
+                                verified_yield=excluded.verified_yield,
+                                min_samples=excluded.min_samples,
+                                success_definition=excluded.success_definition,
+                                telemetry_version=excluded.telemetry_version,
+                                source=excluded.source, run_ids_json=excluded.run_ids_json,
+                                memory_id=excluded.memory_id,
+                                skill_memory_version=excluded.skill_memory_version,
+                                payload_json=excluded.payload_json, updated_at=excluded.updated_at
+                            """,
+                            (
+                                skill_id, str(row.get("task_type") or ""),
+                                str(row.get("scope_key") or ""), int(row.get("attempts") or 0),
+                                int(row.get("successes") or 0), row.get("success_rate"),
+                                latency.get("p50"), latency.get("p90"),
+                                float(row.get("cost_units") or 0),
+                                int(row.get("evidence_yield") or 0),
+                                int(row.get("verified_yield") or 0),
+                                int(row.get("min_samples") or 0),
+                                str(row.get("success_definition") or ""),
+                                str(row.get("telemetry_version") or ""),
+                                str(row.get("source") or ""), _json(row.get("run_ids") or []),
+                                str(row.get("memory_id") or ""),
+                                str(row.get("skill_memory_version") or ""),
+                                _json(row.get("metadata") or {}), now, now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001
+            return 0
+        return written
+
+    def skill_performance_memory(self, *, scope_keys=(), skill_ids=(), task_type: str = "",
+                                 limit: int = 1000) -> list[dict]:
+        """读技能表现投影（按技能/任务类型过滤；`success_rate` 允许为 NULL = 样本不足）。"""
+        result: list[dict] = []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            keys = [str(item) for item in (scope_keys or []) if str(item or "")]
+            if keys:
+                where.append("scope_key IN (%s)" % ",".join("?" for _ in keys))
+                params.extend(keys)
+            picked = [str(item) for item in (skill_ids or []) if str(item or "")]
+            if picked:
+                where.append("skill_id IN (%s)" % ",".join("?" for _ in picked))
+                params.extend(picked)
+            if task_type:
+                where.append("task_type=?")
+                params.append(str(task_type))
+            sql = "SELECT * FROM skill_performance_memory"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY skill_id, task_type LIMIT ?"
+            params.append(max(1, min(int(limit), 5000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["run_ids"] = _decode_json(value.get("run_ids_json"), [])
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
+                result.append(value)
+            return result
+        except Exception:  # noqa: BLE001
+            return result
+
 
 __all__ = ["QaStore"]

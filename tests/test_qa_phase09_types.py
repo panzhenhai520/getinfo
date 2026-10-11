@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 
 os.environ.setdefault("DATABASE_TYPE", "sqlite")
 
@@ -24,6 +25,20 @@ import qa_graph_contracts as contracts  # noqa: E402
 import qa_memory as memory  # noqa: E402
 
 import qa_phase09_fixtures as fx  # noqa: E402
+
+
+@contextmanager
+def _producer_phases(value: str):
+    """临时把产出方 Phase 限成 `value`（Phase 12 的写门开关；退出时还原）。"""
+    saved = os.environ.get("QA_MEMORY_PRODUCER_PHASES")
+    os.environ["QA_MEMORY_PRODUCER_PHASES"] = str(value)
+    try:
+        yield
+    finally:
+        if saved is None:
+            os.environ.pop("QA_MEMORY_PRODUCER_PHASES", None)
+        else:
+            os.environ["QA_MEMORY_PRODUCER_PHASES"] = saved
 
 
 class TypePolicyTests(unittest.TestCase):
@@ -37,9 +52,24 @@ class TypePolicyTests(unittest.TestCase):
             else:
                 self.assertIn(policy["reason"], contracts.MEMORY_WRITE_REASONS)
 
-    def test_only_two_types_are_producible_this_phase(self):
-        producible = [name for name in contracts.MEMORY_TYPES if memory.type_policy(name)["producible"]]
-        self.assertEqual(sorted(producible), ["ENTITY", "VERIFIED_CLAIM"])
+    def test_only_the_p09_producer_phases_own_these_two_types(self):
+        # Phase 12（D-044）起，写门的"能不能产"由**已激活的产出方 Phase** 决定；
+        # 默认激活 P09+P12，所以这条断言收窄到"P09 产出方声明的那两类"：
+        # 用环境变量把产出方限回 P09，再断言**只有**这两类可产（等值断言，不放宽）。
+        with _producer_phases("P09"):
+            producible = [name for name in contracts.MEMORY_TYPES
+                          if memory.type_policy(name)["producible"]]
+            self.assertEqual(sorted(producible), ["ENTITY", "VERIFIED_CLAIM"])
+            for name in ("EPISODIC_RESEARCH", "STRATEGY", "FAILURE", "QUERY_PATTERN",
+                         "SOURCE", "SKILL_PERFORMANCE"):
+                self.assertEqual(memory.type_policy(name)["reason"],
+                                 "TYPE_DEFERRED_TO_PHASE_12")
+        # 默认（P09 + P12）下这六类必须真的可产
+        for name in ("EPISODIC_RESEARCH", "STRATEGY", "FAILURE", "QUERY_PATTERN",
+                     "SOURCE", "SKILL_PERFORMANCE"):
+            policy = memory.type_policy(name)
+            self.assertTrue(policy["producible"], name)
+            self.assertEqual(policy["owner_phase"], "P12")
 
     def test_unknown_type_is_rejected_with_a_contract_reason(self):
         policy = memory.type_policy("MADE_UP")
@@ -48,11 +78,17 @@ class TypePolicyTests(unittest.TestCase):
         self.assertEqual(policy["owner_phase"], "")
 
     def test_deferred_types_name_their_phase(self):
-        self.assertEqual(memory.type_policy("STRATEGY")["reason"], "TYPE_DEFERRED_TO_PHASE_12")
-        self.assertEqual(memory.type_policy("FAILURE")["reason"], "TYPE_DEFERRED_TO_PHASE_12")
-        self.assertEqual(memory.type_policy("SOURCE")["reason"], "TYPE_DEFERRED_TO_PHASE_12")
+        # 产出方没激活 → 归属 Phase 写在理由码里（可审计：不是"不支持"，是"还没轮到它"）
+        with _producer_phases("P09"):
+            self.assertEqual(memory.type_policy("STRATEGY")["reason"], "TYPE_DEFERRED_TO_PHASE_12")
+            self.assertEqual(memory.type_policy("FAILURE")["reason"], "TYPE_DEFERRED_TO_PHASE_12")
+            self.assertEqual(memory.type_policy("SOURCE")["reason"], "TYPE_DEFERRED_TO_PHASE_12")
+        # P15 未落地：无论产出方怎么配，规则类记忆都只能被拒收
         self.assertEqual(memory.type_policy("USER_APPROVED_DOMAIN_RULE")["reason"],
                          "TYPE_DEFERRED_TO_PHASE_15")
+        # `MEMORY_ITEM` 是"记忆条目"节点本身，永远不可产出（与 Phase 09 行为逐字相同）
+        self.assertEqual(memory.type_policy("MEMORY_ITEM")["reason"], "TYPE_NOT_SUPPORTED")
+        self.assertEqual(memory.type_policy("MEMORY_ITEM")["owner_phase"], "P09")
 
 
 class FreshnessRuleTests(unittest.TestCase):
@@ -159,7 +195,9 @@ class CandidateTests(unittest.TestCase):
 
 class ValidatorTests(unittest.TestCase):
     def test_gate_rejects_other_types_with_the_owner_phase_reason(self):
-        with fx.temp_store() as (_database, store):
+        # 产出方限回 P09 时（= Phase 09 自己的世界），六类经验记忆仍被写门拒收并记账；
+        # Phase 12 落地后它们改由 P12 产出（见 tests/test_qa_phase12_*）。
+        with fx.temp_store() as (_database, store), _producer_phases("P09"):
             candidate = {
                 "memory_type": "STRATEGY", "canonical_content": "多跳问题先用图谱邻居扩展",
                 "claim_type": "strategy", "claim_confidence": 0.8, "freshness_class": "LONG",

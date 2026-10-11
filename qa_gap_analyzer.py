@@ -1351,6 +1351,10 @@ class GapLoopState:
         self.verified_claims: set = set()
         self.contradictions: list = []
         self.last_round: dict = {}
+        # 阶段 12（P12-03/P12-06）：最近一次 `next_hops(route_guidance=...)` 的指导回执。
+        # **刻意不塞进 `next_hops` 的返回结构**（那个结构是 Phase 07 的冻结口径），
+        # 由管线自己读这个属性并挂兄弟键 —— 经验指导不许改变既有回执键集。
+        self.last_guidance: dict = {}
         self.errors: list = []          # 分析/规划失败的留痕（失败绝不能静默）
 
     def record_error(self, where: str, error) -> None:
@@ -1474,9 +1478,25 @@ class GapLoopState:
 
     # —— 缺口 → 下一跳 ——
     def next_hops(self, *, plan: Mapping | None = None, limit: int | None = None,
-                  planner: Callable | None = None) -> dict:
-        """对当前 open 缺口规划下一跳（含 seen 去重），并把记账并回状态。"""
+                  planner: Callable | None = None,
+                  route_guidance: Callable | None = None) -> dict:
+        """对当前 open 缺口规划下一跳（含 seen 去重），并把记账并回状态。
+
+        阶段 12 增补（P12-03/P12-06）：`route_guidance` 是一个**可选回调**，签名
+        `(open_gaps) -> (gaps, receipt)`，用来按经验记忆调整缺口的建议通道次序。
+        缺省 `None` → 行为与 Phase 07 **逐字相同**（不新增任何返回键，重新规划过的
+        缺口只换次序、不发明通道）。回调抛错一律吞掉并保留原缺口（经验绝不能挡住检索）。
+        """
         live = self.open_gaps()
+        if callable(route_guidance):
+            try:
+                adjusted, receipt = route_guidance(live)
+            except Exception as exc:      # noqa: BLE001 —— 经验指导坏掉不许拖垮缺口循环
+                self.last_guidance = {"error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+            else:
+                if isinstance(adjusted, (list, tuple)):
+                    live = [gap for gap in adjusted if isinstance(gap, Mapping)]
+                self.last_guidance = dict(receipt) if isinstance(receipt, Mapping) else {}
         plan_result = plan_next_hops(live, plan=plan, claims=self.claims,
                                      round_index=len(self.rounds), limit=limit,
                                      seen_queries=self.seen_queries,
