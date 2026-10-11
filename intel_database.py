@@ -3222,14 +3222,18 @@ class IntelRepository:
                     fresh_details = _json_value(fresh["score_details_json"], {})
                     if not isinstance(fresh_details, dict):
                         fresh_details = {}
-                    # 只更新本作业拥有的键：先把「主题聚类作业拥有的两个键」从最新副本里留出来，
-                    # 再叠加本作业的 score_details —— 本作业不认识的键一律不删、不覆盖。
-                    merged_details = {
-                        key: fresh_details[key]
-                        for key in _TOPIC_OWNED_DETAIL_KEYS
-                        if key in fresh_details
-                    }
-                    merged_details.update(incoming_details)
+                    # 只更新本作业拥有的键：以本作业的 score_details 为主体，
+                    # 最后把「主题聚类作业拥有的两个键」按最新副本落定 —— 本作业的结果里
+                    # 就算也带了同名键（intel_classifier 会算 topic_assignments），也不许覆盖对方。
+                    # 本作业不认识的其它键由主题作业侧的回写护栏负责，这里不做增删。
+                    merged_details = dict(incoming_details)
+                    merged_details.update(
+                        {
+                            key: fresh_details[key]
+                            for key in _TOPIC_OWNED_DETAIL_KEYS
+                            if key in fresh_details
+                        }
+                    )
                     merged_tags_json = incoming_tags_json
                     if any(key in fresh_details for key in _TOPIC_OWNED_DETAIL_KEYS):
                         # topic_tags_json 是同一份 topic_assignments 的「名字列表」投影，
