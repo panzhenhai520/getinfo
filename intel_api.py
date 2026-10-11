@@ -1461,6 +1461,8 @@ _INTEL_PACK_ASSESSMENT_TIMEOUT = 180         # 单次 assess_pack 的等待上�
 _INTEL_PACK_SELF_TEST_TIMEOUT = 240          # 影子自测 + 抓文章实测的等待上限（秒）
 _INTEL_PACK_APPLY_TIMEOUT = 180              # 激活 + 回写建议的等待上限（秒）
 _INTEL_PACK_ASSESSMENT_CACHE_TTL = 600       # 评估结果进程内缓存时长（秒）
+# 【改进】列表读取超时后的兜底等待上限（秒）：兜底只做一次裸 SELECT，正常是毫秒级
+_IMPROVEMENT_FALLBACK_TIMEOUT = 10
 _SUGGESTION_STATUS_VERIFIED = "verified"
 _IMPROVEMENT_POLICY_NOTE = (
     "只有通过影子自测（status=verified）的建议才会显示在【改进】页（DECISION_LOG D-009）"
@@ -2371,6 +2373,34 @@ def assess_pack_improvements(pack_id: str):
     )
 
 
+def _improvement_rows_fallback(engine, pack_id: str, exc: Exception):
+    """读取改进建议失败（超时/报错）时的兜底：跳过建表迁移再裸读一次。
+
+    返回 ``(rows, reason)``：
+      · 兜底拿到数据 → ``(rows, "<首次为何失败>")``，调用方按正常口径返回（带 degraded 标记）；
+      · 引擎压根不可用或兜底也失败 → ``(None, "")``，调用方照旧降级成失败回执（不掩盖故障）。
+
+    为什么必须有这一步（2026-10 真机事故）：`list_suggestions` 里的建表迁移会对一大票 intel 表
+    做 DDL 抢表级锁，排在锁队列里时会把这次调用拖过等待上限；结果库里明明有 verified 建议，
+    【改进】页默认视图却是空白（HTTP 200 + success=false + total=0）。裸读不做 DDL，
+    只要表在就能把已经入库的建议还给页面。
+    """
+
+    if engine is None:
+        return None, ""
+    try:
+        rows = _engine_call(
+            lambda: engine.list_suggestions(pack_id, status="", ensure_schema=False),
+            _IMPROVEMENT_FALLBACK_TIMEOUT,
+            "改进建议兜底读取",
+        )
+    except Exception:  # 兜底失败就按原失败回执返回，不再二次降级
+        return None, ""
+    if not isinstance(rows, (list, tuple)):
+        return None, ""
+    return rows, f"{type(exc).__name__}: {exc}"
+
+
 @intel_bp.route("/packs/<pack_id>/improvements", methods=["GET"])
 @login_required
 def list_pack_improvements(pack_id: str):
@@ -2394,31 +2424,22 @@ def list_pack_improvements(pack_id: str):
     limit = coerce_int(request.args.get("limit"), 0, 0, 500)
     timeout_seconds = coerce_int(request.args.get("timeout_seconds"), 30, 5, 300)
     started = time.monotonic()
+    engine = None
+    failure = None
+    degrade_reason = ""
     try:
         engine = _improvement_engine()
         rows = _engine_call(
             lambda: engine.list_suggestions(normalized_id, status=""), timeout_seconds, "读取改进建议"
         )
     except Exception as exc:
+        # 超时/报错不能再直接返回空列表（那会让【改进】页默认视图空白，而库里其实有建议）：
+        # 先用跳过建表迁移的裸读兜底，拿回数据就照常走下面的口径过滤。
+        failure = exc
+        rows, degrade_reason = _improvement_rows_fallback(engine, normalized_id, exc)
+    if rows is None or not isinstance(rows, (list, tuple)):
         payload = _engine_failure_payload(
-            exc,
-            request_id=request_id,
-            industry_pack_id=normalized_id,
-            elapsed_ms=int((time.monotonic() - started) * 1000),
-        )
-        payload.update(
-            {
-                "suggestions": [],
-                "total": 0,
-                "hidden_count": 0,
-                "counts_by_status": {},
-                "candidate_apply_supported": False,
-            }
-        )
-        return jsonify(payload)
-    if not isinstance(rows, (list, tuple)):
-        payload = _engine_failure_payload(
-            ValueError("改进建议列表结构异常（不是数组）"),
+            failure or ValueError("改进建议列表结构异常（不是数组）"),
             request_id=request_id,
             industry_pack_id=normalized_id,
             elapsed_ms=int((time.monotonic() - started) * 1000),
@@ -2463,6 +2484,10 @@ def list_pack_improvements(pack_id: str):
             "counts_by_status": counts_by_status,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
             "engine_ready": True,
+            # 兜底读取留下的痕迹：True 表示首次读取没在预算内返回（建表迁移卡锁队列等），
+            # 当前这批数据是跳过迁移的裸读取回的——数据可信，但要在日志/前端可追溯。
+            "degraded": bool(degrade_reason),
+            "degrade_reason": degrade_reason,
             # 引擎是否具备「把候选词写进新发布版本」的能力：False 时前端必须提示
             # "发布只会激活当前已发布版本，新词不会生效"，避免让用户误以为改进已上线。
             "candidate_apply_supported": bool(_improvement_prepare_hook(engine)[0]),

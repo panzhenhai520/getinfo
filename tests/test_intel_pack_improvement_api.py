@@ -243,6 +243,31 @@ class _EngineStub:
         return {"suggestion_id": suggestion_id, "status": "rejected", "reason": reason}
 
 
+class _TimeoutThenBareListEngine(_EngineStub):
+    """首次读取（带建表迁移）超时；兜底裸读（ensure_schema=False）能取回数据。
+
+    真机事故就是这个形状：`list_suggestions` 里的建表迁移排在全库 DDL 锁队列上，
+    首次调用被 30 秒等待上限掐断，而裸读同一张表只要毫秒级。
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ensure_schema_flags = []
+
+    def list_suggestions(self, pack_id, *, status="", ensure_schema=True):
+        self.ensure_schema_flags.append(ensure_schema)
+        if ensure_schema:
+            raise intel_api._IntelPackEngineTimeout("读取改进建议超过 30 秒未返回")
+        return [dict(item) for item in self.suggestions.values()]
+
+
+class _AlwaysSlowListEngine(_EngineStub):
+    """首次与兜底都没结果：必须如实返回失败回执（不掩盖故障）。"""
+
+    def list_suggestions(self, pack_id, *, status="", ensure_schema=True):
+        raise intel_api._IntelPackEngineTimeout("读取改进建议超过 30 秒未返回")
+
+
 class _NoRejectEngine(_EngineStub):
     """没有 mark_rejected 钩子的引擎：走【临时降级路径】兜底 SQL。
 
@@ -476,6 +501,92 @@ class IntelPackImprovementApiTest(unittest.TestCase):
         ).get_json()
         self.assertEqual([item["suggestion_id"] for item in debug["suggestions"]], ["sg-staged-1"])
         self.assertTrue(debug["suggestions"][0]["hidden_from_review"])
+
+    # ②a 库里有 2 条 verified + 1 条 rejected（A 机 id=8/13 的真实形状）────────────
+    def test_improvements_two_verified_one_rejected_scope(self):
+        """默认口径 2 条、status=all 3 条，非 verified 不进默认口径（D-009 硬规矩）。"""
+        engine = _EngineStub(
+            suggestions={
+                "sg-verified-1": _suggestion("sg-verified-1", "verified"),
+                "sg-verified-2": _suggestion("sg-verified-2", "verified", kind="source"),
+                "sg-rejected-1": _suggestion("sg-rejected-1", "rejected"),
+            }
+        )
+        self._use_engine(engine)
+
+        default = self.client.get(
+            f"/api/intel/packs/{PACK_ID}/improvements", headers=self.headers
+        ).get_json()
+        self.assertTrue(default["success"])
+        self.assertFalse(default["degraded"])
+        self.assertEqual(default["total"], 2)
+        self.assertEqual(
+            sorted(item["suggestion_id"] for item in default["suggestions"]),
+            ["sg-verified-1", "sg-verified-2"],
+        )
+        self.assertTrue(all(item["status"] == "verified" for item in default["suggestions"]))
+        self.assertTrue(all(item["hidden_from_review"] is False for item in default["suggestions"]))
+        self.assertEqual(default["hidden_count"], 1)
+        self.assertEqual(default["counts_by_status"], {"verified": 2, "rejected": 1})
+
+        all_rows = self.client.get(
+            f"/api/intel/packs/{PACK_ID}/improvements?status=all", headers=self.headers
+        ).get_json()
+        self.assertTrue(all_rows["success"])
+        self.assertEqual(all_rows["status_filter"], "(all)")
+        self.assertEqual(all_rows["total"], 3)
+        self.assertEqual(
+            sorted(item["status"] for item in all_rows["suggestions"]),
+            ["rejected", "verified", "verified"],
+        )
+        rejected = [item for item in all_rows["suggestions"] if item["status"] == "rejected"]
+        self.assertTrue(rejected[0]["hidden_from_review"], "非 verified 只许计数、不许当可见建议")
+
+    # ②a2 读取超时不能把页面变成空白：兜底裸读取回 partial ────────────────────────
+    def test_improvements_timeout_falls_back_to_partial_rows(self):
+        """首次读取被等待上限掐断时，必须用 ensure_schema=False 的裸读把已有建议还给页面。"""
+        engine = _TimeoutThenBareListEngine(
+            suggestions={
+                "sg-verified-1": _suggestion("sg-verified-1", "verified"),
+                "sg-verified-2": _suggestion("sg-verified-2", "verified", kind="source"),
+                "sg-rejected-1": _suggestion("sg-rejected-1", "rejected"),
+            }
+        )
+        self._use_engine(engine)
+
+        payload = self.client.get(
+            f"/api/intel/packs/{PACK_ID}/improvements", headers=self.headers
+        ).get_json()
+        self.assertTrue(payload["success"], "超时不该返回 success=false 的空列表")
+        self.assertEqual(payload["total"], 2)
+        self.assertEqual(
+            sorted(item["suggestion_id"] for item in payload["suggestions"]),
+            ["sg-verified-1", "sg-verified-2"],
+        )
+        self.assertEqual(payload["hidden_count"], 1)
+        self.assertTrue(payload["degraded"])
+        self.assertIn("超过 30 秒未返回", payload["degrade_reason"])
+        self.assertEqual(engine.ensure_schema_flags, [True, False], "兜底必须跳过建表迁移")
+
+    def test_improvements_timeout_without_fallback_still_degrades(self):
+        """兜底也拿不到数据时，仍按老口径返回失败回执（不 500、不假装成功）。"""
+        self._use_engine(_AlwaysSlowListEngine())
+        response = self.client.get(
+            f"/api/intel/packs/{PACK_ID}/improvements", headers=self.headers
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["total"], 0)
+        self.assertEqual(payload["suggestions"], [])
+        self.assertIn("超过 30 秒未返回", payload["reason"])
+
+        # 兜底失败时不能把非 verified 混进默认口径（D-009 依然成立）
+        all_rows = self.client.get(
+            f"/api/intel/packs/{PACK_ID}/improvements?status=all", headers=self.headers
+        ).get_json()
+        self.assertFalse(all_rows["success"])
+        self.assertEqual(all_rows["total"], 0)
 
     # ②b 信源类建议（引擎当前只产 keyword，这里锁定 forward-compatible 归一化）──
     def test_source_kind_suggestion_normalization(self):

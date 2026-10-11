@@ -713,18 +713,45 @@ def _is_admitted(result: Dict) -> bool:
 
 
 # ─────────────────────────── 数据库访问 ───────────────────────────
+def _improvement_table_exists() -> bool:
+    """轻量探测建议表是否已存在：只 SELECT，不建表、不跑迁移。"""
+    db = _repository.db
+    try:
+        with _lock_of(db):
+            cursor = db.connection.cursor()
+            try:
+                cursor.execute("SELECT 1 FROM intel_pack_improvements LIMIT 1")
+                cursor.fetchall()
+                return True
+            finally:
+                cursor.close()
+    except Exception:
+        return False
+
+
 def _ensure_schema() -> None:
-    """幂等建表：老仓库走 IntelRepository._ensure()（内含 ensure_intel_core_tables），
-    它失败时再单独跑一次本模块的建表，避免"主库迁移没跑到"导致整个功能不可用。"""
+    """幂等建表：**表不存在时**才走 IntelRepository._ensure()（内含 ensure_intel_core_tables
+    全量迁移），再单独跑一次本模块的建表，避免"主库迁移没跑到"导致整个功能不可用。
+
+    2026-10 真机事故后收紧：表已存在时不再跑全量 intel 迁移。`ensure_intel_core_tables()`
+    会对 articles / pack_remote_config / article_derivatives 等一大票 intel 表做
+    `CREATE INDEX` / `ALTER TABLE ADD COLUMN`，在 PostgreSQL 上要拿表级排他锁；当时容器内
+    并发的长写任务（实测 backfill_article_events --apply 连跑了 1 小时以上）一持锁，这段 DDL
+    就排在锁队列里，把【改进】列表的读请求拖过接口等待上限——实测 HTTP 200 但
+    success=false / total=0 / reason="读取改进建议超过 30 秒未返回"，页面因此空白，
+    而库里的建议一直都在（A 机 id=8/13 两条 verified 全程未变）。
+    列表是只读接口、只依赖自己的表，所以表在就直接查，不让它替整个 intel 库做体检。
+    """
     db = _repository.db
     try:
         db._ensure_connection()
     except Exception:
         pass
-    try:
-        _repository._ensure()
-    except Exception as exc:  # pragma: no cover - 取决于部署环境
-        print(f"⚠️ intel 仓储 schema 检查失败（继续尝试单表建表）: {str(exc)[:200]}")
+    if not _improvement_table_exists():
+        try:
+            _repository._ensure()
+        except Exception as exc:  # pragma: no cover - 取决于部署环境
+            print(f"⚠️ intel 仓储 schema 检查失败（继续尝试单表建表）: {str(exc)[:200]}")
     try:
         from intel_schema import ensure_intel_pack_improvement_tables
 
@@ -3020,8 +3047,12 @@ def stage_suggestion(
     }
 
 
-def list_suggestions(pack_id: str, *, status: str = "") -> List[Dict]:
-    """列出某包的建议（默认全部；``status`` 可过滤，未知状态报错而不是静默返回空）。"""
+def list_suggestions(pack_id: str, *, status: str = "", ensure_schema: bool = True) -> List[Dict]:
+    """列出某包的建议（默认全部；``status`` 可过滤，未知状态报错而不是静默返回空）。
+
+    ``ensure_schema=False`` 供接口层的**超时兜底**使用：跳过建表/迁移，只做一次裸 SELECT
+    （迁移可能正卡在锁队列上，兜底读不能再等它）。
+    """
     pack_id = str(pack_id or "").strip()
     if not pack_id:
         raise ValueError("pack_id 不能为空")
@@ -3032,7 +3063,8 @@ def list_suggestions(pack_id: str, *, status: str = "") -> List[Dict]:
         raise ValueError(
             f"status 只允许 {SUGGESTION_STATUSES} 之一（或空），收到: {status!r}"
         )
-    _ensure_schema()
+    if ensure_schema:
+        _ensure_schema()
     conditions = ["industry_pack_id = ?"]
     params: List = [pack_id]
     if normalized_status:

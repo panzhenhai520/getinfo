@@ -425,6 +425,43 @@ class IntelPackImprovementTests(unittest.TestCase):
             "SELECT COUNT(*) FROM article_intel_classifications"
         )
 
+    # ── 读路径不做全量迁移（2026-10 真机事故：DDL 排队把读接口拖过等待上限）──
+    def test_ensure_schema_skips_full_migration_when_table_exists(self):
+        """表已存在时不再跑 ensure_intel_core_tables 全量 DDL：它会抢表级排他锁，
+        排队时会把只读的【改进】列表拖过接口等待上限（实测 200 + total=0）。"""
+        calls = []
+        real = m._repository
+
+        class _CountingRepo:
+            db = real.db
+
+            def _ensure(self):
+                calls.append(1)
+
+        m._repository = _CountingRepo()
+        self.addCleanup(lambda: setattr(m, "_repository", real))
+
+        m._ensure_schema()
+        self.assertEqual(calls, [], "表已存在时不应再跑全量 intel 迁移")
+        self.assertEqual(m.list_suggestions("demo_pack"), [])
+        self.assertEqual(calls, [], "列表读取同样不应触发全量迁移")
+
+        # 表没了（老仓库/首次部署）还是要补迁移 + 单表建表
+        self.db.connection.execute("DROP TABLE intel_pack_improvements")
+        self.db.connection.commit()
+        m._ensure_schema()
+        self.assertEqual(calls, [1], "表不存在时必须补跑一次全量迁移")
+        self.assertTrue(m._improvement_table_exists(), "单表建表要把表补回来")
+
+    def test_list_suggestions_can_skip_schema_ensure(self):
+        """``ensure_schema=False`` 是超时兜底用的：只读查询，绝不再等建表/迁移。"""
+        calls = []
+        with patch.object(m, "_ensure_schema", lambda: calls.append(1)):
+            m.list_suggestions("demo_pack", ensure_schema=False)
+            self.assertEqual(calls, [], "兜底裸读必须跳过建表/迁移")
+            m.list_suggestions("demo_pack")
+            self.assertEqual(calls, [1], "常规读取仍要保证表存在")
+
     # ── 评估 ──
     def test_assess_pack_reports_other_pct_gate_failures_and_peer_median(self):
         reason_map = {
