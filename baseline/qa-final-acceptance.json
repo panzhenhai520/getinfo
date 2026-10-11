@@ -1,0 +1,2583 @@
+{
+ "report_version": "qa-final-acceptance-v1",
+ "clock": "2026-10-10T20:57:51Z",
+ "source": {
+  "snapshot": "baseline\\qa-context-real-sample.json",
+  "snapshot_version": "qa-context-real-sample-v1",
+  "captured_at_utc": "2026-10-10T20:57:51Z",
+  "access": "readonly (BEGIN READ ONLY + statement_timeout=20s + LIMIT)",
+  "host": "117.50.211.93",
+  "note": "离线复算 + 同代码重建：A 机尚未发布 Phase 13（qa_stage_runs 里没有 final_verify 行），所以终验结论是拿**真机真实答案**在同一份代码、同一份真实证据上现跑的；时钟取快照 captured_at_utc，两次运行逐字相同。"
+ },
+ "params": {
+  "composer_version": "qa-answer-composer-v1",
+  "verifier_version": "qa-final-verifier-v1",
+  "retry_version": "qa-final-retry-v1",
+  "insufficient_version": "qa-insufficient-evidence-v1",
+  "verifier_core": "qa-verifier-v1",
+  "retry_max": 1,
+  "checks": [
+   "FACT_WITHOUT_EVIDENCE",
+   "EVIDENCE_NOT_SUPPORTING",
+   "OVER_INFERENCE",
+   "COUNTER_EVIDENCE_MISSING",
+   "CITATION_MISBOUND",
+   "SPECULATION_AS_FACT"
+  ]
+ },
+ "runs": [
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "mode": "standard",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "claims": 3,
+   "evidence": 3,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 3,
+    "confirmed": 0,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 2,
+    "insufficient_evidence": 1,
+    "supported_pairs": 0,
+    "refuted_pairs": 0,
+    "pairs": 6,
+    "unsupported_claim_rate": 1.0,
+    "claim_without_evidence": 1
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 1,
+    "claims_in_answer": 1,
+    "bound": 1,
+    "bound_in_answer": 1,
+    "unbound_in_answer": 0,
+    "verified_claims": 0,
+    "binding_reasons": {
+     "BOUND_QUALIFIED": 1
+    },
+    "citation_labels": 3,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 4,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "status": "partial",
+    "verified_claims": 0
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "warning"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 1,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": true,
+    "insufficient_reasons": [
+     "NO_VERIFIED_CLAIM"
+    ],
+    "status": "insufficient_evidence"
+   },
+   "rounds": 2,
+   "answer_status": "insufficient_evidence",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×1，NUMBER_WITHOUT_SPAN×4",
+    "证据不足输出（qa-insufficient-evidence-v1）：NO_VERIFIED_CLAIM"
+   ],
+   "traceability": {
+    "checked": 3,
+    "traceable": 3,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "mode": "standard",
+   "question": "DRG对医院行业的影响有哪些？对患者的影响有哪些？",
+   "claims": 12,
+   "evidence": 6,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 12,
+    "confirmed": 8,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 4,
+    "supported_pairs": 8,
+    "refuted_pairs": 0,
+    "pairs": 8,
+    "unsupported_claim_rate": 0.3333,
+    "claim_without_evidence": 4
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 4,
+    "claims_in_answer": 4,
+    "bound": 4,
+    "bound_in_answer": 4,
+    "unbound_in_answer": 0,
+    "verified_claims": 3,
+    "binding_reasons": {
+     "BOUND_SUPPORTED": 3,
+     "BOUND_QUALIFIED": 1
+    },
+    "citation_labels": 6,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 2,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "status": "partial",
+    "verified_claims": 3
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "warning",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 2,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×1，NUMBER_WITHOUT_SPAN×2",
+    "最终核验告警（qa-final-verifier-v1）：CITATION_MISBOUND、EVIDENCE_NOT_SUPPORTING、OVER_INFERENCE"
+   ],
+   "traceability": {
+    "checked": 6,
+    "traceable": 6,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "mode": "standard",
+   "question": "最近一周最重要的技术进展是什么",
+   "claims": 6,
+   "evidence": 2,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 6,
+    "confirmed": 4,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 2,
+    "supported_pairs": 4,
+    "refuted_pairs": 0,
+    "pairs": 4,
+    "unsupported_claim_rate": 0.3333,
+    "claim_without_evidence": 2
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 2,
+    "claims_in_answer": 2,
+    "bound": 2,
+    "bound_in_answer": 2,
+    "unbound_in_answer": 0,
+    "verified_claims": 1,
+    "binding_reasons": {
+     "BOUND_QUALIFIED": 1,
+     "BOUND_SUPPORTED": 1
+    },
+    "citation_labels": 2,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 14,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "status": "partial",
+    "verified_claims": 1
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "warning"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 1,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×1，NUMBER_WITHOUT_SPAN×14",
+    "最终核验告警（qa-final-verifier-v1）：EVIDENCE_NOT_SUPPORTING、OVER_INFERENCE、SPECULATION_AS_FACT"
+   ],
+   "traceability": {
+    "checked": 2,
+    "traceable": 2,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "239ba38b18ee456f8a0d2304ec6ac342",
+   "mode": "",
+   "question": "",
+   "claims": 0,
+   "evidence": 0,
+   "preexisting_status": "",
+   "skipped": "缺少问题"
+  },
+  {
+   "run_id": "2af7dd7fed684803ad0572f82d8ce042",
+   "mode": "",
+   "question": "",
+   "claims": 0,
+   "evidence": 0,
+   "preexisting_status": "",
+   "skipped": "缺少问题"
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "mode": "standard",
+   "question": "帮我总结一下当前行业的主要风险",
+   "claims": 9,
+   "evidence": 3,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 9,
+    "confirmed": 6,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 3,
+    "supported_pairs": 6,
+    "refuted_pairs": 0,
+    "pairs": 6,
+    "unsupported_claim_rate": 0.3333,
+    "claim_without_evidence": 3
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 3,
+    "claims_in_answer": 3,
+    "bound": 3,
+    "bound_in_answer": 3,
+    "unbound_in_answer": 0,
+    "verified_claims": 2,
+    "binding_reasons": {
+     "BOUND_SUPPORTED": 2,
+     "BOUND_QUALIFIED": 1
+    },
+    "citation_labels": 3,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 10,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "status": "partial",
+    "verified_claims": 2
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 4,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "verifier"
+      ],
+      "reason": "NO_CHANGE",
+      "changes": 0,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×1，NUMBER_WITHOUT_SPAN×10",
+    "最终核验告警（qa-final-verifier-v1）：EVIDENCE_NOT_SUPPORTING、OVER_INFERENCE"
+   ],
+   "traceability": {
+    "checked": 3,
+    "traceable": 3,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "4d89571a535142fcbb2249c654592323",
+   "mode": "",
+   "question": "",
+   "claims": 0,
+   "evidence": 0,
+   "preexisting_status": "",
+   "skipped": "缺少问题"
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "mode": "standard",
+   "question": "出货量超1.9万台，占全球约77.9%的是什么",
+   "claims": 12,
+   "evidence": 12,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 12,
+    "confirmed": 4,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 4,
+    "insufficient_evidence": 4,
+    "supported_pairs": 4,
+    "refuted_pairs": 0,
+    "pairs": 8,
+    "unsupported_claim_rate": 0.6667,
+    "claim_without_evidence": 4
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 4,
+    "claims_in_answer": 1,
+    "bound": 1,
+    "bound_in_answer": 1,
+    "unbound_in_answer": 0,
+    "verified_claims": 0,
+    "binding_reasons": {
+     "NOT_IN_ANSWER": 2,
+     "BOUND_QUALIFIED": 1,
+     "NO_EVIDENCE_REF": 1
+    },
+    "citation_labels": 12,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 9,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 1
+    },
+    "status": "partial",
+    "verified_claims": 0
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "warning",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 2,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": true,
+    "insufficient_reasons": [
+     "NO_VERIFIED_CLAIM"
+    ],
+    "status": "insufficient_evidence"
+   },
+   "rounds": 2,
+   "answer_status": "insufficient_evidence",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×1，NUMBER_WITHOUT_SPAN×9",
+    "证据不足输出（qa-insufficient-evidence-v1）：NO_VERIFIED_CLAIM"
+   ],
+   "traceability": {
+    "checked": 12,
+    "traceable": 12,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "mode": "standard",
+   "question": "DRG对医院的影响和对患者的影响分别有哪些？",
+   "claims": 12,
+   "evidence": 12,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 12,
+    "confirmed": 8,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 4,
+    "supported_pairs": 8,
+    "refuted_pairs": 0,
+    "pairs": 8,
+    "unsupported_claim_rate": 0.3333,
+    "claim_without_evidence": 4
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 4,
+    "claims_in_answer": 4,
+    "bound": 4,
+    "bound_in_answer": 4,
+    "unbound_in_answer": 0,
+    "verified_claims": 4,
+    "binding_reasons": {
+     "BOUND_SUPPORTED": 4
+    },
+    "citation_labels": 12,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 2
+    },
+    "status": "partial",
+    "verified_claims": 4
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 4,
+    "checks_total": 6,
+    "failed_checks": [
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "none",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "warning",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 2,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：NUMBER_WITHOUT_SPAN×2",
+    "最终核验告警（qa-final-verifier-v1）：CITATION_MISBOUND、OVER_INFERENCE"
+   ],
+   "traceability": {
+    "checked": 12,
+    "traceable": 12,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "71e0cf1f3fdf45d4b55a77aa76649292",
+   "mode": "standard",
+   "question": "这个行业最近最大的一笔融资是多少",
+   "claims": 0,
+   "evidence": 0,
+   "preexisting_status": "",
+   "skipped": "没有最终答案"
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "mode": "standard",
+   "question": "这个行业最近最大的一笔融资是多少",
+   "claims": 6,
+   "evidence": 2,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 6,
+    "confirmed": 4,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 2,
+    "supported_pairs": 4,
+    "refuted_pairs": 0,
+    "pairs": 4,
+    "unsupported_claim_rate": 0.3333,
+    "claim_without_evidence": 2
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 2,
+    "claims_in_answer": 2,
+    "bound": 2,
+    "bound_in_answer": 2,
+    "unbound_in_answer": 0,
+    "verified_claims": 2,
+    "binding_reasons": {
+     "BOUND_SUPPORTED": 2
+    },
+    "citation_labels": 2,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 7
+    },
+    "status": "partial",
+    "verified_claims": 2
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 5,
+    "checks_total": 6,
+    "failed_checks": [
+     "OVER_INFERENCE"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "OVER_INFERENCE"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "none",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "verifier"
+      ],
+      "reason": "NO_CHANGE",
+      "changes": 0,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：NUMBER_WITHOUT_SPAN×7",
+    "最终核验告警（qa-final-verifier-v1）：OVER_INFERENCE"
+   ],
+   "traceability": {
+    "checked": 2,
+    "traceable": 2,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "mode": "standard",
+   "question": "特斯拉无人驾驶出租车已经在运行了吗",
+   "claims": 6,
+   "evidence": 1,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 6,
+    "confirmed": 2,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 2,
+    "insufficient_evidence": 2,
+    "supported_pairs": 2,
+    "refuted_pairs": 0,
+    "pairs": 4,
+    "unsupported_claim_rate": 0.6667,
+    "claim_without_evidence": 2
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 2,
+    "claims_in_answer": 2,
+    "bound": 2,
+    "bound_in_answer": 2,
+    "unbound_in_answer": 0,
+    "verified_claims": 0,
+    "binding_reasons": {
+     "BOUND_QUALIFIED": 2
+    },
+    "citation_labels": 1,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 2,
+     "NUMBER_WITHOUT_SPAN": 1
+    },
+    "status": "partial",
+    "verified_claims": 0
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "warning"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 1,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": true,
+    "insufficient_reasons": [
+     "NO_VERIFIED_CLAIM"
+    ],
+    "status": "insufficient_evidence"
+   },
+   "rounds": 2,
+   "answer_status": "insufficient_evidence",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×2，NUMBER_WITHOUT_SPAN×1",
+    "证据不足输出（qa-insufficient-evidence-v1）：NO_VERIFIED_CLAIM"
+   ],
+   "traceability": {
+    "checked": 1,
+    "traceable": 1,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "mode": "standard",
+   "question": "行业里排名靠前的公司最近有什么动作",
+   "claims": 9,
+   "evidence": 3,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 9,
+    "confirmed": 6,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 3,
+    "supported_pairs": 6,
+    "refuted_pairs": 0,
+    "pairs": 6,
+    "unsupported_claim_rate": 0.3333,
+    "claim_without_evidence": 3
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 3,
+    "claims_in_answer": 3,
+    "bound": 3,
+    "bound_in_answer": 3,
+    "unbound_in_answer": 0,
+    "verified_claims": 3,
+    "binding_reasons": {
+     "BOUND_SUPPORTED": 3
+    },
+    "citation_labels": 3,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 14
+    },
+    "status": "partial",
+    "verified_claims": 3
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 5,
+    "checks_total": 6,
+    "failed_checks": [
+     "OVER_INFERENCE"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "OVER_INFERENCE"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "none",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "verifier"
+      ],
+      "reason": "NO_CHANGE",
+      "changes": 0,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：NUMBER_WITHOUT_SPAN×14",
+    "最终核验告警（qa-final-verifier-v1）：OVER_INFERENCE"
+   ],
+   "traceability": {
+    "checked": 3,
+    "traceable": 3,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "mode": "standard",
+   "question": "最近有哪些值得关注的政策变化",
+   "claims": 0,
+   "evidence": 0,
+   "preexisting_status": "insufficient_evidence",
+   "no_evidence": true,
+   "verify_stats": {
+    "claims": 0,
+    "confirmed": 0,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 0,
+    "insufficient_evidence": 0,
+    "supported_pairs": 0,
+    "refuted_pairs": 0,
+    "pairs": 0,
+    "unsupported_claim_rate": null,
+    "claim_without_evidence": 0
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 0,
+    "claims_in_answer": 0,
+    "bound": 0,
+    "bound_in_answer": 0,
+    "unbound_in_answer": 0,
+    "verified_claims": 0,
+    "binding_reasons": {},
+    "citation_labels": 0,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [],
+    "violation_counts": {},
+    "status": "insufficient_evidence",
+    "verified_claims": 0
+   },
+   "after": {
+    "outcome": "pass",
+    "checks_passed": 6,
+    "checks_total": 6,
+    "failed_checks": [],
+    "blocking_codes": [],
+    "warning_codes": [],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "none",
+     "OVER_INFERENCE": "none",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [],
+    "retrieval_calls": 0,
+    "insufficient": true,
+    "insufficient_reasons": [
+     "NO_EVIDENCE",
+     "NO_VERIFIED_CLAIM"
+    ],
+    "status": "insufficient_evidence"
+   },
+   "rounds": 1,
+   "answer_status": "insufficient_evidence",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "证据不足输出（qa-insufficient-evidence-v1）：NO_EVIDENCE、NO_VERIFIED_CLAIM"
+   ],
+   "traceability": {
+    "checked": 0,
+    "traceable": 0,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": null
+   }
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "mode": "standard",
+   "question": "最近融资近3亿元的公司是哪个公司",
+   "claims": 12,
+   "evidence": 7,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 12,
+    "confirmed": 4,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 4,
+    "insufficient_evidence": 4,
+    "supported_pairs": 4,
+    "refuted_pairs": 0,
+    "pairs": 8,
+    "unsupported_claim_rate": 0.6667,
+    "claim_without_evidence": 4
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 4,
+    "claims_in_answer": 4,
+    "bound": 4,
+    "bound_in_answer": 4,
+    "unbound_in_answer": 0,
+    "verified_claims": 2,
+    "binding_reasons": {
+     "BOUND_QUALIFIED": 2,
+     "BOUND_SUPPORTED": 2
+    },
+    "citation_labels": 7,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 4,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 2
+    },
+    "status": "partial",
+    "verified_claims": 2
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "warning"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 2,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×2，NUMBER_WITHOUT_SPAN×4",
+    "最终核验告警（qa-final-verifier-v1）：EVIDENCE_NOT_SUPPORTING、OVER_INFERENCE、SPECULATION_AS_FACT"
+   ],
+   "traceability": {
+    "checked": 7,
+    "traceable": 7,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "mode": "standard",
+   "question": "并购退出是指通过企业兼并或收购风险企业，使风险资本实现退出的方式，没懂，请详细讲解",
+   "claims": 15,
+   "evidence": 15,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 15,
+    "confirmed": 14,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 1,
+    "insufficient_evidence": 0,
+    "supported_pairs": 14,
+    "refuted_pairs": 0,
+    "pairs": 18,
+    "unsupported_claim_rate": 0.0667,
+    "claim_without_evidence": 0
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 5,
+    "claims_in_answer": 5,
+    "bound": 5,
+    "bound_in_answer": 5,
+    "unbound_in_answer": 0,
+    "verified_claims": 4,
+    "binding_reasons": {
+     "BOUND_SUPPORTED": 4,
+     "BOUND_QUALIFIED": 1
+    },
+    "citation_labels": 15,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 4
+    },
+    "status": "partial",
+    "verified_claims": 4
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "CITATION_MISBOUND"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "warning",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 2,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": false,
+    "insufficient_reasons": [],
+    "status": "partial"
+   },
+   "rounds": 2,
+   "answer_status": "partial",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：NUMBER_WITHOUT_SPAN×4",
+    "最终核验告警（qa-final-verifier-v1）：CITATION_MISBOUND、EVIDENCE_NOT_SUPPORTING、OVER_INFERENCE"
+   ],
+   "traceability": {
+    "checked": 15,
+    "traceable": 15,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "mode": "standard",
+   "question": "10月9日，宁德时代迎来久违的大涨。背后的原因是什么？",
+   "claims": 15,
+   "evidence": 15,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 15,
+    "confirmed": 0,
+    "qualified": 0,
+    "conflicted": 0,
+    "unverified": 15,
+    "insufficient_evidence": 0,
+    "supported_pairs": 0,
+    "refuted_pairs": 0,
+    "pairs": 18,
+    "unsupported_claim_rate": 1.0,
+    "claim_without_evidence": 0
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 5,
+    "claims_in_answer": 5,
+    "bound": 5,
+    "bound_in_answer": 5,
+    "unbound_in_answer": 0,
+    "verified_claims": 0,
+    "binding_reasons": {
+     "BOUND_QUALIFIED": 5
+    },
+    "citation_labels": 15,
+    "counter_evidence": 0,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 9,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 5
+    },
+    "status": "partial",
+    "verified_claims": 0
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 3,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "blocking_codes": [],
+    "warning_codes": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE",
+     "SPECULATION_AS_FACT"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "warning",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "warning"
+    },
+    "retries": [
+     {
+      "scope": [
+       "composer",
+       "verifier"
+      ],
+      "reason": "FIXED",
+      "changes": 1,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": true,
+    "insufficient_reasons": [
+     "NO_VERIFIED_CLAIM"
+    ],
+    "status": "insufficient_evidence"
+   },
+   "rounds": 2,
+   "answer_status": "insufficient_evidence",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "生成端 grounding 校验：CLAIM_WITH_UNVERIFIED_EVIDENCE×5，NUMBER_WITHOUT_SPAN×9",
+    "证据不足输出（qa-insufficient-evidence-v1）：NO_VERIFIED_CLAIM"
+   ],
+   "traceability": {
+    "checked": 15,
+    "traceable": 15,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  },
+  {
+   "run_id": "d83ab463596747b6971ccebff3661d63",
+   "mode": "",
+   "question": "",
+   "claims": 0,
+   "evidence": 0,
+   "preexisting_status": "",
+   "skipped": "缺少问题"
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "mode": "standard",
+   "question": "最近工信部在人形机器人领域有什么动态",
+   "claims": 12,
+   "evidence": 12,
+   "preexisting_status": "partial",
+   "no_evidence": false,
+   "verify_stats": {
+    "claims": 12,
+    "confirmed": 6,
+    "qualified": 0,
+    "conflicted": 2,
+    "unverified": 0,
+    "insufficient_evidence": 4,
+    "supported_pairs": 6,
+    "refuted_pairs": 2,
+    "pairs": 8,
+    "unsupported_claim_rate": 0.5,
+    "claim_without_evidence": 4
+   },
+   "verify_error": "",
+   "composition": {
+    "claims": 4,
+    "claims_in_answer": 4,
+    "bound": 4,
+    "bound_in_answer": 4,
+    "unbound_in_answer": 0,
+    "verified_claims": 2,
+    "binding_reasons": {
+     "BOUND_QUALIFIED": 2,
+     "BOUND_SUPPORTED": 2
+    },
+    "citation_labels": 12,
+    "counter_evidence": 1,
+    "unresolved_gaps": 0,
+    "contradictions": 0
+   },
+   "before": {
+    "blocking": false,
+    "blocking_codes": [],
+    "warning_codes": [
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE",
+     "NUMBER_WITHOUT_SPAN"
+    ],
+    "violation_counts": {
+     "NUMBER_WITHOUT_SPAN": 8,
+     "CLAIM_WITH_UNVERIFIED_EVIDENCE": 2
+    },
+    "status": "partial",
+    "verified_claims": 2
+   },
+   "after": {
+    "outcome": "fail",
+    "checks_passed": 4,
+    "checks_total": 6,
+    "failed_checks": [
+     "EVIDENCE_NOT_SUPPORTING",
+     "OVER_INFERENCE"
+    ],
+    "blocking_codes": [
+     "EVIDENCE_NOT_SUPPORTING"
+    ],
+    "warning_codes": [
+     "OVER_INFERENCE"
+    ],
+    "check_severity": {
+     "FACT_WITHOUT_EVIDENCE": "none",
+     "EVIDENCE_NOT_SUPPORTING": "blocking",
+     "OVER_INFERENCE": "warning",
+     "COUNTER_EVIDENCE_MISSING": "none",
+     "CITATION_MISBOUND": "none",
+     "SPECULATION_AS_FACT": "none"
+    },
+    "retries": [
+     {
+      "scope": [
+       "verifier"
+      ],
+      "reason": "NO_CHANGE",
+      "changes": 0,
+      "retrieval_calls": 0
+     }
+    ],
+    "retrieval_calls": 0,
+    "insufficient": true,
+    "insufficient_reasons": [
+     "GROUNDING_BLOCKED"
+    ],
+    "status": "insufficient_evidence"
+   },
+   "rounds": 2,
+   "answer_status": "insufficient_evidence",
+   "degradation_reasons": [
+    "增强检索配置不完整，本次将自动改用项目本地 RAG 检索。",
+    "证据不足输出（qa-insufficient-evidence-v1）：GROUNDING_BLOCKED"
+   ],
+   "traceability": {
+    "checked": 12,
+    "traceable": 12,
+    "failed": 0,
+    "failures": [],
+    "traceable_rate": 1.0
+   }
+  }
+ ],
+ "totals": {
+  "runs_total": 19,
+  "runs_scored": 14,
+  "runs_skipped": 5,
+  "claims": 129,
+  "evidence": 93,
+  "claims_verified_supported": 66,
+  "bindings": 43,
+  "bound_in_answer": 40,
+  "unbound_in_answer": 0,
+  "verified_claims": 23,
+  "binding_reasons": {
+   "BOUND_SUPPORTED": 23,
+   "BOUND_QUALIFIED": 17,
+   "NOT_IN_ANSWER": 2,
+   "NO_EVIDENCE_REF": 1
+  },
+  "citation_labels": 93,
+  "citation_checked": 93,
+  "citation_traceable": 93,
+  "citation_traceable_rate": 1.0,
+  "counter_evidence": 1,
+  "unresolved_gaps": 0,
+  "contradictions": 0,
+  "checks_passed": 52,
+  "checks_total": 84,
+  "checks_pass_rate": 0.619048,
+  "check_failures": {
+   "OVER_INFERENCE": 13,
+   "EVIDENCE_NOT_SUPPORTING": 10,
+   "SPECULATION_AS_FACT": 5,
+   "CITATION_MISBOUND": 4
+  },
+  "outcomes": {
+   "fail": 13,
+   "pass": 1
+  },
+  "blocking_before": 0,
+  "blocking_after": 1,
+  "blocking_fixed_by_retry": 0,
+  "retry_rows": 13,
+  "retry_rows_with_changes": 9,
+  "retry_scopes": {
+   "composer+verifier": 9,
+   "verifier": 4
+  },
+  "retry_reasons": {
+   "FIXED": 9,
+   "NO_CHANGE": 4
+  },
+  "retrieval_calls": 0,
+  "insufficient_runs": 6,
+  "insufficient_reasons": {
+   "NO_VERIFIED_CLAIM": 5,
+   "GROUNDING_BLOCKED": 1,
+   "NO_EVIDENCE": 1
+  },
+  "no_evidence_runs": 1,
+  "no_evidence_marked_insufficient": 1,
+  "preexisting_status": {
+   "partial": 13,
+   "insufficient_evidence": 1
+  },
+  "status_moves": {
+   "partial→partial": 8,
+   "partial→insufficient_evidence": 5,
+   "insufficient_evidence→insufficient_evidence": 1
+  },
+  "status_before": {
+   "partial": 13,
+   "insufficient_evidence": 1
+  },
+  "status_after": {
+   "partial": 8,
+   "insufficient_evidence": 6
+  },
+  "verify_errors": 0
+ },
+ "injection": {
+  "A_fact_without_evidence": {
+   "cases": 13,
+   "inapplicable": 1,
+   "detected": 13,
+   "blocking": 13,
+   "warning": 0,
+   "errors": 0,
+   "detect_rate": 1.0
+  },
+  "B_evidence_refutes_claim": {
+   "cases": 13,
+   "inapplicable": 1,
+   "detected": 13,
+   "blocking": 13,
+   "warning": 0,
+   "errors": 0,
+   "detect_rate": 1.0
+  },
+  "C_number_beyond_span": {
+   "cases": 14,
+   "inapplicable": 0,
+   "detected": 14,
+   "blocking": 0,
+   "warning": 14,
+   "errors": 0,
+   "detect_rate": 1.0
+  },
+  "D_counter_evidence_omitted": {
+   "cases": 13,
+   "inapplicable": 1,
+   "detected": 13,
+   "blocking": 0,
+   "warning": 13,
+   "errors": 0,
+   "detect_rate": 1.0
+  },
+  "E_citation_swapped": {
+   "cases": 13,
+   "inapplicable": 1,
+   "detected": 13,
+   "blocking": 0,
+   "warning": 13,
+   "errors": 0,
+   "detect_rate": 1.0
+  },
+  "F_plan_claim_as_fact": {
+   "cases": 13,
+   "inapplicable": 1,
+   "detected": 13,
+   "blocking": 13,
+   "warning": 0,
+   "errors": 0,
+   "detect_rate": 1.0
+  }
+ },
+ "injection_rows": [
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 7,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "0a5715f4618845e1987d5c8e8405cdb3",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "162612f141e84ead98c36047f4dfd64b",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 17,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 4,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 13,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "48855683e91d48b6b213e8aa8195df50",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 11,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "613514876a1e40698cb1e1e636a0c21b",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 4,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 4,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 7,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 9,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 17,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": false,
+   "detected": false,
+   "severity": "",
+   "failures": 0,
+   "outcome": "",
+   "error": ""
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": false,
+   "detected": false,
+   "severity": "",
+   "failures": 0,
+   "outcome": "",
+   "error": ""
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": false,
+   "detected": false,
+   "severity": "",
+   "failures": 0,
+   "outcome": "",
+   "error": ""
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": false,
+   "detected": false,
+   "severity": "",
+   "failures": 0,
+   "outcome": "",
+   "error": ""
+  },
+  {
+   "run_id": "a419bd545c70440ea78f24eaaa884b76",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": false,
+   "detected": false,
+   "severity": "",
+   "failures": 0,
+   "outcome": "",
+   "error": ""
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 4,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 9,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "adebd40548d343eda11e765cdbaede3f",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 6,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "b76aa77a29c046fa84d55e7db517e810",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 17,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "c3fd469f115d4002bd2824b397425756",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "variant": "A_fact_without_evidence",
+   "target_check": "FACT_WITHOUT_EVIDENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 5,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "variant": "B_evidence_refutes_claim",
+   "target_check": "EVIDENCE_NOT_SUPPORTING",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 3,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "variant": "C_number_beyond_span",
+   "target_check": "OVER_INFERENCE",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 12,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "variant": "D_counter_evidence_omitted",
+   "target_check": "COUNTER_EVIDENCE_MISSING",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 2,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "variant": "E_citation_swapped",
+   "target_check": "CITATION_MISBOUND",
+   "applicable": true,
+   "detected": true,
+   "severity": "warning",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  },
+  {
+   "run_id": "e280beda3f7b48a596293c032f6a15e2",
+   "variant": "F_plan_claim_as_fact",
+   "target_check": "SPECULATION_AS_FACT",
+   "applicable": true,
+   "detected": true,
+   "severity": "blocking",
+   "failures": 1,
+   "outcome": "fail",
+   "error": ""
+  }
+ ],
+ "acceptance": {
+  "real_answers_scored": true,
+  "bindings_are_traceable": true,
+  "six_checks_all_reachable": true,
+  "retry_never_retrieves": true,
+  "no_verification_errors": true,
+  "insufficient_has_a_basis": true,
+  "no_evidence_is_marked_insufficient": true,
+  "passed": true
+ }
+}

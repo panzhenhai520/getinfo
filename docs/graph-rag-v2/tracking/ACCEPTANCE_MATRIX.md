@@ -252,3 +252,9 @@
 |P12-05|技能表现记忆（口径零重定义）|同上加 `tests/test_qa_phase11_telemetry.py`|success_definition 与 Phase 11 逐字相同、样本不足不写成功率|**14 + 37 passed**；真机记录沿用 Phase 11 离线重建 38 条 → 1 条记忆加 3 行投影|PASS|`qa_memory_experience.py:1708`|
 |P12-06|版本感知重试|`python -m pytest tests/test_qa_phase12_pipeline.py tests/test_qa_phase12_behavior.py -q`|六理由码全可达、唯一压制是 SAME_ENVIRONMENT、跨版本必须放行|**6 + 23 passed**；真机 53 次跨版本压制被拦、建议集合被避免通道 17 → 0|PASS|`qa_memory_experience.py:1117/2008`；`qa_gap_analyzer.py:1482`|
 |P12-R1/R2|写门统一、冻结契约与验收可复算|`python -m pytest tests/test_qa_phase12_gate.py tests/test_qa_phase12_contracts.py -q` 与全量|单一真源加派生视图、七指纹不变、版本断言仍是等值断言|**19 + 17 passed**；provenance 52/52、hint 违规 0；全量 **3093 passed / 1 skipped / 0 failed**（Phase 11 基线未破）|PASS|`baseline/qa-experience-acceptance.json`（14/14 true）|
+|P13-01/02|claim 感知组装与引用绑定|`python -m pytest tests/test_qa_phase13_composer.py tests/test_qa_phase13_contracts.py -q`|未核验内容不得当事实；每条引用可回溯|真机 14 个真实答案被评分、129 claim / 93 证据 / 66 条已核验支持；**43 条绑定、40 条落进答案**；引用错绑注入 13/13 检出|PASS|`qa_final_verifier.py`；`baseline/qa-final-acceptance.json`|
+|P13-03|反证与未消解缺口|`python -m pytest tests/test_qa_phase13_counter_gaps.py -q`|反证与未消解缺口必须出现；口径与 Phase 06/07 统一|漏反证注入 **13/13 检出**|PASS|同上|
+|P13-04|终验六问|`python -m pytest tests/test_qa_phase13_verifier.py -q`|六项检查全部可达、复用既有核验与 grounding|注入 A（事实无证据）13/13、B（证据反驳结论）13/13、F（计划当事实）13/13 均为**阻断级**；8 项验收断言全 true|PASS|同上|
+|P13-05|本地重试|`python -m pytest tests/test_qa_phase13_retry.py -q`|只重跑组装或终验、**不得再检索**|`retry_never_retrieves=true`；retry_max=1|PASS|同上|
+|P13-06|证据不足输出|`python -m pytest tests/test_qa_phase13_insufficient.py -q`|无证据必须标记不足并给依据，不许编答案|真机答案状态 partial 13 / insufficient_evidence 1；两条断言均 true|PASS|同上|
+|P13-Gate|Phase 13 Gate（Unit/Integration/Failure-path/兼容回归）|`python -m pytest tests -q`|95 新例全过；全量不破 Phase 12 基线（3093/1/0）|`-k phase13` **95 passed**；相关面 1877 passed；全量 **3188 passed / 1 skipped / 0 failed**（Phase 12 基线未破）；执行图 deep 的 final_verify 占位改已实现且 Phase 05 用例同步|PASS|同上|

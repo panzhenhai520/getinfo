@@ -179,7 +179,7 @@ class ExecutionGraphTests(unittest.TestCase):
         names = {item["node_id"].split(".")[-1] for item in
                  eg.build_execution_graph(question, plan={}, mode="deep")["nodes"]
                  if item["status"] == "deferred"}
-        self.assertEqual(names, {"final_verify"}, "只剩 P13 还是占位")
+        self.assertEqual(names, set(), "Phase 13 之后没有任何占位节点（比原来更强）")
 
 
 class NoModelNoNetworkGuardTests(unittest.TestCase):

@@ -47,6 +47,7 @@ from qa_gap_analyzer import (
     plan_next_hops, review_graph as review_gap_graph,
 )
 from qa_context_pack import context_pack_enabled
+from qa_final_verifier import final_verifier_enabled
 from qa_skills import (
     SKILL_ROUTER_VERSION, skill_router_enabled,
 )
@@ -62,6 +63,9 @@ import config
 
 _PREWARM_LOCK = threading.Lock()
 _PREWARM_LAST: dict[str, float] = {}
+
+FINAL_VERIFY_FAILED_NOTE = "最终核验未完成，已按已核验证据原样交付。"
+"""终验没跑完时的固定说明（两条失败路径──终验内部抛错、接线层抛错──共用同一句，便于检索）。"""
 
 
 def _make_adjustment_parser(provider_registry):
@@ -1175,6 +1179,117 @@ def _gap_stop_reason_from_level1(context: Mapping) -> str:
     stats = level1.get("stats") if isinstance(level1, Mapping) else {}
     receipt = stats.get("gap_loop") if isinstance(stats, Mapping) else {}
     return str((receipt or {}).get("stop_reason") or "") if isinstance(receipt, Mapping) else ""
+
+
+def _final_verify_graph(context: Mapping, store) -> tuple:
+    """阶段 13（P13-04）：终验要看的**结论图**（`(graph, source)`）。
+
+    首选 `conflict_review` 的输出（standard/deep 就有）；快速路径没有这个输出，于是按
+    Phase 06 的 `graph_from_rows()` 从既有四张表**重建**同一形状的图（零新表、零迁移，
+    与证据图 HTTP API 读侧同一条路径）。两条都拿不到就返回空图——终验会退化成
+    "只看答案自带的 claims/evidence"，并在回执里如实写 `answer_only`。
+    """
+    graph = (context.get("outputs") or {}).get("conflict_review")
+    if isinstance(graph, Mapping) and graph.get("claims"):
+        return graph, "conflict_review"
+    run_id = str(((context.get("run") or {}) if isinstance(context.get("run"), Mapping) else {})
+                 .get("id") or "")
+    try:
+        from qa_evidence_graph import graph_from_rows
+
+        rows = store.load_reasoning_graph(run_id) or {}
+        rebuilt = graph_from_rows(claims=rows.get("claims") or [], edges=rows.get("edges") or [],
+                                  conflicts=rows.get("conflicts") or [],
+                                  evidence=rows.get("evidence") or [], run_id=run_id)
+        if rebuilt.get("claims"):
+            return rebuilt, "rebuilt_from_store"
+        return {}, "answer_only"
+    except Exception:  # noqa: BLE001 —— 重建失败就退化成只看答案（终验绝不因此中断）
+        return {}, "answer_only"
+
+
+def _final_verify_routes(graph: Mapping) -> list:
+    """本轮真正用过的检索通道（从证据的 `retrieval_method` 反查，不新造口径）。"""
+    routes = set()
+    for item in ((graph or {}).get("evidence") or []):
+        if isinstance(item, Mapping):
+            route = str(item.get("retrieval_method") or "")
+            if route:
+                routes.add(route)
+    return sorted(routes)
+
+
+def _final_verification_step(context: Mapping, result: Mapping, store, question: str = "") -> dict:
+    """阶段 13（P13-01…P13-06）：组装 → 六问终验 → 局部重试 → 证据不足输出。
+
+    **只加不改**：答案原样作为输入，输出仍是冻结 `FINAL_ANSWER_SCHEMA` 的字段集合
+    （可能被改写的只有 status / degraded / degradation_reasons / answer / sections /
+    claims / citations 这些**已有**字段）。终验自身抛错只记账，答案原样返回（回滚口径）。
+    """
+    from qa_final_verifier import final_verification_layer
+
+    run = context.get("run") or {}
+    graph, source = _final_verify_graph(context, store)
+    pack = graph.get("context_pack") if isinstance(graph, Mapping) else None
+    if not isinstance(pack, Mapping) or not pack:
+        pack = None
+    layer = graph.get("evidence_graph") if isinstance(graph, Mapping) else {}
+    review = layer.get("gap_review") if isinstance(layer, Mapping) else {}
+    stop_reason = (str((review or {}).get("stop_reason") or "")
+                   if isinstance(review, Mapping) else "") or _gap_stop_reason_from_level1(context)
+    final = final_verification_layer(
+        graph=graph, answer=result, pack=pack, question=str(question or ""),
+        stop_reason=stop_reason, routes=_final_verify_routes(graph), store=store,
+        run_id=str((run if isinstance(run, Mapping) else {}).get("id") or ""))
+    receipt = dict(final.get("receipt") or {})
+    receipt["graph_source"] = source
+    # 落库：**每轮一行**（stage=final_verify，attempt=轮次），零迁移复用 qa_stage_runs
+    recorded = []
+    if isinstance(run, Mapping) and run.get("id"):
+        for snapshot in (final.get("rounds") or []):
+            row = dict(snapshot)
+            row["graph_source"] = source
+            recorded.append(store.record_final_verification(
+                str(run.get("id")), row, attempt=int(row.get("round") or 1)))
+    receipt["recorded"] = recorded
+    if isinstance(graph, dict):
+        # 与 Phase 05~12 同一手法：结果挂**兄弟键**（此处只影响内存里的图对象，
+        # 图早在 conflict_review 阶段就落库了；持久化载体是上面那几行 qa_stage_runs）
+        graph["final_verification"] = receipt
+    emit = context.get("_emit_stage_event")
+    if callable(emit):
+        try:
+            emit("stage_progress", {
+                "message": ("最终核验：%s（六问通过 %s/%s；局部重试 %s 次、零检索；"
+                            "证据不足 %s）" % (
+                                receipt.get("outcome") or "-",
+                                sum(1 for check in (receipt.get("checks") or [])
+                                    if check.get("passed")),
+                                len(receipt.get("checks") or []), receipt.get("retries") and
+                                len(receipt["retries"]) or 0,
+                                "是（%s）" % "、".join(receipt.get("insufficient_reasons") or [])
+                                if receipt.get("insufficient") else "否")),
+                "final_verification": receipt,
+            })
+        except Exception:  # noqa: BLE001 —— 推事件失败不该把"已完成的核验"改判成失败
+            pass
+    answer = final.get("answer") if isinstance(final.get("answer"), Mapping) else dict(result)
+    error = str(final.get("error") or "")
+    if error:
+        # 终验内部没跑完（例如组装抛错）：**答案照旧交付**，但必须显式披露，不许静默降级
+        answer = dict(answer)
+        reasons = list(answer.get("degradation_reasons") or [])
+        entry = ("%s%s" % (FINAL_VERIFY_FAILED_NOTE, ("（%s）" % error[:120]) if error else ""))[:500]
+        if entry not in reasons and len(reasons) < 20:
+            reasons.append(entry)
+        answer["degradation_reasons"] = reasons
+        try:
+            store.mark_degraded(str((run if isinstance(run, Mapping) else {}).get("id") or ""), {
+                "stage": "citation_validation", "code": "FINAL_VERIFY_FAILED",
+                "message": FINAL_VERIFY_FAILED_NOTE})
+        except Exception:  # noqa: BLE001
+            pass
+    return {"answer": answer, "layer": final, "receipt": receipt, "error": error}
 
 
 def _context_working_memory(context: Mapping) -> dict:
@@ -3538,6 +3653,24 @@ def build_qa_stage_handlers(
             for ref in conflict.get("evidence_refs") or []
         )
         result["citations"] = list(dict.fromkeys(citations))
+        # 阶段 13（P13-01…P13-06）：Answer Composer 组装 + 六问终验 + 局部重试 + 证据不足输出。
+        # 开关（`QA_FINAL_VERIFIER`）默认关：关掉时下面这一段一个字都不执行，
+        # 本阶段的返回逐字回到接线前（回滚口径）。终验抛错只记账，答案原样过契约。
+        if final_verifier_enabled():
+            try:
+                step = _final_verification_step(context, result, store,
+                                               question=_question_for_synthesis(context))
+                result = dict(step["answer"])
+            except Exception as exc:  # noqa: BLE001 —— 终验绝不能把答案弄丢
+                item = {"stage": "citation_validation", "code": "FINAL_VERIFY_FAILED",
+                        "message": FINAL_VERIFY_FAILED_NOTE}
+                try:
+                    store.mark_degraded(context["run"]["id"], item)
+                except Exception:  # noqa: BLE001
+                    pass
+                result = dict(result)
+                result["degradation_reasons"] = list(result.get("degradation_reasons") or []) + [
+                    "%s（%s）" % (FINAL_VERIFY_FAILED_NOTE, type(exc).__name__)][:20]
         from qa_contracts import validate_final_answer
 
         return validate_final_answer(result)

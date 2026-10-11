@@ -73,12 +73,12 @@
 |P12-04|Source reliability| PASS | 来源可靠性六因子逐项可复算、权重写死、样本不足一律 UNKNOWN、跨轮用总计数重算率；真机 32 个域入投影表（UNKNOWN 17 / MEDIUM 12 / HIGH 2 / LOW 1）；QaStore 两个新方法；14 例 | 2026-10-11 |
 |P12-05|Skill performance memory| PASS | 技能表现记忆口径**零重定义**：直接调 qa_skills.performance_table，success_definition 逐字抄 Phase 11；真机 node_kind=skill 为 0 行 → 记录沿用 Phase 11 的离线重建 38 条，落库 1 条记忆 + 3 行投影；样本不足走 BELOW_SAMPLE_FLOOR；14 例 | 2026-10-11 |
 |P12-06|version-aware retry| PASS | 版本感知重试：六理由码全可达，**唯一能压制的理由只有 SAME_ENVIRONMENT**，且要求记录侧每条轴都被当前环境确认，证明不了就一律放行（MASTER_RULES 15 的安全方向）；缺口循环钩子缺省时行为与 Phase 07 逐字相同；真机 53 次跨版本压制被拦、12 次同环境压制、建议集合里被避免通道 17 → 0；6 + 23 例 | 2026-10-11 |
-|P13-01|claim-aware composer|NOT_STARTED|||
-|P13-02|citation binding|NOT_STARTED|||
-|P13-03|counter-evidence/unresolved gaps|NOT_STARTED|||
-|P13-04|Final Verifier|NOT_STARTED|||
-|P13-05|local retry|NOT_STARTED|||
-|P13-06|insufficient-evidence output|NOT_STARTED|||
+|P13-01|claim-aware composer| PASS | 新增 qa_final_verifier.py：claim 感知的答案组装（按已核验结论组织，未核验内容不得当事实陈述）；真机 14 个真实答案被评分（19 run 中 5 个跳过）、129 claim / 93 证据 / 66 条已核验支持；composer 版本号 qa-answer-composer-v1；测试见 test_qa_phase13_composer.py | 2026-10-11 |
+|P13-02|citation binding| PASS | 引用绑定：43 条绑定、**40 条真正落进答案**，每条可回溯到证据引用；注入变体 E（引用错绑）13 例全部检出（告警级）；测试见 test_qa_phase13_contracts.py | 2026-10-11 |
+|P13-03|counter-evidence/unresolved gaps| PASS | 反证与未消解缺口必须出现在答案里：注入变体 D（漏反证）13 例全部检出；与 Phase 06 的矛盾裁决、Phase 07 的缺口口径统一，不另算一套；测试见 test_qa_phase13_counter_gaps.py | 2026-10-11 |
+|P13-04|Final Verifier| PASS | 终验六问：FACT_WITHOUT_EVIDENCE / EVIDENCE_NOT_SUPPORTING / OVER_INFERENCE / COUNTER_EVIDENCE_MISSING / CITATION_MISBOUND / SPECULATION_AS_FACT 六项全部可达；复用 Phase 03 核验与 Phase 08 grounding（单一真源）；真机 8 项验收断言全 true（真实答案已评分、绑定可回溯、六检查可达、无核验错误）；执行图 deep 路径的 final_verify 占位改为已实现（跑在既有阶段内、开关关时标 skipped） | 2026-10-11 |
+|P13-05|local retry| PASS | 本地重试：只重跑 Composer 或只重跑相关终验，**retrieval_calls 恒为 0**（不得借重试偷偷再检索）；重试上限 retry_max=1；真机断言 retry_never_retrieves=true；测试见 test_qa_phase13_retry.py | 2026-10-11 |
+|P13-06|insufficient-evidence output| PASS | 证据不足输出：无证据时标记为 insufficient_evidence 并给出依据（不是空答案也不是编答案）；真机最终答案状态分布 partial 13 / insufficient_evidence 1（与离线重建口径一致）；断言 insufficient_has_a_basis 与 no_evidence_is_marked_insufficient 均为 true；测试见 test_qa_phase13_insufficient.py | 2026-10-11 |
 |P14-01|Action schema|NOT_STARTED|||
 |P14-02|ExpectedGapReduction utility|NOT_STARTED|||
 |P14-03|KB/EMR/DB/Web routes|NOT_STARTED|||

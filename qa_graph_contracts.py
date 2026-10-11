@@ -2596,10 +2596,313 @@ EXPERIENCE_GUIDANCE_SCHEMA = {
 判定为 `SUPPRESS` 的（版本一变就自动从里面消失）。"""
 
 
+# ── Phase 13（P13-01…P13-06）：Answer Composer & Final Verifier ────────────────
+# 边界（§16/§17）：**只用当前已验证证据回答**。
+#   · §16 Answer Composer 的输入清单（Question / Verified Claims / Evidence Graph /
+#     Unresolved Gaps / Contradictions / Citation Map）与输出形态
+#     （`claim_id → evidence_id[] → source/chunk/span`）→ 落成 `ANSWER_COMPOSITION_SCHEMA`；
+#   · §17 Final Verifier 的**六问**逐字入 `FINAL_VERIFIER_QUESTIONS`，六个检查码入
+#     `FINAL_VERIFIER_CHECKS`；
+#   · §17 "失败时只重跑 Composer 或只重跑相关 Verifier，不重跑整个 Research Graph"
+#     → `FINAL_RETRY_SCOPES` 两值（**没有第三个作用域**，因为规格只给了这两个出口）；
+#   · 口径单一真源：终验**不另造质量判断**——六问全部由 Phase 03 的核验结论
+#     （`qa_verifier` 的 verdict/evidence_score）与 Phase 08 的生成端 grounding 回执
+#     （`qa_context_pack.check_grounding` 的违规码）派生，派生关系写在每个 check 的
+#     `derived_from` 里（机器可校验）；守门用例钉住"改 Phase 08 的回执 → 终验结论跟着变"。
+#   · 冻结契约一个字不动：`FINAL_ANSWER_SCHEMA` 仍 `additionalProperties=False`，
+#     本阶段只写它**已有**的字段（status/degraded/degradation_reasons/citations/citation_map）。
+CLAIM_VERIFICATION_STATUSES: Tuple[str, ...] = (
+    "unverified", "confirmed", "corrected", "qualified", "conflicted", "insufficient_evidence",
+)
+"""结论的核验状态六值 —— **冻结契约 `qa_contracts.CLAIM_SCHEMA.verification_status` 的镜像**。
+
+它与证据层的 `EVIDENCE_STATUSES`（SUPPORTED/QUALIFIED/REFUTED/CONTEXT/UNVERIFIED）是**两套
+词汇**：前者是"这条结论站不站得住"，后者是"这条证据支不支持"。Phase 03 的
+`verify_claim_graph()` 产前者、`verify_evidence_item()` 产后者。本阶段为了不混用两套词，
+在契约层显式给出这个镜像（同样由 `tests/test_qa_phase13_contracts.py` 逐值断言，不放宽）。"""
+
+ANSWER_STATUSES: Tuple[str, ...] = ("ready", "partial", "insufficient_evidence")
+"""答案形态三值——**冻结契约 `qa_contracts.FINAL_ANSWER_SCHEMA.status` 的镜像**（不改它）。
+两处必须机器对齐，由 `tests/test_qa_phase13_contracts.py` 逐值断言（Phase 06 对
+`CLAIM_EVIDENCE_RELATIONSHIPS` 用的是同一手法：镜像 + 守门，而不是让契约层互相 import
+（`qa_contracts` 已经在模块顶部 import 本模块，反向 import 会成环）。"""
+
+ANSWER_COMPOSER_VERSION = "qa-answer-composer-v1"
+"""Answer Composer 组装口径版本（绑定规则/裁剪规则/引用编号口径变更都要换这个号）。"""
+
+FINAL_VERIFIER_VERSION = "qa-final-verifier-v1"
+"""Final Verifier 口径版本（六问的判定规则与派生来源变更要换这个号）。"""
+
+FINAL_VERIFY_RETRY_VERSION = "qa-final-retry-v1"
+"""局部重试口径版本（作用域判定表/上限/幂等判据变更要换这个号）。"""
+
+INSUFFICIENT_EVIDENCE_VERSION = "qa-insufficient-evidence-v1"
+"""证据不足输出口径版本（四条判据与输出形态变更要换这个号）。"""
+
+FINAL_VERIFIER_CHECKS: Tuple[str, ...] = (
+    "FACT_WITHOUT_EVIDENCE",       # §17-1
+    "EVIDENCE_NOT_SUPPORTING",     # §17-2
+    "OVER_INFERENCE",              # §17-3
+    "COUNTER_EVIDENCE_MISSING",    # §17-4
+    "CITATION_MISBOUND",           # §17-5
+    "SPECULATION_AS_FACT",         # §17-6
+)
+"""§17 Final Verifier 的**六个检查码**（一个码对应一问，顺序与规格书逐字一致）。
+`passed=False` 表示这一问没通过；每个码的**派生来源**写在该 check 的 `derived_from` 里，
+绝不新造一套质量判断。"""
+
+FINAL_VERIFIER_QUESTIONS = {
+    "FACT_WITHOUT_EVIDENCE": "每个事实是否有证据？",
+    "EVIDENCE_NOT_SUPPORTING": "证据是否真正支持？",
+    "OVER_INFERENCE": "有没有过度推理？",
+    "SPECULATION_AS_FACT": "有没有把推测写成事实？",
+    "COUNTER_EVIDENCE_MISSING": "是否漏掉重要反证？",
+    "CITATION_MISBOUND": "citation 是否正确？",
+}
+"""§17 六问原文（`FINAL_VERIFIER_CHECKS` 的顺序按"身份类→支持类→推理类→标注类→反证→引用"
+给出，问号原文一字不改；两者的键集合恒相等，有守例钉着）。"""
+
+FINAL_VERIFIER_OUTCOMES: Tuple[str, ...] = ("pass", "fail")
+"""终验的两个结论值（`pass` 才允许原样交付；`fail` 必须走局部重试或证据不足输出）。"""
+
+FINAL_RETRY_SCOPES: Tuple[str, ...] = ("composer", "verifier")
+"""§17 的两个局部重试出口（**只有这两个**）：只重跑 Composer、或只重跑相关 Verifier。
+两条都不重跑检索/证据图/整个 Research Graph（有用例断言本轮零检索、核验只覆盖受影响 claim）。"""
+
+FINAL_RETRY_REASONS: Tuple[str, ...] = (
+    "FIXED", "NO_CHANGE", "RETRY_LIMIT_REACHED", "NO_SCOPE", "SCOPE_UNAVAILABLE",
+)
+"""局部重试的五个去向码：`FIXED` 复验通过；`NO_CHANGE` 重跑后结论一字没变（幂等，不再重试）；
+`RETRY_LIMIT_REACHED` 到上限；`NO_SCOPE` 没有失败码需要重试；`SCOPE_UNAVAILABLE` 作用域要用的
+上游产物（核验结论/证据）本轮不存在，如实记账、绝不假装重试过。"""
+
+FINAL_BINDING_REASONS: Tuple[str, ...] = (
+    "BOUND_SUPPORTED", "BOUND_QUALIFIED", "PLAN_ONLY", "NO_EVIDENCE_REF",
+    "NO_TRACEABLE_SPAN", "NOT_IN_ANSWER",
+)
+"""一条 claim 的绑定判定：前两条是绑上了（按 Phase 03 的 verdict 分档），
+后四条是**没绑上**的具体原因（缺 ref / ref 不可回溯 / 计划态 claim / 不在答案里）。"""
+
+INSUFFICIENT_EVIDENCE_REASONS: Tuple[str, ...] = (
+    "NO_EVIDENCE", "NO_VERIFIED_CLAIM", "RESEARCH_NOT_ANSWERABLE", "GROUNDING_BLOCKED",
+)
+"""证据不足输出的四条判据（任一成立即降为 `status="insufficient_evidence"`）：
+① 本轮一条证据都没有；② 没有任何**被 Phase 03 判 SUPPORTED 且绑得上可回溯 span** 的 claim；
+③ Phase 07 的停止原因不是 `ANSWERABLE`（研究循环自己说了不可回答，单一真源）；
+④ 终验仍有阻断级违规（局部重试也修不掉）。"""
+
+INSUFFICIENT_EVIDENCE_TRIGGERS: Tuple[str, ...] = (
+    "NO_EVIDENCE", "NO_VERIFIED_CLAIM", "GROUNDING_BLOCKED",
+)
+"""四条判据里**单独成立就足以**降档的三条（硬判据）。
+
+`RESEARCH_NOT_ANSWERABLE` 刻意不在里面：它只说明"再检索也没增益/超预算/到深度上限"，
+不代表手上**已有**的已验证证据不够（§14 的语义正是"带着不确定性交付"）。
+它单独出现时按**告警**披露（写进 `degradation_reasons`），与硬判据同时出现时才一起进
+`reason_codes`。这条分歧写死在这里，避免"多一个信号就悄悄把答案降档"。"""
+
+ANSWER_BINDING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "composer_version": {"type": "string"},
+        "claim_id": {"type": "string"},
+        "text": {"type": "string"},
+        "claim_status": {"type": "string", "enum": list(CLAIM_VERIFICATION_STATUSES) + [""]},
+        "plan_only": {"type": "boolean"},
+        "in_answer": {"type": "boolean"},
+        "bound": {"type": "boolean"},
+        "binding_reason": {"type": "string", "enum": list(FINAL_BINDING_REASONS)},
+        "evidence": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "evidence_ref": {"type": "string"},
+                    "evidence_id": {"type": "string"},
+                    "verdict": {"type": "string", "enum": list(EVIDENCE_STATUSES) + [""]},
+                    "evidence_score": {"type": "number"},
+                    "span": {"type": "object"},
+                    "source_url": {"type": "string"},
+                    "chunk_id": {"type": "string"},
+                    "document_id": {"type": "string"},
+                    "source_identity": {"type": "string"},
+                    "grounded": {"type": "boolean"},
+                    "label": {"type": "string"},
+                },
+                "required": ["evidence_ref", "verdict", "grounded"],
+                "additionalProperties": True,
+            },
+        },
+    },
+    "required": ["claim_id", "bound", "binding_reason", "evidence"],
+    "additionalProperties": True,
+}
+"""§16 的**单条事实声明绑定**：`claim_id → evidence_id[] → source/chunk/span`。
+`verdict`/`evidence_score` 直接来自 Phase 03；`span` 直接来自 Phase 02 的最小 span；
+`label` 是引用编号（与 Phase 08 的 `citation_index` 同口径）。"""
+
+ANSWER_COMPOSITION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "composer_version": {"type": "string"},
+        "question": {"type": "string"},
+        "status": {"type": "string", "enum": list(ANSWER_STATUSES)},
+        "bindings": {"type": "array", "items": ANSWER_BINDING_SCHEMA},
+        "verified_claims": {"type": "array", "items": {"type": "string"}},
+        "unbound_claims": {"type": "array", "items": {"type": "string"}},
+        "counter_evidence": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "claim_id": {"type": "string"},
+                    "evidence_ref": {"type": "string"},
+                    "relation": {"type": "string", "enum": list(EVIDENCE_GRAPH_RELATIONSHIPS) + [""]},
+                    "label": {"type": "string"},
+                    "quote": {"type": "string"},
+                    "cited_in_answer": {"type": "boolean"},
+                },
+                "required": ["claim_id", "evidence_ref", "cited_in_answer"],
+                "additionalProperties": True,
+            },
+        },
+        "unresolved_gaps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "gap_id": {"type": "string"},
+                    "gap_type": {"type": "string", "enum": list(QA_GAP_TYPES) + [""]},
+                    "claim_id": {"type": "string"},
+                    "priority": {"type": "number"},
+                    "band": {"type": "string", "enum": list(GAP_PRIORITY_BANDS) + [""]},
+                    "severity": {"type": "string"},
+                    "suggested_routes": {"type": "array",
+                                         "items": {"type": "string",
+                                                   "enum": list(QA_RETRIEVAL_ROUTES)}},
+                    "mentioned_in_answer": {"type": "boolean"},
+                },
+                # `gap_type` 刻意**不进 required**：上游给了闭集合外的取值时，组装层把它记空
+                # 并在 `inputs.unrecognized` 里计数（既不静默放行，也不因为一个陌生值把整份
+                # 组装打爆）；字段本身仍只能是闭集合内的值加空串。
+                "required": ["gap_id"],
+                "additionalProperties": True,
+            },
+        },
+        "contradictions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "conflict_id": {"type": "string"},
+                    "claim_id": {"type": "string"},
+                    "resolution": {"type": "string"},
+                    "reason_code": {"type": "string"},
+                    "winner": {"type": "string"},
+                    "mentioned_in_answer": {"type": "boolean"},
+                },
+                "required": ["conflict_id"],
+                "additionalProperties": True,
+            },
+        },
+        "citation_map": {"type": "object"},
+        "citation_index": {"type": "object"},
+        "inputs": {"type": "object"},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "note": {"type": "string"},
+    },
+    "required": ["composer_version", "bindings", "citation_map", "inputs"],
+    "additionalProperties": True,
+}
+"""§16 Answer Composer 的产物：**事实声明绑定表** + 反证 + 未解决缺口 + 矛盾 + 引用索引。
+它**不写正文**——正文由既有 `qa_synthesis` 生成端负责（本机硬约束禁止调任何模型），
+Composer 只做"把已验证证据组装成可校验的绑定结构"以及"约束与校验"。"""
+
+FINAL_VERIFICATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verifier_version": {"type": "string"},
+        "composer_version": {"type": "string"},
+        "outcome": {"type": "string", "enum": list(FINAL_VERIFIER_OUTCOMES)},
+        "checks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "check_id": {"type": "string", "enum": list(FINAL_VERIFIER_CHECKS)},
+                    "question": {"type": "string"},
+                    "passed": {"type": "boolean"},
+                    "severity": {"type": "string", "enum": ["blocking", "warning", "none"]},
+                    "derived_from": {"type": "array", "items": {"type": "string"}},
+                    "inputs": {"type": "object"},
+                    "failures": {"type": "array", "items": {"type": "object"}},
+                },
+                "required": ["check_id", "passed", "severity", "derived_from", "inputs"],
+                "additionalProperties": True,
+            },
+        },
+        "failed_checks": {"type": "array", "items": {"type": "string",
+                                                     "enum": list(FINAL_VERIFIER_CHECKS)}},
+        "blocking_codes": {"type": "array", "items": {"type": "string"}},
+        "warning_codes": {"type": "array", "items": {"type": "string"}},
+        "grounding": {"type": "object"},
+        "stats": {"type": "object"},
+        "note": {"type": "string"},
+    },
+    "required": ["verifier_version", "outcome", "checks", "failed_checks", "blocking_codes"],
+    "additionalProperties": True,
+}
+"""§17 Final Verifier 的回执：六问逐项可复算（`inputs` 是判据的输入数字，
+`derived_from` 是**上游单一真源**的标识：Phase 03 verdict / Phase 08 违规码）。"""
+
+FINAL_RETRY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "retry_version": {"type": "string"},
+        "attempt": {"type": "integer", "minimum": 0},
+        "max_attempts": {"type": "integer", "minimum": 0},
+        "scope": {"type": "array", "items": {"type": "string", "enum": list(FINAL_RETRY_SCOPES)}},
+        "scope_by_code": {"type": "object"},
+        "reason": {"type": "string", "enum": list(FINAL_RETRY_REASONS) + [""]},
+        "composer": {"type": "object"},
+        "verifier": {"type": "object"},
+        "changes": {"type": "array", "items": {"type": "object"}},
+        "retrieval_calls": {"type": "integer", "minimum": 0},
+        "stats": {"type": "object"},
+    },
+    "required": ["retry_version", "attempt", "max_attempts", "scope", "reason"],
+    "additionalProperties": True,
+}
+"""§17 的局部重试回执：`scope` 只可能是 `composer`/`verifier` 的子集；
+`retrieval_calls` 恒 0（不重跑 Research Graph 的机器可校验形态）。"""
+
+INSUFFICIENT_EVIDENCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "insufficient_version": {"type": "string"},
+        "insufficient": {"type": "boolean"},
+        "status": {"type": "string", "enum": list(ANSWER_STATUSES)},
+        "reason_codes": {"type": "array",
+                         "items": {"type": "string",
+                                   "enum": list(INSUFFICIENT_EVIDENCE_REASONS)}},
+        "inputs": {"type": "object"},
+        "missing": {"type": "array", "items": {"type": "object"}},
+        "searched": {"type": "object"},
+        "text_block": {"type": "string"},
+    },
+    "required": ["insufficient_version", "insufficient", "status", "reason_codes", "inputs"],
+    "additionalProperties": True,
+}
+"""P13-06 证据不足输出：四条判据（`reason_codes`）+ 判据输入（`inputs`，可复算）
++ 缺什么（`missing`，来自 Phase 07 缺口）+ 已经搜过什么（`searched`，来自停止原因与检索回执）。
+答案形态只用冻结 schema 的**已有字段**（status/degraded/degradation_reasons）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s / "
-            "技能注册表 %s / 技能路由 %s / 经验记忆 %s："
+            "技能注册表 %s / 技能路由 %s / 经验记忆 %s / 答案组装 %s / 终验 %s / 局部重试 %s / "
+            "证据不足输出 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
@@ -2607,10 +2910,13 @@ def describe() -> str:
             "记忆类型 %d / 记忆状态 %d / 记忆关系 %d / "
             "时效闸门出口 %d / 复验出口 %d / 记忆矛盾种类 %d / 撤销理由 %d / "
             "技能 %d / 技能种类 %d / 成本档 %d / 延迟档 %d / 权限位 %d / 选择理由码 %d / "
-            "剧集要素 %d / 失败种类 %d / 重试出口 %d / 来源档 %d"
+            "剧集要素 %d / 失败种类 %d / 重试出口 %d / 来源档 %d / "
+            "终验检查 %d / 局部重试作用域 %d / 证据不足判据 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION, EXPERIENCE_MEMORY_VERSION,
+               ANSWER_COMPOSER_VERSION, FINAL_VERIFIER_VERSION, FINAL_VERIFY_RETRY_VERSION,
+               INSUFFICIENT_EVIDENCE_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
@@ -2626,7 +2932,9 @@ def describe() -> str:
                len(SKILL_LATENCY_CLASSES), len(SKILL_PERMISSIONS),
                len(SKILL_SELECTION_REASONS),
                len(EPISODE_SECTIONS), len(FAILURE_KINDS), len(RETRY_DECISIONS),
-               len(SOURCE_RELIABILITY_BANDS)))
+               len(SOURCE_RELIABILITY_BANDS),
+               len(FINAL_VERIFIER_CHECKS), len(FINAL_RETRY_SCOPES),
+               len(INSUFFICIENT_EVIDENCE_REASONS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -2737,6 +3045,12 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "skill_performance_memory": SKILL_PERFORMANCE_MEMORY_SCHEMA,
         "retry_decision": RETRY_DECISION_SCHEMA,
         "experience_guidance": EXPERIENCE_GUIDANCE_SCHEMA,
+        # Phase 13（P13-01…P13-06）
+        "answer_binding": ANSWER_BINDING_SCHEMA,
+        "answer_composition": ANSWER_COMPOSITION_SCHEMA,
+        "final_verification": FINAL_VERIFICATION_SCHEMA,
+        "final_retry": FINAL_RETRY_SCHEMA,
+        "insufficient_evidence": INSUFFICIENT_EVIDENCE_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

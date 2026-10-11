@@ -2649,6 +2649,133 @@ class QaStore:
             })
         return rows
 
+    # ── Phase 13（P13-04/P13-05）：最终核验的落库（**零迁移**，复用 qa_stage_runs）────────
+    # 为什么不再建表：`qa_stage_runs` 已有 status/latency/attempt/details 与
+    # `UNIQUE(run_id, stage, attempt)`，正好是"每个 run 每轮终验一行"（Phase 11 的技能遥测
+    # 用的是同一个手法）。**attempt = 终验轮次**（1 = 首轮，2.. = 第 n 次局部重试之后），
+    # 于是 P13-05 的"只重跑 Composer / 只重跑相关 Verifier"天然可审计。
+    def record_final_verification(self, run_id: str, record: Mapping, *, attempt: int = 1) -> dict:
+        """把一个终验轮次落库。返回 `{ok, stage, attempt, status, error}`；失败只记账。"""
+        record = record if isinstance(record, Mapping) else {}
+        outcome = str(record.get("outcome") or "")
+        insufficient = bool(record.get("insufficient"))
+        error = str(record.get("error") or "")
+        if error:
+            status = "failed"
+        elif outcome == "pass":
+            status = "completed"
+        else:
+            # 终验没通过但答案照样交付（降档 / 证据不足输出）→ 记 degraded，不算 run 失败
+            status = "degraded"
+        failed = [str(code) for code in (record.get("failed_checks") or [])]
+        details = {
+            "final_verifier_version": str(record.get("verifier_version")
+                                          or record.get("layer_version") or ""),
+            "composer_version": str(record.get("composer_version") or ""),
+            "retry_version": str(record.get("retry_version") or ""),
+            "round": max(1, int(attempt)),
+            "outcome": outcome, "insufficient": insufficient,
+            "failed_checks": failed,
+            "blocking_codes": [str(code) for code in (record.get("blocking_codes") or [])],
+            "warning_codes": [str(code) for code in (record.get("warning_codes") or [])],
+            "checks": [dict(item) for item in (record.get("checks") or []) if isinstance(item, Mapping)],
+            "insufficient_reasons": [str(code) for code in (record.get("insufficient_reasons") or [])],
+            "retries": [dict(item) for item in (record.get("retries") or []) if isinstance(item, Mapping)],
+            "retrieval_calls": int(record.get("stats", {}).get("retrieval_calls") or 0)
+            if isinstance(record.get("stats"), Mapping) else 0,
+            "claims": int(record.get("claims") or 0),
+            "verified_claims": int(record.get("verified_claims") or 0),
+            "citation_labels": int(record.get("citation_labels") or 0),
+            "unresolved_gaps": int(record.get("unresolved_gaps") or 0),
+            "answer_status": str(record.get("status") or ""),
+            "stats": dict(record.get("stats") or {}) if isinstance(record.get("stats"), Mapping) else {},
+        }
+        try:
+            self.record_stage(
+                str(run_id), "final_verify", status=status, attempt=max(1, int(attempt)),
+                error_code=(error or ("insufficient_evidence" if insufficient else
+                                      (failed[0] if failed else ""))),
+                details=details, node_id="final_verify", node_kind="final_verify")
+            return {"ok": True, "stage": "final_verify", "attempt": max(1, int(attempt)),
+                    "status": status, "error": ""}
+        except Exception as exc:  # noqa: BLE001 —— 遥测绝不能把主链路打断
+            return {"ok": False, "stage": "final_verify", "attempt": max(1, int(attempt)),
+                    "status": status, "error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+
+    def final_verification_rows(self, *, run_id: str = "", limit: int = 200) -> list:
+        """读终验行（`node_kind='final_verify'`），`details_json` 里的口径值提到顶层。"""
+        rows: list = []
+        try:
+            self.ensure_schema()
+            where, params = ["node_kind='final_verify'"], []
+            if run_id:
+                where.append("run_id=?")
+                params.append(str(run_id))
+            params.append(max(1, int(limit)))
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    raw = cursor.execute(
+                        "SELECT run_id,stage,attempt,status,error_code,latency_ms,details_json "
+                        "FROM qa_stage_runs WHERE %s ORDER BY started_at, attempt LIMIT ?"
+                        % " AND ".join(where), tuple(params)).fetchall()
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001 —— 读不到就当没有遥测（不编数据）
+            return []
+        for row in raw:
+            value = _row_dict(row) or {}
+            try:
+                details = _decode_json(value.get("details_json"), {})
+            except Exception:  # noqa: BLE001
+                details = {}
+            details = details if isinstance(details, Mapping) else {}
+            rows.append({
+                "run_id": str(value.get("run_id") or ""),
+                "stage": str(value.get("stage") or ""),
+                "round": int(details.get("round") or value.get("attempt") or 1),
+                "attempt": int(value.get("attempt") or 1),
+                "status": str(value.get("status") or ""),
+                "error_code": str(value.get("error_code") or ""),
+                "outcome": str(details.get("outcome") or ""),
+                "insufficient": bool(details.get("insufficient")),
+                "failed_checks": list(details.get("failed_checks") or []),
+                "blocking_codes": list(details.get("blocking_codes") or []),
+                "warning_codes": list(details.get("warning_codes") or []),
+                "insufficient_reasons": list(details.get("insufficient_reasons") or []),
+                "retrieval_calls": int(details.get("retrieval_calls") or 0),
+                "claims": int(details.get("claims") or 0),
+                "verified_claims": int(details.get("verified_claims") or 0),
+                "citation_labels": int(details.get("citation_labels") or 0),
+                "unresolved_gaps": int(details.get("unresolved_gaps") or 0),
+                "answer_status": str(details.get("answer_status") or ""),
+                "final_verifier_version": str(details.get("final_verifier_version") or ""),
+                "retries": [dict(item) for item in (details.get("retries") or [])
+                            if isinstance(item, Mapping)],
+                "checks": [dict(item) for item in (details.get("checks") or [])
+                           if isinstance(item, Mapping)],
+                "wall_latency_ms": value.get("latency_ms"),
+            })
+        return rows
+
+    def final_verification_stats(self, *, run_id: str = "") -> dict:
+        """终验的分组统计（验收工具/运维自检用）。"""
+        rows = self.final_verification_rows(run_id=run_id)
+        stats = {"rounds": len(rows), "by_outcome": {}, "by_check_failed": {},
+                 "by_insufficient_reason": {}, "retrieval_calls": 0, "insufficient": 0,
+                 "retries": 0, "error": ""}
+        for row in rows:
+            stats["by_outcome"][row["outcome"]] = stats["by_outcome"].get(row["outcome"], 0) + 1
+            for code in row["failed_checks"]:
+                stats["by_check_failed"][code] = stats["by_check_failed"].get(code, 0) + 1
+            for code in row["insufficient_reasons"]:
+                stats["by_insufficient_reason"][code] = \
+                    stats["by_insufficient_reason"].get(code, 0) + 1
+            stats["retrieval_calls"] += int(row["retrieval_calls"] or 0)
+            stats["insufficient"] += 1 if row["insufficient"] else 0
+            stats["retries"] += len(row["retries"])
+        return stats
+
     def skill_telemetry_stats(self, *, run_id: str = "") -> dict:
         """技能遥测的分组统计（验收工具/运维自检；与 `memory_revalidation_stats` 同一风格）。"""
         stats = {"records": 0, "by_skill": {}, "by_stage": {}, "by_outcome": {},

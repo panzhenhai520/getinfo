@@ -28,10 +28,11 @@
 --------------------------------
   · **零模型调用**：所有真正执行的节点 `model_tier` 都是 `none`/`rule`；`small/medium/strong`
     只用于**声明**（§29），本轮不接任何模型（GPU 与语音机器人共用、已停用）。
-  · §18 的 deep 链里 `gap_loop`(P07) / `final_verify`(P13) 属后续阶段：本模块把它们建成
-    `status="deferred"`、`implemented=False`、`deferred_to="P0x"` 的**占位节点**，不参与预算、
-    也不假装跑过；`evidence_graph`(P06) **已在 Phase 06 实现**（跑在既有 `conflict_review`
-    阶段内部，不新造运行期阶段），不再是占位。既有的 `conflict_review` 阶段一直是真节点。
+  · §18 的 deep 链里 `gap_loop`(P07) / `evidence_graph`(P06) / `final_verify`(P13) 都**已实现**：
+    它们不新造运行期阶段，而是跑在既有阶段内部（分别是 `level1_retrieval` 的检索循环、
+    `conflict_review`、`citation_validation`），所以节点记各自那个**在链上**的阶段。
+    本模块**不再保留任何占位节点**（Phase 13 结清最后一笔账）；开关默认关的节点标
+    `skipped`（不许假装跑过），开关打开才是 `pending`。既有的 `conflict_review` 一直是真节点。
   · `timeout` 是"分配预算"，不等于"一定会被强杀"：每个节点用 `budget_enforced` +
     `budget_source` 标明这笔预算今天到底由谁执行（舰队超时/多跳预算/阶段预算/仅记账）。
 """
@@ -827,16 +828,43 @@ def _nodes_for_path(path: str, ctx: Mapping) -> list:
             budget_source="进程内规则建图/裁决（无外部调用；QA_EVIDENCE_GRAPH 默认关）",
             budget_enforced=False, status=evidence_graph_status,
             notes=evidence_graph_note))
+        # ── §18 deep 链的第 4 段：**P13 交付**的 Final Verifier（六问）──
+        # 诚实说明：P13 没有新造运行期阶段，它跑在既有 `citation_validation` 阶段内部
+        # （`qa_pipeline._final_verification_step`，synthesis 之后），所以本节点的 stage 记
+        # `citation_validation`（该阶段三条链上都有），并依赖既有 finalize 节点。
+        # 开关 `QA_FINAL_VERIFIER` **默认关**：关着的时候这一步根本不会跑，
+        # 所以节点标 `skipped`（与 P06 的 evidence_graph 节点同口径），不许假装已经跑过。
+        final_verify_status = "skipped"
+        final_verify_note = ("P13 已实现（qa_final_verifier：组装 + §17 六问 + 局部重试 + "
+                             "证据不足输出），但 QA_FINAL_VERIFIER 默认关 → 本轮不执行；"
+                             "打开开关即在既有 citation_validation 阶段内做终验（纯规则，零模型），"
+                             "且**先于**该阶段的契约校验（契约校验必须看到终验改写后的答案）")
+        final_verify_timeout = float(ctx.get("final_verify_seconds") or 3.0)
+        try:
+            import qa_final_verifier as final_verifier_module
+
+            if final_verifier_module.final_verifier_enabled():
+                final_verify_status = "pending"
+                final_verify_note = (
+                    "P13 交付：题目/绑定/反证/缺口组装 + 六问终验（FACT_WITHOUT_EVIDENCE / "
+                    "EVIDENCE_NOT_SUPPORTING / OVER_INFERENCE / COUNTER_EVIDENCE_MISSING / "
+                    "CITATION_MISBOUND / SPECULATION_AS_FACT）+ 局部重试（只重跑 Composer 或只重跑"
+                    "相关 Verifier，零检索）+ 证据不足输出；嵌在既有 citation_validation 阶段内")
+        except Exception as exc:  # noqa: BLE001  取不到开关就按"关"处理，并写明原因
+            final_verify_note += "（开关读取失败：%s）" % type(exc).__name__
+            final_verify_timeout = 0.0
         nodes.append(_node(
-            path, "final_verify", node_kind="final_verify", stage="final_verify",
-            purpose="最终核验（§18 deep 的最后一段）",
-            depends_on=["%s.answer" % path], timeout=0.0, model_tier="strong",
-            allowed_tools=["qa_final_verifier"], validation=["final_answer"],
-            failure_policy=QA_FAILURE_FAIL_FAST,
-            output_schema=_signal(SCHEMA_FINAL_ANSWER, ["status"]),
-            implemented=False, deferred_to="P13（Answer Composer / Final Verifier）",
-            status="deferred",
-            notes="本阶段未实现：Phase 13 交付"))
+            path, "final_verify", node_kind="final_verify", stage="citation_validation",
+            purpose="最终核验（§17 六问；P13 已实现，纯规则，失败只重跑 Composer/相关 Verifier）",
+            depends_on=["%s.answer" % path], timeout=final_verify_timeout, model_tier="rule",
+            allowed_tools=["qa_final_verifier"],
+            validation=["final_verification", "answer_composition", "insufficient_evidence"],
+            failure_policy=QA_FAILURE_DEGRADE,
+            input_schema=_signal(SCHEMA_FINAL_ANSWER, ["answer", "claims", "citations"]),
+            output_schema=_signal(SCHEMA_FINAL_ANSWER, ["answer", "status", "citations"]),
+            budget_source="进程内规则组装/判定（无外部调用；QA_FINAL_VERIFIER 默认关）",
+            budget_enforced=False, status=final_verify_status,
+            notes=final_verify_note))
         # 说明：deep 链里 P07 的 `gap_loop` 自 Phase 07 起是**真节点**（不再 deferred），
         # 它跑在 level1_retrieval 的检索循环内部，所以声明在检索段（三条路径都有）。
     return nodes

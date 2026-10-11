@@ -11,8 +11,9 @@
      失败策略只用五值枚举，并且与 `qa_orchestrator.DEGRADABLE_STAGES` 对齐；
   4. 舰队打开时首跳是**并行扇出 + fan-in barrier**（§2.4/§2.5），Hunter 节点的超时/重试
      直接取舰队的既有旋钮；
-  5. 执行图里**未实现**的占位节点只剩 P13 的 `final_verify`（`deferred`、不参与预算）；
-     `evidence_graph`（P06）与 `gap_loop`（P07）自各自 Phase 起都是真节点（开关关着时标 skipped）。
+  5. 执行图里**没有任何占位节点**（Phase 13 起 `final_verify` 也是真节点）：
+     `evidence_graph`（P06）、`gap_loop`（P07）、`final_verify`（P13）都是实现节点，
+     开关关着时标 `skipped`（不许假装跑过）。
 """
 import os
 import sys
@@ -156,19 +157,41 @@ class NodeContractTests(unittest.TestCase):
             self.assertIn(edge["dst"], by_id)
             self.assertEqual(edge["schema"], by_id[edge["src"]]["output_schema"]["name"])
 
-    def test_deep_path_defers_later_phase_nodes(self):
-        """Phase 06 起 `evidence_graph` 已实现；Phase 07 起 `gap_loop` 也**不再是占位**。
-        仍占位的只剩 P13 的 `final_verify`（deep 链独有）。"""
+    def test_no_placeholder_nodes_remain_on_any_path(self):
+        """Phase 13 起**没有任何占位节点**（`final_verify` 也成了真节点）。
+
+        断言比 Phase 07 时**更强**：那时只要求"剩下的占位只有 final_verify"，
+        现在要求"三条路径上一个占位都没有"，并且逐条钉住 final_verify 是真的实现节点。
+        """
+        for mode in ("fast", "standard", "deep"):
+            graph = _graph(mode=mode)
+            self.assertEqual(graph["node_counts"]["deferred"], 0,
+                             "%s 路径上不许再有占位节点" % mode)
+            self.assertEqual([node for node in graph["nodes"] if node["status"] == "deferred"], [])
         graph = _graph(mode="deep")
-        deferred = [node for node in graph["nodes"] if node["status"] == "deferred"]
-        self.assertEqual({node["node_id"].split(".")[-1] for node in deferred},
-                         {"final_verify"})
-        for node in deferred:
-            self.assertFalse(node["implemented"])
-            self.assertTrue(node["deferred_to"].startswith("P"))
-            self.assertEqual(node["timeout"], 0.0, "占位节点不占预算")
-        self.assertEqual(graph["node_counts"]["deferred"], 1)
-        # P06 的 evidence_graph 现在是**真节点**：implementation 打开、有预算、阶段在链上
+        final_verify = [node for node in graph["nodes"]
+                        if node["node_id"] == "deep.final_verify"][0]
+        self.assertTrue(final_verify["implemented"], "P13 之后 final_verify 是真节点")
+        self.assertEqual(final_verify["deferred_to"], "")
+        self.assertGreater(final_verify["timeout"], 0.0, "真节点要占预算")
+        self.assertIn(final_verify["stage"], set(graph["stage_chain"]))
+        self.assertEqual(final_verify["model_tier"], "rule", "P13 是纯规则实现（不许调模型）")
+        self.assertEqual(final_verify["allowed_tools"], ["qa_final_verifier"])
+        self.assertEqual(final_verify["depends_on"], ["deep.answer"],
+                         "§17：终验读的是答案（与证据图），不是重新检索")
+        # 开关默认关 → 这一步本轮真的不会跑，节点必须标 skipped（不许假装跑过）
+        self.assertEqual(final_verify["status"], "skipped")
+        saved = os.environ.get("QA_FINAL_VERIFIER")
+        os.environ["QA_FINAL_VERIFIER"] = "1"
+        try:
+            enabled = [node for node in _graph(mode="deep")["nodes"]
+                       if node["node_id"] == "deep.final_verify"][0]
+            self.assertEqual(enabled["status"], "pending", "开关打开后才进入待跑状态")
+        finally:
+            os.environ.pop("QA_FINAL_VERIFIER", None)
+            if saved is not None:
+                os.environ["QA_FINAL_VERIFIER"] = saved
+        # P06 的 evidence_graph 同样是真节点：implementation 打开、有预算、阶段在链上
         evidence_graph = [node for node in graph["nodes"]
                           if node["node_id"] == "deep.evidence_graph"][0]
         self.assertTrue(evidence_graph["implemented"])
