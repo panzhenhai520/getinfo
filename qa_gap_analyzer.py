@@ -292,6 +292,31 @@ def independent_sources_floor() -> int:
     return _env_int("QA_GAP_INDEPENDENT_SOURCES", DEFAULT_INDEPENDENT_SOURCES, 1, 20)
 
 
+def resolve_floors(floors: Mapping | None = None) -> dict:
+    """缺口判据的三个下界的**解析**（Phase 14 · P14-07 的会话配置落点，唯一真源）。
+
+    缺省（`None` 或键缺失）→ 环境变量/常量给的默认值 → **行为与 Phase 13 逐字相同**；
+    给了覆盖值就按覆盖值判 —— 这样"提高来源权威要求 / 放宽收紧证据门槛"才真的改变判据。
+    非法值（非数字、NaN）一律丢弃并退回默认值：会话配置绝不允许把判据弄坏。
+    """
+    values = {"authority": int(authority_floor()), "relevance": float(relevance_floor()),
+              "independent": int(independent_sources_floor())}
+    raw = floors if isinstance(floors, Mapping) else {}
+    for key, low, high in (("authority", 0.0, 100.0), ("relevance", 0.0, 1.0),
+                           ("independent", 1.0, 20.0)):
+        if key not in raw:
+            continue
+        try:
+            number = float(raw.get(key))
+        except (TypeError, ValueError):
+            continue
+        if number != number:      # NaN
+            continue
+        number = max(low, min(high, number))
+        values[key] = round(number, 4) if key == "relevance" else int(number)
+    return values
+
+
 def safety_terms() -> tuple:
     raw = str(os.environ.get("QA_GAP_SAFETY_TERMS", "") or "")
     extra = tuple(item.strip() for item in raw.split(",") if item.strip())
@@ -699,11 +724,13 @@ def _make_gap(claim: dict, missing: str, *, detail: str, reason: str, facts: dic
 
 
 def _rules_for_claim(claim: dict, facts: dict, *, category: str,
-                     contradictions: Sequence[Mapping], plan: Mapping | None = None) -> list:
+                     contradictions: Sequence[Mapping], plan: Mapping | None = None,
+                     floors: Mapping | None = None) -> list:
     """一条 claim 上跑一遍缺口规则，返回 [{missing, detail, reason, contradiction}]。
 
     规则顺序 = 判定优先级（先判"根本没证据"，再判质量/独立性/链接，最后判反证）。
     每条规则都是"事实 → 结论"的纯函数，理由文本里带数字，可复算。
+    `floors` 是 Phase 14（P14-07）的会话级判据覆盖值（缺省 = 环境默认值，行为不变）。
     """
     found: list = []
     total = len(facts["evidence"])
@@ -713,9 +740,10 @@ def _rules_for_claim(claim: dict, facts: dict, *, category: str,
     # Phase 03 理由码 → 缺口类型（**缺口不是另算的**：verifier 说"重叠不足"，这里就记 LOW_RELEVANCE）
     derived = {_GAP_TYPES_BY_REASON[code] for code in reasons if code in _GAP_TYPES_BY_REASON}
     facts["derived_types"] = sorted(derived)
-    authority_floor_value = authority_floor()
-    relevance_floor_value = relevance_floor()
-    independent_floor_value = independent_sources_floor()
+    floor_values = resolve_floors(floors)
+    authority_floor_value = floor_values["authority"]
+    relevance_floor_value = floor_values["relevance"]
+    independent_floor_value = floor_values["independent"]
 
     if total == 0 or QA_GAP_NO_EVIDENCE in derived:
         found.append({"missing": QA_GAP_NO_EVIDENCE,
@@ -838,18 +866,20 @@ def _ambiguous_entity(claim: Mapping, plan: Mapping | None) -> bool:
 def detect_gaps(claims: Sequence[Mapping], *, edges: Sequence[Mapping] = (),
                 evidence: Sequence[Mapping] = (), contradictions: Sequence[Mapping] = (),
                 category: str = "", plan: Mapping | None = None,
-                limit: int | None = None) -> dict:
+                limit: int | None = None, floors: Mapping | None = None) -> dict:
     """P07-01：把"当前有哪些必要 Claim、各自缺什么证据"算成 Gap 清单。
 
     入参都是既有产物（plan claim / Phase 06 claim row、Phase 06 边、证据包、Phase 06 裁决、
     Phase 05 研究计划）；返回 `{"gaps": [...], "stats": {...}}`：gaps 按 (priority 降序,
     gap_id 升序) 排好，单条 claim 最多留 `QA_GAP_MAX_GAPS_PER_CLAIM` 条（只留最要紧的），
     总数受 `QA_GAP_MAX_GAPS` 限制。
+    `floors`（Phase 14 增补，缺省 None）覆盖判据下界 —— 缺省时逐字等于既有行为。
     """
     edges = list(edges or [])
     evidence_pool = list(evidence or [])
     evidence_by_ref = {str(item.get("evidence_ref") or ""): item for item in evidence_pool}
-    relevance_floor_value = relevance_floor()
+    floor_values = resolve_floors(floors)
+    relevance_floor_value = floor_values["relevance"]
     # 类别优先取显式入参，其次从计划里读（两种调用方式给同一个答案）
     category = str(category or category_of(plan) or "")
     normalized = []
@@ -864,7 +894,8 @@ def detect_gaps(claims: Sequence[Mapping], *, edges: Sequence[Mapping] = (),
                                 evidence_pool=evidence_pool,
                                 relevance_floor_value=relevance_floor_value)
         found = _rules_for_claim(claim, facts, category=category,
-                                 contradictions=contradictions, plan=plan)
+                                 contradictions=contradictions, plan=plan,
+                                 floors=floor_values)
         made = [_make_gap(claim, item["missing"], detail=item["detail"], reason=item["reason"],
                           facts=facts, contradiction=item.get("contradiction"))
                 for item in found]
@@ -908,25 +939,29 @@ def hunters_for(route: str) -> list:
 
 
 def evidence_requirement_for(missing: str, *, gap_claim: Mapping | None = None,
-                             facts: Mapping | None = None) -> dict:
+                             facts: Mapping | None = None,
+                             floors: Mapping | None = None) -> dict:
     """P07-02：这条缺口到底缺哪类证据、缺到什么程度（§7 Evidence Requirement 口径）。
 
     `satisfied_by` **本轮一律留空**：它是"哪个节点负责满足它"的声明位（Phase 05 定的字段），
     真实满足度由下一轮的缺口重算来证明（`status=resolved`），不在这里自证。
+    `floors`（Phase 14 增补，缺省 None）＝会话级判据覆盖值，缺省时逐字等于既有行为。
     """
     missing = str(missing)
     claim = gap_claim if isinstance(gap_claim, Mapping) else {}
     facts = facts if isinstance(facts, Mapping) else {}
+    floor_values = resolve_floors(floors)
     need_independent = missing == QA_GAP_SINGLE_SOURCE
     require_counter = missing == QA_GAP_MISSING_COUNTEREVIDENCE
-    min_authority = authority_floor() if missing in (QA_GAP_LOW_AUTHORITY, QA_GAP_CONTRADICTION) else 0
+    min_authority = floor_values["authority"] if missing in (QA_GAP_LOW_AUTHORITY,
+                                                             QA_GAP_CONTRADICTION) else 0
     return {
         "requirement_id": "req:%s" % _digest("%s|%s" % (claim.get("claim_id") or "", missing), 10),
         "plan_node_kind": "evidence_requirement",
         "sub_question_id": str(claim.get("sub_question_id") or ""),
         "evidence_type": EVIDENCE_TYPE_BY_GAP.get(missing, "any_evidence"),
         "missing": missing,
-        "min_independent_sources": independent_sources_floor() if need_independent else 1,
+        "min_independent_sources": floor_values["independent"] if need_independent else 1,
         "min_authority_level": min_authority,
         "require_verified": True,
         "require_counterevidence": require_counter,
@@ -1323,7 +1358,8 @@ class GapLoopState:
                  started: float | None = None, clock: Callable | None = None,
                  threshold: float | None = None, no_gain_threshold: int | None = None,
                  category: str = "", plan: Mapping | None = None,
-                 corpus_version: str = "", retrieval_config: str = ""):
+                 corpus_version: str = "", retrieval_config: str = "",
+                 floors: Mapping | None = None):
         self.rounds_limit = max(1, int(rounds_limit or MAX_HOP_ROUNDS))
         self.budget_seconds = float(budget_seconds or 0.0)
         self.clock = clock or _monotonic
@@ -1334,6 +1370,9 @@ class GapLoopState:
         self.plan = dict(plan) if isinstance(plan, Mapping) else {}
         self.corpus_version = str(corpus_version or "")
         self.retrieval_config = str(retrieval_config or "")
+        # Phase 14（P14-07）：会话级判据覆盖值（缺省 None → 环境默认值，行为与 Phase 13 逐字相同）
+        self.floors = resolve_floors(floors)
+        self.floors_source = "session_config" if isinstance(floors, Mapping) and floors else "defaults"
         self.rounds: list = []
         self.gaps: list = []
         self.previous_gaps: dict = {}
@@ -1369,7 +1408,8 @@ class GapLoopState:
         """算这一轮的缺口事实并与上一轮做差（返回本轮回执）。"""
         analysis = detect_gaps(claims, edges=edges, evidence=evidence,
                                contradictions=contradictions,
-                               category=self.category, plan=self.plan, limit=None)
+                               category=self.category, plan=self.plan, limit=None,
+                               floors=self.floors)
         gaps = analysis["gaps"]
         current = {gap["gap_id"]: gap for gap in gaps}
         resolved = [gap for gap_id, gap in self.previous_gaps.items() if gap_id not in current]
@@ -1651,7 +1691,8 @@ def _monotonic() -> float:
 # ── 证据图阶段的缺口复核（UNRESOLVABLE_CONTRADICTION 的权威出口）────────────
 def review_graph(layer: Mapping, *, graph: Mapping | None = None, plan: Mapping | None = None,
                  state: GapLoopState | None = None,
-                 previous_stop_reason: str = "") -> dict:
+                 previous_stop_reason: str = "",
+                 floors: Mapping | None = None) -> dict:
     """在 Phase 06 证据图上做一次缺口复核（**不再发起检索**：检索阶段已经结束）。
 
     它回答两个问题：
@@ -1672,7 +1713,8 @@ def review_graph(layer: Mapping, *, graph: Mapping | None = None, plan: Mapping 
                       if isinstance(item, Mapping)]
     analysis = detect_gaps(claims, edges=edges, evidence=evidence,
                            contradictions=contradictions, plan=plan,
-                           category=category_of(plan))
+                           category=category_of(plan),
+                           floors=floors)
     gaps = analysis["gaps"]
     unresolved = [item for item in contradictions
                   if str(item.get("resolution") or "") == "unresolved"]

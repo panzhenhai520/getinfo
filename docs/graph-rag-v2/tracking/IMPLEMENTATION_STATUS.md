@@ -79,13 +79,13 @@
 |P13-04|Final Verifier| PASS | 终验六问：FACT_WITHOUT_EVIDENCE / EVIDENCE_NOT_SUPPORTING / OVER_INFERENCE / COUNTER_EVIDENCE_MISSING / CITATION_MISBOUND / SPECULATION_AS_FACT 六项全部可达；复用 Phase 03 核验与 Phase 08 grounding（单一真源）；真机 8 项验收断言全 true（真实答案已评分、绑定可回溯、六检查可达、无核验错误）；执行图 deep 路径的 final_verify 占位改为已实现（跑在既有阶段内、开关关时标 skipped） | 2026-10-11 |
 |P13-05|local retry| PASS | 本地重试：只重跑 Composer 或只重跑相关终验，**retrieval_calls 恒为 0**（不得借重试偷偷再检索）；重试上限 retry_max=1；真机断言 retry_never_retrieves=true；测试见 test_qa_phase13_retry.py | 2026-10-11 |
 |P13-06|insufficient-evidence output| PASS | 证据不足输出：无证据时标记为 insufficient_evidence 并给出依据（不是空答案也不是编答案）；真机最终答案状态分布 partial 13 / insufficient_evidence 1（与离线重建口径一致）；断言 insufficient_has_a_basis 与 no_evidence_is_marked_insufficient 均为 true；测试见 test_qa_phase13_insufficient.py | 2026-10-11 |
-|P14-01|Action schema|NOT_STARTED|||
-|P14-02|ExpectedGapReduction utility|NOT_STARTED|||
-|P14-03|KB/EMR/DB/Web routes|NOT_STARTED|||
-|P14-04|ask-patient route|NOT_STARTED|||
-|P14-05|Context Gap no-repeat|NOT_STARTED|||
-|P14-07|重复提问识别与思路调整确认|NOT_STARTED|||
-|P14-06|clinical/safety weights|NOT_STARTED|||
+|P14-01|Action schema| PASS | 新增动作契约段：六动作逐字入契约（动作、来源、通道、Hunter 四张映射加 8 个新 schema，注册进 validate 并进 describe）；19 例 | 2026-10-11 |
+|P14-02|ExpectedGapReduction utility| PASS | 新 qa_acquisition.py：ExpectedGapReduction 等于适配度乘（0.5 加 0.5 乘严重度），Utility 等于 EGR 乘重要性乘可靠性除以（延迟加成本加用户负担），逐项可手算；16 例 | 2026-10-11 |
+|P14-03|KB/EMR/DB/Web routes| PASS | 动作映射到既有七通道（EMR 与问诊如实为空串）加部署源；route_guidance_from 复用 Phase 12 的通道指导真改缺口通道次序（keyword 到 semantic 有前后对比）；10 个淘汰理由码全可达；14 例 | 2026-10-11 |
+|P14-04|ask-patient route| PASS | 问诊候选用规则模板生成加可插拔生成器注入点（未注册或抛错或非法载荷三条失败路径回落模板）；恒为 is_evidence=False、in_citation_map=False、requires_revalidation=True（MASTER_RULES 11）；16 例 | 2026-10-11 |
+|P14-05|Context Gap no-repeat| PASS | 上下文缺口去重：用**真实 Phase 08 产物**验证 6/6 动作被拦（含问诊）、5 个抑制理由码全可达、上下文动作只在 Phase 08 冻结的四值内；13 例 | 2026-10-11 |
+|P14-06|clinical/safety weights| PASS | 安全权重：临床风险与安全权重与诊断区分度；安全覆盖把重要性抬到安全优先下界（**直接引 Phase 07 的覆盖阈值**），覆盖真能换赢家（kb 0.9375 变 ask_patient 0.7875 并记 SAFETY_OVERRIDE）；另加安全占比条件（0.6）防「沾安全词就无视效用」；11 例 | 2026-10-11 |
+|P14-07|重复提问识别与思路调整确认| PASS | 新增 qa_realignment.py（1183 行）：重复提问识别（词面 Jaccard 达阈值 **或** Phase 05 意图加 Phase 10 实体 Jaccard）；不满意评估四类六条依据；8 个选项各带预期影响与代价与风险（含保持原思路）；交互步骤幂等加 TTL 加失败不阻断。**真机快照（15 轮真问题）：重复提问检出 2 次、交互 2 次、每条 2 条可解释依据；13 轮不同题未触发（NOT_A_REPEAT）**→ 误报守卫在真数据上成立。**「下次真的按新思路执行」的前后对比**：扩大时间窗（检索器实际收到 days=1095）、提高权威要求（缺口判据 authority 50 到 90，缺口 1 到 2 条）、换检索通道（keyword 到 semantic 并记 route_changes）；并实测发现「会话配置必须进检索缓存键」（否则被旧缓存吃掉）。28 加 14 加 5 例 | 2026-10-11 |
 |P15-01|scope enforcement|NOT_STARTED|||
 |P15-02|encounter isolation|NOT_STARTED|||
 |P15-03|longitudinal freshness|NOT_STARTED|||

@@ -2898,11 +2898,402 @@ INSUFFICIENT_EVIDENCE_SCHEMA = {
 答案形态只用冻结 schema 的**已有字段**（status/degraded/degradation_reasons）。"""
 
 
+# ── Phase 14（P14-01…P14-07）：SAGE-RAG Unified Acquisition ───────────────────
+# 边界：把"检索"与"问患者"统一成 **Evidence Acquisition**（§33 第 10 条工程原则 + §6/§13/§21/§22）。
+# 契约设计口径（与前序阶段一致，逐字对齐 01_V2_ARCHITECTURE）：
+#   1. §13/§21 的动作清单**逐字**入 `ACQUISITION_ACTIONS`（六值），缺一个就有守例挂；
+#      §21/§22 的医疗侧三个权重因子入 `ACQUISITION_CLINICAL_FACTORS`（clinical_risk /
+#      safety_weight / diagnostic_discrimination）。
+#   2. **与既有阶段口径统一，不另造一套**：
+#      · 动作的检索落点只吃 Phase 01 冻结的 `QA_RETRIEVAL_ROUTES`（`ACQUISITION_ACTION_ROUTES`），
+#        与 Phase 04 的 `HUNTER_BY_ROUTE`、Phase 11 的 `SKILL_ROUTE_BY_ID` **同源**；
+#      · 缺口类型/严重度/优先级只用 Phase 07 的 `GAP_SEVERITY` / `is_high_priority`（不重算）；
+#      · "证据已在图上、只是没进上下文"用 Phase 08 的 Context Gap 与四个 Context Gap 动作；
+#      · 安全关键缺口用 Phase 07/§21 的 `Priority Override` **同档**（`SAFETY_PRIORITY_FLOOR`）。
+#   3. **MASTER_RULES 第 11 条**：问诊候选与交互文案都是**交互/提示**，恒不进 citation_map；
+#      `PATIENT_INQUIRY_SCHEMA.is_evidence` 恒 False —— 患者回答是"用户陈述"，
+#      要成为证据仍必须过 Phase 03 的核验（本阶段不改变这一点）。
+#   4. **MASTER_RULES 第 13/17 条**：Context Gap 默认不触发新检索（P14-05 把这条写成闭集合）；
+#      SafetyCritical=true 时安全规则覆盖 UserBurden（P14-06 的 `SAFETY_OVERRIDE`）。
+ACQUISITION_ACTION_SCHEMA_VERSION = "qa-acquisition-action-v1"
+"""动作候选 schema 版本（P14-01）：动作取值/因子/理由码增删都要换这个号。"""
+
+ACQUISITION_UTILITY_VERSION = "qa-acquisition-utility-v1"
+"""ExpectedGapReduction 与动作效用口径版本（P14-02）：公式或权重变更都要换这个号。"""
+
+ACQUISITION_PLANNER_VERSION = "qa-acquisition-planner-v1"
+"""动作选择（Planner）口径版本（P14-02/P14-03）：判据顺序与闸门变更都要换这个号。"""
+
+ACQUISITION_ROUTES_VERSION = "qa-acquisition-routes-v1"
+"""KB/EMR/DB/Web 路由落点口径版本（P14-03）：动作→通道/来源映射变更都要换这个号。"""
+
+PATIENT_INQUIRY_VERSION = "qa-patient-inquiry-v1"
+"""问诊候选与文案模板版本（P14-04）：模板/负担口径变更都要换这个号。"""
+
+CONTEXT_GAP_NO_REPEAT_VERSION = "qa-context-gap-no-repeat-v1"
+"""Context Gap 不重复追问口径版本（P14-05）：抑制规则变更都要换这个号。"""
+
+CLINICAL_SAFETY_WEIGHTS_VERSION = "qa-clinical-safety-weights-v1"
+"""临床/安全权重与 Safety Override 口径版本（P14-06）：权重或覆盖规则变更都要换这个号。"""
+
+REALIGNMENT_VERSION = "qa-repeat-question-realignment-v1"
+"""P14-07 总口径版本（触发判据 + 不满意依据 + 选项表 + 会话级配置）。"""
+
+REALIGNMENT_DETECTOR_VERSION = "qa-repeat-question-detector-v1"
+"""重复提问检测器版本（P14-07）：相似判据/阈值/窗口变更都要换这个号。"""
+
+REALIGNMENT_OPTION_VERSION = "qa-realignment-options-v1"
+"""思路调整选项表版本（P14-07）：选项集合、预期影响与代价文案变更都要换这个号。"""
+
+ACQUISITION_ACTIONS: Tuple[str, ...] = (
+    "retrieve_document", "retrieve_emr", "graph_traverse", "query_database",
+    "web_search", "ask_patient",
+)
+"""§13/§21 的 Evidence Acquisition Action **逐字**六值（§16 的 Action Candidate）。
+`ask_patient` 是唯一**交互型**动作（§6 的 ASK_PATIENT），其余五个都是检索型。"""
+
+ACQUISITION_ACTION_KINDS: Tuple[str, ...] = ("retrieval", "interaction")
+"""两类动作：`retrieval` 会去拿证据；`interaction` 只产出"该问谁什么"（本阶段 = ask_patient）。"""
+
+ACQUISITION_INTERACTION_ACTIONS: Tuple[str, ...] = ("ask_patient",)
+"""交互型动作集合（推导视图，守门用例断言与 `ACQUISITION_ACTION_KINDS` 机器对齐）。"""
+
+ACQUISITION_SOURCES: Tuple[str, ...] = ("kb", "emr", "db", "graph", "web", "patient")
+"""动作的**来源**六值（§33 的四路统一获取 + 图谱 + 患者）：KB/EMR/DB/Web 是 §8.6 的四条腿，
+`graph` 是既有图谱通道，`patient` 是本阶段新增的交互来源。"""
+
+ACQUISITION_ACTION_SOURCE: Mapping[str, str] = {
+    "retrieve_document": "kb",
+    "retrieve_emr": "emr",
+    "graph_traverse": "graph",
+    "query_database": "db",
+    "web_search": "web",
+    "ask_patient": "patient",
+}
+"""动作 → 来源（**单一真源**：P14-03 的路由表就是它的派生视图）。"""
+
+ACQUISITION_ACTION_ROUTES: Mapping[str, str] = {
+    # 取值只允许 Phase 01 冻结的七个通道或空串（空串 = 本部署没有这条检索通道）。
+    "retrieve_document": QA_ROUTE_KEYWORD,
+    "graph_traverse": QA_ROUTE_GRAPH,
+    "query_database": QA_ROUTE_POLICY_EXACT,
+    "web_search": QA_ROUTE_WEB,
+    # EMR 在本部署按 D-002 的中性映射落成"内部证据库"（Phase 04 的 `structured_providers`
+    # 注入点），它不是 §2 冻结的七个检索通道之一，所以**如实给空串**而不是硬塞一个通道值。
+    "retrieve_emr": "",
+    # §6 的 ASK_PATIENT 不是检索通道（Phase 11 的 `SKILL_ROUTE_BY_ID` 同一处置口径）。
+    "ask_patient": "",
+}
+"""动作 → 检索通道（**空串 = 本部署没有这条通道**；与 Phase 04/11 的两张表同源）。"""
+
+ACQUISITION_ACTION_HUNTERS: Mapping[str, Tuple[str, ...]] = {
+    # 与 Phase 07 的 `HUNTER_BY_ROUTE` 逐键一致（复用 Phase 04 的 Hunter 身份）。
+    "retrieve_document": ("bm25",),
+    "graph_traverse": ("graph",),
+    "query_database": ("structured",),
+    "web_search": ("query_expansion",),
+    "retrieve_emr": ("structured",),
+    "ask_patient": (),
+}
+"""动作 → 执行它的 Hunter 身份（声明式；`ask_patient` 没有 Hunter —— 它不是检索）。"""
+
+ACQUISITION_UTILITY_FACTORS: Tuple[str, ...] = (
+    "expected_gap_reduction", "importance", "evidence_reliability", "latency", "cost", "user_burden",
+)
+"""§13/§21 的效用分子分母六项**逐字**：`Utility = EGR × Importance × Reliability / (Latency + Cost + UserBurden)`。"""
+
+ACQUISITION_CLINICAL_FACTORS: Tuple[str, ...] = (
+    "clinical_risk", "safety_weight", "diagnostic_discrimination",
+)
+"""§21/§22 的医疗侧三个权重因子**逐字**（`Importance` 的加分项）。"""
+
+ACQUISITION_DECISIONS: Tuple[str, ...] = ("selected", "skipped")
+"""动作选择的两个决策（与 Phase 08 的 `CONTEXT_DECISIONS`、Phase 11 的 Router 同构）。"""
+
+ACQUISITION_SKIP_REASONS: Tuple[str, ...] = (
+    "SOURCE_UNAVAILABLE", "NOT_APPLICABLE_TO_GAP", "PERMISSION_DENIED", "CONTEXT_GAP_NO_REPEAT",
+    "PATIENT_QUESTION_ALREADY_ASKED", "LOWER_UTILITY", "DUPLICATE_ACTION", "OVER_USER_BURDEN",
+    "UTILITY_FLOOR", "SAFETY_OVERRIDE",
+)
+"""动作淘汰理由码（闭集合）：**每一条淘汰必须带一个**，否则"为什么没走这条路"无法回答。
+
+`CONTEXT_GAP_NO_REPEAT`（P14-05）与 `PATIENT_QUESTION_ALREADY_ASKED`（不重复追问）都指向
+MASTER_RULES 第 13 条；`SAFETY_OVERRIDE`（P14-06）表示"按普通效用该降级，但安全规则把它抬回来"。
+"""
+
+CONTEXT_GAP_NO_REPEAT_REASONS: Tuple[str, ...] = (
+    "EVIDENCE_ALREADY_IN_GRAPH", "EVIDENCE_ALREADY_IN_PACK", "SPAN_TRUNCATED_ONLY",
+    "COUNTEREVIDENCE_ALREADY_IN_GRAPH", "CONFLICT_IS_ADJUDICATED",
+)
+"""P14-05 的抑制理由码（§6 + MASTER_RULES 13）：证据**已经在手上**，只是没进当前上下文。
+
+每条都对应一个 Phase 08 的 Context Gap 动作（`REPACK_CONTEXT` / `EXPAND_EVIDENCE_SPAN` /
+`LOAD_COUNTEREVIDENCE`）或一个已经裁决过的矛盾 —— 也就是说：**该重组上下文，不该再检索、
+更不该再问患者**。
+"""
+
+SAFETY_PRIORITY_FLOOR = SAFETY_OVERRIDE_PRIORITY
+"""§21/§22 的 `Priority Override` 档位（**直接引 Phase 07 的 `SAFETY_OVERRIDE_PRIORITY`**，
+不另设阈值 —— 两个阶段对"安全关键"必须是同一个数字）。"""
+
+SAFETY_WEIGHT_CEILING = 1.0
+"""`safety_weight` 的上界（§22：SafetyCritical 时安全规则覆盖普通成本效用）。"""
+
+ANALYSIS_LENSES: Tuple[str, ...] = ("event", "trend", "risk")
+"""分析口径（P14-07 的"换分析口径（如事件 vs 趋势）"）：`event` = 事件/因果链，
+`trend` = 趋势/对比，`risk` = 风险/反证。取值闭集合，映射到 Phase 07 的问题类别时见
+`qa_realignment.LENS_CATEGORY`（**不新造类别**，只用 `qa_gap_analyzer` 认得的那几个键）。"""
+
+REALIGNMENT_TRIGGERS: Tuple[str, ...] = ("LEXICAL_OVERLAP", "SAME_SUBJECT_SAME_INTENT")
+"""P14-07 的两个（可同时命中的）触发判据：归一化词面重叠达阈值 **或** 同主体+同命题意图。"""
+
+REALIGNMENT_DISSATISFACTION_REASONS: Tuple[str, ...] = (
+    "NO_NEW_VERIFIED_EVIDENCE",          # ① 上次回答没有新增已核验证据（Phase 07 的 new_verified_claims）
+    "ANSWER_DEGRADED",                   # ② 上次回答被标注降档/无证据（Phase 08/13 的 degradation_reasons）
+    "STOP_REASON_NO_GAIN",               # ③ 上次停止原因 NO_GAIN
+    "STOP_REASON_BUDGET_EXHAUSTED",      # ③ 上次停止原因 BUDGET_EXHAUSTED
+    "STOP_REASON_MAX_DEPTH",             # ③ 上次停止原因 MAX_DEPTH
+    "UNRESOLVED_GAP_RATE_HIGH",          # ④ 上次缺口未解决率高于阈值
+)
+"""P14-07 的"不满意信号"四类六值（**必须逐条落到回执里**，不许空口宣称用户不满意）。"""
+
+REALIGNMENT_OPTION_IDS: Tuple[str, ...] = (
+    "change_route", "widen_time_window", "narrow_time_window", "raise_authority",
+    "loosen_evidence_threshold", "tighten_evidence_threshold", "change_analysis_lens",
+    "keep_strategy",
+)
+"""P14-07 的选项闭集合：换通道 / 扩窗 / 收窗 / 提高权威要求 / 放宽门槛 / 收紧门槛 /
+换分析口径 / **保持原思路**（最后一项是"可拒绝"的落地，缺它就不合规）。"""
+
+REALIGNMENT_CONFIG_KEYS: Tuple[str, ...] = (
+    "route_preference", "time_window", "authority_floor", "relevance_floor", "analysis_lens",
+)
+"""会话级**可执行配置**的键闭集合（P14-07）：用户的选择必须落成这五个键里的子集，
+下一次同题运行据此**真的改变检索/缺口判据**（见 `qa_realignment.apply_session_config`）。"""
+
+REALIGNMENT_DECISIONS: Tuple[str, ...] = ("CHANGE_STRATEGY", "KEEP_STRATEGY")
+"""用户决定的二值。`KEEP_STRATEGY` 是**明确的用户决定**（不是沉默默认），落入 TTL 后不再追问。"""
+
+REALIGNMENT_SKIP_REASONS: Tuple[str, ...] = (
+    "NO_SESSION_CONTEXT", "NOT_A_REPEAT", "NO_DISSATISFACTION_EVIDENCE",
+    "ALREADY_ASKED_IN_TTL", "KEEP_STRATEGY_DECLARED", "INTERACTION_LIMIT_REACHED", "ERROR",
+)
+"""不交互的理由码（闭集合）：**跳过必须可解释**（单轮调用、不同题、没依据、问过了、
+已声明保持原思路、超次数上限、判定抛错）。"""
+
+REALIGNMENT_DEFAULT_OVERLAP_THRESHOLD = 0.60
+"""词面重叠阈值默认值（`QA_REPEAT_QUESTION_OVERLAP`）：归一化实词集合的 Jaccard。"""
+
+REALIGNMENT_DEFAULT_WINDOW_TURNS = 5
+"""回看窗口默认值（`QA_REPEAT_QUESTION_WINDOW`）：同一会话内最多回看最近几轮问题。"""
+
+REALIGNMENT_DEFAULT_UNRESOLVED_RATE = 0.50
+"""缺口未解决率阈值默认值（`QA_REPEAT_QUESTION_UNRESOLVED_RATE`）。"""
+
+REALIGNMENT_DEFAULT_TTL_HOURS = 24
+""""保持原思路"后的静默 TTL（小时，`QA_REPEAT_QUESTION_TTL_HOURS`）。"""
+
+REALIGNMENT_MAX_INTERACTIONS = 1
+"""同一会话同一议题的交互次数上限（默认 1：**幂等，重复触发只记一次**）。"""
+
+REPEAT_QUESTION_SETTINGS_ENV: Tuple[str, ...] = (
+    "QA_REPEAT_QUESTION_ENABLED", "QA_REPEAT_QUESTION_OVERLAP", "QA_REPEAT_QUESTION_WINDOW",
+    "QA_REPEAT_QUESTION_UNRESOLVED_RATE", "QA_REPEAT_QUESTION_TTL_HOURS",
+    "QA_REPEAT_QUESTION_MAX_INTERACTIONS", "QA_REPEAT_QUESTION_LLM_INTERPRETER",
+)
+"""P14-07 的全部配置旋钮（**可复算**：回执里逐项回写实际生效值）。"""
+
+ACQUISITION_ACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action_version": {"type": "string", "enum": [ACQUISITION_ACTION_SCHEMA_VERSION]},
+        "action_id": {"type": "string"},
+        "action": {"type": "string", "enum": list(ACQUISITION_ACTIONS)},
+        "kind": {"type": "string", "enum": list(ACQUISITION_ACTION_KINDS)},
+        "source": {"type": "string", "enum": list(ACQUISITION_SOURCES)},
+        "route": {"type": "string", "enum": list(QA_RETRIEVAL_ROUTES) + [""]},
+        "hunters": {"type": "array", "items": {"type": "string", "enum": list(QA_HUNTER_IDS)}},
+        "gap_id": {"type": "string"},
+        "gap_type": {"type": "string", "enum": list(QA_GAP_TYPES) + [""]},
+        "decision": {"type": "string", "enum": list(ACQUISITION_DECISIONS)},
+        "skip_reason": {"type": "string", "enum": list(ACQUISITION_SKIP_REASONS) + [""]},
+        "utility": {"type": "number", "minimum": 0},
+        "factors": {"type": "object"},
+        "clinical": {"type": "object"},
+        "safety_critical": {"type": "boolean"},
+        "rank": {"type": "integer", "minimum": 0},
+        "detail": {"type": "string"},
+    },
+    "required": ["action_version", "action_id", "action", "kind", "source",
+                 "decision", "gap_id", "utility", "factors"],
+    "additionalProperties": True,
+}
+"""P14-01 的动作候选：**一条动作一个决策一个理由**，效用与因子全部可复算。
+
+`route` **刻意不进 required**：EMR 与问诊动作在本部署**没有**检索通道（空串是如实取值，
+不是缺字段）—— 与 `SKILL_ROUTE_BY_ID` 对空串的处置口径一致。"""
+
+ACQUISITION_PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "planner_version": {"type": "string", "enum": [ACQUISITION_PLANNER_VERSION]},
+        "utility_version": {"type": "string", "enum": [ACQUISITION_UTILITY_VERSION]},
+        "routes_version": {"type": "string", "enum": [ACQUISITION_ROUTES_VERSION]},
+        "candidates": {"type": "array", "items": ACQUISITION_ACTION_SCHEMA},
+        "selected": {"type": "array", "items": {"type": "string", "enum": list(ACQUISITION_ACTIONS)}},
+        "by_source": {"type": "object"},
+        "skipped": {"type": "object"},
+        "sources": {"type": "object"},
+        "safe_current_evidence": {"type": "object"},
+        "settings": {"type": "object"},
+        "stats": {"type": "object"},
+    },
+    "required": ["planner_version", "candidates", "selected", "sources"],
+    "additionalProperties": True,
+}
+"""P14-02/P14-03 的获取计划回执（放 `stats` 的**兄弟键**，既有回执键集不动）。"""
+
+PATIENT_INQUIRY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "inquiry_version": {"type": "string", "enum": [PATIENT_INQUIRY_VERSION]},
+        "inquiry_id": {"type": "string"},
+        "slot_skill_id": {"type": "string", "enum": ["patient_inquiry"]},
+        "skill_owner_phase": {"type": "string", "enum": [SKILL_INTERACTION_SLOT_OWNER]},
+        "gap_id": {"type": "string"},
+        "gap_type": {"type": "string", "enum": list(QA_GAP_TYPES) + [""]},
+        "question_text": {"type": "string"},
+        "question_fields": {"type": "array", "items": {"type": "string"}},
+        "why": {"type": "string"},
+        "user_burden": {"type": "string", "enum": ["none", "low", "medium", "high"]},
+        "requires_permission": {"type": "string", "enum": list(SKILL_PERMISSIONS)},
+        "permission_granted": {"type": "boolean"},
+        # MASTER_RULES 11：问诊拿到的是"用户陈述"，**不是**已验证证据。
+        "is_evidence": {"type": "boolean"},
+        "requires_revalidation": {"type": "boolean"},
+        "in_citation_map": {"type": "boolean"},
+        "asked_before": {"type": "boolean"},
+        "suppressed_by": {"type": "string", "enum": list(CONTEXT_GAP_NO_REPEAT_REASONS) + [""]},
+    },
+    "required": ["inquiry_version", "inquiry_id", "slot_skill_id", "question_text", "user_burden",
+                 "is_evidence", "in_citation_map"],
+    "additionalProperties": True,
+}
+"""P14-04 的问诊候选：规则模板拼装、**零模型调用**；恒 `is_evidence=False`、`in_citation_map=False`。"""
+
+CONTEXT_GAP_NO_REPEAT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "no_repeat_version": {"type": "string", "enum": [CONTEXT_GAP_NO_REPEAT_VERSION]},
+        "gaps": {"type": "integer", "minimum": 0},
+        "in_graph": {"type": "integer", "minimum": 0},
+        "in_pack": {"type": "integer", "minimum": 0},
+        "suppressed": {"type": "integer", "minimum": 0},
+        "suppressed_by_reason": {"type": "object"},
+        "suppressed_actions": {"type": "object"},
+        "kept_actions": {"type": "object"},
+        "context_actions": {"type": "array", "items": {"type": "string",
+                                                       "enum": list(CONTEXT_GAP_ACTIONS)}},
+    },
+    "required": ["no_repeat_version", "gaps", "suppressed", "suppressed_by_reason"],
+    "additionalProperties": True,
+}
+"""P14-05 的抑制回执：**几条动作因为"证据已在手上"被拦下**，逐条带理由码与对应的上下文动作。"""
+
+REALIGNMENT_OPTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "option_version": {"type": "string", "enum": [REALIGNMENT_OPTION_VERSION]},
+        "option_id": {"type": "string", "enum": list(REALIGNMENT_OPTION_IDS)},
+        "label": {"type": "string"},
+        "config_keys": {"type": "array",
+                        "items": {"type": "string", "enum": list(REALIGNMENT_CONFIG_KEYS)}},
+        "expected_effect": {"type": "string"},
+        "cost": {"type": "string"},
+        "risk": {"type": "string"},
+    },
+    "required": ["option_version", "option_id", "label", "config_keys", "expected_effect", "cost"],
+    "additionalProperties": True,
+}
+"""P14-07 的单个选项：**必须写清预期影响与代价**（否则用户无法判断该不该换思路）。"""
+
+REALIGNMENT_INTERACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "realignment_version": {"type": "string", "enum": [REALIGNMENT_VERSION]},
+        "detector_version": {"type": "string", "enum": [REALIGNMENT_DETECTOR_VERSION]},
+        "topic_key": {"type": "string"},
+        "scope_key": {"type": "string"},
+        "previous_run_id": {"type": "string"},
+        "interaction_index": {"type": "integer", "minimum": 1},
+        "max_interactions": {"type": "integer", "minimum": 1},
+        "triggers": {"type": "array", "items": {"type": "string",
+                                                "enum": list(REALIGNMENT_TRIGGERS)}},
+        "evidence": {"type": "array", "items": {"type": "string",
+                                                "enum": list(REALIGNMENT_DISSATISFACTION_REASONS)}},
+        "similarity": {"type": "object"},
+        "question": {"type": "string"},
+        "options": {"type": "array", "items": REALIGNMENT_OPTION_SCHEMA},
+        "settings": {"type": "object"},
+        "idempotent": {"type": "boolean"},
+    },
+    "required": ["realignment_version", "topic_key", "scope_key", "triggers", "evidence",
+                 "options", "question"],
+    "additionalProperties": True,
+}
+"""P14-07 的一次交互：触发判据 + 逐条不满意依据 + 具体选项表（**一次、给选项、可拒绝**）。"""
+
+REALIGNMENT_CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "config_version": {"type": "string", "enum": [REALIGNMENT_VERSION]},
+        "decision": {"type": "string", "enum": list(REALIGNMENT_DECISIONS)},
+        "option_id": {"type": "string", "enum": list(REALIGNMENT_OPTION_IDS)},
+        "topic_key": {"type": "string"},
+        "scope_key": {"type": "string"},
+        "session_id": {"type": "string"},
+        "applied_keys": {"type": "array",
+                         "items": {"type": "string", "enum": list(REALIGNMENT_CONFIG_KEYS)}},
+        "config": {"type": "object"},
+        "decided_by": {"type": "string"},
+        "decided_at": {"type": "string"},
+        "ttl_until": {"type": "string"},
+    },
+    "required": ["config_version", "decision", "option_id", "topic_key", "config"],
+    "additionalProperties": True,
+}
+"""P14-07 的会话级可执行配置（**用户决定的落地形态**）：下一次同题运行据此真的换思路。"""
+
+REALIGNMENT_RECEIPT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "realignment_version": {"type": "string", "enum": [REALIGNMENT_VERSION]},
+        "interaction": {"type": "object"},
+        "config": {"type": "object"},
+        "applied": {"type": "object"},
+        "skipped_reason": {"type": "string", "enum": list(REALIGNMENT_SKIP_REASONS) + [""]},
+        "skip_detail": {"type": "string"},
+        "realignment_error": {"type": "string"},
+        "settings": {"type": "object"},
+        "stats": {"type": "object"},
+    },
+    "required": ["realignment_version", "settings"],
+    "additionalProperties": True,
+}
+"""P14-07 的总回执（兄弟键）：交互、会话配置、**本次运行真的应用了什么**，失败时带
+`realignment_error` 而**不阻断回答**。
+
+`skipped_reason` **刻意不进 required**：真的发起交互时它就是空串（合法状态），
+放进去会让"成功交互"被判成缺字段 —— 这类"空串是合法取值"的字段一律不进 required
+（与 `ACQUISITION_ACTION_SCHEMA` 的 `route` 同一处置口径）。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s / "
             "技能注册表 %s / 技能路由 %s / 经验记忆 %s / 答案组装 %s / 终验 %s / 局部重试 %s / "
-            "证据不足输出 %s："
+            "证据不足输出 %s / 获取动作 %s / 获取效用 %s / 问诊 %s / 上下文不重复追问 %s / "
+            "临床安全权重 %s / 重复提问重对齐 %s："
             "节点类型 %d / 边关系 %d / "
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
@@ -2911,12 +3302,17 @@ def describe() -> str:
             "时效闸门出口 %d / 复验出口 %d / 记忆矛盾种类 %d / 撤销理由 %d / "
             "技能 %d / 技能种类 %d / 成本档 %d / 延迟档 %d / 权限位 %d / 选择理由码 %d / "
             "剧集要素 %d / 失败种类 %d / 重试出口 %d / 来源档 %d / "
-            "终验检查 %d / 局部重试作用域 %d / 证据不足判据 %d"
+            "终验检查 %d / 局部重试作用域 %d / 证据不足判据 %d / "
+            "获取动作 %d / 获取来源 %d / 淘汰理由码 %d / 上下文抑制理由码 %d / "
+            "重复提问触发判据 %d / 不满意依据 %d / 思路选项 %d / 会话配置键 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                SKILL_REGISTRY_VERSION, SKILL_ROUTER_VERSION, EXPERIENCE_MEMORY_VERSION,
                ANSWER_COMPOSER_VERSION, FINAL_VERIFIER_VERSION, FINAL_VERIFY_RETRY_VERSION,
-               INSUFFICIENT_EVIDENCE_VERSION,
+               INSUFFICIENT_EVIDENCE_VERSION, ACQUISITION_ACTION_SCHEMA_VERSION,
+               ACQUISITION_UTILITY_VERSION, PATIENT_INQUIRY_VERSION,
+               CONTEXT_GAP_NO_REPEAT_VERSION, CLINICAL_SAFETY_WEIGHTS_VERSION,
+               REALIGNMENT_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
                len(QA_RETRIEVAL_ROUTES), len(QA_FAILURE_POLICIES), len(QA_STOP_REASONS),
                len(EVIDENCE_STATUSES), len(QA_HUNTER_IDS),
@@ -2934,7 +3330,11 @@ def describe() -> str:
                len(EPISODE_SECTIONS), len(FAILURE_KINDS), len(RETRY_DECISIONS),
                len(SOURCE_RELIABILITY_BANDS),
                len(FINAL_VERIFIER_CHECKS), len(FINAL_RETRY_SCOPES),
-               len(INSUFFICIENT_EVIDENCE_REASONS)))
+               len(INSUFFICIENT_EVIDENCE_REASONS),
+               len(ACQUISITION_ACTIONS), len(ACQUISITION_SOURCES),
+               len(ACQUISITION_SKIP_REASONS), len(CONTEXT_GAP_NO_REPEAT_REASONS),
+               len(REALIGNMENT_TRIGGERS), len(REALIGNMENT_DISSATISFACTION_REASONS),
+               len(REALIGNMENT_OPTION_IDS), len(REALIGNMENT_CONFIG_KEYS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -3051,6 +3451,15 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "final_verification": FINAL_VERIFICATION_SCHEMA,
         "final_retry": FINAL_RETRY_SCHEMA,
         "insufficient_evidence": INSUFFICIENT_EVIDENCE_SCHEMA,
+        # Phase 14（P14-01…P14-07）
+        "acquisition_action": ACQUISITION_ACTION_SCHEMA,
+        "acquisition_plan": ACQUISITION_PLAN_SCHEMA,
+        "patient_inquiry": PATIENT_INQUIRY_SCHEMA,
+        "context_gap_no_repeat": CONTEXT_GAP_NO_REPEAT_SCHEMA,
+        "realignment_option": REALIGNMENT_OPTION_SCHEMA,
+        "realignment_interaction": REALIGNMENT_INTERACTION_SCHEMA,
+        "realignment_config": REALIGNMENT_CONFIG_SCHEMA,
+        "realignment_receipt": REALIGNMENT_RECEIPT_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

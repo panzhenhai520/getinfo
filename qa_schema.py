@@ -60,7 +60,19 @@ import hashlib
 #   · 回滚：`DROP TABLE skill_performance_memory, source_reliability_memory;` + 本常量改回 v9；
 #     代码侧 `QA_EXPERIENCE_MEMORY=0`（默认）即回到 Phase 11 行为（经验写入只落在
 #     既有 memory_* 表 + 这两张新表）。
-QA_SCHEMA_VERSION = "unified-qa-schema-v10"
+# v10 → v11（graph-rag-v2 通用包 Phase 14 · P14-07）：
+#   · 新增 **一张表** qa_realignment_decisions（重复提问识别与"思路调整确认"的会话级账）：
+#     一个 (scope_key, topic_key) 一行 —— 议题的交互次数、不满意依据、用户决定、
+#     落成的**可执行配置**与"保持原思路"的静默 TTL 都在里面；
+#   · **没有新增列、没有改既有列语义**：老库执行 ensure_qa_tables 时按
+#     `CREATE TABLE IF NOT EXISTS` 自动补建（`QA_ADDED_COLUMNS_V11` 为空元组，
+#     与 v7/v8/v9/v10 同一手法），既有 QA 表一个字不动；
+#   · 为什么不复用 qa_session_constraints：那张表是**规划约束**（时间/实体/输出形式），
+#     会被逐条喂给 `QaQueryPlanner.plan()`；把交互账混进去会让"用户在选项里选了保持原思路"
+#     变成一条规划输入（污染既有语义），所以按"谁能产出谁负责"另开一张表（见 D-049）；
+#   · 回滚：`DROP TABLE qa_realignment_decisions;` + 本常量改回 v10；代码侧
+#     `QA_REALIGNMENT=0`（默认）与 `QA_ACQUISITION=0`（默认）即回到 Phase 13 行为。
+QA_SCHEMA_VERSION = "unified-qa-schema-v11"
 
 QA_TABLE_DDL = (
     """
@@ -679,6 +691,35 @@ QA_TABLE_DDL = (
         UNIQUE(scope_key, skill_id, task_type)
     )
     """,
+    # ── Phase 14（P14-07）：重复提问识别与思路调整确认的会话级账 ──
+    """
+    CREATE TABLE IF NOT EXISTS qa_realignment_decisions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope_key TEXT NOT NULL,
+        owner_user_id TEXT NOT NULL DEFAULT '',
+        session_id TEXT NOT NULL DEFAULT '',
+        industry_pack_id TEXT NOT NULL DEFAULT '',
+        topic_key TEXT NOT NULL,
+        question_hash TEXT NOT NULL DEFAULT '',
+        asked_count INTEGER NOT NULL DEFAULT 0,
+        interaction_index INTEGER NOT NULL DEFAULT 0,
+        triggers_json TEXT NOT NULL DEFAULT '[]',
+        evidence_json TEXT NOT NULL DEFAULT '[]',
+        similarity_json TEXT NOT NULL DEFAULT '{}',
+        decision TEXT NOT NULL DEFAULT '',
+        option_id TEXT NOT NULL DEFAULT '',
+        config_json TEXT NOT NULL DEFAULT '{}',
+        applied_keys_json TEXT NOT NULL DEFAULT '[]',
+        previous_run_id TEXT NOT NULL DEFAULT '',
+        run_id TEXT NOT NULL DEFAULT '',
+        last_asked_at TEXT NOT NULL DEFAULT '',
+        ttl_until TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(scope_key, topic_key)
+    )
+    """,
 )
 
 QA_INDEX_DDL = (
@@ -735,6 +776,11 @@ QA_INDEX_DDL = (
     " ON skill_performance_memory(skill_id, task_type)",
     "CREATE INDEX IF NOT EXISTS idx_skill_performance_scope"
     " ON skill_performance_memory(scope_key, success_rate)",
+    # Phase 14（P14-07）：按"会话 + 议题"查交互账（幂等与 TTL 抑制都走这一条）。
+    "CREATE INDEX IF NOT EXISTS idx_qa_realignment_scope"
+    " ON qa_realignment_decisions(session_id, topic_key)",
+    "CREATE INDEX IF NOT EXISTS idx_qa_realignment_owner"
+    " ON qa_realignment_decisions(owner_user_id, session_id, updated_at)",
 )
 
 QA_REQUIRED_TABLES = frozenset(
@@ -779,6 +825,8 @@ QA_REQUIRED_TABLES = frozenset(
         # source_reliability_memory，Phase 09 刻意留给本阶段）
         "source_reliability_memory",
         "skill_performance_memory",
+        # Phase 14（v11）：重复提问识别与思路调整确认的会话级账（一张表）
+        "qa_realignment_decisions",
     }
 )
 
@@ -832,6 +880,14 @@ v10 只新增两张投影表（`source_reliability_memory` / `skill_performance_
 经验类记忆本体写在 v8 的 `memory_item` 里（六类只是 `memory_type` 的取值），
 §12 那两段要写的字段在新表里一次给全，所以一行 ADD COLUMN 都不需要 ——
 `tests/test_qa_phase12_schema.py` 断言本元组为空，防止有人借"经验记忆"往老表加列。"""
+
+QA_ADDED_COLUMNS_V11 = ()
+"""Phase 14（v10 → v11）新增列清单：**空**。
+
+v11 只新增一张表（`qa_realignment_decisions`）。P14-07 要写的字段
+（交互次数/触发判据/不满意依据/用户决定/可执行配置/TTL）在新表里一次给全，
+所以一行 ADD COLUMN 都不需要 —— 与 v7/v8/v9/v10 同一手法；
+`tests/test_qa_phase14_contracts.py` 断言本元组为空，防止有人借"重复提问"往老表加列。"""
 
 
 def _existing_columns(cursor, table_name: str) -> set:
@@ -907,6 +963,7 @@ __all__ = [
     "QA_ADDED_COLUMNS_V8",
     "QA_ADDED_COLUMNS_V9",
     "QA_ADDED_COLUMNS_V10",
+    "QA_ADDED_COLUMNS_V11",
     "QA_INDEX_DDL",
     "QA_REQUIRED_TABLES",
     "QA_SCHEMA_VERSION",

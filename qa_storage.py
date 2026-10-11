@@ -3005,5 +3005,187 @@ class QaStore:
         except Exception:  # noqa: BLE001
             return result
 
+    # ── Phase 14（P14-07）：重复提问识别与思路调整确认的会话级账（v11 新表，一张表）────────
+    # 为什么单独一张表而不是塞进 `qa_session_constraints`：那张表是**规划约束**，会被逐条
+    # 喂给 `QaQueryPlanner.plan()`；把交互账混进去等于让"用户明确表示保持原思路"变成一条
+    # 规划输入，污染既有语义。这里按"谁能产出谁负责"另开一张表（回滚 = DROP TABLE）。
+    _REALIGNMENT_FIELDS = (
+        "asked_count", "interaction_index", "triggers_json", "evidence_json", "similarity_json",
+        "decision", "option_id", "config_json", "applied_keys_json", "previous_run_id", "run_id",
+        "last_asked_at", "ttl_until", "payload_json", "question_hash",
+    )
+    """可写列的**顺序真源**（`_REALIGNMENT_COLUMNS` 由它派生，避免两处列名漂移）。"""
+
+    _REALIGNMENT_COLUMNS = (
+        "scope_key", "topic_key", "owner_user_id", "session_id", "industry_pack_id",
+        "question_hash", "asked_count", "interaction_index", "triggers_json", "evidence_json",
+        "similarity_json", "decision", "option_id", "config_json", "applied_keys_json",
+        "previous_run_id", "run_id", "last_asked_at", "ttl_until", "payload_json",
+        "created_at", "updated_at",
+    )
+    """写入列清单（与 v11 的建表列**逐字一致**；`tests/test_qa_phase14_contracts.py` 会核对）。"""
+
+    def save_realignment_decision(self, *, scope_key: str, topic_key: str,
+                                  owner_user_id: str = "", session_id: str = "",
+                                  industry_pack_id: str = "", payload: Mapping | None = None,
+                                  asked: bool = False) -> dict:
+        """落一次交互账（**幂等**：同 `(scope_key, topic_key)` 覆盖同一行）。
+
+        `asked=True` 时 `asked_count` 与 `interaction_index` 各 +1（**只有真的问了才算问过**，
+        重复触发只记一次增量 —— 这正是 P14-07 的"同一议题最多交互一次"的库侧保证）。
+        返回写后的行（读不到就返回空字典，**绝不抛**：交互账坏掉不许拖累问答）。
+        """
+        payload = dict(payload or {})
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                prior_row = self.database.connection.execute(
+                    "SELECT * FROM qa_realignment_decisions WHERE scope_key=? AND topic_key=?",
+                    (str(scope_key), str(topic_key)),
+                ).fetchone()
+                prior = _row_dict(prior_row) or {}
+                asked_count = int(prior.get("asked_count") or 0) + (1 if asked else 0)
+                interaction_index = int(prior.get("interaction_index") or 0) + (1 if asked else 0)
+                values = {
+                    "scope_key": str(scope_key), "topic_key": str(topic_key),
+                    "owner_user_id": str(owner_user_id or prior.get("owner_user_id") or ""),
+                    "session_id": str(session_id or prior.get("session_id") or ""),
+                    "industry_pack_id": str(industry_pack_id or prior.get("industry_pack_id") or ""),
+                    "question_hash": str(payload.get("question_hash")
+                                         or prior.get("question_hash") or ""),
+                    "asked_count": asked_count, "interaction_index": interaction_index,
+                    "triggers_json": _json(payload.get("triggers")
+                                           or _decode_json(prior.get("triggers_json"), [])),
+                    "evidence_json": _json(payload.get("evidence")
+                                           or _decode_json(prior.get("evidence_json"), [])),
+                    "similarity_json": _json(payload.get("similarity")
+                                             or _decode_json(prior.get("similarity_json"), {})),
+                    "decision": str(payload.get("decision") or prior.get("decision") or ""),
+                    "option_id": str(payload.get("option_id") or prior.get("option_id") or ""),
+                    "config_json": _json(payload.get("config") if payload.get("config") is not None
+                                         else _decode_json(prior.get("config_json"), {})),
+                    "applied_keys_json": _json(payload.get("applied_keys")
+                                               or _decode_json(prior.get("applied_keys_json"), [])),
+                    "previous_run_id": str(payload.get("previous_run_id")
+                                           or prior.get("previous_run_id") or ""),
+                    "run_id": str(payload.get("run_id") or prior.get("run_id") or ""),
+                    "last_asked_at": str(payload.get("last_asked_at")
+                                         or (now if asked else prior.get("last_asked_at") or "")),
+                    "ttl_until": str(payload.get("ttl_until") or prior.get("ttl_until") or ""),
+                    "payload_json": _json(payload.get("record")
+                                          if payload.get("record") is not None
+                                          else _decode_json(prior.get("payload_json"), {})),
+                    "created_at": str(prior.get("created_at") or now), "updated_at": now,
+                }
+                columns = self._REALIGNMENT_COLUMNS
+                self.database.connection.execute(
+                    "INSERT INTO qa_realignment_decisions(%s) VALUES(%s) ON CONFLICT(scope_key, topic_key) DO UPDATE SET %s"
+                    % (",".join(columns), ",".join("?" for _ in columns),
+                       ",".join("%s=excluded.%s" % (name, name)
+                                for name in columns if name not in ("scope_key", "topic_key", "created_at"))),
+                    tuple(values.get(name) for name in columns),
+                )
+                self.database.connection.commit()
+            return self.realignment_decision(scope_key=str(scope_key),
+                                             topic_key=str(topic_key)) or {}
+        except Exception:  # noqa: BLE001 —— 交互账绝不能把问答链路打断
+            return {}
+
+    def realignment_decision(self, *, scope_key: str = "", topic_key: str = "",
+                             session_id: str = "", owner_user_id: str = "") -> dict | None:
+        """读一条交互账（按 `(scope_key, topic_key)` 精确匹配；拿不到返回 None）。"""
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            if scope_key:
+                where.append("scope_key=?")
+                params.append(str(scope_key))
+            if topic_key:
+                where.append("topic_key=?")
+                params.append(str(topic_key))
+            if session_id:
+                where.append("session_id=?")
+                params.append(str(session_id))
+            if owner_user_id:
+                where.append("owner_user_id=?")
+                params.append(str(owner_user_id))
+            if not where:
+                return None
+            with self.database.lock:
+                row = self.database.connection.execute(
+                    "SELECT * FROM qa_realignment_decisions WHERE " + " AND ".join(where) +
+                    " ORDER BY updated_at DESC LIMIT 1", tuple(params)).fetchone()
+            return self._decode_realignment(row)
+        except Exception:  # noqa: BLE001
+            return None
+
+    def realignment_decisions(self, *, session_id: str = "", owner_user_id: str = "",
+                              limit: int = 100) -> list[dict]:
+        """读一个会话（或一个用户）的全部交互账（验收/运维报表用）。"""
+        rows_out: list[dict] = []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            if session_id:
+                where.append("session_id=?")
+                params.append(str(session_id))
+            if owner_user_id:
+                where.append("owner_user_id=?")
+                params.append(str(owner_user_id))
+            sql = "SELECT * FROM qa_realignment_decisions"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY updated_at DESC LIMIT ?"
+            params.append(max(1, min(int(limit), 1000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                value = self._decode_realignment(row)
+                if value:
+                    rows_out.append(value)
+            return rows_out
+        except Exception:  # noqa: BLE001
+            return rows_out
+
+    def realignment_stats(self, *, session_id: str = "", owner_user_id: str = "") -> dict:
+        """交互次数分布（P14-07 的验收口径：**重复提问检出数** 与 **交互次数分布**）。"""
+        rows = self.realignment_decisions(session_id=session_id, owner_user_id=owner_user_id)
+        stats = {"topics": len(rows), "detected": 0, "asked": 0, "kept": 0, "changed": 0,
+                 "interactions_histogram": {}, "by_option": {}, "by_trigger": {},
+                 "by_evidence": {}, "skipped": 0, "errors": 0}
+        for row in rows:
+            asked_count = int(row.get("asked_count") or 0)
+            if asked_count > 0:
+                stats["detected"] += 1
+                stats["asked"] += asked_count
+                stats["interactions_histogram"][str(asked_count)] = \
+                    stats["interactions_histogram"].get(str(asked_count), 0) + 1
+            decision = str(row.get("decision") or "")
+            if decision == "KEEP_STRATEGY":
+                stats["kept"] += 1
+            elif decision == "CHANGE_STRATEGY":
+                stats["changed"] += 1
+                option = str(row.get("option_id") or "")
+                stats["by_option"][option] = stats["by_option"].get(option, 0) + 1
+            for trigger in row.get("triggers") or []:
+                stats["by_trigger"][str(trigger)] = stats["by_trigger"].get(str(trigger), 0) + 1
+            for reason in row.get("evidence") or []:
+                stats["by_evidence"][str(reason)] = stats["by_evidence"].get(str(reason), 0) + 1
+        return stats
+
+    @staticmethod
+    def _decode_realignment(row) -> dict | None:
+        value = _row_dict(row)
+        if not value:
+            return None
+        value["triggers"] = _decode_json(value.get("triggers_json"), [])
+        value["evidence"] = _decode_json(value.get("evidence_json"), [])
+        value["similarity"] = _decode_json(value.get("similarity_json"), {})
+        value["config"] = _decode_json(value.get("config_json"), {})
+        value["applied_keys"] = _decode_json(value.get("applied_keys_json"), [])
+        value["record"] = _decode_json(value.get("payload_json"), {})
+        return value
+
 
 __all__ = ["QaStore"]

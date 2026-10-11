@@ -48,6 +48,14 @@ from qa_gap_analyzer import (
 )
 from qa_context_pack import context_pack_enabled
 from qa_final_verifier import final_verifier_enabled
+# 阶段 14（P14-01…P14-07）：**只引开关与入口**，模块层级不跑任何判定（与 Phase 13 同一手法）。
+from qa_acquisition import (
+    ACQUISITION_PLANNER_VERSION, acquisition_enabled, acquisition_receipt, apply_session_config,
+    deployment_sources, plan_acquisition, route_guidance_from,
+)
+from qa_realignment import (
+    realignment_enabled, realignment_step as run_realignment_step,
+)
 from qa_skills import (
     SKILL_ROUTER_VERSION, skill_router_enabled,
 )
@@ -752,7 +760,8 @@ def _build_evidence_graph_layer(graph: dict, *, plan: Mapping | None, run_meta: 
 def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: Mapping | None,
                               run_meta: Mapping, working_memory: Mapping | None = None,
                               memory_items: Sequence[Mapping] = (),
-                              skill_items: Sequence[Mapping] = ()) -> dict:
+                              skill_items: Sequence[Mapping] = (),
+                              gaps: Sequence[Mapping] = ()) -> dict:
     """阶段 08（P08-01…P08-06）：按任务组装最小有效 Context Pack。
 
     **只加不改**：结果挂在 `graph["context_pack"]` 这个兄弟键上（Phase 06 的
@@ -767,6 +776,11 @@ def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: 
     阶段 11（P11-05）：`skill_items` 是 Skill Router 的 **SKILL_HINT** 指令条目
     （口子在 `qa_skills.skill_context_items()`），只填空 `skill_context` 段；同样不传就
     保持 Phase 08 的空段行为。
+
+    阶段 14（P14-05）：`gaps` 是运行期真实缺口（缺口环的 open gaps）。传了它且
+    `QA_ACQUISITION` 打开时，本函数会用**真实的 Phase 08 Context Gap** 再算一次获取计划，
+    并把"有几条动作因为信息已在手上被拦下"挂到 `pack["acquisition"]`（**不新增 graph 顶层键**，
+    于是 Phase 06~13 的键集断言一条都不动）。§13 的关键收益（不重复追问用户）在这里可量化。
     """
     try:
         from qa_context_pack import build_context_pack, context_pack_receipt
@@ -777,6 +791,15 @@ def _build_context_pack_layer(graph: Mapping, *, plan: Mapping | None, request: 
                                   memory_items=memory_items,
                                   skill_items=skill_items)
         pack["receipt"] = context_pack_receipt(pack)
+        if _acquisition_enabled() and gaps:
+            try:
+                plan_receipt = plan_acquisition(
+                    list(gaps), context_gaps=pack.get("context_gaps") or (),
+                    acquired_evidence=graph.get("evidence") or (),
+                    preferred_routes=list(((plan or {}).get("route_preference") or [])))
+                pack["acquisition"] = acquisition_receipt(plan_receipt)
+            except Exception as exc:  # noqa: BLE001 —— 获取计划坏掉绝不影响上下文包
+                pack["acquisition"] = {"error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
         return pack
     except Exception as exc:  # noqa: BLE001
         return {"pack_version": CONTEXT_PACK_VERSION,
@@ -1348,6 +1371,168 @@ def _persist_session_constraints(store, run_meta: Mapping, plan_result: Mapping)
         return 0
 
 
+# ── 阶段 14（P14-01…P14-07）：SAGE-RAG 统一获取 + 重复提问重对齐 ──────────────
+# 口径（与 Phase 06/07/08/12/13 一致）：
+#   · 开关默认关（`QA_ACQUISITION` / `QA_REPEAT_QUESTION_ENABLED`）→ 关掉时这里一个键都不新增、
+#     一行都不写库，行为逐字回到 Phase 13；
+#   · 打开后只加**兄弟键**（`stats["acquisition"]` / `plan["realignment"]` /
+#     `graph["context_gap_no_repeat"]`），既有回执键集一个字不动；
+#   · **失败一律不阻断**：获取计划、问诊候选、重对齐判定抛错都只记账。
+
+REALIGNMENT_FAILED_NOTE = "重复提问识别未完成，本轮按原思路继续作答。"
+"""P14-07 失败时的固定说明（与 Phase 13 的 `FINAL_VERIFY_FAILED_NOTE` 同一处置口径）。"""
+
+ACQUISITION_FAILED_NOTE = "获取动作规划未完成，本轮沿用既有检索通道。"
+"""P14-01…P14-06 失败时的固定说明（获取计划是**优化**，绝不能挡住检索与回答）。"""
+
+
+def _realignment_enabled() -> bool:
+    """P14-07 开关（独立函数便于用例打桩，避免 import 期取快照）。"""
+    return realignment_enabled()
+
+
+def _acquisition_enabled() -> bool:
+    """P14-01…P14-06 开关（同上）。"""
+    return acquisition_enabled()
+
+
+def _plan_gap_floors(retrieval_plan: Mapping | None) -> dict:
+    """本轮缺口判据的覆盖值（P14-07 的会话配置落点之一；缺省空字典 = 用环境默认值）。"""
+    plan = retrieval_plan if isinstance(retrieval_plan, Mapping) else {}
+    raw = plan.get("gap_floors")
+    return dict(raw) if isinstance(raw, Mapping) else {}
+
+
+def _runtime_gaps(context: Mapping) -> list:
+    """运行期真实缺口（缺口环的 open gaps；拿不到就是空列表）。
+
+    阶段 14（P14-05）用它把"运行期缺口"与"Phase 08 的真实 Context Gap"对上，
+    从而量化 §13 的关键收益（证据已在手上 → **不重复追问用户**）。
+    """
+    outputs = (context or {}).get("outputs") if isinstance(context, Mapping) else {}
+    level1 = (outputs or {}).get("level1_retrieval") if isinstance(outputs, Mapping) else {}
+    stats = level1.get("stats") if isinstance(level1, Mapping) else {}
+    loop = stats.get("gap_loop") if isinstance(stats, Mapping) else {}
+    gaps = loop.get("gaps") if isinstance(loop, Mapping) else []
+    return [dict(gap) for gap in (gaps or []) if isinstance(gap, Mapping)]
+
+
+def _acquisition_receipt_for(gaps: Sequence[Mapping], *, retrieval_plan: Mapping | None,
+                             session_config: Mapping | None, config_prefer: Sequence[str],
+                             graph_enabled: bool = False,
+                             decision_point: str = "gap_loop") -> dict:
+    """算一次获取计划 + 把通道偏好真的作用到缺口上，返回**回执**（供 level1 挂兄弟键）。
+
+    口径：缺口的 `suggested_routes` 次序会被"被选中动作的通道"与"会话配置的通道偏好"
+    依次重排（复用 Phase 12 的 `apply_route_guidance`）—— 于是 §13 的
+    "Gap → Best Retrieval Action" 与 P14-07 的"换通道"都落在**真实数据**上，可前后对比。
+    """
+    plan_receipt = _acquisition_plan_for_gaps(list(gaps or ()), retrieval_plan=retrieval_plan,
+                                              session_config=session_config,
+                                              graph_enabled=graph_enabled)
+    guide = route_guidance_from(plan_receipt)
+    adjusted, route_receipt = _apply_preferred_routes(list(gaps or ()),
+                                                      list(guide.get("prefer_routes") or []))
+    session_receipt: dict = {}
+    if config_prefer:
+        adjusted, session_receipt = _apply_preferred_routes(adjusted, list(config_prefer))
+    receipt = acquisition_receipt(plan_receipt, guidance=guide, config=session_config)
+    receipt["route_changes"] = (list(route_receipt.get("route_changes") or [])
+                                + list(session_receipt.get("route_changes") or []))
+    receipt["route_guidance"] = {
+        **dict(guide),
+        "session_preference": list(config_prefer),
+        "applied_changes": len(receipt["route_changes"]),
+    }
+    receipt["gap_floors"] = _plan_gap_floors(retrieval_plan)
+    receipt["context_gaps"] = []
+    receipt["decision_point"] = str(decision_point)
+    return receipt
+
+
+def _realignment_topic_note(receipt: Mapping) -> str:
+    """给 SSE 的一行说明：这次是"发现了重复提问"还是"按你上次的选择换了思路"。"""
+    receipt = receipt if isinstance(receipt, Mapping) else {}
+    interaction = receipt.get("interaction") if isinstance(receipt.get("interaction"), Mapping) else {}
+    config = receipt.get("config") if isinstance(receipt.get("config"), Mapping) else {}
+    if interaction:
+        return "同一个问题你问了不止一次，按证据给出一组可选思路（本轮照常作答）。"
+    if config.get("usable"):
+        return "沿用你上次选择的思路（%s）。" % "、".join(
+            str(item) for item in (config.get("applied_keys") or [])[:3])
+    return ""
+
+
+def _realignment_plan_step(store, run_meta: Mapping, question: str,
+                           plan_result: Mapping) -> dict:
+    """P14-07 在 `plan` 阶段的接线：判定 → 交互回执 → **把会话配置落到本轮计划上**。
+
+    返回回执（含 `applied_plan`）。任何异常只记账（`realignment_error`），**绝不阻断**。
+    """
+    receipt = {}
+    try:
+        receipt = run_realignment_step(store=store, run_meta=run_meta, question=question)
+    except Exception as exc:  # noqa: BLE001 —— 判定/交互构造抛错**绝不阻断回答**
+        from qa_realignment import realignment_receipt
+
+        return realignment_receipt(error="%s: %s" % (type(exc).__name__, str(exc)[:160]))
+    config = receipt.get("config") if isinstance(receipt.get("config"), Mapping) else {}
+    if not config.get("usable"):
+        return receipt
+    try:
+        target = dict(plan_result) if isinstance(plan_result, Mapping) else {}
+        # "时间窗只补空缺"由 `apply_session_config` 统一兜底（用户本轮明确说的话优先），
+        # 这里不再自己判一遍 —— 两处判据迟早打架（Phase 06/07 的教训）。
+        applied_target, applied = apply_session_config(target, dict(config.get("config") or {}))
+        receipt = {**receipt, "applied_plan": applied}
+        receipt["plan_result"] = applied_target
+    except Exception as exc:  # noqa: BLE001 —— 配置落不下去只记账
+        receipt = {**receipt, "realignment_error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+    return receipt
+
+
+def _acquisition_plan_for_gaps(gaps: Sequence[Mapping], *, retrieval_plan: Mapping | None,
+                               session_config: Mapping | None = None,
+                               graph_enabled: bool = False) -> dict:
+    """P14-01…P14-06 的获取计划（缺口 → 动作候选 → 效用 → 选择）。
+
+    来源可用性按**本部署真实能力**给（KB/DB 在、图谱看本轮是否开、Web 看本轮是否需要、
+    EMR 需要部署方注入内部证据库、患者通道默认关）；权限位取 Phase 11 的默认拒绝口径。
+    """
+    plan = retrieval_plan if isinstance(retrieval_plan, Mapping) else {}
+    sources = deployment_sources(
+        needs_web=bool(plan.get("needs_web")),
+        has_graph=bool(graph_enabled),
+        has_emr=False,
+        has_db=True,
+        has_kb=True,
+    )
+    permissions = {"patient_contact": False, "emr_read": False, "corpus_read": True,
+                   "graph_read": True, "db_read": True, "web_access": True}
+    config = session_config if isinstance(session_config, Mapping) else {}
+    requested = config.get("config") if isinstance(config.get("config"), Mapping) else {}
+    # 会话配置里的**通道偏好**直接进缺口的建议通道次序（P14-03 + P14-07 的联动点）
+    prefer = [str(item) for item in (requested.get("route_preference") or [])]
+    return plan_acquisition(gaps, sources=sources, permissions=permissions,
+                            preferred_routes=prefer)
+
+
+def _apply_preferred_routes(gaps: list, prefer: Sequence[str]) -> tuple:
+    """把会话配置的通道偏好作用到缺口的 `suggested_routes`（复用 Phase 12 的同一条实现）。
+
+    只换次序、绝不发明通道；没有任何偏好时原样返回（零行为变化）。
+    """
+    routes = [str(item) for item in (prefer or []) if str(item)]
+    if not routes:
+        return gaps, {}
+    try:
+        from qa_memory_experience import apply_route_guidance
+
+        return apply_route_guidance(gaps, {"prefer_routes": routes, "avoid_routes": []})
+    except Exception as exc:  # noqa: BLE001 —— 偏好坏掉不许挡住缺口循环
+        return gaps, {"error": "%s: %s" % (type(exc).__name__, str(exc)[:120])}
+
+
 # ── 阶段 01（F-7）：SearchTrace 的 route / results / accepted / rejected ──────
 # route 的取值域是 `qa_graph_contracts.QA_RETRIEVAL_ROUTES`（单一事实源，别在这儿另造字符串）。
 _ROUTE_BY_METHOD = {
@@ -1490,7 +1675,9 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                    corpus_version: str = "", hop_audit: dict | None = None,
                    budget_seconds: float | None = None,
                    plan_claims: Sequence[Mapping] | None = None, mode: str = "",
-                   retrieval_config_version: str = ""):
+                   retrieval_config_version: str = "",
+                   gap_floors: Mapping | None = None,
+                   acquisition_router: Callable | None = None):
     """按 DAG 顺序执行多跳检索，返回 (合并后的 local, 每跳回执)。
 
     预算与跳数是**双重硬约束**：跳数上限 `QA_MAX_HOPS`，墙钟上限
@@ -1513,6 +1700,14 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
       · 收尾时按 §14 给出**停止原因**（`merged["gap_loop"]["stop_reason"]`），
         并把 `gap_id`/`new_claims`/`resolved_gap` 通过 `trace_recorder` 真正落库
         （Phase 01 埋的 `qa_reasoning_traces` 三列，本阶段填上）。
+
+    阶段 14（P14-01…P14-06）增补：
+      · `gap_floors`：缺口判据的覆盖值（P14-07 的会话配置落点；缺省 None → 环境默认值，
+        行为与 Phase 13 逐字相同）；
+      · `acquisition_router`：**可选回调** `(live_gaps) -> (gaps, receipt)`，在每一轮
+        "缺口 → 下一跳"之前被调用一次 —— 它把 §13/§21 的 Action Utility 算出来、
+        把**被选中动作的通道偏好**作用到缺口上（于是下一跳真的换了通道）；
+        回调抛错一律吞掉（获取规划是优化，绝不能挡住检索）。
     """
     import time as _time
 
@@ -1545,22 +1740,43 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             rounds_limit=max(2, len(hops) + 1 + max(1, int(getattr(config, "QA_MAX_HOPS", 3) or 3))),
             budget_seconds=budget, started=started,
             category=_gap_loop_category(retrieval_plan), plan=retrieval_plan,
-            corpus_version=corpus_version, retrieval_config=retrieval_config_version)
+            corpus_version=corpus_version, retrieval_config=retrieval_config_version,
+            # 阶段 14（P14-07）：会话级配置覆盖缺口判据（缺省 None → 环境默认值，零变化）
+            floors=dict(gap_floors) if isinstance(gap_floors, Mapping) else None)
 
     # ── 阶段 12（P12-03/P12-06）：经验指导真的改变缺口的通道次序（默认关）──
     experience_guidance: dict = {}
+    acquisition_state: dict = {}
     experience_wired = bool(gap_state is not None and _experience_loop_enabled(store=store))
-    if experience_wired:
-        # 规划期召回（§10）：召回失败/策略类记忆 → 通道偏好 + 提前提示。
-        # 只读、恒为 MEMORY_HINT；召回或判定坏掉一律不改变缺口的建议通道（原行为）。
+    acquisition_wired = bool(gap_state is not None and callable(acquisition_router))
+    if acquisition_wired:
+        # 阶段 14（P14-01…P14-06）：每一轮"缺口 → 下一跳"之前算一次获取计划。
+        # 计划只做两件事：① 记回执（动作/效用/淘汰理由）；② 把被选中动作的通道偏好
+        # 作用到缺口上 —— 于是 §13 的 "Gap → Best Retrieval Action" 真的改变了下一跳通道。
+        def _acquisition_route(gaps: list) -> tuple:
+            try:
+                adjusted, receipt = acquisition_router(gaps)
+            except Exception as exc:  # noqa: BLE001 —— 获取规划不许挡住检索
+                acquisition_state["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:160])
+                return gaps, {}
+            if isinstance(receipt, Mapping):
+                acquisition_state.update(dict(receipt))
+            if isinstance(adjusted, (list, tuple)):
+                return list(adjusted), dict(acquisition_state)
+            return gaps, dict(acquisition_state)
+
+    if experience_wired or acquisition_wired:
         from qa_memory_experience import apply_route_guidance, guidance_receipt
 
         def _route_guidance(gaps: list) -> tuple:
+            if not experience_wired:
+                # 只开了阶段 14：直接走获取规划（经验记忆的召回一次都不发生）
+                return _acquisition_route(gaps)
             guidance = _planning_guidance(run_meta=run_meta, plan=retrieval_plan, store=store,
                                           question=question, corpus_version=corpus_version,
                                           retrieval_config_version=retrieval_config_version)
             if not guidance:
-                return gaps, {}
+                return _acquisition_route(gaps) if acquisition_wired else (gaps, {})
             adjusted, receipt = apply_route_guidance(gaps, guidance)
             receipt["warnings"] = list(guidance.get("warnings") or [])
             receipt["guidance"] = guidance_receipt(guidance)
@@ -1576,6 +1792,9 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                                               "route": warning.get("route"),
                                               "routes": warning.get("routes"),
                                               "failure_id": warning.get("failure_id")}})
+            if acquisition_wired:
+                # 阶段 14：经验偏好生效**之后**再算获取计划（获取计划看到的是最终通道次序）
+                adjusted, _ = _acquisition_route(adjusted)
             return adjusted, receipt
 
     def _observe_gap_round(round_no: int, *, new_refs=()) -> dict:
@@ -1849,7 +2068,8 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
             try:
                 planned = gap_state.next_hops(plan=retrieval_plan, limit=1,
                                               route_guidance=_route_guidance
-                                              if experience_wired else None)
+                                              if (experience_wired or acquisition_wired)
+                                              else None)
             except Exception as exc:      # noqa: BLE001 —— 规划器坏掉不许把检索打断
                 gap_state.record_error("next_hops", "%s: %s" % (type(exc).__name__,
                                                                 str(exc)[:120]))
@@ -1976,6 +2196,9 @@ def _run_multi_hop(article_retriever, retrieval_plan, first_local, context, *,
                                              for row in (experience_guidance.get("route_changes")
                                                          or [])[:3]))),
                     "experience_memory": experience_guidance.get("applied")})
+        if acquisition_state:
+            # 阶段 14（P14-01…P14-06）：获取计划回执走**兄弟键**（gap_loop / multi_hop 键集不动）
+            merged["acquisition"] = dict(acquisition_state)
         merged["multi_hop"]["gap_stop_reason"] = str(decision.get("stop_reason") or "")
         merged["multi_hop"]["gap_loop_version"] = GAP_ANALYZER_VERSION
         if callable(emit_stage_event):
@@ -2524,6 +2747,37 @@ def build_qa_stage_handlers(
                 })
         result = planner.plan(request_payload)
         _persist_session_constraints(store, run_meta, result)
+        # ── 阶段 14（P14-07）：重复提问识别与思路调整确认（`QA_REPEAT_QUESTION_ENABLED` 默认关）──
+        # 关掉时这里一个键都不新增、一行都不写库（逐字回到 Phase 13）。
+        # 打开时：判定 → 交互回执 + **把上一轮用户选定的思路落到本轮计划上**
+        # （时间窗 / 分析口径 / 缺口判据 / 通道偏好；用户本轮明确说的时间范围优先）。
+        if _realignment_enabled():
+            _realignment = _realignment_plan_step(
+                store, run_meta, str(request_payload.get("question") or ""), result)
+            _applied_plan = _realignment.pop("plan_result", None)
+            if isinstance(_applied_plan, Mapping):
+                result = dict(_applied_plan)
+            result["realignment"] = _realignment
+            if callable(context.get("_emit_stage_event")):
+                _interaction = _realignment.get("interaction") or {}
+                if _interaction:
+                    context["_emit_stage_event"]("action_required", {
+                        "message": str(_interaction.get("question") or ""),
+                        "realignment": {
+                            "topic_key": str(_interaction.get("topic_key") or ""),
+                            "triggers": list(_interaction.get("triggers") or []),
+                            "evidence": list(_interaction.get("evidence") or []),
+                            "options": list(_interaction.get("options") or []),
+                            "max_interactions": int(_interaction.get("max_interactions") or 1),
+                        }})
+                else:
+                    _note = _realignment_topic_note(_realignment)
+                    if _note:
+                        context["_emit_stage_event"]("stage_progress", {
+                            "message": _note,
+                            "realignment": {"skipped_reason": str(_realignment.get("skipped_reason") or ""),
+                                            "applied_keys": list(
+                                                ((_realignment.get("applied_plan") or {}).get("changed")) or [])}})
         question_plan = result.get("question_plan") if isinstance(result.get("question_plan"), Mapping) else {}
         emit_stage_event = context.get("_emit_stage_event")
         if callable(emit_stage_event) and question_plan:
@@ -2622,12 +2876,29 @@ def build_qa_stage_handlers(
         pack_id = request_payload["industry_pack_id"]
         kb_version = _local_version(pack_id)
         scope_hash = _scope_hash(context)
+        # ── 阶段 14（P14-01…P14-06）：SAGE-RAG 统一获取（`QA_ACQUISITION` 默认关）──
+        # 先把会话级思路配置取出来（P14-07 落在计划上的那份）：它既要进缓存键，
+        # 又要喂给获取计划与通道偏好。开关关着时它是空的 → 下面每一处都是空操作。
+        _session_realignment = retrieval_plan.get("realignment") if isinstance(
+            retrieval_plan.get("realignment"), Mapping) else {}
+        _session_config = (_session_realignment.get("config")
+                           if isinstance(_session_realignment.get("config"), Mapping) else {})
+        _config_prefer = [str(item) for item in
+                          ((_session_config.get("config") or {}).get("route_preference") or [])] \
+            if _session_config.get("usable") else []
         cache_payload = {
             "queries": retrieval_plan.get("queries") or [],
             "mode": request_payload.get("mode"),
             "web": bool(retrieval_plan.get("needs_web")),
             "page_context": request_payload.get("page_context") or {},
         }
+        # 阶段 14（P14-07）：**会话级思路配置必须进缓存键** —— 否则"下次按新思路执行"会被
+        # 同一句查询的旧缓存悄悄吃掉（实测踩到：换了时间窗但返回的是缓存结果）。
+        # 没有配置时一个键都不加 → 既有缓存键逐字不变（零回归）。
+        if _session_config.get("usable"):
+            cache_payload["realignment_config"] = dict(_session_config.get("config") or {})
+        if _plan_gap_floors(retrieval_plan):
+            cache_payload["gap_floors"] = _plan_gap_floors(retrieval_plan)
         cache_key = resilience.cache_key(
             "level1_retrieval", cache_payload, pack_id=pack_id,
             kb_version=kb_version, policy_version="qa-retrieval-v3-policy-exact",
@@ -2694,6 +2965,20 @@ def build_qa_stage_handlers(
             gap_plan, gap_plan_claims = _gap_plan_claims(
                 retrieval_plan, question=_planned_question(context),
                 mode=str(request_payload.get("mode") or "standard"))
+        # ── 阶段 14（P14-01…P14-06）：获取动作规划回调（开关关着时是 None → 空操作）──
+        # 它在每一轮"缺口 → 下一跳"之前算一次 Action Utility，并把被选中动作的通道偏好
+        # 真的作用到缺口的建议通道次序上。
+        acquisition_router = None
+        if _acquisition_enabled() and gap_analyzer_enabled():
+            def acquisition_router(live_gaps, _plan=retrieval_plan, _config=_session_config,
+                                   _prefer=_config_prefer, _local=local):
+                """回调：缺口 → 动作候选 → 效用 → **真的改变下一跳通道**（失败不打断检索）。"""
+                return live_gaps, _acquisition_receipt_for(
+                    live_gaps, retrieval_plan=_plan, session_config=_config,
+                    config_prefer=_prefer,
+                    graph_enabled=bool((_local.get("graph") or {}).get("enabled")),
+                    decision_point="gap_loop_next_hop")
+
         multi_hop_plan = retrieval_plan.get("decomposition") or {}
         # 阶段 07：缺口循环打开时，**没有多跳 DAG 的问题也进循环**（单跳问题同样可能带缺口，
         # 而 §13 的补充跳正是为它们准备的）；开关关着时条件与原来逐字一致。
@@ -2751,6 +3036,9 @@ def build_qa_stage_handlers(
                 plan_claims=gap_plan_claims,
                 mode=str(request_payload.get("mode") or "standard"),
                 retrieval_config_version="qa-retrieval-v3-policy-exact",
+                # 阶段 14：会话级判据覆盖值 + 获取动作规划回调（都缺省 → 与 Phase 13 逐字相同）
+                gap_floors=_plan_gap_floors(retrieval_plan),
+                acquisition_router=acquisition_router,
             )
         elif multi_hop_plan.get("hops"):
             hop_receipts = [{
@@ -2907,6 +3195,63 @@ def build_qa_stage_handlers(
                                        "prefer_routes") or []) or "无",
                                    int((_experience_receipt.get("applied") or {}).get("changed") or 0))),
                     "experience_memory": dict(_experience_receipt.get("guidance") or {})})
+        # 阶段 14（P14-01…P14-06）：统一获取计划的回执走**兄弟键** `stats["acquisition"]`
+        # （Phase 02/03/05/06/07/12 同样手法；开关关着时这个键根本不存在）。
+        _acquisition_plan_receipt = local.get("acquisition")
+        if _acquisition_enabled() and not _acquisition_plan_receipt:
+            # 缺口环**早停**（NO_GAIN/预算用尽/没发补充跳）时，路由回调一次都没被调用 ——
+            # 这时用**收尾时的 open 缺口**再算一次计划：§13 的"下一步该由谁去拿"本身就要可观测，
+            # 不能因为"这一轮不打算再搜"就当作没有决策。
+            _final_gaps = [gap for gap in ((local.get("gap_loop") or {}).get("gaps") or [])
+                           if isinstance(gap, Mapping)]
+            if _final_gaps:
+                try:
+                    _acquisition_plan_receipt = _acquisition_receipt_for(
+                        _final_gaps, retrieval_plan=retrieval_plan, session_config=_session_config,
+                        config_prefer=_config_prefer,
+                        graph_enabled=bool((local.get("graph") or {}).get("enabled")),
+                        decision_point="final_open_gaps")
+                except Exception as exc:  # noqa: BLE001 —— 获取规划不许挡住检索
+                    _acquisition_plan_receipt = {
+                        "error": "%s: %s" % (type(exc).__name__, str(exc)[:160]),
+                        "decision_point": "final_open_gaps"}
+        if isinstance(_acquisition_plan_receipt, Mapping) and _acquisition_plan_receipt:
+            stats["acquisition"] = dict(_acquisition_plan_receipt)
+            if callable(emit_stage_event):
+                emit_stage_event("stage_progress", {
+                    "message": ("获取动作：选中 %s（来源 %s）；淘汰 %d 条%s。"
+                                % ("、".join(_acquisition_plan_receipt.get("selected") or []) or "无",
+                                   "、".join("%s=%s" % (k, v) for k, v in
+                                             (_acquisition_plan_receipt.get("by_source") or {}).items())
+                                   or "无",
+                                   sum(int(v or 0) for v in
+                                       (_acquisition_plan_receipt.get("skipped") or {}).values()),
+                                   "；其中 %d 条因「信息已在手上」被拦下（§13 不重复追问）"
+                                   % int((_acquisition_plan_receipt.get("skipped") or {}).get(
+                                       "CONTEXT_GAP_NO_REPEAT") or 0)
+                                   if (_acquisition_plan_receipt.get("skipped") or {}).get(
+                                       "CONTEXT_GAP_NO_REPEAT") else "")),
+                    "acquisition": {
+                        "selected": list(_acquisition_plan_receipt.get("selected") or []),
+                        "by_source": dict(_acquisition_plan_receipt.get("by_source") or {}),
+                        "skipped": dict(_acquisition_plan_receipt.get("skipped") or {}),
+                        "route_changes": list(_acquisition_plan_receipt.get("route_changes") or []),
+                    }})
+            # P14-04：被选中的问诊候选**交给交互层**（`action_required` 事件；恒不是证据）
+            for inquiry in list(_acquisition_plan_receipt.get("inquiries") or [])[:3]:
+                if callable(emit_stage_event):
+                    emit_stage_event("action_required", {
+                        "message": str(inquiry.get("question_text") or ""),
+                        "acquisition_inquiry": dict(inquiry)})
+        elif _acquisition_enabled():
+            # 开关打开但没有缺口循环（`QA_GAP_ANALYZER` 关着）→ 如实说明"没有缺口可规划"
+            stats["acquisition"] = {
+                "planner_version": ACQUISITION_PLANNER_VERSION,
+                "selected": [], "by_source": {}, "skipped": {}, "inquiries": [],
+                "skipped_reason": "NO_GAP_ANALYSIS",
+                "note": "获取动作由缺口驱动（§13）；本轮没有跑缺口分析，因此没有动作可规划。",
+                "gap_floors": _plan_gap_floors(retrieval_plan),
+            }
         result = {
             "queries": list(retrieval_plan.get("queries") or []),
             "evidence": evidence,
@@ -3411,7 +3756,9 @@ def build_qa_stage_handlers(
                 working_memory=_context_working_memory(context),
                 memory_items=_memory_items_from(
                     memory_recall, revalidated_hints=memory_revalidation.get("hints") or ()),
-                skill_items=_skill_items_from(_skill_routing))
+                skill_items=_skill_items_from(_skill_routing),
+                # 阶段 14（P14-05）：运行期真实缺口（开关关着时这一项被忽略，零行为变化）
+                gaps=_runtime_gaps(context))
         # 阶段 11（P11-06）：遥测放在上下文包**之后**（它要读 `skill_context.loaded_skills`）
         if skill_router_enabled() and _skill_routing:
             _skill_telemetry = _attach_skill_telemetry(
@@ -3490,7 +3837,8 @@ def build_qa_stage_handlers(
                     working_memory=_context_working_memory(context),
                     memory_items=_memory_items_from(
                         _fast_memory, revalidated_hints=_fast_revalidation.get("hints") or ()),
-                    skill_items=_skill_items_from(_fast_skill_routing))
+                    skill_items=_skill_items_from(_fast_skill_routing),
+                    gaps=_runtime_gaps(context))
             # 阶段 11（P11-06）：fast 路径同样记遥测（在上下文包之后）
             if skill_router_enabled() and _fast_skill_routing:
                 _fast_skill_telemetry = _attach_skill_telemetry(

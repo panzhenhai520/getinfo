@@ -9,8 +9,9 @@
   3. 两个镜像枚举（`CLAIM_VERIFICATION_STATUSES` / `ANSWER_STATUSES`）与**冻结契约机器对齐**
      （逐值相等，不是子集）；
   4. 六问 / 重试作用域 / 证据不足判据都是闭集合，取值与规格书逐字一致；
-  5. **零迁移**：库表清单与版本号一个字没变（`QA_SCHEMA_VERSION` 仍 `unified-qa-schema-v10`），
-     没有新的 `qa_final*` 表；三个新开关默认关；
+  5. **Phase 13 自身零迁移**：没有新的 `qa_final*` 表；三个新开关默认关
+     （版本常量的**等值断言**随跨阶段契约变更同步字面量：Phase 14 抬到
+     `unified-qa-schema-v11`，断言强度不变）；
   6. 零网络 / 零模型：模块不 import 网络或模型库、源码零 http(s) 字面量。
 """
 import ast
@@ -147,7 +148,7 @@ class NewContractTests(unittest.TestCase):
 
 class NoMigrationTests(unittest.TestCase):
     def test_schema_version_and_tables_unchanged(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v11")
         ddl = "\n".join(qa_schema.QA_TABLE_DDL)
         tables = {statement.split("CREATE TABLE IF NOT EXISTS")[1].split("(")[0].strip()
                   for statement in qa_schema.QA_TABLE_DDL if "CREATE TABLE" in statement}

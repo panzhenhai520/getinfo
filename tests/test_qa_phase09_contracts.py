@@ -126,7 +126,7 @@ class FrozenContractTests(unittest.TestCase):
         # 最后两张表（skill_performance_memory / source_reliability_memory）。
         # 字面量随跨阶段契约变更，但**强度不变、并且更强**：等值断言 + 零 ADD COLUMN +
         # 逐张点名"哪些表必须在、哪些表不许有"。
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v11")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V8, ())
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V9, (), "Phase 10 也只许新建表")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V10, (), "Phase 12 也只许新建表")

@@ -3,8 +3,9 @@
 """graph-rag-v2 通用包 Phase 12 · P12 库表（v9 → v10）用例。
 
 钉住（全部在隔离临时 sqlite 上真跑，`setUp` 断言 `backend == 'sqlite'`）：
-  1. `QA_SCHEMA_VERSION` = `unified-qa-schema-v10`，`QA_ADDED_COLUMNS_V10` **为空**
-     （经验类记忆本体写在既有 `memory_item`，v10 只允许新建两张投影表）；
+  1. `QA_ADDED_COLUMNS_V10` **为空**（经验类记忆本体写在既有 `memory_item`，
+     v10 只允许新建两张投影表）；版本常量的**等值断言**随跨阶段契约变更同步字面量
+     （Phase 14 把它抬到 `unified-qa-schema-v11`，断言强度不变）；
   2. §12 里 Phase 09 刻意留给本阶段的两张表（`source_reliability_memory` /
      `skill_performance_memory`）在**清库路径**与**老库升级路径**都必须建出来；
   3. 列的清单逐字固定（多一列少一列都挂）；
@@ -79,7 +80,7 @@ class SchemaVersionTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_version_is_v10_with_zero_added_columns(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v11")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V10, (), "v10 只允许新建表，不许 ADD COLUMN")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V9, (), "v9 的零 ADD COLUMN 承诺不变")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V8, (), "v8 的零 ADD COLUMN 承诺不变")
@@ -135,8 +136,8 @@ class SchemaVersionTests(unittest.TestCase):
             self.assertNotIn(name, tables)
         after = {name: _columns(self.database, name) for name in watched}
         self.assertEqual(before, after, "回滚只许删两张新表")
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION.replace("v10", "v9"),
-                         "unified-qa-schema-v9", "版本号回退口径写在这里，供回滚时对照")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION.replace("v11", "v10"),
+                         "unified-qa-schema-v10", "版本号回退口径写在这里，供回滚时对照")
 
     def test_checksum_covers_the_new_ddl(self):
         blob = " ".join(qa_schema.QA_TABLE_DDL)

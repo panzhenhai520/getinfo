@@ -258,3 +258,9 @@
 |P13-05|本地重试|`python -m pytest tests/test_qa_phase13_retry.py -q`|只重跑组装或终验、**不得再检索**|`retry_never_retrieves=true`；retry_max=1|PASS|同上|
 |P13-06|证据不足输出|`python -m pytest tests/test_qa_phase13_insufficient.py -q`|无证据必须标记不足并给依据，不许编答案|真机答案状态 partial 13 / insufficient_evidence 1；两条断言均 true|PASS|同上|
 |P13-Gate|Phase 13 Gate（Unit/Integration/Failure-path/兼容回归）|`python -m pytest tests -q`|95 新例全过；全量不破 Phase 12 基线（3093/1/0）|`-k phase13` **95 passed**；相关面 1877 passed；全量 **3188 passed / 1 skipped / 0 failed**（Phase 12 基线未破）；执行图 deep 的 final_verify 占位改已实现且 Phase 05 用例同步|PASS|同上|
+|P14-01/02|动作契约与 EGR/Utility|`python -m pytest tests/test_qa_phase14_contracts.py tests/test_qa_phase14_utility.py -q`|六动作逐字入契约；两个公式逐项可手算|**19 + 16 passed**|PASS|`qa_acquisition.py`；`qa_graph_contracts.py:2901-3290`|
+|P14-03/04|通道路由与用户追问|`python -m pytest tests/test_qa_phase14_routes.py tests/test_qa_phase14_ask_patient.py -q`|通道只在冻结枚举内；追问恒非证据、不进引用表|**14 + 16 passed**；真改缺口通道次序（keyword→semantic）有前后对比|PASS|`qa_acquisition.py`|
+|P14-05|上下文缺口去重|`python -m pytest tests/test_qa_phase14_context_gap.py -q`|6/6 动作被拦、5 个抑制理由码可达|**13 passed**（用真实 Phase 08 产物验证）|PASS|同上|
+|P14-06|安全权重与覆盖|`python -m pytest tests/test_qa_phase14_safety.py -q`|安全覆盖只能换赢家且需占比条件、引 Phase 07 阈值|**11 passed**；覆盖实测换赢家（0.9375 → 0.7875）并记 SAFETY_OVERRIDE|PASS|同上|
+|**P14-07**|**重复提问识别与思路调整确认（用户需求）**|`python -m pytest tests/test_qa_phase14_realignment.py tests/test_qa_phase14_pipeline.py -q`|触发判据可复算、不满意必须可解释、最多交互一次且必须给「不改」、选项落成会话级配置并**真的改变下一次运行**、失败不阻断|**28 + 14 + 5 passed**；真机快照 15 轮：**检出 2 次重复、交互 2 次、13 轮不同题未触发**；前后对比：时间窗 days=1095、权威 50→90（缺口 1→2）、通道 keyword→semantic；并实测出「会话配置须进检索缓存键」|PASS|`qa_realignment.py`；`qa_schema.py:696`|
+|P14-R1|跨阶段契约变更（v10→v11）与冻结契约|`python -m pytest tests/test_qa_phase14_contracts.py -q` 与全量|新增一张表、零 ADD COLUMN、版本断言仍是等值断言、七指纹不变|12 个既有测试的版本字面量同步为 v11（强度不变）；七契约指纹复算不变；全量 **3324 passed / 1 skipped / 0 failed**（Phase 13 基线 3188 未破）|PASS|`qa_schema.py`|

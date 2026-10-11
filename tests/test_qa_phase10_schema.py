@@ -67,7 +67,7 @@ class SchemaVersionTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_version_is_v9_with_zero_added_columns(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v11")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V9, (), "v9 只允许新建表，不许 ADD COLUMN")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V8, (), "v8 的零 ADD COLUMN 承诺不变")
         self.assertEqual(len(qa_schema.QA_ADDED_COLUMNS_V6), 15, "Phase 01 的列清单不许被动过")

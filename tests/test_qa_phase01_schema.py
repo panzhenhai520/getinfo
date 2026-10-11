@@ -77,7 +77,7 @@ class Phase01SchemaVersionTests(unittest.TestCase):
         `tests/test_qa_phase02_seen.py`、v8 的八张记忆表见 `tests/test_qa_phase09_schema.py`、
 v9 的两张复验/矛盾表见 `tests/test_qa_phase10_schema.py`。
         """
-        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v11")
 
     def test_fresh_ddl_and_upgrade_list_agree(self):
         """新建库路径（建表文本）与老库升级路径（ADD COLUMN 清单）必须逐字一致。

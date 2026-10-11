@@ -321,7 +321,7 @@ class FrozenContractTests(unittest.TestCase):
         # Phase 12（D-044）把 v9 升到 v10 并建了 §12 留给它的两张表，所以这里把
         # "不许有 skill_* 表"的断言精确化为：**Phase 11 自己引入的表 = 0**
         # （`skill_performance_memory` 是 Phase 12 建的投影表，不是 Phase 11 建的遥测表）。
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v10")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v11")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V10, (), "Phase 12 也只许新建表")
         joined = " ".join(qa_schema.QA_TABLE_DDL).casefold()
         for name in ("skill_load_log", "skill_registry", "skill_performance",
