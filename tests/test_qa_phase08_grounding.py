@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 os.environ.setdefault("DATABASE_TYPE", "sqlite")
 
@@ -376,6 +377,129 @@ class SynthesizerGateTests(unittest.TestCase):
                          {item["evidence_ref"] for item in body["evidence"]},
                          "提示里给模型看的证据必须与引用编号完全一致")
         self.assertTrue(body["context_pack"]["约束"])
+
+
+class GroundingGateUnavailableTests(unittest.TestCase):
+    """闸门**自己坏掉**时不许伪装成"零违规通过"，两次尝试都失败时不许把原因抹掉。
+
+    钉的是 B 机真实事故 run 16d1eeb0425345c5882b0e9cca16e715：
+      · `degradation_reasons=[]`、`qa_runs.degradation_json=[]`、日志零 Traceback；
+      · 离线复算却应命中 NUMBER_WITHOUT_SPAN×4 —— 说明闸门**根本没跑到**，
+        而不是"跑了、判了零违规"；根因是终局兜底 `reason=""` + 异常只塞进 `last_error` 后再没被读。
+    """
+
+    def _graph(self):
+        evidence = [evidence_item("article:1", text=SUPPORTED_TEXT,
+                                  doc_type="official_policy", authority=100,
+                                  verification=verification("SUPPORTED", score=0.95))]
+        claims = [graph_claim("c1", text="香港家族办公室税收优惠政策对内地高净值客户有影响",
+                              refs=["article:1"])]
+        return graph(claims=claims, evidence=evidence, edges=[graph_edge("c1", "article:1")])
+
+    def _pack_for(self, graph_obj):
+        return cp.build_context_pack(graph=graph_obj, plan=plan(),
+                                     request={"question": QUESTION}, run_id="r1")
+
+    @staticmethod
+    def _client(answer="宽免适用于符合条件的管理人 [1]。"):
+        def client(profile, messages, timeout=90):
+            return json.dumps({"status": "ready", "answer": answer, "sections": {},
+                               "claims": ["c1"], "conflicts": [],
+                               "citations": ["article:1"]}, ensure_ascii=False)
+        return client
+
+    def test_gate_failure_is_marked_unavailable_not_zero_violations(self):
+        """check_grounding 抛异常 → 回执必须带**明确的降级标记 + 原因**，不许只是一份空 violations。"""
+        os.environ["QA_GROUNDING_GATE"] = "1"
+        try:
+            with mock.patch.object(qa_synthesis, "check_grounding",
+                                   side_effect=ValueError("构造：闸门内部炸了")):
+                report = qa_synthesis.QaFinalSynthesizer._grounding_report(
+                    {"answer": "x", "claims": [], "sections": {}, "citations": []},
+                    context_pack=None, graph={})
+        finally:
+            os.environ.pop("QA_GROUNDING_GATE", None)
+        self.assertEqual(report["violations"], [])
+        self.assertFalse(report["blocking"])
+        self.assertTrue(report.get("unavailable"), "闸门不可用必须在回执里显式标出来")
+        self.assertIn("ValueError", report.get("error") or "", "原因必须带异常类型")
+        self.assertIn("闸门内部炸了", report.get("error") or "")
+        self.assertIn("不代表本轮零违规", report.get("note") or "",
+                      "回执必须写明这不是'零违规'")
+
+    def test_generate_discloses_the_unavailable_gate(self):
+        """闸门不可用时，答案照出，但必须落进 degradation_reasons + degraded=True。"""
+        graph_obj = self._graph()
+        pack = self._pack_for(graph_obj)
+        os.environ["QA_GROUNDING_GATE"] = "1"
+        try:
+            with mock.patch.object(qa_synthesis, "check_grounding",
+                                   side_effect=RuntimeError("构造：闸门炸了")):
+                result = qa_synthesis.QaFinalSynthesizer(model_client=self._client()).generate(
+                    question=QUESTION, graph=graph_obj, level1={}, level2={}, degradation=[],
+                    profile=_Profile(), models={"synthesis": "stub"}, context_pack=pack)
+        finally:
+            os.environ.pop("QA_GROUNDING_GATE", None)
+        qa_contracts.validate_final_answer(result)
+        self.assertTrue(result["degraded"], "闸门不可用必须算降级")
+        reasons = " ".join(result["degradation_reasons"])
+        self.assertIn("grounding", reasons)
+        self.assertIn("不可用", reasons)
+        self.assertIn("RuntimeError", reasons, "原因摘要必须能追到异常")
+        self.assertNotEqual(result["degradation_reasons"], [])
+
+    def test_a_healthy_gate_still_reports_its_violations(self):
+        """对照：闸门正常时违规照常上报、且回执**不带** unavailable 标记；正常一轮不许凭空多出降级。"""
+        graph_obj = self._graph()
+        pack = self._pack_for(graph_obj)
+        os.environ["QA_GROUNDING_GATE"] = "1"
+        try:
+            # 直接喂一份"数字无据"的答案：闸门正常 → 违规必须照常出现在回执里
+            draft = final_answer(
+                answer="门槛为 9999 万港元 [1]。",
+                claims=[answer_claim("c1", ["article:1"])],
+                citations=["article:1"], citation_map=pack["citation_map"],
+                evidence=[evidence_item("article:1", text=SUPPORTED_TEXT,
+                                        doc_type="official_policy", authority=100,
+                                        verification=verification("SUPPORTED", score=0.95))])
+            report = qa_synthesis.QaFinalSynthesizer._grounding_report(
+                draft, context_pack=pack, graph=graph_obj)
+            result = qa_synthesis.QaFinalSynthesizer(model_client=self._client()).generate(
+                question=QUESTION, graph=graph_obj, level1={}, level2={}, degradation=[],
+                profile=_Profile(), models={"synthesis": "stub"}, context_pack=pack)
+        finally:
+            os.environ.pop("QA_GROUNDING_GATE", None)
+        self.assertNotIn("unavailable", report, "正常回执不许带不可用标记")
+        self.assertIn("NUMBER_WITHOUT_SPAN", report["violation_counts"], "违规照常上报")
+        self.assertFalse(report["blocking"])
+        # 正常一轮：只可能出现"生成端 grounding 校验：…"这条**老口径**，
+        # 绝不许出现"不可用"（新逻辑不许制造误报，也不许改动老路径的口径）
+        reasons = result["degradation_reasons"]
+        self.assertTrue(reasons, "这一轮确有违规 → 照旧必须落进 degradation_reasons")
+        self.assertTrue(all(reason.startswith("生成端 grounding 校验：") for reason in reasons),
+                        reasons)
+        self.assertFalse(any("不可用" in reason for reason in reasons))
+
+    def test_two_failed_attempts_are_recorded_not_erased(self):
+        """两次尝试都失败 → 终局兜底必须留原因，绝不能再出现"空 degradation 的 fallback"。"""
+
+        def client(profile, messages, timeout=90):
+            return "这既不是 JSON 也没有大括号"
+
+        graph_obj = self._graph()
+        pack = self._pack_for(graph_obj)
+        synthesizer = qa_synthesis.QaFinalSynthesizer(model_client=client)
+        result = synthesizer.generate(
+            question=QUESTION, graph=graph_obj, level1={}, level2={}, degradation=[],
+            profile=_Profile(), models={"synthesis": "stub"}, context_pack=pack)
+        qa_contracts.validate_final_answer(result)
+        self.assertTrue(result["degradation_reasons"],
+                        "两次都没过不许在库里留一个空的 degradation_reasons")
+        self.assertTrue(result["degraded"])
+        codes = (result["sections"].get("diagnostics") or {}).get("degradation_codes") or []
+        self.assertIn("SYNTHESIS_FALLBACK_USED", codes)
+        self.assertIn("QaContractError", " ".join(result["degradation_reasons"]),
+                      "兜底原因必须带最后一次异常的类型")
 
 
 class _Profile:

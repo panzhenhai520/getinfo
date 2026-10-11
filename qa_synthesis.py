@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import ast
@@ -35,6 +36,15 @@ _REFUSAL_RE = re.compile(r"(抱歉|无法|不能|拒绝|sorry|cannot|can't|unabl
 _RISK_RE = re.compile(r"(风险|冲击|影响|应对|调整|合规|家族办公室|家族信托|离岸信托|规避|反避税|申报|税务)", re.I)
 _RAG_PROVIDER_RE = re.compile(r"RAGFlow", re.I)
 _POLICY_QA_RE = re.compile(r"(公告|政策|法规|办法|条例|通知|个税|个人所得税|征管|离岸信托|境外信托)", re.I)
+
+_LOGGER = logging.getLogger(__name__)
+"""本模块的日志器。存在意义只有一个：**失败必须留痕**。
+
+历史事故（B 机 run 16d1eeb0425345c5882b0e9cca16e715）：最终综合两次尝试都在 try 块里
+抛了异常，异常被存进 `last_error` 后**再没被读过**，终局兜底又传 `reason=""`，
+于是 `degradation_reasons=[]`、`qa_runs.degradation_json=[]`、qa-worker 日志 0 行 Traceback——
+"生成端 grounding 闸门零产出"看起来像"零违规"，实际是**闸门根本没跑到**。
+"""
 
 
 def _int_env(name: str, default: int, low: int, high: int) -> int:
@@ -1096,6 +1106,39 @@ def _ensure_inline_citations(answer: str, claims: list[Mapping], citation_map: M
     return text + "\n\n关键依据：\n" + "\n".join(lines)
 
 
+def _mark_grounding_unavailable(answer: Mapping, report: Mapping) -> dict:
+    """闸门不可用时的**显式降级**（只动既有可选字段，冻结 schema 一个键都不加）。
+
+    口径与 `mark_ungrounded_answer` 一致：违规 → 追加 `degradation_reasons`；
+    这里把"校验没跑成"当成一种必须披露的降级，绝不静默当成"零违规通过"。
+    """
+    result = dict(answer) if isinstance(answer, Mapping) else {}
+    reason = "生成端 grounding 校验不可用，本轮未完成校验（不得视为零违规或已通过）"
+    detail = str(dict(report or {}).get("error") or "").strip()
+    if detail:
+        reason += "：" + detail[:200]
+    reasons = list(result.get("degradation_reasons") or [])
+    if reason not in reasons and len(reasons) < 20:
+        reasons.append(reason[:500])
+    result["degradation_reasons"] = reasons
+    result["degraded"] = True
+    return result
+
+
+_FALLBACK_FAILED_NOTE = "最终综合模型两次尝试都未通过契约校验，已改用证据约束的结构化重组。"
+"""终局兜底的对外说明。**必须非空**：空 message 会让 `SYNTHESIS_FALLBACK_USED` 不落账。"""
+
+
+def _fallback_reason(last_error) -> str:
+    """终局兜底的原因串：带上最后一次异常的类型与摘要，供人追因。
+
+    历史事故里这里传的是 `reason=""`，于是两次失败在库、日志、回执里全都查无此事。
+    """
+    if last_error is None:
+        return _FALLBACK_FAILED_NOTE
+    return "%s（%s: %s）" % (_FALLBACK_FAILED_NOTE, type(last_error).__name__, str(last_error)[:200])
+
+
 class QaFinalSynthesizer:
     def __init__(self, model_client: Callable | None = None):
         self.model_client = model_client or OpenAIJsonModelClient()
@@ -1294,11 +1337,18 @@ class QaFinalSynthesizer:
                     raise QaContractError("生成端 grounding 未通过: " + "; ".join(
                         str(item.get("detail") or item.get("code"))
                         for item in (report.get("violations") or [])[:5]))
+                if report and report.get("unavailable"):
+                    # 闸门自己坏了：显式降级披露，绝不静默当成"零违规通过"。
+                    result = _mark_grounding_unavailable(result, report)
                 if report and report.get("violations"):
                     result = mark_ungrounded_answer(result, report, pack=context_pack)
                 return _finalize(validate_final_answer(result))
             except (QaContractError, KeyError, TypeError, ValueError) as exc:
                 last_error = exc
+                # 吞异常必须留痕：旧实现只把它塞进 last_error（再没被读过），
+                # 于是一条"两次都没过"的 run 在库和日志里都看着像"一次就过了"。
+                _LOGGER.warning("最终综合第 %d 次尝试未通过契约校验：%s: %s",
+                                attempt + 1, type(exc).__name__, str(exc)[:300])
                 if attempt:
                     break
                 raw = self.model_client(
@@ -1325,13 +1375,15 @@ class QaFinalSynthesizer:
                         degradation=list(degradation or []) + [item], models=models,
                         reason=item["message"], question=question,
                     ))
+        _LOGGER.warning("最终综合两次尝试都未通过契约校验，改用证据约束结构化重组；最后一次异常：%s",
+                        "%s: %s" % (type(last_error).__name__, str(last_error)[:200]) if last_error else "-")
         return _finalize(fallback_final_answer(
             graph=graph,
             level1=level1,
             level2=level2,
             degradation=list(degradation or []),
             models=models,
-            reason="",
+            reason=_fallback_reason(last_error),
             question=question,
         ))
 
@@ -1355,8 +1407,14 @@ class QaFinalSynthesizer:
                     extra.append(normalize_evidence_layer(item))
             return check_grounding(result, pack=context_pack, extra_evidence=extra)
         except Exception as exc:      # noqa: BLE001 —— 校验绝不拖累主流程
+            # 校验坏了 ≠ 本轮零违规：回执里必须带**不可用**标记 + 原因，并且留一条告警日志。
+            # 旧实现只返回 violations=[] / blocking=False，调用方读不出任何区别，
+            # 等于把"闸门没跑成"伪装成"闸门判了通过"（MASTER_RULES 第 11 条禁止）。
+            detail = "%s: %s" % (type(exc).__name__, str(exc)[:160])
+            _LOGGER.warning("生成端 grounding 闸门不可用（本轮未完成校验）：%s", detail)
             return {"grounding_version": "qa-grounding-v1", "checked_claims": 0, "violations": [],
-                    "blocking": False, "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+                    "blocking": False, "unavailable": True, "error": detail,
+                    "note": "闸门异常的降级回执：本章节**不代表本轮零违规**，只说明校验没跑成。"}
 
     @staticmethod
     def _lock_to_graph(parsed: Mapping, graph: Mapping, level1: Mapping, level2: Mapping, degradation: list, models: Mapping, *, question: str = "", context_pack: Mapping | None = None) -> dict:
