@@ -344,6 +344,147 @@ class IndustryPackActivationTest(unittest.TestCase):
         self.assertEqual(policy_total, 1)
         self.assertEqual(policy_rows[0]["article_id"], article_ids[0])
 
+    def test_projection_rebind_invalidates_stale_score_without_touching_category(self):
+        """回归：重绑换掉 hits.anchor 却不刷新评分 → _gate_failure_key 误报 below_min_score。
+
+        线上真实受损形态：分类时没命中锚点（anchor=[]、relevance_score=0 < 阈值 2），
+        之后行业包激活重绑把项目词池命中塞进 hits.anchor，评分却留在 0 —— 于是
+        「锚点非空 + 陈旧 0 分 < 阈值」被归因成 below_min_score（100% 假象）。
+        """
+        from intel_pack_improvement import _gate_failure_key
+
+        content = "家族办公室与财富传承信息仍命中当前项目关键词。"
+        article_id = int(
+            self.database.connection.execute(
+                """
+                INSERT INTO articles(
+                    url,title,content,domain,publish_date,status,
+                    content_hash,content_length
+                ) VALUES(?,?,?,?,date('now'),'active',?,?)
+                """,
+                (
+                    "https://projection.example.test/stale-score",
+                    "家族办公室陈旧评分回归用例",
+                    content,
+                    "projection.example.test",
+                    "projection-stale-score",
+                    len(content),
+                ),
+            ).lastrowid
+        )
+        self.repository.upsert_classification(
+            {
+                "article_id": article_id,
+                "industry_pack_id": "family_office",
+                "activation_id": "legacy-activation",
+                "industry_pack_version": "1.0.0",
+                "classifier_version": "legacy-fixture",
+                "article_content_hash": "projection-stale-score",
+                "rule_category": "other",
+                "rule_confidence": 0.45,
+                "rule_reason": "核心相关性低于行业包阈值",
+                "score_details": {
+                    "relevance_score": 0.0,
+                    "minimum_relevance_score": 2.0,
+                    "hits": {"anchor": [], "trend": ["政策"]},
+                    "rule_signal": "below_threshold",
+                },
+                "matched_keywords": ["政策"],
+                "topic_tags": ["政策与税务"],
+                "final_category": "other",
+                "final_confidence": 0.45,
+                "final_reason": "核心相关性低于行业包阈值",
+            }
+        )
+        self.database.connection.commit()
+
+        columns = (
+            "activation_id,industry_pack_version,classifier_version,rule_category,"
+            "rule_confidence,rule_reason,final_category,final_confidence,final_reason,"
+            "matched_keywords_json,topic_tags_json,score_details_json"
+        )
+
+        def snapshot():
+            row = self.database.connection.execute(
+                f"SELECT {columns} FROM article_intel_classifications WHERE article_id=?",
+                (article_id,),
+            ).fetchone()
+            names = [item.strip() for item in columns.split(",")]
+            return dict(zip(names, row))
+
+        def gate_key(view):
+            return _gate_failure_key(
+                {
+                    "rule_reason": view["rule_reason"],
+                    "final_reason": view["final_reason"],
+                    "score_details_json": view["score_details_json"],
+                }
+            )
+
+        before = snapshot()
+        # 重绑前是诚实的「没命中锚点」。
+        self.assertEqual(gate_key(before), "no_anchor")
+
+        result = self.repository.restore_pack_projection_for_activation(
+            industry_pack_id="family_office",
+            activation_id="new-activation",
+            target_pack_version="2.0.0",
+            project_keywords=["家族办公室"],
+        )
+        self.assertEqual(result["classification_rows_evaluated"], 1)
+        self.assertEqual(result["classification_rows_restored"], 1)
+        self.assertEqual(result["classification_rows_left_hidden"], 0)
+
+        after = snapshot()
+        # 重绑确实换掉了锚点证据（否则本用例是空跑）。
+        after_details = json.loads(after["score_details_json"])
+        self.assertEqual(after_details["hits"]["anchor"], ["家族办公室"])
+        # 关键断言：修复后不再把「陈旧评分」误报成 below_min_score。
+        self.assertNotEqual(gate_key(after), "below_min_score")
+        self.assertEqual(gate_key(after), "unknown")
+        # 反证：若沿用"只换 anchor 不刷新评分"的旧写法，这个夹具必然报 below_min_score。
+        stale_pre_fix = dict(after_details)
+        stale_pre_fix["relevance_score"] = 0.0
+        stale_pre_fix["minimum_relevance_score"] = 2.0
+        self.assertEqual(
+            _gate_failure_key(
+                {
+                    "rule_reason": after["rule_reason"],
+                    "final_reason": after["final_reason"],
+                    "score_details_json": json.dumps(stale_pre_fix, ensure_ascii=False),
+                }
+            ),
+            "below_min_score",
+        )
+        # 陈旧评分被置为"未知"，不是被伪造成新分数。
+        self.assertIsNone(after_details["relevance_score"])
+        self.assertIsNone(after_details["minimum_relevance_score"])
+        # 除锚点与两个评分字段外，score_details 其余内容一字未变。
+        before_details = json.loads(before["score_details_json"])
+        for payload in (before_details, after_details):
+            payload.pop("relevance_score", None)
+            payload.pop("minimum_relevance_score", None)
+            (payload.get("hits") or {}).pop("anchor", None)
+        self.assertEqual(after_details, before_details)
+
+        # category / topic 证据一字未变（docstring 明令不得覆盖）。
+        self.assertEqual(after["activation_id"], "new-activation")
+        for name in (
+            "industry_pack_version",
+            "classifier_version",
+            "rule_category",
+            "rule_confidence",
+            "rule_reason",
+            "final_category",
+            "final_confidence",
+            "final_reason",
+            "matched_keywords_json",
+            "topic_tags_json",
+        ):
+            self.assertEqual(after[name], before[name], name)
+        self.assertEqual(after["final_category"], "other")
+        self.assertEqual(json.loads(after["topic_tags_json"]), ["政策与税务"])
+
     def test_failure_during_apply_rolls_back_settings_sources_and_activation(self):
         first = self._publish()
         first_preview = self.service.preview("education_news")

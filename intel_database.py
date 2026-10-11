@@ -342,6 +342,13 @@ class IntelRepository:
                         hits = {}
                     hits["anchor"] = list(matched)
                     score_details["hits"] = hits
+                    # 锚点被换掉了，按上一轮锚点算出的旧评分必须一起作废：继续留着会让
+                    # 下游 _gate_failure_key 看到「锚点非空 + 陈旧 0 分 < 阈值」，把这些
+                    # 行误判成 below_min_score（纯假归因）。这里只把评分置为"未知"，
+                    # 不重算、也不碰 category/topic —— 该行的分类结论不是本次重绑产生的，
+                    # 重算会伪造出"该结论由目标包版本评分过"的假一致性（见函数 docstring）。
+                    score_details["relevance_score"] = None
+                    score_details["minimum_relevance_score"] = None
                     cursor.execute(
                         """
                         UPDATE article_intel_classifications
