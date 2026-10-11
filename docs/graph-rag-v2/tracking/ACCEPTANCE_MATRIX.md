@@ -277,3 +277,10 @@
 |P16-06|成本与延迟仪表盘|同上|缺失量写 null 而不是 0|真机真实数据：worst p95=76272ms、缓存 level1_retrieval=17、adopted=72、tokens 为 null（线上无用量记录）|PASS|同上|
 |P16-接口|只读 HTTP 面与登录态|A 机真 curl|未登录 302/401、路由只有 GET、界面只读|`GET /qa-observability` 未登录 **302** 跳登录；`GET /api/qa/v1/observability/views` 未登录 **401**；登录尝试用容器内默认口令返回 200 但 success=false（用户已改口令）→ **未取得登录态，如实记录且未猜改口令**|PASS（登录态为边界）|同上|
 |P16-R1|冻结契约与基线|`python -m pytest tests -q`|七指纹不变、不改冻结 schema|全量 **3527 passed / 1 skipped / 0 failed**（改动前先复跑基线 3447/1/0 逐字吻合，+80 为本阶段新增，零回归零删除跳过）|PASS|同上|
+|P17-01|E2E suite|`python -m pytest tests/test_qa_phase17_e2e.py -q`|真跑生产阶段处理器；生成端不可得时用离线桩并逐次记账|**30 passed**；`baseline/qa-e2e-acceptance.json` 13/13 检查通过（12 题真跑 + 14 条真机 run 重放 / 93 证据 / 129 claim）|PASS|`qa_e2e.py`|
+|P17-02|ablation ladder|`python -m pytest tests/test_qa_phase17_ablation.py -q`|每格独立临时库、只翻生产开关、真跑两端|**10 passed**；15 格真跑、7/7 检查通过；结论：增益不在取回率而在可追溯性与判定能力；**非可加残差已量化**|PASS|`qa_ablation.py`；`baseline/qa-ablation-acceptance.json`|
+|P17-03|metric report（含独立标注集）|`python -m pytest tests/test_qa_phase17_metrics.py -q`|36 项指标带口径与状态码；独立标注集必须独立于调参样本|**15 passed**；独立标注集 **101 对**、与金标零文本重叠、**support_recall 0.8537、false_support_rate 0.0**|PASS|`qa_metrics_report.py`；`config/qa_e2e_annotation_v1.json`|
+|P17-04|compatibility regression|`python -m pytest tests/test_qa_phase17_release.py -q`|与冻结产物逐条对比、不做近似|**16/16 通过**；含七指纹与 24 个开关默认值逐个从真源读|PASS|`qa_release.py`；`baseline/qa-release-acceptance.json`|
+|P17-05|migration rollback|同上|真做前滚与回滚与再前滚、幂等|回滚 DROP 14 张后加表后表集合恰等于 v6 核心且老数据一字不少；**诚实代价**（回滚数据不可找回）有用例钉住|PASS|同上|
+|P17-06|final report/release|`python tools/qa_phase17_acceptance.py --section all`|发布清单含版本锚点、产物哈希、验收矩阵、回滚口径、边界与阻塞|四段验收全 PASS（约 135 秒可复跑）；Gate 如实记两项未满足（tracking 落盘、B-003 阻塞）|PASS|`baseline/qa-release-acceptance.json`|
+|P17-Gate|全量回归与冻结契约|`python -m pytest tests -q`|全量不破 Phase 16 基线（3527/1/0）|`-k phase17` **80 passed**；相关面 2290 passed；全量 **3607 passed / 1 skipped / 0 failed**|PASS|同上|

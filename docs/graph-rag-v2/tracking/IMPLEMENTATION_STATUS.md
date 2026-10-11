@@ -98,9 +98,9 @@
 |P16-04|Memory View| PASS | 记忆视图：作用域与状态只读投影；空态给 NO_MEMORY_IN_SCOPE（线上 memory 表 0 行，属真实状态） | 2026-10-11 |
 |P16-05|Search Trace| PASS | 检索轨迹视图：六字段齐备（memory_recalled / context_items / skills_loaded 等）；空态给 NO_STAGE_ARTIFACT 并说明缺的是哪份阶段产物 | 2026-10-11 |
 |P16-06|cost/latency/token/cache/skill dashboard| PASS | 成本与延迟仪表盘（**真机真实数据 ok**）：真实延迟 worst p95=76272ms、缓存 level1_retrieval=17、adopted=72；tokens 写 null 而不是 0（线上没有 token 用量记录，不假装为 0）；技能与缓存命中同一口径 | 2026-10-11 |
-|P17-01|E2E suite|NOT_STARTED|||
-|P17-02|ablation ladder|NOT_STARTED|||
-|P17-03|metric report|NOT_STARTED|||
-|P17-04|compatibility regression|NOT_STARTED|||
-|P17-05|migration rollback|NOT_STARTED|||
-|P17-06|final report/release|NOT_STARTED|||
+|P17-01|E2E suite| PASS | 新增 qa_e2e.py：11 层注册表（逐层写明开关名、生产默认值由各模块自己的 accessor 读而不抄字面量、作用侧、生产接线点、该层该看哪些指标）；检索侧真跑生产阶段处理器，回答侧按生产同序重放规则层；无对象标注与 Phase 00 基线读取。真机口径：A 机只读快照 12 题真跑 + 14 条真机 run 重放（93 证据 / 129 claim）；生成端不可得故用真机已录答案，三个外呼口换离线桩并逐次记账；30 例 | 2026-10-11 |
+|P17-02|ablation ladder| PASS | 新增 qa_ablation.py：15 格阶梯（基线/全栈/仅检索/仅回答 + 11 个逐层移除），每格**文件级复制独立临时库**并只翻生产开关，真跑两端；给出逐层边际贡献、组合效应与**非可加残差**；把「无对象」与「增量为 0」分开。真跑 15 格、7/7 检查通过；结论：本包增益**不在取回率**（快照语料上取回已饱和，hit/recall 增量 0），而在可追溯性、判定与组装能力（citation_precision +0.0694、avg_evidence +1.0、tokens +22856、记忆 +48、技能 +39、缺口 +258）；10 例 | 2026-10-11 |
+|P17-03|metric report| PASS | 新增 qa_metrics_report.py：七族指标总表 36 项（每项带值与口径来源与状态码 ok/no_object/not_measurable/not_implemented）；补上 Phase 04 明确留给本阶段的排序指标（MRR@k / nDCG@k，用逐题真实命中位置算 DCG）；**独立标注集**（补 Phase 03 的遗留缺口）：真机快照按评价前写死的机械规则构造 **101 对**（41 正例 + 60 负例），与金标 18 对**文本零重叠**（有反例用例），结果 **support_recall 0.8537、false_support_rate 0.0**；15 例 | 2026-10-11 |
+|P17-04|compatibility regression| PASS | 发布兼容回归 16 项**与冻结产物逐条对比**（不做近似）：Phase 00 清单、20 个必需模块、129 条依赖边无自环、七契约指纹、证据契约严格性、三个版本锚点、schema 版本与 v8 到 v11 零 ADD COLUMN、九组枚举计数、Phase 16 六视图清单、**24 个开关默认值（逐个从真源读）**、三条阶段链、冻结答案契约行为级严格性、Phase 17 四模块零网络与零端点字面量（AST 级含反例）；16/16 通过 | 2026-10-11 |
+|P17-05|migration rollback| PASS | 迁移回滚真做一次：前滚建 v11 全表 37 张 → 写 v6 时代老数据 → 按回滚 SQL 删掉 v7 到 v11 新增的 14 张表 → 校验剩余表集合恰等于 v6 核心且老数据一字不少 → 再前滚恢复 37 张且老数据仍在 → 第三次执行无变化（幂等）。回滚 SQL 原文写进产物（可执行手册）。**诚实代价**：回滚会连带删掉后加表里的数据且再前滚找不回来，有用例钉住这一点，不粉饰 | 2026-10-11 |
+|P17-06|final report/release| PASS | 发布清单：版本锚点 + 8 件产物 sha256 + 六行验收矩阵 + 7 条 Gate 勾选 + 回滚口径（schema SQL 与 24 个开关默认值）+ 已知边界 + 阻塞项 B-003（开放，受硬约束） + 下一阶段就绪度。Gate 如实记：tracking 落盘与「无未处理阻塞」两项未满足（后者因 B-003） | 2026-10-11 |

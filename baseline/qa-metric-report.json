@@ -1,0 +1,563 @@
+{
+ "acceptance": {
+  "numbers": {
+   "annotation_pairs": 101,
+   "false_support_rate": 0.0,
+   "mrr_at_k": 0.333333,
+   "ndcg_at_k": 0.333333,
+   "support_recall": 0.853659
+  },
+  "status": "PASS"
+ },
+ "annotation": {
+  "annotation_set_id": "71cc3dfb91e5c4c7",
+  "annotation_version": "qa-e2e-annotation-v1",
+  "counts": {
+   "by_group": {
+    "NEGATIVE_CROSS_SUBJECT_LOW_COVERAGE": 55,
+    "NEGATIVE_UNCITED_LOW_COVERAGE": 5,
+    "POSITIVE_CITED_HIGH_COVERAGE": 41
+   },
+   "max_pairs_per_group": 60,
+   "min_pairs_per_group": 8,
+   "negatives": 60,
+   "pairs": 101,
+   "positives": 41,
+   "skipped": {
+    "golden_overlap": 0,
+    "no_claim_text": 0,
+    "no_evidence": 0,
+    "no_partner": 0
+   }
+  },
+  "evaluation": {
+   "annotation_set_id": "71cc3dfb91e5c4c7",
+   "by_group": {
+    "NEGATIVE_CROSS_SUBJECT_LOW_COVERAGE": {
+     "expected_no_support_pairs": 55,
+     "expected_support_pairs": 0,
+     "pairs": 55,
+     "support_rate": 0.0,
+     "verdicts": {
+      "UNVERIFIED": 55
+     }
+    },
+    "NEGATIVE_UNCITED_LOW_COVERAGE": {
+     "expected_no_support_pairs": 5,
+     "expected_support_pairs": 0,
+     "pairs": 5,
+     "support_rate": 0.0,
+     "verdicts": {
+      "UNVERIFIED": 5
+     }
+    },
+    "POSITIVE_CITED_HIGH_COVERAGE": {
+     "expected_no_support_pairs": 0,
+     "expected_support_pairs": 41,
+     "pairs": 41,
+     "support_rate": 0.853659,
+     "verdicts": {
+      "QUALIFIED": 1,
+      "REFUTED": 1,
+      "SUPPORTED": 35,
+      "UNVERIFIED": 4
+     }
+    }
+   },
+   "caliber": {
+    "entry": "qa_verifier.verify_evidence_item（与生产同一条判定路径）",
+    "note": "独立标注集只用于**测量**，不参与任何阈值调整；support_recall 反映方向是否守住，false_support_rate 是 MASTER_RULES 11 的硬指标。",
+    "verifier": "qa-verifier-v1"
+   },
+   "false_support_rate": 0.0,
+   "negatives": 60,
+   "pairs": 101,
+   "positives": 41,
+   "qualified_rate_on_positives": 0.02439,
+   "support_recall": 0.853659,
+   "verdict_distribution": {
+    "negatives": {
+     "UNVERIFIED": 60
+    },
+    "positives": {
+     "QUALIFIED": 1,
+     "REFUTED": 1,
+     "SUPPORTED": 35,
+     "UNVERIFIED": 4
+    }
+   }
+  },
+  "rules": {
+   "constructed_from": "baseline/qa-context-real-sample.json（A 机只读快照，真机 run/claim/证据）",
+   "coverage_definition": "字符二元组集合的包含率：|bigrams(claim) ∩ bigrams(text)| / |bigrams(claim)|；bigram 取自去掉空白后的原文。",
+   "independence_claim": "与 config/qa_verifier_golden.json 的 18 对金标**零文本重叠**；金标是人工合成文本，本标注集只取真机文本。",
+   "known_limitation": "机器构造 + 可人工复核的 holdout，**不是人类金标**；它回答「在没参与调参的样本上方向是否守住」，不能替代人类标注的 NLI 质量评测。",
+   "negative_cross_subject_rule": "证据与 claim **不在同一个 run**，且覆盖率 < 0.2 → 标 expect_support=False（跨主体证据不可能支持该结论）。",
+   "negative_uncited_rule": "证据与 claim 同 run 但**未被 claim 引用**，且覆盖率 < 0.2 → 标 expect_support=False。",
+   "positive_rule": "① evidence_ref 出现在 claim.evidence_refs 里（真机确实把它当引用的那条）；② claim 文本的**字符二元组覆盖率**在证据正文（标题+摘录）里 ≥ 0.5。两条同时满足 → 标 expect_support=True（即「这条证据应当被判为支持」）。",
+   "preregistered": true,
+   "preregistered_statement": "下面两条规则在**任何核验判定之前**写死，且只读 claim 文本/evidence_refs/证据正文，不读 qa_verifier 的任何阈值与判定结果。",
+   "rules_version": "qa-e2e-annotation-v1"
+  }
+ },
+ "catalog": {
+  "Agent": {
+   "cache_hits": {
+    "caliber": "E2E 每格用独立临时库（缓存为空是刻意的，避免串味）",
+    "reason_code": "ISOLATED_DB_PER_CELL",
+    "source": "qa_retrieval_cache",
+    "status": "not_measurable",
+    "value": null
+   },
+   "fleet_degraded": {
+    "caliber": "降级通道次数",
+    "reason_code": "",
+    "source": "qa_hunter_fleet",
+    "status": "ok",
+    "value": 5
+   },
+   "fleet_parallelism_gain_ms": {
+    "caliber": "墙钟节省（通道累计 − 墙钟）",
+    "reason_code": "",
+    "source": "qa_hunter_fleet（舰队回执）",
+    "status": "ok",
+    "value": 1288
+   },
+   "rounds_with_gap_loop": {
+    "caliber": "跑过缺口环的题数",
+    "reason_code": "",
+    "source": "qa_gap_analyzer（缺口环回执）",
+    "status": "ok",
+    "value": 12
+   }
+  },
+  "Context": {
+   "context_gap_false_retrieval": {
+    "caliber": "被拦下的重复获取动作数（§13 不得默认触发新检索）",
+    "reason_code": "SWITCH_OFF_OR_NO_GAP",
+    "source": "qa_acquisition + qa_context_pack.detect_context_gaps",
+    "status": "no_object",
+    "value": 0
+   },
+   "context_items": {
+    "caliber": "进包条目数（九段）",
+    "reason_code": "",
+    "source": "qa_context_pack.build_context_pack",
+    "status": "ok",
+    "value": 287
+   },
+   "context_tokens": {
+    "caliber": "预算单位不是真 token（D-031）",
+    "reason_code": "",
+    "source": "qa_context_pack（确定性相对预算单位）",
+    "status": "ok",
+    "value": 22856
+   },
+   "counter_evidence_coverage": {
+    "caliber": "真机 REFUTES 边 0 条 → 无对象",
+    "reason_code": "",
+    "source": "qa_final_verifier.compose_answer（反证条目）",
+    "status": "ok",
+    "value": 1
+   },
+   "token_efficiency": {
+    "caliber": "每个进包条目的平均预算单位",
+    "reason_code": "",
+    "source": "派生：context_tokens / context_items",
+    "status": "ok",
+    "value": 79.638
+   }
+  },
+  "Evidence": {
+   "citation_precision": {
+    "caliber": "弱标注口径：分子=含 ≥1 个期待词的采纳证据条数，分母=采纳证据总条数（只统计带 expect_terms 的题目，未被标注的题目不计入分母）；分母为 0 → null",
+    "reason_code": "",
+    "source": "tools.qa_retrieval_acceptance.summarize",
+    "status": "ok",
+    "value": 0.6944
+   },
+   "citation_recall": {
+    "caliber": "弱标注口径：分子=至少一条采纳证据含期待词的题目数，分母=带 expect_terms 的题目数（题级粗细口径）；分母为 0 → null",
+    "reason_code": "",
+    "source": "tools.qa_retrieval_acceptance.summarize",
+    "status": "ok",
+    "value": 0.5714
+   },
+   "citation_traceable_rate": {
+    "caliber": "逐条复算 content_excerpt[start:end] == span.quote",
+    "reason_code": "",
+    "source": "tools.qa_phase08_context_acceptance._traceability",
+    "status": "ok",
+    "value": 1.0
+   },
+   "claim_coverage": {
+    "caliber": "有已核验 SUPPORTS 边的非计划 claim 占比",
+    "reason_code": "",
+    "source": "qa_evidence_graph.claim_coverage",
+    "status": "ok",
+    "value": 0.711538
+   },
+   "contradiction_detection": {
+    "caliber": "真机 qa_conflicts 行数（0 → 无对象）",
+    "reason_code": "NO_CONFLICT_ROW_IN_REAL_DATA",
+    "source": "qa_evidence_graph.detect_contradictions",
+    "status": "no_object",
+    "value": 0
+   },
+   "entailment_precision_holdout": {
+    "caliber": "独立标注集（与调参样本零重叠）上的支持方向命中率；不是人类金标",
+    "reason_code": "",
+    "source": "qa_metrics_report.evaluate_annotation（独立标注集）",
+    "status": "ok",
+    "value": 0.853659
+   },
+   "false_support_rate_holdout": {
+    "caliber": "反例组被判 SUPPORTED 的比例（硬指标，必须 0）",
+    "reason_code": "",
+    "source": "qa_metrics_report.evaluate_annotation（独立标注集）",
+    "status": "ok",
+    "value": 0.0
+   },
+   "unsupported_claim_rate": {
+    "caliber": "1 − 已核验 SUPPORTED 的 claim 占比（MASTER_RULES 11）",
+    "reason_code": "",
+    "source": "qa_verifier.verify_claim_graph（claim 级）",
+    "status": "ok",
+    "value": 0.488372
+   }
+  },
+  "Memory": {
+   "memory_recalled": {
+    "caliber": "恒为 MEMORY_HINT（非证据）",
+    "reason_code": "",
+    "source": "qa_memory.recall_from_run",
+    "status": "ok",
+    "value": 0
+   },
+   "memory_written": {
+    "caliber": "写门通过并落库的记忆条数",
+    "reason_code": "",
+    "source": "qa_memory.write_memories_from_graph",
+    "status": "ok",
+    "value": 48
+   },
+   "pollution_rate": {
+    "caliber": "越界泄漏条数 / 命中条数（真机 0）",
+    "reason_code": "",
+    "source": "qa_memory_safety（作用域隔离回执）",
+    "status": "ok",
+    "value": 0.0
+   },
+   "revalidation_pass": {
+    "caliber": "Phase 10 真机通过率 0.7429（快照口径）",
+    "reason_code": "PHASE10_ARTIFACT_ONLY",
+    "source": "qa_memory_revalidation",
+    "status": "not_implemented",
+    "value": null
+   },
+   "stale_rate": {
+    "caliber": "本报告未重算；Phase 15 真机陈旧率 0.186667（快照口径）",
+    "reason_code": "PHASE15_ARTIFACT_ONLY（见 baseline/qa-memory-safety-acceptance.json）",
+    "source": "qa_memory_safety（长期时效）",
+    "status": "not_implemented",
+    "value": null
+   }
+  },
+  "Retrieval": {
+   "evidence_recall_at_k": {
+    "caliber": "证据召回：命中了的采纳证据条数 / 该题全部相关证据条数；弱标注下「全部相关证据」不可知，故这里定义为**题级证据召回** = 至少一条采纳证据含期待词的题 / 有标注题，与 citation_recall 同值同源（**不另算一套**，只做登记）。",
+    "reason_code": "",
+    "source": "tools.qa_retrieval_acceptance.summarize",
+    "status": "ok",
+    "value": 0.5714
+   },
+   "hit_rate": {
+    "caliber": "取到证据的题占比",
+    "reason_code": "",
+    "source": "tools.qa_retrieval_acceptance.summarize",
+    "status": "ok",
+    "value": 0.8571
+   },
+   "mrr_at_k": {
+    "caliber": "弱标注口径：对每题取「第一条含 ≥1 个 expect_term 的采纳证据」的排名 r，题级得分 1/r（没命中记 0）；MRR = 有 expect_terms 的题的平均分。分母为 0 → null。P17-03 新登记（Phase 04 遗留项）。",
+    "reason_code": "",
+    "source": "qa_metrics_report.ranking_metrics",
+    "status": "ok",
+    "value": 0.333333
+   },
+   "ndcg_at_k": {
+    "caliber": "弱标注口径：二元增益（证据含 ≥1 个 expect_term 记 1，否则 0），DCG = Σ gain/log2(i+1)，IDCG = 理想排序（把全部相关项排在最前）的 DCG；NDCG = DCG/IDCG，逐题取平均。分母为 0 → null。P17-03 新登记。",
+    "reason_code": "",
+    "source": "qa_metrics_report.ranking_metrics",
+    "status": "ok",
+    "value": 0.333333
+   },
+   "phase00_frozen_recall_at_k": {
+    "caliber": "Phase 00 冻结 baseline：全库 8544 篇语料、k=12、词级 micro",
+    "reason_code": "",
+    "source": "data/qa_acceptance_history.jsonl（冻结留档行）",
+    "status": "ok",
+    "value": 0.8333
+   },
+   "recall_at_k": {
+    "caliber": "弱标注口径：K=本次评估实际使用的 --limit（每题最多采纳证据条数上限）；分子=采纳证据里命中的期待词数（expect_terms 去重），分母=全部弱标注期待词数（只统计带 expect_terms 的题目）；分母为 0 → null（不输出 0 充数）",
+    "reason_code": "",
+    "source": "tools.qa_retrieval_acceptance.summarize",
+    "status": "ok",
+    "value": 0.5714
+   }
+  },
+  "SafetyMapping（D-002 中性映射：临床→作用域/合规风险）": {
+   "critical_gap_recall": {
+    "caliber": "真机安全关键缺口计数在 Phase 07 产物里（15 条）",
+    "reason_code": "PHASE07_ARTIFACT_ONLY",
+    "source": "qa_gap_analyzer（安全关键缺口）",
+    "status": "not_implemented",
+    "value": null
+   },
+   "safety_miss": {
+    "caliber": "真机 HARD 触发 0（Phase 15 已标注为无对象）",
+    "reason_code": "HARD_TRIGGER_ZERO_ON_REAL_DATA",
+    "source": "qa_memory_safety（硬触发）",
+    "status": "no_object",
+    "value": null
+   },
+   "user_burden": {
+    "caliber": "离线无交互接口，本报告不测",
+    "reason_code": "OFFLINE_NO_INTERACTION",
+    "source": "qa_acquisition（问诊/追问候选）",
+    "status": "not_measurable",
+    "value": null
+   }
+  },
+  "System": {
+   "cost": {
+    "caliber": "读 qa_stage_runs 失败，cost 降级为 null：no such table: qa_stage_runs",
+    "reason_code": "COST_DEGRADED",
+    "source": "qa_stage_runs.token_usage_json（按 run 累计）",
+    "status": "no_object",
+    "value": null
+   },
+   "latency_ms_avg": {
+    "caliber": "单题检索平均墙钟（不含生成端）",
+    "reason_code": "",
+    "source": "tools.qa_retrieval_acceptance.summarize",
+    "status": "ok",
+    "value": 936
+   },
+   "latency_phase00_baseline_ms": {
+    "caliber": "Phase 00 冻结行（全库语料）",
+    "reason_code": "",
+    "source": "data/qa_acceptance_history.jsonl",
+    "status": "ok",
+    "value": 1150
+   },
+   "quality_checks_pass_rate": {
+    "caliber": "六问终验通过率",
+    "reason_code": "",
+    "source": "qa_final_verifier.verify_answer（六问）",
+    "status": "ok",
+    "value": 0.607143
+   },
+   "tokens_recorded_online": {
+    "caliber": "线上没有 token 用量记录（Phase 16 已如实记 null）",
+    "reason_code": "NO_TOKEN_ROWS_ONLINE",
+    "source": "A 机 qa_stage_runs.token_usage_json",
+    "status": "no_object",
+    "value": null
+   }
+  }
+ },
+ "checks": {
+  "annotation_disjoint_from_golden": true,
+  "annotation_has_both_groups": true,
+  "annotation_size_above_floor": true,
+  "catalog_covers_seven_families": true,
+  "false_support_rate_is_zero": true,
+  "no_zero_masquerading_nulls": true,
+  "ranking_metrics_measured": true,
+  "support_recall_measured": true
+ },
+ "generated_at_utc": "2026-10-11T11:58:52+00:00",
+ "independent_annotation": {
+  "counts": {
+   "by_group": {
+    "NEGATIVE_CROSS_SUBJECT_LOW_COVERAGE": 55,
+    "NEGATIVE_UNCITED_LOW_COVERAGE": 5,
+    "POSITIVE_CITED_HIGH_COVERAGE": 41
+   },
+   "max_pairs_per_group": 60,
+   "min_pairs_per_group": 8,
+   "negatives": 60,
+   "pairs": 101,
+   "positives": 41,
+   "skipped": {
+    "golden_overlap": 0,
+    "no_claim_text": 0,
+    "no_evidence": 0,
+    "no_partner": 0
+   }
+  },
+  "disjointness": {
+   "claim_text_overlap": 0,
+   "disjoint": true,
+   "evidence_text_overlap": 0,
+   "golden_texts": 33,
+   "overlapping_pair_ids": []
+  },
+  "evaluation": {
+   "annotation_set_id": "71cc3dfb91e5c4c7",
+   "by_group": {
+    "NEGATIVE_CROSS_SUBJECT_LOW_COVERAGE": {
+     "expected_no_support_pairs": 55,
+     "expected_support_pairs": 0,
+     "pairs": 55,
+     "support_rate": 0.0,
+     "verdicts": {
+      "UNVERIFIED": 55
+     }
+    },
+    "NEGATIVE_UNCITED_LOW_COVERAGE": {
+     "expected_no_support_pairs": 5,
+     "expected_support_pairs": 0,
+     "pairs": 5,
+     "support_rate": 0.0,
+     "verdicts": {
+      "UNVERIFIED": 5
+     }
+    },
+    "POSITIVE_CITED_HIGH_COVERAGE": {
+     "expected_no_support_pairs": 0,
+     "expected_support_pairs": 41,
+     "pairs": 41,
+     "support_rate": 0.853659,
+     "verdicts": {
+      "QUALIFIED": 1,
+      "REFUTED": 1,
+      "SUPPORTED": 35,
+      "UNVERIFIED": 4
+     }
+    }
+   },
+   "caliber": {
+    "entry": "qa_verifier.verify_evidence_item（与生产同一条判定路径）",
+    "note": "独立标注集只用于**测量**，不参与任何阈值调整；support_recall 反映方向是否守住，false_support_rate 是 MASTER_RULES 11 的硬指标。",
+    "verifier": "qa-verifier-v1"
+   },
+   "false_support_rate": 0.0,
+   "negatives": 60,
+   "pairs": 101,
+   "positives": 41,
+   "qualified_rate_on_positives": 0.02439,
+   "support_recall": 0.853659,
+   "verdict_distribution": {
+    "negatives": {
+     "UNVERIFIED": 60
+    },
+    "positives": {
+     "QUALIFIED": 1,
+     "REFUTED": 1,
+     "SUPPORTED": 35,
+     "UNVERIFIED": 4
+    }
+   }
+  },
+  "path": "config\\qa_e2e_annotation_v1.json",
+  "rules": {
+   "constructed_from": "baseline/qa-context-real-sample.json（A 机只读快照，真机 run/claim/证据）",
+   "coverage_definition": "字符二元组集合的包含率：|bigrams(claim) ∩ bigrams(text)| / |bigrams(claim)|；bigram 取自去掉空白后的原文。",
+   "independence_claim": "与 config/qa_verifier_golden.json 的 18 对金标**零文本重叠**；金标是人工合成文本，本标注集只取真机文本。",
+   "known_limitation": "机器构造 + 可人工复核的 holdout，**不是人类金标**；它回答「在没参与调参的样本上方向是否守住」，不能替代人类标注的 NLI 质量评测。",
+   "negative_cross_subject_rule": "证据与 claim **不在同一个 run**，且覆盖率 < 0.2 → 标 expect_support=False（跨主体证据不可能支持该结论）。",
+   "negative_uncited_rule": "证据与 claim 同 run 但**未被 claim 引用**，且覆盖率 < 0.2 → 标 expect_support=False。",
+   "positive_rule": "① evidence_ref 出现在 claim.evidence_refs 里（真机确实把它当引用的那条）；② claim 文本的**字符二元组覆盖率**在证据正文（标题+摘录）里 ≥ 0.5。两条同时满足 → 标 expect_support=True（即「这条证据应当被判为支持」）。",
+   "preregistered": true,
+   "preregistered_statement": "下面两条规则在**任何核验判定之前**写死，且只读 claim 文本/evidence_refs/证据正文，不读 qa_verifier 的任何阈值与判定结果。",
+   "rules_version": "qa-e2e-annotation-v1"
+  }
+ },
+ "phase00_baseline": {
+  "frozen_summary": {
+   "avg_evidence": 4.75,
+   "avg_ms": 1150,
+   "benchmark_format": "object",
+   "benchmark_generated_at": "2026-10-08T23:48:58Z",
+   "benchmark_questions_file": "config/qa_acceptance_questions.json",
+   "benchmark_version": "qa-acceptance-v1",
+   "by_kind": {
+    "attribute": {
+     "graph": 4,
+     "grounded": 4,
+     "hit": 4,
+     "questions": 4,
+     "traceable": 4
+    },
+    "event": {
+     "graph": 2,
+     "grounded": 2,
+     "hit": 2,
+     "questions": 2,
+     "traceable": 2
+    },
+    "time_window": {
+     "graph": 0,
+     "grounded": 4,
+     "hit": 4,
+     "questions": 6,
+     "traceable": 4
+    }
+   },
+   "citation_evidence_matched": 44,
+   "citation_evidence_total": 57,
+   "citation_precision": 0.7719,
+   "citation_precision_note": "弱标注口径：分子=含 ≥1 个期待词的采纳证据条数，分母=采纳证据总条数（只统计带 expect_terms 的题目，未被标注的题目不计入分母）；分母为 0 → null",
+   "citation_questions_labeled": 12,
+   "citation_questions_matched": 10,
+   "citation_recall": 0.8333,
+   "citation_recall_note": "弱标注口径：分子=至少一条采纳证据含期待词的题目数，分母=带 expect_terms 的题目数（题级粗细口径）；分母为 0 → null",
+   "corpus_snapshot_id": "pending:first-run",
+   "cost": {
+    "degraded": false,
+    "note": "按 run 聚合 qa_stage_runs.token_usage_json 的库内累计值（验收本身不调用 LLM，故这不是本次检索的花费）；runs_counted=有 token 记录的 run 数，stage_rows=扫到的 stage 行数；before/after 用两次留档的 tokens_total 相减；库内有 897 行但都没带 token 记录 → 累计值为 0",
+    "runs_counted": 0,
+    "source": "qa_stage_runs.token_usage_json",
+    "stage_rows": 897,
+    "stage_rows_with_tokens": 0,
+    "tokens_in": 0,
+    "tokens_out": 0,
+    "tokens_total": 0
+   },
+   "errors": 0,
+   "graph_rate": 0.5,
+   "grounded_rate": 0.8333,
+   "hit_rate": 0.8333,
+   "k": 12,
+   "pack_filter": "",
+   "questions": 12,
+   "recall_at_k": 0.8333,
+   "recall_at_k_labeled_questions": 12,
+   "recall_at_k_note": "弱标注口径：K=本次评估实际使用的 --limit（每题最多采纳证据条数上限）；分子=采纳证据里命中的期待词数（expect_terms 去重），分母=全部弱标注期待词数（只统计带 expect_terms 的题目）；分母为 0 → null（不输出 0 充数）",
+   "recall_at_k_terms": 12,
+   "recall_at_k_terms_hit": 10,
+   "traceable_rate": 0.8333
+  },
+  "history_path": "data\\qa_acceptance_history.jsonl",
+  "note": "Phase 00 冻结行是在**全库语料**（8544 篇）上跑的；本阶段 E2E/消融在**两包 239 篇快照**上跑。指标口径逐字相同（同一个 summarize），但**分母语料不同**，所以只做并列展示，不做任何换算或「提升 X%」的宣称。",
+  "reason_code": ""
+ },
+ "ranking": {
+  "labeled_questions": 12,
+  "mrr_at_k": 0.333333,
+  "mrr_at_k_note": "弱标注口径：对每题取「第一条含 ≥1 个 expect_term 的采纳证据」的排名 r，题级得分 1/r（没命中记 0）；MRR = 有 expect_terms 的题的平均分。分母为 0 → null。P17-03 新登记（Phase 04 遗留项）。",
+  "ndcg_at_k": 0.333333,
+  "ndcg_at_k_note": "弱标注口径：二元增益（证据含 ≥1 个 expect_term 记 1，否则 0），DCG = Σ gain/log2(i+1)，IDCG = 理想排序（把全部相关项排在最前）的 DCG；NDCG = DCG/IDCG，逐题取平均。分母为 0 → null。P17-03 新登记。",
+  "questions_with_hit": 4
+ },
+ "report_version": "qa-metric-report-v1",
+ "status_counts": {
+  "no_object": 5,
+  "not_implemented": 3,
+  "not_measurable": 2,
+  "ok": 26
+ }
+}

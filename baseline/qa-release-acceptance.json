@@ -1,0 +1,1000 @@
+{
+ "acceptance": {
+  "failed_gates": [
+   "IMPLEMENTATION_STATUS / ACCEPTANCE_MATRIX 已更新",
+   "无未处理高优先级 blocker"
+  ],
+  "gates_passed": false,
+  "status": "PASS"
+ },
+ "acceptance_matrix": [
+  {
+   "evidence": "qa_e2e.py + tests/test_qa_phase17_e2e.py + baseline/qa-e2e-acceptance.json",
+   "id": "P17-01",
+   "numbers": {
+    "avg_ms": 640,
+    "checks_pass_rate": 0.607143,
+    "citation_precision": 0.6944,
+    "citation_recall": 0.3333,
+    "citation_traceable_rate": 1.0,
+    "claims": 129,
+    "evidence": 93,
+    "hit_rate": 0.5,
+    "mrr_at_k": 0.333333,
+    "ndcg_at_k": 0.333333,
+    "questions": 12,
+    "recall_at_k": 0.3333,
+    "runs_scored": 14,
+    "unsupported_claim_rate": 0.488372
+   },
+   "status": "PASS",
+   "task": "E2E suite"
+  },
+  {
+   "evidence": "qa_ablation.py + tests/test_qa_phase17_ablation.py + baseline/qa-ablation-acceptance.json",
+   "id": "P17-02",
+   "numbers": {
+    "cells": 15,
+    "layers": 11
+   },
+   "status": "PASS",
+   "task": "ablation ladder"
+  },
+  {
+   "evidence": "qa_metrics_report.py + config/qa_e2e_annotation_v1.json + baseline/qa-metric-report.json",
+   "id": "P17-03",
+   "numbers": {
+    "annotation_pairs": 101,
+    "false_support_rate": 0.0,
+    "support_recall": 0.853659
+   },
+   "status": "PASS",
+   "task": "metric report"
+  },
+  {
+   "evidence": "qa_release.compatibility_regression + tests/test_qa_phase17_release.py",
+   "id": "P17-04",
+   "numbers": {
+    "checks": 16,
+    "failed": []
+   },
+   "status": "PASS",
+   "task": "compatibility regression"
+  },
+  {
+   "evidence": "qa_release.migration_rollback（真做 前滚→回滚→再前滚）",
+   "id": "P17-05",
+   "numbers": {
+    "dropped_tables": 14,
+    "steps": 5
+   },
+   "status": "PASS",
+   "task": "migration rollback"
+  },
+  {
+   "evidence": "baseline/qa-release-acceptance.json + tracking 三文件（由用户统一落盘）",
+   "id": "P17-06",
+   "numbers": {
+    "artifacts": 8
+   },
+   "status": "PASS",
+   "task": "final report/release"
+  }
+ ],
+ "artifacts": [
+  {
+   "bytes": 462794,
+   "path": "baseline/qa-e2e-acceptance.json",
+   "present": true,
+   "sha256": "a262f41c39794659136fc3a6b6c56874b29e1d9d2e56a19029974212a4a0a1c5"
+  },
+  {
+   "bytes": 6033233,
+   "path": "baseline/qa-ablation-acceptance.json",
+   "present": true,
+   "sha256": "a1d12d5372dbab4c865644e48dcc9a1d97518b4b2b5663d2f2695bb448041253"
+  },
+  {
+   "bytes": 21629,
+   "path": "baseline/qa-metric-report.json",
+   "present": true,
+   "sha256": "2909ec97ce3f9db660a41c23756449d67573e5e2a186297d021ac1b8aa8f5053"
+  },
+  {
+   "bytes": 27689,
+   "path": "baseline/qa-release-acceptance.json",
+   "present": true,
+   "sha256": "94c78203bb3d119b45131b515003c669df18e39177f6d50ef08b6dc03dca7b29"
+  },
+  {
+   "bytes": 189695,
+   "path": "config/qa_e2e_annotation_v1.json",
+   "present": true,
+   "sha256": "7d9458fd1c886262f1f864143430632a2140fece9b2f023674e7df83b20995c7"
+  },
+  {
+   "bytes": 24550,
+   "path": "tools/qa_phase17_acceptance.py",
+   "present": true,
+   "sha256": "b226044d0b9cb5ee867a1fe61e2de4850e861f08b791283f374feefed3b4a17c"
+  },
+  {
+   "bytes": 8402,
+   "path": "tools/qa_phase17_real_probe.py",
+   "present": true,
+   "sha256": "b87e24dedbc85bfe050c8bba5d1d46d75380b2f015d1b93a7523c803f26b9413"
+  },
+  {
+   "bytes": 2720,
+   "path": "baseline/qa-phase17-real-probe.json",
+   "present": true,
+   "sha256": "0a1bbf65b6ef9dd3bccffbaa8c1a7c1a94bd7bee3b1426c8b37fd131bc6f30af"
+  }
+ ],
+ "blockers": [
+  {
+   "id": "B-003",
+   "impact": "E2E/消融只能采用「真机只读快照 + 同一份代码离线重放」口径；这影响「生产行为已验证」这一更强断言，不影响代码正确性判定",
+   "resolution_needs": "用户决策：是否允许在机器人空闲时段跑一次真实 QA run",
+   "root_cause": "硬约束（禁用模型/嵌入端点，QA_ALLOWED_PROVIDER_HOSTS 指向共用 GPU 机器）",
+   "scope": "P01~P17",
+   "status": "OPEN",
+   "summary": "生产端到端行为验收缺数据：qa_runs 停在 15 次，真机没有本包新层的行为数据"
+  }
+ ],
+ "bundle": "graph-rag-v2",
+ "checks": {
+  "artifacts_recorded": true,
+  "blocker_recorded_truthfully": true,
+  "compatibility_regression_passed": true,
+  "migration_rollback_passed": true,
+  "release_matrix_complete": true,
+  "rollback_sql_present": true
+ },
+ "compatibility": {
+  "ast_guard": {
+   "note": "白名单只有离线桩占位域 example.invalid；出现任何真实端点即违规",
+   "ok": true,
+   "scanned": [
+    "qa_e2e.py",
+    "qa_ablation.py",
+    "qa_metrics_report.py",
+    "qa_release.py"
+   ],
+   "url_literals": [
+    {
+     "module": "qa_metrics_report.py",
+     "value": "https://example.invalid/%s"
+    },
+    {
+     "module": "qa_release.py",
+     "value": "https://example.invalid/"
+    },
+    {
+     "module": "qa_release.py",
+     "value": "http://example.invalid/"
+    }
+   ],
+   "violations": []
+  },
+  "checks": [
+   {
+    "actual": null,
+    "detail": "Phase 00 冻结的模块清单产物在位（baseline\\qa-baseline-inventory.json）",
+    "expected": null,
+    "name": "frozen_inventory_present",
+    "ok": true
+   },
+   {
+    "actual": 20,
+    "detail": "Phase 00 要求的 20 个模块全部在位",
+    "expected": 20,
+    "name": "required_modules_present",
+    "ok": true
+   },
+   {
+    "actual": "129 & 0",
+    "detail": "依赖边 129 条、自环 0 条（冻结产物口径：from/to）",
+    "expected": ">0 & 0 self-loop",
+    "name": "dependency_edges_recorded",
+    "ok": true
+   },
+   {
+    "actual": {
+     "CLAIM_SCHEMA": "06fcdb02441248b2",
+     "CONFLICT_SCHEMA": "aabd3259b07f9a3e",
+     "EVIDENCE_SCHEMA": "370301331c02c738",
+     "FINAL_ANSWER_SCHEMA": "4d1efa54ca1cbc1a",
+     "LEVEL1_RESULT_SCHEMA": "7e864764429db111",
+     "LEVEL2_RESULT_SCHEMA": "a0484f894e7bc9d6",
+     "QA_EVENT_SCHEMA": "59358bfa88a6c6af"
+    },
+    "detail": "七契约指纹与 P00-02 逐字相同",
+    "expected": {
+     "CLAIM_SCHEMA": "06fcdb02441248b2",
+     "CONFLICT_SCHEMA": "aabd3259b07f9a3e",
+     "EVIDENCE_SCHEMA": "370301331c02c738",
+     "FINAL_ANSWER_SCHEMA": "4d1efa54ca1cbc1a",
+     "LEVEL1_RESULT_SCHEMA": "7e864764429db111",
+     "LEVEL2_RESULT_SCHEMA": "a0484f894e7bc9d6",
+     "QA_EVENT_SCHEMA": "59358bfa88a6c6af"
+    },
+    "name": "seven_fingerprints_unchanged",
+    "ok": true
+   },
+   {
+    "actual": null,
+    "detail": "EVIDENCE_SCHEMA.additionalProperties 仍为 False",
+    "expected": null,
+    "name": "evidence_schema_still_closed",
+    "ok": true
+   },
+   {
+    "actual": {
+     "GRAPH_CONTRACT_VERSION": "graph-contract-v1",
+     "QA_CONTRACT_VERSION": "unified-qa-v1",
+     "QA_SSE_PROTOCOL_VERSION": "qa-sse-v1"
+    },
+    "detail": "三个版本锚点逐字未变",
+    "expected": {
+     "GRAPH_CONTRACT_VERSION": "graph-contract-v1",
+     "QA_CONTRACT_VERSION": "unified-qa-v1",
+     "QA_SSE_PROTOCOL_VERSION": "qa-sse-v1"
+    },
+    "name": "version_anchors_unchanged",
+    "ok": true
+   },
+   {
+    "actual": "unified-qa-schema-v11",
+    "detail": "schema 版本等于已声明的最新版（演进链见 SCHEMA_EVOLUTION）",
+    "expected": "unified-qa-schema-v11",
+    "name": "schema_version_is_declared_latest",
+    "ok": true
+   },
+   {
+    "actual": "True",
+    "detail": "v7…v11 的 ADD COLUMN 清单全为空（回滚只需 DROP TABLE）",
+    "expected": "V8..V11 == ()",
+    "name": "no_added_columns_after_v6",
+    "ok": true
+   },
+   {
+    "actual": 15,
+    "detail": "QA_ADDED_COLUMNS_V6 仍是 Phase 01 的 15 条",
+    "expected": 15,
+    "name": "v6_columns_frozen",
+    "ok": true
+   },
+   {
+    "actual": {
+     "EVIDENCE_GRAPH_RELATIONSHIPS": 5,
+     "FINAL_VERIFIER_CHECKS": 6,
+     "MEMORY_TYPES": 10,
+     "OBSERVABILITY_VIEWS": 6,
+     "QA_FAILURE_POLICIES": 5,
+     "QA_HUNTER_IDS": 5,
+     "QA_RETRIEVAL_ROUTES": 7,
+     "QA_STOP_REASONS": 5,
+     "SKILL_IDS": 11
+    },
+    "detail": "九组冻结取值域的个数未变",
+    "expected": {
+     "EVIDENCE_GRAPH_RELATIONSHIPS": 5,
+     "FINAL_VERIFIER_CHECKS": 6,
+     "MEMORY_TYPES": 10,
+     "OBSERVABILITY_VIEWS": 6,
+     "QA_FAILURE_POLICIES": 5,
+     "QA_HUNTER_IDS": 5,
+     "QA_RETRIEVAL_ROUTES": 7,
+     "QA_STOP_REASONS": 5,
+     "SKILL_IDS": 11
+    },
+    "name": "enum_sizes_unchanged",
+    "ok": true
+   },
+   {
+    "actual": [
+     "execution",
+     "evidence",
+     "context",
+     "memory",
+     "search_trace",
+     "dashboard"
+    ],
+    "detail": "P16 六视图清单逐字未变",
+    "expected": "六视图固定序",
+    "name": "observability_views_unchanged",
+    "ok": true
+   },
+   {
+    "actual": [],
+    "detail": "24 个开关的默认值未变（含 12 个默认关的层开关）",
+    "expected": "全部相等",
+    "name": "switch_defaults_unchanged",
+    "ok": true
+   },
+   {
+    "actual": {
+     "deep": [
+      "plan",
+      "level1_retrieval",
+      "logic_validation",
+      "level1_draft",
+      "level2_retrieval",
+      "level2_research",
+      "conflict_review",
+      "synthesis",
+      "citation_validation"
+     ],
+     "fast": [
+      "plan",
+      "level1_retrieval",
+      "logic_validation",
+      "level1_draft",
+      "synthesis",
+      "citation_validation"
+     ],
+     "standard": [
+      "plan",
+      "level1_retrieval",
+      "logic_validation",
+      "level1_draft",
+      "level2_retrieval",
+      "level2_research",
+      "conflict_review",
+      "synthesis",
+      "citation_validation"
+     ]
+    },
+    "detail": "fast/standard/deep 三条阶段链逐字未变",
+    "expected": {
+     "deep": [
+      "plan",
+      "level1_retrieval",
+      "logic_validation",
+      "level1_draft",
+      "level2_retrieval",
+      "level2_research",
+      "conflict_review",
+      "synthesis",
+      "citation_validation"
+     ],
+     "fast": [
+      "plan",
+      "level1_retrieval",
+      "logic_validation",
+      "level1_draft",
+      "synthesis",
+      "citation_validation"
+     ],
+     "standard": [
+      "plan",
+      "level1_retrieval",
+      "logic_validation",
+      "level1_draft",
+      "level2_retrieval",
+      "level2_research",
+      "conflict_review",
+      "synthesis",
+      "citation_validation"
+     ]
+    },
+    "name": "stage_plans_unchanged",
+    "ok": true
+   },
+   {
+    "actual": null,
+    "detail": "冻结答案契约仍然拒绝多余的顶层键：最终答案 不符合 unified-qa-v1: $: Additional properties are not allowed ('unexpected' was unexpected)",
+    "expected": null,
+    "name": "final_answer_contract_still_strict",
+    "ok": true
+   },
+   {
+    "actual": null,
+    "detail": "P16 视图契约仍能拦下多余字段",
+    "expected": null,
+    "name": "observability_view_contract_rejects_extra",
+    "ok": true
+   },
+   {
+    "actual": [],
+    "detail": "P17 四个新模块零网络库、零 http(s) 字面量、零模型客户端痕迹",
+    "expected": "无违禁导入/字面量",
+    "name": "new_modules_zero_network_zero_model",
+    "ok": true
+   }
+  ],
+  "enum_values": {
+   "EVIDENCE_GRAPH_RELATIONSHIPS": [
+    "SUPPORTS",
+    "REFUTES",
+    "DEPENDS",
+    "CONTRADICTS",
+    "MENTIONS"
+   ],
+   "FINAL_VERIFIER_CHECKS": [
+    "FACT_WITHOUT_EVIDENCE",
+    "EVIDENCE_NOT_SUPPORTING",
+    "OVER_INFERENCE",
+    "COUNTER_EVIDENCE_MISSING",
+    "CITATION_MISBOUND",
+    "SPECULATION_AS_FACT"
+   ],
+   "MEMORY_TYPES": [
+    "MEMORY_ITEM",
+    "VERIFIED_CLAIM",
+    "ENTITY",
+    "EPISODIC_RESEARCH",
+    "STRATEGY",
+    "FAILURE",
+    "QUERY_PATTERN",
+    "SOURCE",
+    "SKILL_PERFORMANCE",
+    "USER_APPROVED_DOMAIN_RULE"
+   ],
+   "OBSERVABILITY_VIEWS": [
+    "execution",
+    "evidence",
+    "context",
+    "memory",
+    "search_trace",
+    "dashboard"
+   ],
+   "QA_FAILURE_POLICIES": [
+    "FAIL_FAST",
+    "RETRY",
+    "SKIP",
+    "FALLBACK",
+    "DEGRADE"
+   ],
+   "QA_HUNTER_IDS": [
+    "bm25",
+    "semantic",
+    "graph",
+    "structured",
+    "query_expansion"
+   ],
+   "QA_RETRIEVAL_ROUTES": [
+    "keyword",
+    "semantic",
+    "graph",
+    "graph_attribute",
+    "page_context",
+    "policy_exact",
+    "web"
+   ],
+   "QA_STOP_REASONS": [
+    "ANSWERABLE",
+    "BUDGET_EXHAUSTED",
+    "MAX_DEPTH",
+    "NO_GAIN",
+    "UNRESOLVABLE_CONTRADICTION"
+   ],
+   "SKILL_IDS": [
+    "bm25_search",
+    "semantic_search",
+    "graph_traversal",
+    "sql_query",
+    "emr_search",
+    "web_search",
+    "causal_reasoning",
+    "clinical_evidence",
+    "contradiction_resolution",
+    "citation_verification",
+    "patient_inquiry"
+   ]
+  },
+  "failed": [],
+  "fingerprints": {
+   "CLAIM_SCHEMA": "06fcdb02441248b2",
+   "CONFLICT_SCHEMA": "aabd3259b07f9a3e",
+   "EVIDENCE_SCHEMA": "370301331c02c738",
+   "FINAL_ANSWER_SCHEMA": "4d1efa54ca1cbc1a",
+   "LEVEL1_RESULT_SCHEMA": "7e864764429db111",
+   "LEVEL2_RESULT_SCHEMA": "a0484f894e7bc9d6",
+   "QA_EVENT_SCHEMA": "59358bfa88a6c6af"
+  },
+  "frozen_inventory": {
+   "captured_at_utc": "2026-10-09T15:58:47Z",
+   "dependency_edges": 129,
+   "path": "baseline\\qa-baseline-inventory.json",
+   "required_modules": 20
+  },
+  "passed": true,
+  "schema_evolution": [
+   {
+    "decision": "基线",
+    "delta": "初始 24 张 qa_* 表",
+    "phase": "P00",
+    "version": "unified-qa-schema-v6"
+   },
+   {
+    "decision": "D-007",
+    "delta": "+qa_evidence_seen（零 ADD COLUMN）",
+    "phase": "P02",
+    "version": "unified-qa-schema-v7"
+   },
+   {
+    "decision": "D-033",
+    "delta": "+8 张 memory_* 表",
+    "phase": "P09",
+    "version": "unified-qa-schema-v8"
+   },
+   {
+    "decision": "D-037",
+    "delta": "+memory_validation/memory_contradiction",
+    "phase": "P10",
+    "version": "unified-qa-schema-v9"
+   },
+   {
+    "decision": "D-044",
+    "delta": "+source_reliability_memory/skill_performance_memory",
+    "phase": "P12",
+    "version": "unified-qa-schema-v10"
+   },
+   {
+    "decision": "D-049",
+    "delta": "+qa_realignment_decisions",
+    "phase": "P14",
+    "version": "unified-qa-schema-v11"
+   }
+  ],
+  "stage_plans": {
+   "deep": [
+    "plan",
+    "level1_retrieval",
+    "logic_validation",
+    "level1_draft",
+    "level2_retrieval",
+    "level2_research",
+    "conflict_review",
+    "synthesis",
+    "citation_validation"
+   ],
+   "fast": [
+    "plan",
+    "level1_retrieval",
+    "logic_validation",
+    "level1_draft",
+    "synthesis",
+    "citation_validation"
+   ],
+   "standard": [
+    "plan",
+    "level1_retrieval",
+    "logic_validation",
+    "level1_draft",
+    "level2_retrieval",
+    "level2_research",
+    "conflict_review",
+    "synthesis",
+    "citation_validation"
+   ]
+  },
+  "switches": {
+   "QA_ACQUISITION": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_ASK_PATIENT": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_CONTEXT_PACK": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_ENCOUNTER_ISOLATION": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_EVIDENCE_GRAPH": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_EVIDENCE_LAYER_ENABLED": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_EVIDENCE_SEEN_PRUNE_ENABLED": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_EXECUTION_GRAPH": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_EXECUTION_GRAPH_NODE_RUNS": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_EXPERIENCE_MEMORY": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_FINAL_VERIFIER": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_GAP_ANALYZER": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_GROUNDING_GATE": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_HUNTER_FLEET": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_LONGITUDINAL_FRESHNESS": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_MEMORY_AUDIT": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_MEMORY_GRAPH": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_MEMORY_SCOPE_ENFORCEMENT": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_PRIVACY_MINIMAL_LOG": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_REPEAT_QUESTION_ENABLED": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_SAFETY_HARD_TRIGGER": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   },
+   "QA_SKILL_ROUTER": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_SKILL_TELEMETRY": {
+    "accessor": "ok",
+    "actual": false,
+    "expected": false
+   },
+   "QA_VERIFIER_ENABLED": {
+    "accessor": "ok",
+    "actual": true,
+    "expected": true
+   }
+  },
+  "version": "qa-release-acceptance-v1"
+ },
+ "contract_fingerprints": {
+  "CLAIM_SCHEMA": "06fcdb02441248b2",
+  "CONFLICT_SCHEMA": "aabd3259b07f9a3e",
+  "EVIDENCE_SCHEMA": "370301331c02c738",
+  "FINAL_ANSWER_SCHEMA": "4d1efa54ca1cbc1a",
+  "LEVEL1_RESULT_SCHEMA": "7e864764429db111",
+  "LEVEL2_RESULT_SCHEMA": "a0484f894e7bc9d6",
+  "QA_EVENT_SCHEMA": "59358bfa88a6c6af"
+ },
+ "gates": [
+  {
+   "detail": "P17-01=PASS; P17-02=PASS; P17-03=PASS; P17-04=PASS; P17-05=PASS; P17-06=PASS",
+   "gate": "所有 Must 子任务 PASS",
+   "ok": true
+  },
+  {
+   "detail": "tests/test_qa_phase17_*.py（本阶段新例）",
+   "gate": "Unit tests PASS",
+   "ok": true
+  },
+  {
+   "detail": "E2E 检索侧真跑生产阶段 + 回答侧真机 run 重放",
+   "gate": "Integration tests PASS",
+   "ok": true
+  },
+  {
+   "detail": "离线桩记账 / 缺快照 / 缺口径 / 缺 store / 逐层关闭 等失败路径逐条有用例",
+   "gate": "Failure-path tests PASS",
+   "ok": true
+  },
+  {
+   "detail": "七指纹 + 版本锚点 + 九组枚举 + 开关默认值 + 阶段链 + 冻结答案契约严格性",
+   "gate": "Compatibility regression PASS",
+   "ok": true
+  },
+  {
+   "detail": "待落文本已在报告里给出；按用户要求由用户统一落盘（本阶段不写 tracking 文件）",
+   "gate": "IMPLEMENTATION_STATUS / ACCEPTANCE_MATRIX 已更新",
+   "ok": false
+  },
+  {
+   "detail": "B-003（生产端到端行为验收缺数据）为 OPEN（受硬约束，非实现缺陷）",
+   "gate": "无未处理高优先级 blocker",
+   "ok": false
+  }
+ ],
+ "gates_passed": false,
+ "generated_at_utc": "2026-10-11T11:58:52+00:00",
+ "known_limitations": [
+  {
+   "id": "L1",
+   "text": "E2E 的生成端不可得（硬约束禁模型），草稿用真机已录答案，因此「端到端」覆盖到合成前的全部规则层 + 真机答案后的终验层"
+  },
+  {
+   "id": "L2",
+   "text": "检索侧语料是两包 239 篇快照（Phase 04 导出），与 Phase 00 冻结 baseline 的 8544 篇全库**分母不同**，只并列不换算"
+  },
+  {
+   "id": "L3",
+   "text": "web 检索与 level2（RAGFlow）在离线环境无对象，回执里记 OFFLINE_* 原因码"
+  },
+  {
+   "id": "L4",
+   "text": "独立标注集是机器构造 + 可人工复核的 holdout，不是人类金标"
+  },
+  {
+   "id": "L5",
+   "text": "消融每格用独立临时库，检索缓存命中恒 0（刻意的隔离，非性能结论）"
+  }
+ ],
+ "migration_rollback": {
+  "db_path": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\qa-p17-acceptance-x22vhmow\\rollback.sqlite3",
+  "passed": true,
+  "post_v6_tables": [
+   "qa_evidence_seen",
+   "memory_item",
+   "memory_version",
+   "memory_entity_link",
+   "memory_evidence_link",
+   "memory_relation",
+   "memory_recall_log",
+   "memory_write_decision",
+   "memory_usage_stat",
+   "memory_validation",
+   "memory_contradiction",
+   "source_reliability_memory",
+   "skill_performance_memory",
+   "qa_realignment_decisions"
+  ],
+  "rollback_sql": {
+   "direction": "v11 → v6",
+   "forward_sql": "qa_schema.ensure_qa_tables(cursor)（CREATE TABLE/INDEX IF NOT EXISTS，幂等）",
+   "no_column_drops_needed": true,
+   "reason": "v7…v11 的 ADD COLUMN 清单全为空（零 ADD COLUMN 演进），所以回滚没有列级动作",
+   "steps": [
+    {
+     "action": "停止写入",
+     "detail": "确认没有正在写 QA 表的进程（本包不部署，回滚只涉及库结构）",
+     "step": 1
+    },
+    {
+     "action": "DROP 后加表",
+     "detail": "只删 v7…v11 新增的 14 张表；v6 核心表与全部行数据不动",
+     "sql": [
+      "DROP TABLE IF EXISTS qa_realignment_decisions",
+      "DROP TABLE IF EXISTS skill_performance_memory",
+      "DROP TABLE IF EXISTS source_reliability_memory",
+      "DROP TABLE IF EXISTS memory_contradiction",
+      "DROP TABLE IF EXISTS memory_validation",
+      "DROP TABLE IF EXISTS memory_usage_stat",
+      "DROP TABLE IF EXISTS memory_write_decision",
+      "DROP TABLE IF EXISTS memory_recall_log",
+      "DROP TABLE IF EXISTS memory_relation",
+      "DROP TABLE IF EXISTS memory_evidence_link",
+      "DROP TABLE IF EXISTS memory_entity_link",
+      "DROP TABLE IF EXISTS memory_version",
+      "DROP TABLE IF EXISTS memory_item",
+      "DROP TABLE IF EXISTS qa_evidence_seen"
+     ],
+     "step": 2
+    },
+    {
+     "action": "校验",
+     "detail": "剩余表集合 == v6 核心表集；qa_runs/qa_claims/qa_evidence 行数与回滚前逐字相等",
+     "step": 3
+    },
+    {
+     "action": "代码侧回滚",
+     "detail": "把 QA_SCHEMA_VERSION 退回 unified-qa-schema-v6 并停用 P02…P17 的层开关：所有层开关默认关（SWITCH_DEFAULTS_V1 里 12 个默认关），打开过的层关掉即逐字回到 Phase 01 行为（每层都有守门用例）",
+     "step": 4
+    }
+   ]
+  },
+  "schema_version": "unified-qa-schema-v11",
+  "steps": [
+   {
+    "all_required_present": true,
+    "checksum": "8c45c4d231ebff73c1c8d5b5baa7c3b8c0efaf0ce97eb9ed45b6468ce8eb9c5b",
+    "schema_version": "unified-qa-schema-v11",
+    "step": "forward",
+    "tables": 37
+   },
+   {
+    "row_counts": {
+     "qa_claims": 2,
+     "qa_runs": 2
+    },
+    "step": "legacy_data"
+   },
+   {
+    "dropped": 14,
+    "legacy_rows_intact": true,
+    "matches_v6_core": true,
+    "row_counts": {
+     "qa_claims": 2,
+     "qa_runs": 2
+    },
+    "step": "rollback",
+    "tables": 23
+   },
+   {
+    "legacy_rows_intact": true,
+    "restored": true,
+    "row_counts": {
+     "qa_claims": 2,
+     "qa_runs": 2
+    },
+    "step": "forward_again",
+    "tables": 37
+   },
+   {
+    "step": "idempotent_rereun",
+    "tables": 37,
+    "unchanged": true
+   }
+  ],
+  "version": "qa-release-acceptance-v1"
+ },
+ "next_phase_readiness": {
+  "handover": [
+   "E2E 与消融可随时复跑（tools/qa_phase17_acceptance.py）",
+   "独立标注集可重建（--rebuild-annotation）与扩样",
+   "回滚 SQL 与开关默认值表已冻结在 qa_release.py"
+  ],
+  "next": "无后续阶段；剩余项只有 B-003 需要的用户决策与真实端到端行为数据",
+  "phase": "P17（本包最后一阶段）",
+  "ready": true
+ },
+ "repo_version_file": "1.0.0",
+ "rollback": {
+  "code_side": "本包未部署到 A 机（不部署是硬约束）：回滚 = 保持开关默认 + 把 QA_SCHEMA_VERSION 退回 v6 并 DROP 后加表",
+  "per_layer_switches": {
+   "QA_ACQUISITION": false,
+   "QA_ASK_PATIENT": false,
+   "QA_CONTEXT_PACK": false,
+   "QA_ENCOUNTER_ISOLATION": true,
+   "QA_EVIDENCE_GRAPH": false,
+   "QA_EVIDENCE_LAYER_ENABLED": true,
+   "QA_EVIDENCE_SEEN_PRUNE_ENABLED": false,
+   "QA_EXECUTION_GRAPH": false,
+   "QA_EXECUTION_GRAPH_NODE_RUNS": false,
+   "QA_EXPERIENCE_MEMORY": false,
+   "QA_FINAL_VERIFIER": false,
+   "QA_GAP_ANALYZER": false,
+   "QA_GROUNDING_GATE": false,
+   "QA_HUNTER_FLEET": false,
+   "QA_LONGITUDINAL_FRESHNESS": true,
+   "QA_MEMORY_AUDIT": true,
+   "QA_MEMORY_GRAPH": false,
+   "QA_MEMORY_SCOPE_ENFORCEMENT": true,
+   "QA_PRIVACY_MINIMAL_LOG": true,
+   "QA_REPEAT_QUESTION_ENABLED": false,
+   "QA_SAFETY_HARD_TRIGGER": true,
+   "QA_SKILL_ROUTER": false,
+   "QA_SKILL_TELEMETRY": false,
+   "QA_VERIFIER_ENABLED": true
+  },
+  "schema": {
+   "direction": "v11 → v6",
+   "forward_sql": "qa_schema.ensure_qa_tables(cursor)（CREATE TABLE/INDEX IF NOT EXISTS，幂等）",
+   "no_column_drops_needed": true,
+   "reason": "v7…v11 的 ADD COLUMN 清单全为空（零 ADD COLUMN 演进），所以回滚没有列级动作",
+   "steps": [
+    {
+     "action": "停止写入",
+     "detail": "确认没有正在写 QA 表的进程（本包不部署，回滚只涉及库结构）",
+     "step": 1
+    },
+    {
+     "action": "DROP 后加表",
+     "detail": "只删 v7…v11 新增的 14 张表；v6 核心表与全部行数据不动",
+     "sql": [
+      "DROP TABLE IF EXISTS qa_realignment_decisions",
+      "DROP TABLE IF EXISTS skill_performance_memory",
+      "DROP TABLE IF EXISTS source_reliability_memory",
+      "DROP TABLE IF EXISTS memory_contradiction",
+      "DROP TABLE IF EXISTS memory_validation",
+      "DROP TABLE IF EXISTS memory_usage_stat",
+      "DROP TABLE IF EXISTS memory_write_decision",
+      "DROP TABLE IF EXISTS memory_recall_log",
+      "DROP TABLE IF EXISTS memory_relation",
+      "DROP TABLE IF EXISTS memory_evidence_link",
+      "DROP TABLE IF EXISTS memory_entity_link",
+      "DROP TABLE IF EXISTS memory_version",
+      "DROP TABLE IF EXISTS memory_item",
+      "DROP TABLE IF EXISTS qa_evidence_seen"
+     ],
+     "step": 2
+    },
+    {
+     "action": "校验",
+     "detail": "剩余表集合 == v6 核心表集；qa_runs/qa_claims/qa_evidence 行数与回滚前逐字相等",
+     "step": 3
+    },
+    {
+     "action": "代码侧回滚",
+     "detail": "把 QA_SCHEMA_VERSION 退回 unified-qa-schema-v6 并停用 P02…P17 的层开关：所有层开关默认关（SWITCH_DEFAULTS_V1 里 12 个默认关），打开过的层关掉即逐字回到 Phase 01 行为（每层都有守门用例）",
+     "step": 4
+    }
+   ]
+  }
+ },
+ "schema_evolution": [
+  {
+   "decision": "基线",
+   "delta": "初始 24 张 qa_* 表",
+   "phase": "P00",
+   "version": "unified-qa-schema-v6"
+  },
+  {
+   "decision": "D-007",
+   "delta": "+qa_evidence_seen（零 ADD COLUMN）",
+   "phase": "P02",
+   "version": "unified-qa-schema-v7"
+  },
+  {
+   "decision": "D-033",
+   "delta": "+8 张 memory_* 表",
+   "phase": "P09",
+   "version": "unified-qa-schema-v8"
+  },
+  {
+   "decision": "D-037",
+   "delta": "+memory_validation/memory_contradiction",
+   "phase": "P10",
+   "version": "unified-qa-schema-v9"
+  },
+  {
+   "decision": "D-044",
+   "delta": "+source_reliability_memory/skill_performance_memory",
+   "phase": "P12",
+   "version": "unified-qa-schema-v10"
+  },
+  {
+   "decision": "D-049",
+   "delta": "+qa_realignment_decisions",
+   "phase": "P14",
+   "version": "unified-qa-schema-v11"
+  }
+ ],
+ "schema_version": "unified-qa-schema-v11",
+ "version": "qa-release-acceptance-v1"
+}
