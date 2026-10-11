@@ -791,14 +791,54 @@ def _build_memory_recall_layer(graph: Mapping, *, plan: Mapping | None, request:
                 "stats": {}, "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
-def _memory_items_from(receipt: Mapping | None, *, limit: int = 6) -> list:
-    """把召回回执转成 `memory_context` 段的上下文条目（关掉开关时返回空列表）。"""
+def _memory_items_from(receipt: Mapping | None, *, limit: int = 6,
+                       revalidated_hints: Sequence[Mapping] = ()) -> list:
+    """把召回回执转成 `memory_context` 段的上下文条目（关掉开关时返回空列表）。
+
+    阶段 10（P10-03）：`revalidated_hints` 是复验改写过的命中（`requires_revalidation`
+    可能已置 False、并带上 `verified_scope`）——有它就优先用，让上下文段如实反映复验结论。
+    """
     if not isinstance(receipt, Mapping) or receipt.get("error"):
         return []
+    payload = dict(receipt)
+    if revalidated_hints:
+        payload["hits"] = list(revalidated_hints)
     try:
-        return memory_context_items(receipt, max_items=limit)
+        return memory_context_items(payload, max_items=limit)
     except Exception:  # noqa: BLE001 —— 条目构造失败就当没有记忆（不编内容）
         return []
+
+
+def _attach_memory_revalidation(graph: dict, *, recall: Mapping | None, run_meta: Mapping,
+                                store, trace_id: str = "") -> dict:
+    """阶段 10（P10-01…P10-06）：对召回命中跑**时效闸门 → 复验 → 矛盾/取代**。
+
+    口径（与 Phase 09 同一手法）：
+      · 默认**关**（`QA_MEMORY_REVALIDATION=0`）→ 一个键都不新增、一行都不写库；
+      · 结果挂**兄弟键** `graph["memory_revalidation"]`（冻结契约的键集一个字不动）；
+      · 只吃本轮证据图里的证据（**不发明检索**）、只用 Phase 03 的核验判定器
+        （不另算一套质量判断）；
+      · 任何异常都吞掉并记账：复验绝不能把出答案的链路打断。
+    """
+    if store is None or not isinstance(recall, Mapping) or not recall:
+        return {}
+    try:
+        from qa_memory_revalidation import (revalidation_enabled, revalidation_receipt,
+                                            run_revalidation)
+    except Exception as exc:  # noqa: BLE001 —— 模块不可用时与本开关关闭同效
+        return {"revalidation_version": "", "checked": 0, "gate_decisions": {}, "outcomes": {},
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
+    if not revalidation_enabled():
+        return {}
+    hints = [hit for hit in (recall.get("hits") or []) if isinstance(hit, Mapping)]
+    try:
+        report = run_revalidation(store, hints=hints, graph=graph, run_meta=run_meta,
+                                 trace_id=trace_id)
+        report["receipt"] = revalidation_receipt(report)
+        return report
+    except Exception as exc:  # noqa: BLE001
+        return {"revalidation_version": "", "checked": 0, "gate_decisions": {}, "outcomes": {},
+                "error": "%s: %s" % (type(exc).__name__, str(exc)[:160])}
 
 
 def _attach_memory_recall(graph: dict, *, plan: Mapping | None, request: Mapping | None,
@@ -2881,12 +2921,31 @@ def build_qa_stage_handlers(
         memory_recall = _attach_memory_recall(
             graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
             request=context["request"], run_meta=context["run"], store=store)
+        # 阶段 10（P10-01…P10-06）：时效闸门 + 复验 + 矛盾/取代（默认关）。
+        # 结果挂兄弟键 `graph["memory_revalidation"]`；复验改写过的命中交给上下文段。
+        memory_revalidation = _attach_memory_revalidation(
+            graph, recall=memory_recall, run_meta=context["run"], store=store,
+            trace_id=str(context["run"].get("id") or ""))
+        if memory_revalidation:
+            graph["memory_revalidation"] = memory_revalidation
+            if callable(emit_stage_event):
+                emit_stage_event("stage_progress", {
+                    "message": ("记忆复验：受检 %s 条，复验成功 %s 条（提升 %s 条），"
+                                "矛盾候选 %s 条（取代 %s 条）"
+                                % (memory_revalidation.get("checked"),
+                                   memory_revalidation.get("revalidated"),
+                                   memory_revalidation.get("promoted"),
+                                   (memory_revalidation.get("contradictions") or {}).get("candidates"),
+                                   (memory_revalidation.get("contradictions") or {}).get("supersessions"))),
+                    "memory_revalidation": memory_revalidation.get("receipt") or {},
+                })
         if context_pack_enabled():
             graph["context_pack"] = _build_context_pack_layer(
                 graph, plan=(plan_output if isinstance(plan_output, Mapping) else {}),
                 request=context["request"], run_meta=context["run"],
                 working_memory=_context_working_memory(context),
-                memory_items=_memory_items_from(memory_recall))
+                memory_items=_memory_items_from(
+                    memory_recall, revalidated_hints=memory_revalidation.get("hints") or ()))
         store.persist_reasoning_graph(context["run"]["id"], graph)
         if callable(emit_stage_event):
             message = (f"证据图已建立：{len(graph.get('claims') or [])} 条结论、"
@@ -2938,13 +2997,20 @@ def build_qa_stage_handlers(
             _fast_memory = _attach_memory_recall(
                 graph, plan=(context["outputs"].get("plan") or {}),
                 request=context["request"], run_meta=run, store=store)
+            # 阶段 10：fast 路径同样复验（口径与 standard/deep 一致）
+            _fast_revalidation = _attach_memory_revalidation(
+                graph, recall=_fast_memory, run_meta=run, store=store,
+                trace_id=str(run.get("id") or ""))
+            if _fast_revalidation:
+                graph["memory_revalidation"] = _fast_revalidation
             if context_pack_enabled():
                 # 阶段 08：fast 路径同样组装上下文包（口径与 standard/deep 一致，只是没有 level2 计划）
                 graph["context_pack"] = _build_context_pack_layer(
                     graph, plan=(context["outputs"].get("plan") or {}),
                     request=context["request"], run_meta=run,
                     working_memory=_context_working_memory(context),
-                    memory_items=_memory_items_from(_fast_memory))
+                    memory_items=_memory_items_from(
+                        _fast_memory, revalidated_hints=_fast_revalidation.get("hints") or ()))
             store.persist_reasoning_graph(run["id"], graph)
         current_run = store.get_run(run["id"]) or run
         degradation = list(current_run.get("degradation") or [])

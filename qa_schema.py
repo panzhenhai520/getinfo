@@ -36,7 +36,18 @@ import hashlib
 #   · 回滚：`DROP TABLE memory_usage_stat, memory_write_decision, memory_recall_log,
 #     memory_relation, memory_evidence_link, memory_entity_link, memory_version,
 #     memory_item;` + 本常量改回 v7；代码侧 `QA_MEMORY_GRAPH=0`（默认）即回到 Phase 08 行为。
-QA_SCHEMA_VERSION = "unified-qa-schema-v8"
+#
+# v8 → v9（graph-rag-v2 通用包 Phase 10 · P10-01/P10-04）：
+#   · 新增 **两张表**（§12 里 Phase 09 **刻意留给 Phase 10** 的那两张，见 D-033）：
+#     memory_validation（复验留痕：出口/理由码/证据引用/verdict 分布）与
+#     memory_contradiction（记忆矛盾：Phase 06 裁决器的 resolution/reason_code + 状态动作）；
+#   · **没有新增列、没有改既有列语义**：`superseded_by` / `last_verified_at` / `valid_until` /
+#     `confidence` 这些 P10 要写的字段在 v8 的 memory_item 里**已经都有**，所以本次
+#     一行 ADD COLUMN 都不需要（`QA_ADDED_COLUMNS_V9` 为空元组，与 v7/v8 同一手法）；
+#   · 回滚：`DROP TABLE memory_contradiction, memory_validation;` + 本常量改回 v8；
+#     代码侧 `QA_MEMORY_REVALIDATION=0`（默认）与 `QA_MEMORY_GRAPH=0`（默认）即回到
+#     Phase 09/08 行为（Phase 10 的写入只落在自己的两张新表 + 既有记忆状态的合法迁移）。
+QA_SCHEMA_VERSION = "unified-qa-schema-v9"
 
 QA_TABLE_DDL = (
     """
@@ -554,6 +565,54 @@ QA_TABLE_DDL = (
         UNIQUE(memory_id, day)
     )
     """,
+    # ── Phase 10（P10-01…P10-06）：复验与记忆矛盾两张表（§12 里 P09 留给 P10 的那两张）──
+    """
+    CREATE TABLE IF NOT EXISTS memory_validation (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        validation_id TEXT NOT NULL,
+        memory_id TEXT NOT NULL,
+        run_id TEXT NOT NULL DEFAULT '',
+        trace_id TEXT NOT NULL DEFAULT '',
+        outcome TEXT NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        gate_decision TEXT NOT NULL DEFAULT '',
+        gate_reason TEXT NOT NULL DEFAULT '',
+        status_before TEXT NOT NULL DEFAULT '',
+        status_after TEXT NOT NULL DEFAULT '',
+        verdicts_json TEXT NOT NULL DEFAULT '{}',
+        evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+        verified INTEGER NOT NULL DEFAULT 0,
+        promoted INTEGER NOT NULL DEFAULT 0,
+        high_stakes INTEGER NOT NULL DEFAULT 0,
+        judge TEXT NOT NULL DEFAULT '',
+        revalidation_version TEXT NOT NULL DEFAULT '',
+        gate_version TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(validation_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS memory_contradiction (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        contradiction_id TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT '',
+        conflict_type TEXT NOT NULL DEFAULT '',
+        left_memory_id TEXT NOT NULL,
+        right_memory_id TEXT NOT NULL DEFAULT '',
+        right_evidence_ref TEXT NOT NULL DEFAULT '',
+        resolution TEXT NOT NULL DEFAULT '',
+        reason_code TEXT NOT NULL DEFAULT '',
+        decider TEXT NOT NULL DEFAULT '',
+        status_action TEXT NOT NULL DEFAULT '',
+        rationale TEXT NOT NULL DEFAULT '',
+        run_id TEXT NOT NULL DEFAULT '',
+        contradiction_version TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(contradiction_id)
+    )
+    """,
 )
 
 QA_INDEX_DDL = (
@@ -594,6 +653,13 @@ QA_INDEX_DDL = (
     "CREATE INDEX IF NOT EXISTS idx_memory_recall_run ON memory_recall_log(run_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_memory_write_run ON memory_write_decision(run_id, decision)",
     "CREATE INDEX IF NOT EXISTS idx_memory_usage_day ON memory_usage_stat(memory_id, day)",
+    # Phase 10（P10-03/P10-04）：复验按"记忆 / run"查，矛盾按"两侧记忆 / run"查。
+    "CREATE INDEX IF NOT EXISTS idx_memory_validation_memory"
+    " ON memory_validation(memory_id, outcome)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_validation_run ON memory_validation(run_id, outcome)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_contradiction_left"
+    " ON memory_contradiction(left_memory_id, resolution)",
+    "CREATE INDEX IF NOT EXISTS idx_memory_contradiction_run ON memory_contradiction(run_id, resolution)",
 )
 
 QA_REQUIRED_TABLES = frozenset(
@@ -631,6 +697,9 @@ QA_REQUIRED_TABLES = frozenset(
         "memory_recall_log",
         "memory_write_decision",
         "memory_usage_stat",
+        # Phase 10（v9）：复验留痕与记忆矛盾（§12 的最后两张）
+        "memory_validation",
+        "memory_contradiction",
     }
 )
 
@@ -668,6 +737,14 @@ QA_ADDED_COLUMNS_V8 = ()
 v8 只新增八张表（走 `CREATE TABLE IF NOT EXISTS`，老库执行 `ensure_qa_tables` 自动补建），
 一行 ADD COLUMN 都不需要 —— 与 Phase 02 的 v7 同一手法，回滚只需 DROP 八张新表。
 `tests/test_qa_phase09_schema.py` 断言本元组为空，防止后续有人偷偷往老表加列。"""
+
+QA_ADDED_COLUMNS_V9 = ()
+"""Phase 10（v8 → v9）新增列清单：**空**。
+
+v9 只新增两张表（memory_validation / memory_contradiction）。
+Phase 10 要写的记忆字段（`superseded_by` / `last_verified_at` / `valid_until` / `confidence`）
+在 v8 的 memory_item 里**已经全部存在**，所以一行 ADD COLUMN 都不需要 ——
+`tests/test_qa_phase10_schema.py` 断言本元组为空，防止后续有人借"复验"往老表加列。"""
 
 
 def _existing_columns(cursor, table_name: str) -> set:
@@ -741,6 +818,7 @@ def ensure_qa_tables(cursor) -> None:
 __all__ = [
     "QA_ADDED_COLUMNS_V6",
     "QA_ADDED_COLUMNS_V8",
+    "QA_ADDED_COLUMNS_V9",
     "QA_INDEX_DDL",
     "QA_REQUIRED_TABLES",
     "QA_SCHEMA_VERSION",

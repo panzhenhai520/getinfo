@@ -1843,11 +1843,16 @@ class QaStore:
         except Exception:  # noqa: BLE001
             return result
 
-    def memory_evidence(self, memory_ids=(), *, evidence_refs=()) -> list[dict]:
-        """取记忆↔证据绑定行（provenance 读侧；两个过滤条件都可单独用）。"""
+    def memory_evidence(self, memory_ids=(), *, evidence_refs=(), source_fingerprints=()) -> list[dict]:
+        """取记忆↔证据绑定行（provenance 读侧；三个过滤条件都可单独用）。
+
+        `source_fingerprints` 是 Phase 10（P10-06）按来源撤销污染记忆用的选择器：
+        一个来源指纹可能被多条记忆引用，所以这里必须能**只按来源**查。
+        """
         ids = [str(item) for item in (memory_ids or []) if str(item or "")]
         refs = [str(item) for item in (evidence_refs or []) if str(item or "")]
-        if not ids and not refs:
+        sources = [str(item) for item in (source_fingerprints or []) if str(item or "")]
+        if not ids and not refs and not sources:
             return []
         try:
             self.ensure_schema()
@@ -1858,10 +1863,41 @@ class QaStore:
             if refs:
                 where.append("evidence_ref IN (%s)" % ",".join("?" for _ in refs))
                 params.extend(refs)
+            if sources:
+                where.append("source_fingerprint IN (%s)" % ",".join("?" for _ in sources))
+                params.extend(sources)
             with self.database.lock:
                 rows = self.database.connection.execute(
                     "SELECT * FROM memory_evidence_link WHERE " + " AND ".join(where)
                     + " ORDER BY memory_id, evidence_ref", tuple(params)).fetchall()
+            out = []
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
+                out.append(value)
+            return out
+        except Exception:  # noqa: BLE001
+            return []
+
+    def memory_entities(self, memory_ids=(), *, entity_keys=()) -> list[dict]:
+        """取记忆↔实体绑定行（Phase 10 的实体选择器：配对矛盾与按实体撤销污染记忆要用）。"""
+        ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+        keys = [str(item) for item in (entity_keys or []) if str(item or "")]
+        if not ids and not keys:
+            return []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            if ids:
+                where.append("memory_id IN (%s)" % ",".join("?" for _ in ids))
+                params.extend(ids)
+            if keys:
+                where.append("entity_key IN (%s)" % ",".join("?" for _ in keys))
+                params.extend(keys)
+            with self.database.lock:
+                rows = self.database.connection.execute(
+                    "SELECT * FROM memory_entity_link WHERE " + " AND ".join(where)
+                    + " ORDER BY memory_id, entity_key", tuple(params)).fetchall()
             out = []
             for row in rows:
                 value = _row_dict(row) or {}
@@ -2034,6 +2070,481 @@ class QaStore:
             return out
         except Exception:  # noqa: BLE001
             return []
+
+    # ── Phase 10（P10-01…P10-06）：复验留痕 / 记忆矛盾 / 取代 / 撤销 ──────────────
+
+    def record_memory_validation(self, rows: list) -> int:
+        """落复验留痕（P10-03）：**每条被闸门判过的记忆**都要有一行（含被 BLOCK 的）。
+
+        幂等口径：`validation_id` 是内容寻址（记忆+run+出口+证据集），重复跑同一轮
+        只更新同一行，不会把 `memory_validation` 撑成日志表（第二遍的"0 新增"可复算）。
+        """
+        written = 0
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows or []:
+                        if not isinstance(row, Mapping):
+                            continue
+                        validation_id = str(row.get("validation_id") or "")
+                        memory_id = str(row.get("memory_id") or "")
+                        if not validation_id or not memory_id:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_validation(
+                                validation_id,memory_id,run_id,trace_id,outcome,reason,
+                                gate_decision,gate_reason,status_before,status_after,verdicts_json,
+                                evidence_refs_json,verified,promoted,high_stakes,judge,
+                                revalidation_version,gate_version,payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(validation_id) DO UPDATE SET
+                                outcome=excluded.outcome, reason=excluded.reason,
+                                status_after=excluded.status_after,
+                                verdicts_json=excluded.verdicts_json,
+                                evidence_refs_json=excluded.evidence_refs_json,
+                                verified=excluded.verified, promoted=excluded.promoted,
+                                payload_json=excluded.payload_json
+                            """,
+                            (
+                                validation_id, memory_id, str(row.get("run_id") or ""),
+                                str(row.get("trace_id") or ""), str(row.get("outcome") or ""),
+                                str(row.get("reason") or ""), str(row.get("gate_decision") or ""),
+                                str(row.get("gate_reason") or ""), str(row.get("status_before") or ""),
+                                str(row.get("status_after") or ""), _json(row.get("verdicts") or {}),
+                                _json(row.get("evidence_refs") or []),
+                                1 if row.get("verified_evidence") else 0,
+                                1 if row.get("promoted") else 0,
+                                1 if row.get("high_stakes") else 0, str(row.get("judge") or ""),
+                                str(row.get("revalidation_version") or ""),
+                                str(row.get("gate_version") or ""),
+                                _json(row.get("metadata") or {}), now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001 —— 留痕失败不冒泡（复验本身已经算完）
+            return 0
+        return written
+
+    def memory_validations(self, *, memory_ids=(), run_id: str = "", outcomes=(),
+                           limit: int = 1000) -> list[dict]:
+        """读复验留痕（验收/运维自检；`outcome` 分布靠它复算）。"""
+        result: list[dict] = []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+            picked = [str(item) for item in (outcomes or []) if str(item or "")]
+            if ids:
+                where.append("memory_id IN (%s)" % ",".join("?" for _ in ids))
+                params.extend(ids)
+            if run_id:
+                where.append("run_id=?")
+                params.append(str(run_id))
+            if picked:
+                where.append("outcome IN (%s)" % ",".join("?" for _ in picked))
+                params.extend(picked)
+            sql = "SELECT * FROM memory_validation"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY id LIMIT ?"
+            params.append(max(1, min(int(limit), 5000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["verdicts"] = _decode_json(value.get("verdicts_json"), {})
+                value["evidence_refs"] = _decode_json(value.get("evidence_refs_json"), [])
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
+                result.append(value)
+            return result
+        except Exception:  # noqa: BLE001
+            return result
+
+    def record_memory_contradiction(self, rows: list) -> int:
+        """落记忆矛盾（P10-04）：`contradiction_id` 内容寻址 → 同一条矛盾只留一行（幂等）。"""
+        written = 0
+        now = _now()
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    for row in rows or []:
+                        if not isinstance(row, Mapping):
+                            continue
+                        contradiction_id = str(row.get("contradiction_id") or "")
+                        left = str(row.get("left_memory_id") or "")
+                        if not contradiction_id or not left:
+                            continue
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_contradiction(
+                                contradiction_id,kind,conflict_type,left_memory_id,right_memory_id,
+                                right_evidence_ref,resolution,reason_code,decider,status_action,
+                                rationale,run_id,contradiction_version,payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(contradiction_id) DO UPDATE SET
+                                resolution=excluded.resolution, reason_code=excluded.reason_code,
+                                status_action=excluded.status_action,
+                                rationale=excluded.rationale,
+                                payload_json=excluded.payload_json
+                            """,
+                            (
+                                contradiction_id, str(row.get("kind") or ""),
+                                str(row.get("conflict_type") or ""), left,
+                                str(row.get("right_memory_id") or ""),
+                                str(row.get("right_evidence_ref") or ""),
+                                str(row.get("resolution") or ""), str(row.get("reason_code") or ""),
+                                str(row.get("decider") or ""), str(row.get("status_action") or ""),
+                                str(row.get("rationale") or "")[:2000], str(row.get("run_id") or ""),
+                                str(row.get("contradiction_version") or ""),
+                                _json(row.get("metadata") or {}), now,
+                            ),
+                        )
+                        written += 1
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception:  # noqa: BLE001
+            return 0
+        return written
+
+    def memory_contradictions(self, *, memory_ids=(), run_id: str = "",
+                              resolutions=(), limit: int = 1000) -> list[dict]:
+        """读记忆矛盾（两侧命中都算：一条记忆可能既是左方也是右方）。"""
+        result: list[dict] = []
+        try:
+            self.ensure_schema()
+            where, params = [], []
+            ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+            picked = [str(item) for item in (resolutions or []) if str(item or "")]
+            if ids:
+                marks = ",".join("?" for _ in ids)
+                where.append("(left_memory_id IN (%s) OR right_memory_id IN (%s))" % (marks, marks))
+                params.extend(ids)
+                params.extend(ids)
+            if run_id:
+                where.append("run_id=?")
+                params.append(str(run_id))
+            if picked:
+                where.append("resolution IN (%s)" % ",".join("?" for _ in picked))
+                params.extend(picked)
+            sql = "SELECT * FROM memory_contradiction"
+            if where:
+                sql += " WHERE " + " AND ".join(where)
+            sql += " ORDER BY id LIMIT ?"
+            params.append(max(1, min(int(limit), 5000)))
+            with self.database.lock:
+                rows = self.database.connection.execute(sql, tuple(params)).fetchall()
+            for row in rows:
+                value = _row_dict(row) or {}
+                value["metadata"] = _decode_json(value.get("payload_json"), {})
+                result.append(value)
+            return result
+        except Exception:  # noqa: BLE001
+            return result
+
+    def apply_memory_revalidation(self, memory_id: str, *, status: str = "", confidence=None,
+                                  last_verified_at: str = "", valid_until=None, reason: str = "",
+                                  run_id: str = "", change: str = "REVALIDATE",
+                                  payload: Mapping | None = None) -> dict:
+        """复验成功后的**唯一写入口**（P10-03）：刷新核验时间/置信/有效期（+可选状态）+ 追加版本行。
+
+        `valid_until=None` = 不动有效期；`valid_until=""` = 显式清空（例如长期有效的结论）。
+        §2.3 "旧 Memory 不物理覆盖"：这里仍然只追加 `memory_version`，历史一行不删。
+        """
+        memory_id = str(memory_id or "")
+        result = {"memory_id": memory_id, "from": "", "to": "", "version": 0, "changed": False,
+                  "error": ""}
+        if not memory_id:
+            result["error"] = "memory_id 为空"
+            return result
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    row = cursor.execute(
+                        "SELECT status,version,confidence,canonical_content,valid_until,"
+                        "last_verified_at,decay_score FROM memory_item WHERE memory_id=?",
+                        (memory_id,)).fetchone()
+                    current = _row_dict(row)
+                    if current is None:
+                        result["error"] = "记忆不存在"
+                        return result
+                    before = str(current.get("status") or "")
+                    after = str(status or before)
+                    target_confidence = (float(current.get("confidence") or 0) if confidence is None
+                                         else float(confidence))
+                    target_verified = str(last_verified_at or current.get("last_verified_at") or "")
+                    target_until = (str(current.get("valid_until") or "") if valid_until is None
+                                    else str(valid_until))
+                    # 幂等：同钟重放算出来的补丁与库里逐字段相同 → 一行都不写（不追加版本行）。
+                    if (before == after
+                            and abs(float(current.get("confidence") or 0) - target_confidence) < 1e-12
+                            and str(current.get("last_verified_at") or "") == target_verified
+                            and str(current.get("valid_until") or "") == target_until):
+                        result.update({"from": before, "to": after,
+                                       "version": int(current.get("version") or 0)})
+                        return result
+                    version = int(current.get("version") or 0) + 1
+                    now = _now()
+                    cursor.execute(
+                        "UPDATE memory_item SET status=?, confidence=?, last_verified_at=?, "
+                        "valid_until=?, version=?, updated_at=? WHERE memory_id=?",
+                        (after, target_confidence, target_verified, target_until, version, now,
+                         memory_id),
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO memory_version(
+                            memory_id,version,change,status,confidence,canonical_content,
+                            valid_until,last_verified_at,decay_score,reason,payload_json,created_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(memory_id,version) DO UPDATE SET
+                            change=excluded.change,status=excluded.status,
+                            confidence=excluded.confidence,valid_until=excluded.valid_until,
+                            last_verified_at=excluded.last_verified_at,reason=excluded.reason
+                        """,
+                        (
+                            memory_id, version, str(change or "REVALIDATE"), after,
+                            target_confidence, str(current.get("canonical_content") or ""),
+                            target_until, target_verified,
+                            float(current.get("decay_score") or 0), str(reason or ""),
+                            _json(dict(payload or {})), now,
+                        ),
+                    )
+                    self.database.connection.commit()
+                    result.update({"from": before, "to": after, "version": version, "changed": True})
+                    return result
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+            return result
+
+    def mark_memory_superseded(self, memory_id: str, *, superseded_by: str, reason: str = "",
+                               run_id: str = "", change: str = "SUPERSEDE") -> dict:
+        """取代（P10-05）：写 `superseded_by` 字段 + 状态 SUPERSEDED + 追加版本行。
+
+        关系边由调用方写（`memory_relation` 的 `SUPERSEDES` 方向是"新→旧"）——
+        本方法只管记忆自己的字段与状态，**不动 canonical_content**（§2.3 不物理覆盖）。
+        """
+        memory_id = str(memory_id or "")
+        superseded_by = str(superseded_by or "")
+        result = {"memory_id": memory_id, "superseded_by": superseded_by, "from": "", "to": "",
+                  "version": 0, "changed": False, "error": ""}
+        if not memory_id or not superseded_by:
+            result["error"] = "memory_id / superseded_by 必填"
+            return result
+        if memory_id == superseded_by:
+            result["error"] = "不许自己取代自己"
+            return result
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    row = cursor.execute(
+                        "SELECT status,version,confidence,canonical_content,valid_until,"
+                        "last_verified_at,decay_score,superseded_by FROM memory_item "
+                        "WHERE memory_id=?", (memory_id,)).fetchone()
+                    current = _row_dict(row)
+                    if current is None:
+                        result["error"] = "记忆不存在"
+                        return result
+                    before = str(current.get("status") or "")
+                    if before == "REVOKED":
+                        result["error"] = "已撤销的记忆不许被取代（REVOKED 是终态）"
+                        result["from"] = before
+                        return result
+                    if before == "SUPERSEDED" \
+                            and str(current.get("superseded_by") or "") == superseded_by:
+                        # 幂等：已经是"被同一个后继取代" → 不重复追加版本行
+                        result.update({"from": before, "to": "SUPERSEDED",
+                                       "version": int(current.get("version") or 0)})
+                        return result
+                    if before == "SUPERSEDED" and str(current.get("superseded_by") or ""):
+                        # §11 禁止"最新自动覆盖"：取代链是单调的，已经指向别的后继就不改写
+                        # （要改链只能先人工把字段清掉，运维动作，不在自动链路里）
+                        result.update({"from": before, "to": before,
+                                       "version": int(current.get("version") or 0),
+                                       "superseded_by": str(current.get("superseded_by") or ""),
+                                       "error": "ALREADY_SUPERSEDED_BY_OTHER"})
+                        return result
+                    version = int(current.get("version") or 0) + 1
+                    now = _now()
+                    cursor.execute(
+                        "UPDATE memory_item SET status='SUPERSEDED', superseded_by=?, version=?, "
+                        "updated_at=? WHERE memory_id=?",
+                        (superseded_by, version, now, memory_id),
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO memory_version(
+                            memory_id,version,change,status,confidence,canonical_content,
+                            valid_until,last_verified_at,decay_score,reason,payload_json,created_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(memory_id,version) DO UPDATE SET
+                            change=excluded.change,status=excluded.status,reason=excluded.reason
+                        """,
+                        (
+                            memory_id, version, str(change or "SUPERSEDE"), "SUPERSEDED",
+                            float(current.get("confidence") or 0),
+                            str(current.get("canonical_content") or ""),
+                            str(current.get("valid_until") or ""),
+                            str(current.get("last_verified_at") or ""),
+                            float(current.get("decay_score") or 0), str(reason or ""),
+                            _json({"superseded_by": superseded_by, "run_id": str(run_id or "")}), now,
+                        ),
+                    )
+                    self.database.connection.commit()
+                    result.update({"from": before, "to": "SUPERSEDED", "version": version,
+                                   "changed": True})
+                    return result
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+            return result
+
+    def revoke_memory_items(self, memory_ids, *, reason: str = "", run_id: str = "",
+                            payload: Mapping | None = None) -> dict:
+        """污染撤销（P10-06）：批量置 REVOKED + 逐条追加版本行（一个事务，要么全成要么全不成）。
+
+        已 REVOKED 的记忆**跳过**（幂等：第二遍 revoked=0 / already_revoked=N）；
+        返回 `{checked, revoked:[...], skipped:[...], already_revoked}`，逐条可审计。
+        """
+        ids = [str(item) for item in (memory_ids or []) if str(item or "")]
+        receipt = {"checked": len(ids), "revoked": [], "skipped": [], "already_revoked": 0,
+                   "error": ""}
+        if not ids:
+            return receipt
+        try:
+            self.ensure_schema()
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                try:
+                    now = _now()
+                    for memory_id in ids:
+                        row = cursor.execute(
+                            "SELECT status,version,confidence,canonical_content,valid_until,"
+                            "last_verified_at,decay_score FROM memory_item WHERE memory_id=?",
+                            (memory_id,)).fetchone()
+                        current = _row_dict(row)
+                        if current is None:
+                            receipt["skipped"].append({"memory_id": memory_id,
+                                                       "reason": "MEMORY_NOT_FOUND"})
+                            continue
+                        before = str(current.get("status") or "")
+                        if before == "REVOKED":
+                            receipt["already_revoked"] += 1
+                            receipt["skipped"].append({"memory_id": memory_id, "status": before,
+                                                       "reason": "ALREADY_REVOKED"})
+                            continue
+                        version = int(current.get("version") or 0) + 1
+                        cursor.execute(
+                            "UPDATE memory_item SET status='REVOKED', version=?, updated_at=? "
+                            "WHERE memory_id=?", (version, now, memory_id),
+                        )
+                        cursor.execute(
+                            """
+                            INSERT INTO memory_version(
+                                memory_id,version,change,status,confidence,canonical_content,
+                                valid_until,last_verified_at,decay_score,reason,payload_json,created_at
+                            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(memory_id,version) DO UPDATE SET
+                                change=excluded.change,status=excluded.status,reason=excluded.reason
+                            """,
+                            (
+                                memory_id, version, "REVOKE", "REVOKED",
+                                float(current.get("confidence") or 0),
+                                str(current.get("canonical_content") or ""),
+                                str(current.get("valid_until") or ""),
+                                str(current.get("last_verified_at") or ""),
+                                float(current.get("decay_score") or 0), str(reason or ""),
+                                _json(dict(payload or {})), now,
+                            ),
+                        )
+                        receipt["revoked"].append({"memory_id": memory_id, "from": before,
+                                                   "to": "REVOKED", "version": version})
+                    self.database.connection.commit()
+                except Exception:
+                    self.database.connection.rollback()
+                    raise
+                finally:
+                    cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            receipt["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return receipt
+
+    def memory_revalidation_stats(self, *, run_id: str = "") -> dict:
+        """复验与矛盾的分组统计（验收工具/运维自检；与 `memory_stats` 同一风格）。"""
+        stats = {"validations": 0, "by_outcome": {}, "by_reason": {}, "by_gate": {},
+                 "verified": 0, "promoted": 0, "contradictions": 0, "by_resolution": {},
+                 "by_reason_code": {}, "by_status_action": {}, "memory_status": {}, "error": ""}
+        try:
+            self.ensure_schema()
+            where, params = "", []
+            if run_id:
+                where = " WHERE run_id=?"
+                params.append(str(run_id))
+            with self.database.lock:
+                cursor = self.database.connection.cursor()
+                for column, target in (("outcome", "by_outcome"), ("reason", "by_reason"),
+                                       ("gate_decision", "by_gate")):
+                    for row in cursor.execute(
+                            "SELECT %s AS k, count(*) AS n FROM memory_validation%s GROUP BY 1"
+                            % (column, where), tuple(params)).fetchall():
+                        value = _row_dict(row) or {}
+                        stats[target][str(value.get("k") or "")] = int(value.get("n") or 0)
+                stats["validations"] = sum(stats["by_outcome"].values())
+                row = cursor.execute(
+                    "SELECT coalesce(sum(verified),0), coalesce(sum(promoted),0) "
+                    "FROM memory_validation" + where, tuple(params)).fetchone()
+                value = _row_dict(row) or {}
+                stats["verified"] = int(list(value.values())[0] or 0) if value else 0
+                stats["promoted"] = int(list(value.values())[1] or 0) if value else 0
+                cwhere, cparams = "", []
+                if run_id:
+                    cwhere = " WHERE run_id=?"
+                    cparams.append(str(run_id))
+                for column, target in (("resolution", "by_resolution"),
+                                       ("reason_code", "by_reason_code"),
+                                       ("status_action", "by_status_action")):
+                    for row in cursor.execute(
+                            "SELECT %s AS k, count(*) AS n FROM memory_contradiction%s GROUP BY 1"
+                            % (column, cwhere), tuple(cparams)).fetchall():
+                        value = _row_dict(row) or {}
+                        stats[target][str(value.get("k") or "")] = int(value.get("n") or 0)
+                stats["contradictions"] = sum(stats["by_resolution"].values())
+                for row in cursor.execute(
+                        "SELECT status AS k, count(*) AS n FROM memory_item GROUP BY 1").fetchall():
+                    value = _row_dict(row) or {}
+                    stats["memory_status"][str(value.get("k") or "")] = int(value.get("n") or 0)
+                cursor.close()
+        except Exception as exc:  # noqa: BLE001
+            stats["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:120])
+        return stats
 
 
 __all__ = ["QaStore"]

@@ -113,16 +113,23 @@ class FrozenContractTests(unittest.TestCase):
             ok, note = contracts.validate(name, payload)
             self.assertTrue(ok, "%s: %s" % (name, note))
 
-    def test_schema_version_is_v8_with_zero_added_columns(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v8")
+    def test_schema_version_is_v9_with_zero_added_columns(self):
+        # Phase 09 钉死的是"八张表 + 零 ADD COLUMN"；Phase 10（D-037）在 v9 里补了
+        # §12 的最后两张表（memory_validation / memory_contradiction），因此本条的
+        # 字面量随跨阶段契约变更为 v9，但**强度不变**：仍是等值断言 + 零 ADD COLUMN。
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v9")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V8, ())
+        self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V9, (), "Phase 10 也只许新建表")
         blob = " ".join(qa_schema.QA_TABLE_DDL)
         for table in ("memory_item", "memory_version", "memory_entity_link",
                       "memory_evidence_link", "memory_relation", "memory_recall_log",
                       "memory_write_decision", "memory_usage_stat"):
             self.assertIn("CREATE TABLE IF NOT EXISTS %s " % table, blob)
-        for deferred in ("memory_validation", "memory_contradiction",
-                         "skill_performance_memory", "source_reliability_memory"):
+        # Phase 10 的两张表（D-033 明确留给 P10 的账）现在必须存在
+        for added in ("memory_validation", "memory_contradiction"):
+            self.assertIn("CREATE TABLE IF NOT EXISTS %s " % added, blob)
+        # Phase 12 的两张表仍然不许提前建（本阶段边界的机器校验）
+        for deferred in ("skill_performance_memory", "source_reliability_memory"):
             self.assertNotIn(deferred, blob, "%s 属后续 Phase，本阶段不许建" % deferred)
 
 

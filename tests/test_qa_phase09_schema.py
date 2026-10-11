@@ -44,9 +44,12 @@ def _columns(database, table):
 
 
 class SchemaVersionTests(unittest.TestCase):
-    def test_version_is_v8_and_no_added_columns(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v8")
+    def test_version_is_v9_and_no_added_columns(self):
+        # 本阶段（P09）钉的是"八张表 + 零 ADD COLUMN"；Phase 10（D-037）在 v9 里补了
+        # §12 的最后两张表，所以字面量随跨阶段变更走，但**断言强度不变**（仍是等值断言）。
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v9")
         self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V8, (), "v8 只允许新建表，不许 ADD COLUMN")
+        self.assertEqual(qa_schema.QA_ADDED_COLUMNS_V9, (), "v9 同样只允许新建表")
         self.assertEqual(len(qa_schema.QA_ADDED_COLUMNS_V6), 15, "Phase 01 的列清单不许被动过")
 
     def test_required_tables_include_the_eight_memory_tables(self):

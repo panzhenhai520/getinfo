@@ -55,12 +55,12 @@
 |P09-04|Recall API| PASS | 召回六项打分；**每条命中恒为 MEMORY_HINT**（hint=True、requires_revalidation=True、verified_evidence=False）；非 ACTIVE 不进命中；作用域隔离；召回留痕且 recall_count 与 reuse_count 分开计；21 例 | 2026-10-11 |
 |P09-05|lifecycle| PASS | 确定性衰减（半衰期按七档乘置信乘证据乘复用，纯函数）加状态机（只自动产 ACTIVE/STALE/EXPIRED，其余只尊重）；幂等（同钟第二次 0 迁移）与确定性（两独立库同序列分布逐字相同）；真机 +0/+30/+90/+365 天衰减分布与 STALE/EXPIRED 迁移数已记录；17 例 | 2026-10-11 |
 |P09-06|provenance/vector+graph+relational| PASS | 四通道召回；向量通道只用**库内已有向量**（真机 119 条 1024 维、覆盖被引用 73 篇），查询向量为离线质心、零嵌入端点调用；图通道为有向一跳；provenance 真机 82/82 可回溯且与 Phase 02 seen 指纹逐条同口径（122/122）；污染率全 0；16 例 | 2026-10-11 |
-|P10-01|freshness/TTL|NOT_STARTED|||
-|P10-02|source-version detection|NOT_STARTED|||
-|P10-03|MEMORY_HINT revalidation|NOT_STARTED|||
-|P10-04|MemoryContradiction|NOT_STARTED|||
-|P10-05|SUPERSEDED_BY|NOT_STARTED|||
-|P10-06|revoke/high-risk hook|NOT_STARTED|||
+|P10-01|freshness/TTL| PASS | 新增 qa_memory_revalidation.py：时效闸门是十一条**先判先返回**的规则（唯一真源）——终态 BLOCK、valid_until 过期、EXPIRED、衰减低于过期线、来源版本变、高危、必须复验档、STALE、年龄超阈值、无证据绑定、ALLOW；阈值与档位全部可配；真机 +0/+90 天 {ALLOW 61, REVALIDATE 21}、+365 天全 REVALIDATE 82；31 例 | 2026-10-11 |
+|P10-02|source-version detection| PASS | 来源版本检测两条确定性口径：语料版本（绑定时与本轮对比）与文档版本号（**只认显式版本标记，不把普通日期当版本**）；无可比信息如实记 NO_CORPUS_VERSION 或 NO_VERSION_TOKEN（不猜）；真机 35/35 落 NO_CORPUS_VERSION（快照证据行无该字段，边界如实记）；7 例 | 2026-10-11 |
+|P10-03|MEMORY_HINT revalidation| PASS | 记忆提示复验：判定器**只有 Phase 03** 的核验（判 SUPPORTED 才提升）、候选只用本轮已有证据（**零新增检索**）、七出口；verified_evidence 语义钉死为 verified_scope=evidence_refs（**记忆正文永远不是证据**，MASTER_RULES 11）；真机受检 35 → REVALIDATED 26 / NO_CANDIDATE_EVIDENCE 6 / REFRESHED_NO_CHANGE 3，通过率 0.7429；同钟重放 0 写入；24 例 | 2026-10-11 |
+|P10-04|MemoryContradiction| PASS | 记忆矛盾两族判定；裁决**完全复用 Phase 06 的规则裁决器**（理由码同一张表、decider=rule:qa-contradiction-resolver-v1）；四条前置条件（断言型类型白名单、实体键 Jaccard≥0.5、词面重叠≥0.5、Phase 03 否定极性）；真机断言型记忆 0 条真矛盾（与 qa_conflicts 0 行同口径），能力证据用真机素材构造注入（正例 2、负例控制组 0）；28+6 例 | 2026-10-11 |
+|P10-05|SUPERSEDED_BY| PASS | SUPERSEDED_BY 落成三件套：字段 + 状态 + （M2 到 M1 的）SUPERSEDES 边 + 版本行（不物理覆盖）；链单调（已指向别的后继不改写）、REVOKED 拒绝被取代、后继必须是记忆否则退化为 CONTRADICTED（永不悬空）；规范后继唯一（生效时间最晚，并列取 id 最小）；真机取代链 problems 为空；8 例 | 2026-10-11 |
+|P10-06|revoke/high-risk hook| PASS | 按来源、实体、会话、显式 id 四选择器撤销污染记忆（并集去重）+ REVOKE 版本行 + EXPIRED_BY 边（可追溯）；REVOKED 是终态不可复活；幂等；高危钩子给确定性动作映射，模型判定只留注入点（默认规则、零调用）；真机构造撤销 13 条；13 例 | 2026-10-11 |
 |P11-01|Skill schema/version|NOT_STARTED|||
 |P11-02|Registry|NOT_STARTED|||
 |P11-03|Router|NOT_STARTED|||

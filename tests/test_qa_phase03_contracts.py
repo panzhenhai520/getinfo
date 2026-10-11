@@ -178,8 +178,8 @@ class SchemaVersionGuardTests(unittest.TestCase):
     """库表结构：本阶段**不动**（核验缓存复用既有 qa_retrieval_cache 表）。"""
 
     def test_schema_version_unchanged(self):
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v8",
-                         "阶段 03 自身零库表变更；v8 是 Phase 09 的变更（八张 memory_* 表），本条仍钉死字面量")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v9",
+                         "阶段 03 自身零库表变更；v9 = Phase 09 的八张 memory_* 表 + Phase 10 的两张复验/矛盾表，本条仍钉死字面量")
 
     def test_no_new_table_or_column(self):
         self.assertIn("qa_retrieval_cache", qa_schema.QA_REQUIRED_TABLES)

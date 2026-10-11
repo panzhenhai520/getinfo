@@ -103,7 +103,7 @@ class PersistAndLoadTests(_Base):
         blob = " ".join(qa_schema.QA_TABLE_DDL)
         for marker in ("qa_evidence_graph", "qa_claim_relations", "qa_contradiction"):
             self.assertNotIn(marker, blob, "Phase 06 不许新建表")
-        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v8", "Phase 06 自身零迁移；v8 由 Phase 09 的八张 memory_* 表引入")
+        self.assertEqual(qa_schema.QA_SCHEMA_VERSION, "unified-qa-schema-v9", "Phase 06 自身零迁移；v9 由 Phase 09 的八张 memory_* 表 + Phase 10 的两张复验/矛盾表引入")
 
     def test_load_rebuilds_the_same_graph_shape(self):
         graph = self._graph()

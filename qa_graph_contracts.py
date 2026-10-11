@@ -1566,6 +1566,328 @@ MEMORY_PROVENANCE_REPORT_SCHEMA = {
 回溯不上的必须列进 `untraceable`（不许四舍五入成"都能回溯"）。"""
 
 
+# ── Phase 10（P10-01…P10-06）：Revalidation & Memory Conflict ──────────────────
+# 边界：时效闸门、来源版本检测、MEMORY_HINT 复验、记忆矛盾、取代与污染撤销。
+# 契约设计口径（全部逐字对齐 01_V2_ARCHITECTURE）：
+#   1. §10 的硬规则逐条落成**判定顺序表**："status!=ACTIVE 不作证据"、
+#      "source_version_changed 必须 revalidate"、"freshness_required 必须 revalidate"、
+#      "high_stakes 默认 revalidate" —— 四条都是先判先返回、带理由码；
+#   2. §11 的矛盾口径**完全复用 Phase 06 的规则裁决**（`qa_evidence_graph.resolve()` 与
+#      `CONTRADICTION_RESOLUTION_CODES`）：Phase 10 不另算一套质量判断，只把"记忆"与
+#      "本轮证据"折算成同类可比指标（mass/verified_mass/authority/independence/时间）；
+#   3. §11 "禁止最新自动覆盖"：只有 `NEWER_VERSION_PRECEDES` 才允许 SUPERSEDE，
+#      其余 resolved 只把败方标 `CONTRADICTED`，unresolved 两侧都标 `CONTRADICTED`
+#      （status!=ACTIVE 不作证据 → 冲突未消解的记忆不得再当依据）；
+#   4. §11 防污染："支持按 source/entity/session 撤销污染 Memory" → `MEMORY_REVOKE_REASONS`；
+#   5. MASTER_RULES 11：复验把记忆重新绑上"**本轮** Phase 03 判为 SUPPORTED 的证据"时，
+#      才算"有已验证证据支撑"；记忆**正文本身永远不是证据**（只有证据引用是），
+#      所以复验回执里 `verified_evidence` 的语义被写成 `verified_scope="evidence_refs"`。
+MEMORY_FRESHNESS_GATE_VERSION = "qa-memory-freshness-gate-v1"
+"""P10-01 时效闸门口径版本（判定顺序、阈值、需求档位变更都要换这个号）。"""
+
+MEMORY_SOURCE_VERSION_VERSION = "qa-memory-source-version-v1"
+"""P10-02 来源版本检测口径版本（版本号抽取规则与比较口径变更要换这个号）。"""
+
+MEMORY_REVALIDATION_VERSION = "qa-memory-revalidation-v1"
+"""P10-03 MEMORY_HINT 复验口径版本（复验输入、出口与提升规则变更要换这个号）。"""
+
+MEMORY_CONTRADICTION_VERSION = "qa-memory-contradiction-v1"
+"""P10-04 记忆矛盾口径版本（配对规则与状态动作映射变更要换这个号）。"""
+
+MEMORY_SUPERSESSION_VERSION = "qa-memory-supersession-v1"
+"""P10-05 取代口径版本（`SUPERSEDED_BY` 的落地形态变更要换这个号）。"""
+
+MEMORY_REVOKE_VERSION = "qa-memory-revoke-v1"
+"""P10-06 撤销口径版本（污染选择器与高危钩子变更要换这个号）。"""
+
+MEMORY_FRESHNESS_DECISIONS: Tuple[str, ...] = ("ALLOW", "REVALIDATE", "BLOCK")
+"""§10 Freshness Gate 的三个出口：
+· `ALLOW`：够新、有已核验证据绑定 → 提示可原样用（**仍然是提示，不是证据**）；
+· `REVALIDATE`：必须重新核验（四条硬规则命中其一）；
+· `BLOCK`：连提示都不该用（非 ACTIVE / 衰减低于过期线）。"""
+
+MEMORY_FRESHNESS_REASONS: Tuple[str, ...] = (
+    # BLOCK（两个：终态不许复验 / 衰减已到过期线）
+    "NOT_ACTIVE", "DECAY_BELOW_EXPIRE_FLOOR",
+    # REVALIDATE（§10 的四条硬规则 + 状态与年龄阈值）
+    "VALID_UNTIL_PASSED", "STATUS_EXPIRED", "SOURCE_VERSION_CHANGED", "HIGH_STAKES_DEFAULT",
+    "FRESHNESS_REQUIRED", "STATUS_STALE", "AGE_OVER_REVALIDATE_THRESHOLD",
+    "NO_EVIDENCE_BINDING",
+    # ALLOW
+    "FRESH_AND_VERIFIED",
+)
+"""时效闸门的理由码（每条判定都要带一个，可复算"为什么这条要重新核验"）：
+
+判定顺序**先判先返回**（P10-01 的唯一真源，守卫用例逐条钉死）：
+① `SUPERSEDED`/`CONTRADICTED`/`REVOKED` → BLOCK/`NOT_ACTIVE`（终态，不许复验）；
+② `valid_until` 已过 → REVALIDATE/`VALID_UNTIL_PASSED`；
+③ 状态 `EXPIRED` → REVALIDATE/`STATUS_EXPIRED`（§2.3 写明回退要 Phase 10 的 revalidation）；
+④ 衰减分 < 过期线 → BLOCK/`DECAY_BELOW_EXPIRE_FLOOR`；
+⑤ 来源版本变了 → REVALIDATE/`SOURCE_VERSION_CHANGED`（§10 硬规则）；
+⑥ 高危 → REVALIDATE/`HIGH_STAKES_DEFAULT`（§10 硬规则）；
+⑦ 时效档属于必须复验的档 → REVALIDATE/`FRESHNESS_REQUIRED`（§10 硬规则）；
+⑧ 状态 `STALE` → REVALIDATE/`STATUS_STALE`；
+⑨ 年龄超过"半衰期 × 比例"阈值 → REVALIDATE/`AGE_OVER_REVALIDATE_THRESHOLD`；
+⑩ 没有任何证据绑定 → REVALIDATE/`NO_EVIDENCE_BINDING`；
+⑪ 其余 → ALLOW/`FRESH_AND_VERIFIED`。"""
+
+MEMORY_SOURCE_VERSION_REASONS: Tuple[str, ...] = (
+    "CORPUS_VERSION_CHANGED", "DOCUMENT_VERSION_CHANGED", "SOURCE_VERSION_STABLE",
+    "NO_CORPUS_VERSION", "NO_VERSION_TOKEN",
+)
+"""来源版本检测的理由码：语料版本变了 / 文档版本号变新 / 稳定 / 没有可比信息。"""
+
+MEMORY_REVALIDATION_OUTCOMES: Tuple[str, ...] = (
+    "REVALIDATED", "REFRESHED_NO_CHANGE", "REFUTED", "UNVERIFIED",
+    "NO_CANDIDATE_EVIDENCE", "BLOCKED_BY_GATE", "SKIPPED_NOT_ACTIVE",
+)
+"""P10-03 的七个出口：
+· `REVALIDATED`：本轮证据**规则核验判 SUPPORTED** → 记忆重新绑上已验证证据；
+· `REFRESHED_NO_CHANGE`：闸门判 ALLOW（够新且有绑定）→ 不重跑核验，只刷新时间戳；
+· `REFUTED`：本轮证据判 REFUTED（交给 P10-04 的矛盾裁决）；
+· `UNVERIFIED`：有候选证据但都判不到 SUPPORTED（不许假装验过）；
+· `NO_CANDIDATE_EVIDENCE`：本轮没有可比对的证据 —— **不编检索**（检索是 Phase 04/07 的账）；
+· `BLOCKED_BY_GATE` / `SKIPPED_NOT_ACTIVE`：时效闸门或状态不允许复验。"""
+
+MEMORY_REVALIDATION_REASONS: Tuple[str, ...] = (
+    "EVIDENCE_STILL_SUPPORTS", "FRESHNESS_NOT_DUE", "EVIDENCE_REFUTES",
+    "EVIDENCE_INSUFFICIENT", "NO_EVIDENCE_AVAILABLE", "MEMORY_NOT_ACTIVE",
+    "GATE_BLOCKED", "HIGH_RISK_UNREVALIDATED",
+)
+"""复验理由码（与出口一一对应；`HIGH_RISK_UNREVALIDATED` 是高危钩子的降级理由）。"""
+
+MEMORY_CONTRADICTION_KINDS: Tuple[str, ...] = ("memory_memory", "memory_evidence")
+"""两类记忆矛盾：两条记忆互相冲突；一条记忆被**本轮证据**反驳（§11 的 M1 支持 C / M2 反驳 C）。"""
+
+MEMORY_CONTRADICTION_OUTCOMES: Tuple[str, ...] = ("resolved", "unresolved")
+"""矛盾裁决的两个结果（**逐字沿用 Phase 06** 的 `resolution` 取值域）。"""
+
+MEMORY_CONTRADICTION_STATUS_ACTIONS: Tuple[str, ...] = (
+    "SUPERSEDE", "CONTRADICT", "KEEP_BOTH", "NONE",
+)
+"""矛盾裁决落到状态上的四个动作（§11 禁止"最新自动覆盖"，所以只有时间裁决才 SUPERSEDE）：
+· `SUPERSEDE`：`NEWER_VERSION_PRECEDES` → 旧方 SUPERSEDED + 建取代链；
+· `CONTRADICT`：权威/质量/独立性/强度裁决或未消解 → 败方（未消解则双方）CONTRADICTED；
+· `KEEP_BOTH`：`SCOPE_DIFFERENCE` → 两份都成立，不改状态；
+· `NONE`：不适用（例如对侧不是记忆）。"""
+
+MEMORY_SUPERSESSION_REASONS: Tuple[str, ...] = (
+    "NEWER_VERSION_PRECEDES", "SOURCE_VERSION_CHANGED", "MANUAL_SUPERSEDE",
+)
+"""取代理由码：时间裁决胜出 / 来源版本变新 / 人工指定。"""
+
+MEMORY_REVOKE_REASONS: Tuple[str, ...] = (
+    "SOURCE_CONTAMINATED", "ENTITY_CONTAMINATED", "SESSION_CONTAMINATED",
+    "EXTERNAL_INSTRUCTION_CONTAMINATION", "SENSITIVE_CONTENT", "MANUAL_REVOKE",
+)
+"""§11 防污染的撤销理由码（按 source/entity/session 撤销 + 指令注入/敏感内容 + 人工）。"""
+
+MEMORY_CONTRADICTION_RESOLUTION_CODES: Tuple[str, ...] = CONTRADICTION_RESOLUTION_CODES
+"""Phase 10 的矛盾理由码 = **Phase 06 的同一张表**（单一真源，不另立一套质量判断）。"""
+
+MEMORY_REVALIDATION_TRANSITIONS = {
+    # 复验成功：把被衰减压下去的记忆放回可用（§2.3；P09 契约里写明"回退要 Phase 10 的 revalidation"）
+    ("STALE", "ACTIVE"): "REVALIDATED_WITH_FRESH_EVIDENCE",
+    ("EXPIRED", "ACTIVE"): "REVALIDATED_WITH_FRESH_EVIDENCE",
+    # 复验不成立但仍是提示：状态不动
+    ("ACTIVE", "ACTIVE"): "NO_CHANGE",
+    ("STALE", "STALE"): "NO_CHANGE",
+    ("EXPIRED", "EXPIRED"): "NO_CHANGE",
+    ("SUPERSEDED", "SUPERSEDED"): "NO_CHANGE",
+    ("CONTRADICTED", "CONTRADICTED"): "NO_CHANGE",
+    ("REVOKED", "REVOKED"): "NO_CHANGE",
+    # 高危且未复验成功：降级为 STALE（仍是提示、但明确"不该直接采信"）
+    ("ACTIVE", "STALE"): "HIGH_RISK_UNREVALIDATED",
+    # 取代（§11）：只有时间裁决能走到这里
+    ("ACTIVE", "SUPERSEDED"): "SUPERSEDED_BY_NEWER",
+    ("STALE", "SUPERSEDED"): "SUPERSEDED_BY_NEWER",
+    # 矛盾：败方 / 未消解双方
+    ("ACTIVE", "CONTRADICTED"): "CONTRADICTED_BY_CONFLICT",
+    ("STALE", "CONTRADICTED"): "CONTRADICTED_BY_CONFLICT",
+    # 污染撤销（终态，不可复活）
+    ("ACTIVE", "REVOKED"): "REVOKED_BY_POLLUTION",
+    ("STALE", "REVOKED"): "REVOKED_BY_POLLUTION",
+    ("SUPERSEDED", "REVOKED"): "REVOKED_BY_POLLUTION",
+    ("CONTRADICTED", "REVOKED"): "REVOKED_BY_POLLUTION",
+    ("EXPIRED", "REVOKED"): "REVOKED_BY_POLLUTION",
+}
+"""Phase 10 **允许自动发生的状态迁移**（值 = 理由码）。
+
+与 P09 的 `MEMORY_LIFECYCLE_TRANSITIONS` 分开维护：那张表是"衰减能自动做什么"，
+这张表是"复验/矛盾/取代/撤销能自动做什么"。**REVOKED 是终态**：本表里没有任何
+`REVOKED → *` 的迁移（撤销不可复活，MASTER_RULES 11/12 的防污染口径）。"""
+
+MEMORY_FRESHNESS_DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "gate_version": {"type": "string"},
+        "memory_id": {"type": "string"},
+        "decision": {"type": "string", "enum": list(MEMORY_FRESHNESS_DECISIONS)},
+        "reason": {"type": "string", "enum": list(MEMORY_FRESHNESS_REASONS)},
+        "freshness_class": {"type": "string", "enum": list(MEMORY_FRESHNESS_CLASSES) + [""]},
+        "status": {"type": "string", "enum": list(MEMORY_STATUSES) + [""]},
+        "age_days": {"type": "number"},
+        "half_life_days": {"type": "number"},
+        "decay_score": {"type": "number"},
+        "valid_until": {"type": "string"},
+        "high_stakes": {"type": "boolean"},
+        "source_version_changed": {"type": "boolean"},
+        "thresholds": {"type": "object"},
+        "detail": {"type": "string"},
+    },
+    "required": ["gate_version", "memory_id", "decision", "reason"],
+    "additionalProperties": True,
+}
+"""时效闸门判定（P10-01）：每条记忆一条，理由码 + 参与判定的数字全部落下来。"""
+
+MEMORY_SOURCE_VERSION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "source_version_check": {"type": "string"},
+        "memory_id": {"type": "string"},
+        "changed": {"type": "boolean"},
+        "reasons": {"type": "array",
+                    "items": {"type": "string", "enum": list(MEMORY_SOURCE_VERSION_REASONS)}},
+        "corpus_version_current": {"type": "string"},
+        "link_corpus_versions": {"type": "array", "items": {"type": "string"}},
+        "version_tokens_memory": {"type": "array", "items": {"type": "string"}},
+        "version_tokens_current": {"type": "array", "items": {"type": "string"}},
+        "detail": {"type": "string"},
+    },
+    "required": ["source_version_check", "memory_id", "changed", "reasons"],
+    "additionalProperties": True,
+}
+"""来源版本检测（P10-02）：语料版本 + 文档版本号两条确定性口径，理由码可复算。"""
+
+MEMORY_REVALIDATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "validation_id": {"type": "string"},
+        "revalidation_version": {"type": "string"},
+        "memory_id": {"type": "string"},
+        "memory_type": {"type": "string", "enum": list(MEMORY_TYPES) + [""]},
+        "run_id": {"type": "string"},
+        "trace_id": {"type": "string"},
+        "outcome": {"type": "string", "enum": list(MEMORY_REVALIDATION_OUTCOMES)},
+        "reason": {"type": "string", "enum": list(MEMORY_REVALIDATION_REASONS)},
+        "status_before": {"type": "string", "enum": list(MEMORY_STATUSES) + [""]},
+        "status_after": {"type": "string", "enum": list(MEMORY_STATUSES) + [""]},
+        "freshness": {"type": "object"},
+        "source_version": {"type": "object"},
+        "evidence_refs": {"type": "array", "items": {"type": "string"}},
+        "verdicts": {"type": "object"},
+        "verified_evidence": {"type": "boolean"},
+        "verified_scope": {"type": "string"},
+        "promoted": {"type": "boolean"},
+        "high_stakes": {"type": "boolean"},
+        "judge": {"type": "string"},
+        "candidates": {"type": "integer", "minimum": 0},
+        "detail": {"type": "string"},
+    },
+    "required": ["validation_id", "revalidation_version", "memory_id", "outcome", "reason",
+                 "verified_evidence", "verified_scope"],
+    "additionalProperties": True,
+}
+"""复验回执（P10-03）：出口/理由码/证据引用/核验 verdict 分布全部落库，可逐条复算。
+
+`verified_evidence=True` 的语义被 `verified_scope` 钉死为 `evidence_refs`：
+**可作证据的是被重新核验的那些证据引用，记忆正文本身不是证据**（MASTER_RULES 11）。"""
+
+MEMORY_CONTRADICTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "contradiction_id": {"type": "string"},
+        "contradiction_version": {"type": "string"},
+        "kind": {"type": "string", "enum": list(MEMORY_CONTRADICTION_KINDS)},
+        "conflict_type": {"type": "string"},
+        "left_memory_id": {"type": "string"},
+        "right_memory_id": {"type": "string"},
+        "right_evidence_ref": {"type": "string"},
+        "resolution": {"type": "string", "enum": list(MEMORY_CONTRADICTION_OUTCOMES)},
+        "reason_code": {"type": "string", "enum": list(CONTRADICTION_RESOLUTION_CODES)},
+        "decider": {"type": "string"},
+        "rationale": {"type": "string"},
+        "status_action": {"type": "string", "enum": list(MEMORY_CONTRADICTION_STATUS_ACTIONS)},
+        "status_actions": {"type": "array", "items": {"type": "object"}},
+        "left": {"type": "object"},
+        "right": {"type": "object"},
+        "run_id": {"type": "string"},
+    },
+    "required": ["contradiction_id", "contradiction_version", "kind", "left_memory_id",
+                 "resolution", "reason_code", "status_action"],
+    "additionalProperties": True,
+}
+"""记忆矛盾（P10-04）：`resolution`/`reason_code` 直接来自 Phase 06 的裁决器（单一真源）。"""
+
+MEMORY_SUPERSESSION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "supersession_id": {"type": "string"},
+        "supersession_version": {"type": "string"},
+        "memory_id": {"type": "string"},
+        "superseded_by": {"type": "string"},
+        "relation": {"type": "string", "enum": list(MEMORY_RELATIONS)},
+        "reason": {"type": "string", "enum": list(MEMORY_SUPERSESSION_REASONS)},
+        "from_status": {"type": "string", "enum": list(MEMORY_STATUSES) + [""]},
+        "run_id": {"type": "string"},
+        "rationale": {"type": "string"},
+    },
+    "required": ["supersession_id", "supersession_version", "memory_id", "superseded_by",
+                 "relation", "reason"],
+    "additionalProperties": True,
+}
+"""取代（P10-05）：§11 的 `M1--SUPERSEDED_BY→M2` 在本仓库的落地形态 ——
+`memory_item.superseded_by` 字段 + 一条方向相反的 `SUPERSEDES` 关系边（M2 → M1）；
+关系枚举是冻结的九个取值，**不新增** `SUPERSEDED_BY` 这个边名。"""
+
+MEMORY_REVOKE_RECEIPT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "revoke_version": {"type": "string"},
+        "reason": {"type": "string", "enum": list(MEMORY_REVOKE_REASONS)},
+        "selector": {"type": "object"},
+        "checked": {"type": "integer", "minimum": 0},
+        "revoked": {"type": "array", "items": {"type": "object"}},
+        "skipped": {"type": "array", "items": {"type": "object"}},
+        "status_counts": {"type": "object"},
+        "already_revoked": {"type": "integer", "minimum": 0},
+        "run_id": {"type": "string"},
+        "high_risk": {"type": "object"},
+        "note": {"type": "string"},
+    },
+    "required": ["revoke_version", "reason", "checked", "revoked"],
+    "additionalProperties": True,
+}
+"""污染撤销回执（P10-06）：逐条列出被撤销/被跳过的记忆（不许四舍五入成"撤销过了"）。"""
+
+MEMORY_REVALIDATION_REPORT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "revalidation_version": {"type": "string"},
+        "gate_version": {"type": "string"},
+        "source_version_check": {"type": "string"},
+        "contradiction_version": {"type": "string"},
+        "checked": {"type": "integer", "minimum": 0},
+        "gate_decisions": {"type": "object"},
+        "gate_reasons": {"type": "object"},
+        "outcomes": {"type": "object"},
+        "reasons": {"type": "object"},
+        "source_version": {"type": "object"},
+        "revalidated": {"type": "integer", "minimum": 0},
+        "promoted": {"type": "integer", "minimum": 0},
+        "contradictions": {"type": "object"},
+        "supersessions": {"type": "integer", "minimum": 0},
+        "revocations": {"type": "integer", "minimum": 0},
+        "high_risk": {"type": "object"},
+        "idempotent": {"type": "boolean"},
+        "note": {"type": "string"},
+    },
+    "required": ["revalidation_version", "checked", "gate_decisions", "outcomes"],
+    "additionalProperties": True,
+}
+"""Phase 10 总回执（真跑分布的证据口径）：闸门判定、复验出口、矛盾裁决、取代与撤销计数。"""
+
+
 def describe() -> str:
     """给验收脚本/日志用的一行摘要（不参与业务逻辑）。"""
     return ("图谱契约 %s / 证据层 %s / 检索舰队 %s / 执行图 %s / 证据图 %s / 缺口分析 %s："
@@ -1573,7 +1895,8 @@ def describe() -> str:
             "检索通道 %d / 失败策略 %d / 停止原因 %d / 证据状态 %d / Hunter %d / "
             "问题意图 %d / 执行节点类型 %d / 证据图节点类型 %d / 证据图关系 %d / 裁决理由码 %d / "
             "缺口类型 %d / 优先级分档 %d / Context 段 %d / ContextItem 种类 %d / Context Gap 动作 %d / "
-            "记忆类型 %d / 记忆状态 %d / 记忆关系 %d"
+            "记忆类型 %d / 记忆状态 %d / 记忆关系 %d / "
+            "时效闸门出口 %d / 复验出口 %d / 记忆矛盾种类 %d / 撤销理由 %d"
             % (GRAPH_CONTRACT_VERSION, EVIDENCE_LAYER_VERSION, HUNTER_CONTRACT_VERSION,
                EXECUTION_GRAPH_VERSION, EVIDENCE_GRAPH_VERSION, GAP_ANALYZER_VERSION,
                len(KG_NODE_TYPES), len(KG_RELATION_KINDS),
@@ -1584,7 +1907,9 @@ def describe() -> str:
                len(CONTRADICTION_RESOLUTION_CODES),
                len(QA_GAP_TYPES), len(GAP_PRIORITY_BANDS),
                len(CONTEXT_SECTIONS), len(CONTEXT_ITEM_KINDS), len(CONTEXT_GAP_ACTIONS),
-               len(MEMORY_TYPES), len(MEMORY_STATUSES), len(MEMORY_RELATIONS)))
+               len(MEMORY_TYPES), len(MEMORY_STATUSES), len(MEMORY_RELATIONS),
+               len(MEMORY_FRESHNESS_DECISIONS), len(MEMORY_REVALIDATION_OUTCOMES),
+               len(MEMORY_CONTRADICTION_KINDS), len(MEMORY_REVOKE_REASONS)))
 
 
 def _check_node(schema: dict, payload: Mapping, path: str) -> str:
@@ -1670,6 +1995,14 @@ def validate(schema_name: str, payload: dict) -> Tuple[bool, str]:
         "memory_recall_receipt": MEMORY_RECALL_RECEIPT_SCHEMA,
         "memory_lifecycle_report": MEMORY_LIFECYCLE_REPORT_SCHEMA,
         "memory_provenance_report": MEMORY_PROVENANCE_REPORT_SCHEMA,
+        # Phase 10（P10-01…P10-06）
+        "memory_freshness_decision": MEMORY_FRESHNESS_DECISION_SCHEMA,
+        "memory_source_version": MEMORY_SOURCE_VERSION_SCHEMA,
+        "memory_revalidation": MEMORY_REVALIDATION_SCHEMA,
+        "memory_contradiction": MEMORY_CONTRADICTION_SCHEMA,
+        "memory_supersession": MEMORY_SUPERSESSION_SCHEMA,
+        "memory_revoke_receipt": MEMORY_REVOKE_RECEIPT_SCHEMA,
+        "memory_revalidation_report": MEMORY_REVALIDATION_REPORT_SCHEMA,
     }
     schema = schemas.get(str(schema_name))
     if not schema:

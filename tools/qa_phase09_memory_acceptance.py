@@ -58,6 +58,62 @@ FALLBACK_SNAPSHOT = os.path.join("baseline", "qa-context-real-sample.json")
 DEFAULT_OUTPUT = os.path.join("baseline", "qa-memory-acceptance.json")
 DECAY_DAYS = (0, 30, 90, 365)
 
+FALLBACK_BASELINE_CLOCK = datetime(2026, 10, 11, tzinfo=timezone.utc)
+"""离线重建的**兜底基准时刻**（快照里没有 `captured_at_utc` 时用它）。
+
+写死成一个常量而不是"现在"：验收产物必须逐字可复现，任何一处读墙上时钟都会让
+"同一天绿、跨天红"（Phase 10 的 D-038 记录了这个缺陷与修复）。"""
+
+BASELINE_CLOCK_ENV = "QA_P09_BASELINE_CLOCK"
+FAKE_NOW_ENV = "QA_P09_FAKE_NOW"
+"""两个**只在验收/守门用例里用**的时钟注入点：
+`QA_P09_BASELINE_CLOCK` 覆盖"基准时刻"（快照抓取时刻的替身），
+`QA_P09_FAKE_NOW` 覆盖进程看到的"墙上时钟"——守门用例用两个不同的假"现在"各跑一遍，
+产物必须逐字相同（若有人把时钟改回墙上时间，产物就会跟着"现在"漂，用例变红）。"""
+
+_baseline_clock: datetime | None = None
+
+
+def _wall_clock() -> datetime:
+    """进程**看到的**"现在"：只给"确实需要当前时间"的地方用（本工具里应当一处都没有）。
+
+    守门用例通过 `QA_P09_FAKE_NOW` 注入两个不同的假"现在"来证明产物与它无关。
+    """
+    return _parse_time(os.environ.get(FAKE_NOW_ENV, "")) or datetime.now(timezone.utc)
+
+
+def set_baseline_clock(value) -> dict:
+    """钉死离线重建的基准时刻（**默认 = 快照抓取时刻**，见 `_graph_for` 的理由）。
+
+    优先级（写清楚是为了让"产物跟谁对齐"没有歧义）：
+      ① `QA_P09_BASELINE_CLOCK`（显式覆盖，守门用例的控制组用它证明基准时刻真的进了数字）；
+      ② 调用方传入的快照抓取时刻（正常路径）；
+      ③ `FALLBACK_BASELINE_CLOCK` 常量（快照缺 `captured_at_utc` 时）。
+    **任何情况下都不使用墙上时钟**。
+    """
+    global _baseline_clock
+    env_value = _parse_time(os.environ.get(BASELINE_CLOCK_ENV, ""))
+    passed = value if isinstance(value, datetime) else _parse_time(value)
+    if env_value is not None:
+        moment, source = env_value, BASELINE_CLOCK_ENV
+    elif passed is not None:
+        moment, source = passed, "snapshot.captured_at_utc"
+    else:
+        moment, source = FALLBACK_BASELINE_CLOCK, "fallback_constant"
+    _baseline_clock = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    return {"baseline_clock": _baseline_clock.isoformat(timespec="seconds"),
+            "baseline_clock_source": source,
+            "fallback_constant": FALLBACK_BASELINE_CLOCK.isoformat(timespec="seconds"),
+            "wall_clock_env": FAKE_NOW_ENV,
+            "wall_clock_used": False}
+
+
+def baseline_clock() -> datetime:
+    """当前基准时刻（`_graph_for` 的默认时钟）。"""
+    if _baseline_clock is not None:
+        return _baseline_clock
+    return _parse_time(os.environ.get(BASELINE_CLOCK_ENV, "")) or FALLBACK_BASELINE_CLOCK
+
 
 def _utc_now_z() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -98,7 +154,7 @@ def _fresh_store() -> tuple:
     return database, QaStore(database)
 
 
-def _graph_for(bucket: dict, *, verify: bool = True) -> dict:
+def _graph_for(bucket: dict, *, verify: bool = True, now=None) -> dict:
     """把快照里一个 run 的行还原成证据图（只读既有 payload，口径与 Phase 08 同源）。
 
     真机 run 早于 Phase 02/03 的接线（payload 里没有 `evidence_layer`），所以这里**离线补跑**
@@ -107,7 +163,15 @@ def _graph_for(bucket: dict, *, verify: bool = True) -> dict:
       ② Phase 03 `qa_verifier.verify_evidence_batch()`：按 claim 文本逐条核验出 verdict。
     补跑之后的 verdict 才是写门的输入 —— 写门**不会**因为"真机没有 verdict"而放行
     （MASTER_RULES 11：没有通过核验的证据不写 VerifiedClaimMemory）。
+
+    **时钟一律走 `now or baseline_clock()`（不再读墙上时钟）**：Phase 03 的时效维度按"天"变，
+    用墙上时钟的话同一份快照在不同天算出不同的证据分（进而写门的 confidence 差 5e-5），
+    验收产物就不再逐字可复现 —— `test_committed_report_matches_a_fresh_run` 会在跨天时变红
+    （实测踩到，见 Phase 10 的 D-038）。基准时刻的选择：**快照的抓取时刻**
+    （`snapshot.captured_at_utc`；由 `build_report` 通过 `set_baseline_clock()` 钉住），
+    理由是"这份快照代表那一时刻的真实数据"，用它当基准才能让产物与快照一一对应。
     """
+    moment = now if isinstance(now, datetime) else (now or baseline_clock())
     claims = [item for item in (_claim_graph_row(row) for row in bucket.get("claims") or [])
               if item]
     evidence, by_ref = [], {}
@@ -117,7 +181,8 @@ def _graph_for(bucket: dict, *, verify: bool = True) -> dict:
             continue
         annotated = qa_evidence.annotate_evidence(
             item, run_id=str(row.get("run_id") or ""), stage="level1_retrieval",
-            corpus_version=str((bucket.get("run") or {}).get("corpus_version") or ""))
+            corpus_version=str((bucket.get("run") or {}).get("corpus_version") or ""),
+            retrieved_at=moment.isoformat(timespec="seconds"))
         evidence.append(annotated)
         by_ref[str(annotated.get("evidence_ref") or "")] = annotated
     seen, edges = set(), []
@@ -140,7 +205,7 @@ def _graph_for(bucket: dict, *, verify: bool = True) -> dict:
             items = [dict(by_ref[ref]) for ref in refs]
             reviewed, _audit = verify_evidence_batch(
                 items, claim_text=str(claim.get("text") or ""),
-                terms=term_set(str(claim.get("text") or "")), gate="off")
+                terms=term_set(str(claim.get("text") or "")), gate="off", now=moment)
             for item in reviewed:
                 ref = str(item.get("evidence_ref") or "")
                 by_ref[ref] = item
@@ -308,7 +373,8 @@ def _recall_phase(buckets: list, *, seed: bool, now=None, vectors=None) -> dict:
 def _lifecycle_phase(buckets: list, *, captured_at: str, now=None) -> dict:
     """衰减分布：写完之后在 +0/+30/+90/+365 天各跑一次 lifecycle，并验证幂等。"""
     database, store = _fresh_store()
-    base = _parse_time(captured_at) or datetime.now(timezone.utc)
+    # 基准时刻优先取快照抓取时刻，缺失时退到**钉死的常量**（不读墙上时钟，见 `_graph_for`）
+    base = _parse_time(captured_at) or baseline_clock()
     out = {"base": base.isoformat(timespec="seconds"), "at_days": {}, "idempotent": None,
            "deterministic": None}
     try:
@@ -552,7 +618,9 @@ def build_report(snapshot: dict, *, snapshot_path: str = "") -> dict:
     buckets = sorted(_rows_by_run(snapshot).items())
     pairs = [(bucket.get("run") or {}, bucket) for _run_id, bucket in buckets
              if (bucket.get("run") or {}).get("id")]
-    frozen_now = _parse_time(snapshot.get("captured_at_utc")) or datetime.now(timezone.utc)
+    # 基准时刻 = 快照抓取时刻（写进产物，便于复核）；缺失时退到常量，**绝不退到"现在"**
+    clock = set_baseline_clock(snapshot.get("captured_at_utc"))
+    frozen_now = baseline_clock()
     write = _write_phase(pairs, now=frozen_now)
     write_receipt = {key: write[key] for key in (
         "runs", "candidates", "persisted", "merged", "session_only", "dropped",
@@ -640,6 +708,8 @@ def build_report(snapshot: dict, *, snapshot_path: str = "") -> dict:
     return {
         "report_version": REPORT_VERSION,
         "generated_at_utc": _utc_now_z(),
+        # 离线重建的基准时刻（快照抓取时刻）：产物必须与它一一对应、与"现在几点"无关
+        "clock": clock,
         "snapshot": {
             "path": snapshot_path,
             "captured_at_utc": snapshot.get("captured_at_utc"),

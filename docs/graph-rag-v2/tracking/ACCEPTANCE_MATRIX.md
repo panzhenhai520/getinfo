@@ -232,3 +232,9 @@
 |P09-06|provenance 与四通道|`python -m pytest tests/test_qa_phase09_provenance.py -q`|每条记忆可回溯到证据、与 seen 指纹同口径|**16 passed**；真机 82/82 可回溯、与 Phase 02 seen 指纹 122/122 同口径；污染率全 0；向量只用库内已有（119 条）|PASS|同上|
 |P09-R1|Phase 08 memory_context 接线|`python -m pytest tests/test_qa_phase08_context.py tests/test_qa_phase09_pipeline.py -q`|填段并写 implemented_by、不再写 deferred_to|Phase 08 新增 2 例、**原断言一条未放松**；管线新增兄弟键且默认关（关掉时键集与写库行数逐字不变）|PASS|`qa_context_pack.py:1170-1360`；`qa_pipeline.py:779-845`|
 |P09-R2|跨阶段契约变更（v7→v8）|`python -m pytest tests/test_qa_phase09_contracts.py -q`|版本字面量同步但断言未放宽、指纹不变|**13 passed**；9 处版本断言同步为 v8 且仍为等值断言；七契约指纹复算不变|PASS|同上|
+|P10-01/02|时效闸门与来源版本|`python -m pytest tests/test_qa_phase10_freshness.py -q`|十一条规则顺序可复算、阈值可配、缺信息不猜|**31 passed**；真机 +0/+90 {ALLOW 61 / REVALIDATE 21}、+365 全 REVALIDATE 82；35/35 落 NO_CORPUS_VERSION|PASS|`qa_memory_revalidation.py`|
+|P10-03|记忆提示复验|`python -m pytest tests/test_qa_phase10_revalidation.py -q`|只有 SUPPORTED 才提升、零新增检索、七出口、幂等|**24 passed**；真机命中 35 → 26 条 REVALIDATED（通过率 0.7429），同钟重放 0 写入|PASS|`baseline/qa-memory-revalidation-acceptance.json`|
+|P10-04|记忆矛盾判定|`python -m pytest tests/test_qa_phase10_contradiction.py tests/test_qa_phase10_canonical_successor.py -q`|理由码与 Phase 06 同表、两类假矛盾有负例守住|**34 passed**；真机 0 条真矛盾加构造注入正例 2 / 负例 0|PASS|同上|
+|P10-05/06|取代与撤销|`python -m pytest tests/test_qa_phase10_revoke.py -q`|字段加边加版本行三件套、链单调、终态不可复活|**13 passed**；真机取代链 problems 为空；构造撤销 13 条；四选择器并集去重|PASS|同上|
+|P10-R1|P09 验收工具时钟修复|`python -m pytest tests/test_qa_phase09_acceptance_clock.py -q`|产物可复现：两个不同假现在产出逐字相同|**5 passed**；变异性证明——把时钟改回墙上时间后守门用例立刻变红（3!=2 与 1 failed）；刷新后的基线与原基线数字一致（0.218473）|PASS|`tools/qa_phase09_memory_acceptance.py`|
+|P10-R2|冻结契约与基线|`python -m pytest tests/test_qa_phase10_contracts.py -q`|七指纹不变、版本断言同步不放宽|**17 passed**；全量 2725 passed / 1 skipped / 0 failed（Phase 09 基线 2573+1 未破）；11 处版本断言同步为 v9 且仍为等值断言|PASS|同上|

@@ -1504,18 +1504,37 @@ def memory_context_items(receipt: Mapping, *, max_items: int = 6) -> list:
     for hit in hits[:max(1, int(max_items))]:
         refs = list(hit.get("evidence_refs") or [])
         grounded = bool(refs)
-        text = "%s%s（%s，时效档 %s，召回分 %.3f；用前必须重新核验）" % (
-            MEMORY_HINT_MARK, hit.get("canonical_content"), hit.get("memory_type"),
-            hit.get("freshness_class"), float(hit.get("score") or 0))
+        # 阶段 10（P10-03）：命中若已被**本轮复验**改写（requires_revalidation=False、
+        # verified_evidence=True 且带 verified_scope="evidence_refs"），条目要如实反映；
+        # 否则逐字保持 P09 的 MEMORY_HINT 口径（默认路径行为不变）。
+        requires_revalidation = bool(hit.get("requires_revalidation", True))
+        verified_evidence = bool(hit.get("verified_evidence", False)) and requires_revalidation is False
+        mark = MEMORY_HINT_MARK if requires_revalidation else MEMORY_REVALIDATED_MARK
+        tail = ("用前必须重新核验" if requires_revalidation
+                else "本轮已复验（可作证据的是其证据引用，记忆正文仍不是证据）")
+        text = "%s%s（%s，时效档 %s，召回分 %.3f；%s）" % (
+            mark, hit.get("canonical_content"), hit.get("memory_type"),
+            hit.get("freshness_class"), float(hit.get("score") or 0), tail)
+        reason = None
+        if requires_revalidation:
+            reason = ("记忆提示：可回溯到证据引用，但**未经本轮核验**（Phase 10 才做 revalidation）"
+                      if grounded else "记忆提示：该记忆链不到证据引用（不可当证据）")
+        elif verified_evidence:
+            reason = ("本轮复验：Phase 03 对当前证据重新判为 SUPPORTED，已重新绑定证据引用；"
+                      "可作证据的是这些引用，记忆正文仍不是证据")
+        elif grounded:
+            reason = "本轮已过时效闸门，但复验没有重新绑定到 SUPPORTED 证据（仍不可当证据）"
         items.append(make_context_item(
             kind="memory", section="memory_context", text=text, source_stage="memory_graph",
             evidence_ref=str(refs[0]) if refs else "",
             grounding={
                 "grounded": grounded, "hint": True,
-                "requires_revalidation": True, "verified_evidence": False,
+                "requires_revalidation": requires_revalidation,
+                "verified_evidence": verified_evidence,
+                "verified_scope": str(hit.get("verified_scope") or "") if verified_evidence else "",
+                "revalidation": dict(hit.get("revalidation") or {}),
                 "memory_id": str(hit.get("memory_id") or ""),
-                "reason": ("记忆提示：可回溯到证据引用，但**未经本轮核验**（Phase 10 才做 revalidation）"
-                           if grounded else "记忆提示：该记忆链不到证据引用（不可当证据）"),
+                "reason": reason or "",
             },
             metadata={"role": "memory_hint", "memory_id": str(hit.get("memory_id") or ""),
                       "memory_type": str(hit.get("memory_type") or ""),
@@ -1524,13 +1543,21 @@ def memory_context_items(receipt: Mapping, *, max_items: int = 6) -> list:
                       "hint_version": str(hit.get("hint_version") or ""),
                       "channels": list(hit.get("channels") or []),
                       "evidence_refs": refs,
-                      "requires_revalidation": True},
+                      "requires_revalidation": requires_revalidation,
+                      "verified_scope": (str(hit.get("verified_scope") or "")
+                                         if verified_evidence else "")},
         ))
     return items
 
 
 MEMORY_HINT_MARK = "【记忆提示·未重新核验】"
 """上下文与提示里统一使用的记忆标记（生成端据此知道"这条不是证据"）。"""
+
+MEMORY_REVALIDATED_MARK = "【记忆·本轮已复验】"
+"""Phase 10（P10-03）复验成功后的标记：**本轮**已重新绑上 Phase 03 判 SUPPORTED 的证据引用。
+
+它不是"已验证记忆"这种资格：可作证据的仍然是那些证据引用，记忆正文本身永远不是证据
+（MASTER_RULES 11）；标记只是让生成端知道"这条不必再按未核验提示处理"。"""
 
 
 # ── P09-05：lifecycle（§2.3 六状态 + 确定性衰减/失效）────────────────────────
@@ -1857,6 +1884,7 @@ def write_memories_from_graph(store, *, graph: Mapping, run_meta: Mapping, trace
 __all__ = [
     "DEFAULT_RECALL_LIMIT", "DEFAULT_RECALL_MIN_SCORE", "DEFAULT_WRITE_MIN_UTILITY",
     "EXPIRE_FLOOR", "GRAPH_EXPANSION_WEIGHT", "HALF_LIFE_DAYS", "MEMORY_HINT_MARK",
+    "MEMORY_REVALIDATED_MARK",
     "REUSE_BASE", "STABILITY_BASE", "STALE_FLOOR", "STALENESS_BASE", "TTL_DAYS",
     "apply_lifecycle", "apply_write_gate", "build_memory_item", "canonicalize",
     "claim_evidence_rows", "classify_freshness", "content_fingerprint",

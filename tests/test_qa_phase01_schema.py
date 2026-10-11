@@ -68,14 +68,16 @@ def _legacy_v5_ddl(table):
 class Phase01SchemaVersionTests(unittest.TestCase):
     def test_schema_version_is_v7(self):
         """库表结构版本锚点：v5 → v6（Phase 01）→ v7（Phase 02 新增 qa_evidence_seen 表）
-        → **v8**（Phase 09 新增八张 memory_* 表，见 D-033）。
+        → **v8**（Phase 09 新增八张 memory_* 表，见 D-033）→ **v9**（Phase 10 新增
+  memory_validation / memory_contradiction 两张表，见 D-037）。
 
         这里刻意仍然钉死字面量（而不是"大于等于"）：版本号漂移必须当场红。
         Phase 02/09 都只加了**表**、没加列，Phase 01 的升级清单由下面的
         `test_fresh_ddl_and_upgrade_list_agree` 逐条守住；v7 的表/列细节见
-        `tests/test_qa_phase02_seen.py`、v8 的八张记忆表见 `tests/test_qa_phase09_schema.py`。
+        `tests/test_qa_phase02_seen.py`、v8 的八张记忆表见 `tests/test_qa_phase09_schema.py`、
+v9 的两张复验/矛盾表见 `tests/test_qa_phase10_schema.py`。
         """
-        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v8")
+        self.assertEqual(QA_SCHEMA_VERSION, "unified-qa-schema-v9")
 
     def test_fresh_ddl_and_upgrade_list_agree(self):
         """新建库路径（建表文本）与老库升级路径（ADD COLUMN 清单）必须逐字一致。

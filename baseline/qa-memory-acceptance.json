@@ -1,6 +1,13 @@
 {
  "report_version": "qa-memory-acceptance-v1",
- "generated_at_utc": "2026-10-10T22:36:32Z",
+ "generated_at_utc": "2026-10-11T00:59:34Z",
+ "clock": {
+  "baseline_clock": "2026-10-10T22:23:32+00:00",
+  "baseline_clock_source": "snapshot.captured_at_utc",
+  "fallback_constant": "2026-10-11T00:00:00+00:00",
+  "wall_clock_env": "QA_P09_FAKE_NOW",
+  "wall_clock_used": false
+ },
  "snapshot": {
   "path": "baseline\\qa-memory-real-sample.json",
   "captured_at_utc": "2026-10-10T22:23:32Z",
