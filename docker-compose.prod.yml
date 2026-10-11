@@ -238,6 +238,9 @@ services:
       QA_GAP_ANALYZER: "1"
       QA_CONTEXT_PACK: "1"
       QA_GROUNDING_GATE: "1"
+      # hunter fleet 调试日志开关（只给 qa-worker；_debug_log 的 gating 变量，默认关，不改任何判定与语义）
+      # 用途：定性「hunter 为什么进第 2 次尝试」——目前判定为未确定（n=2，R1 零重试反证非每轮必发）
+      QA_HUNTER_FLEET_DEBUG: "1"
     volumes:
       - ./data:/app/data
       - ./crawl_results:/app/crawl_results
