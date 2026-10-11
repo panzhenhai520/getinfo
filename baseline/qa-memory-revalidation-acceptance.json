@@ -1,0 +1,4033 @@
+{
+ "report_version": "qa-memory-revalidation-acceptance-v1",
+ "generated_at_utc": "2026-10-11T00:31:02Z",
+ "snapshot": {
+  "path": "baseline\\qa-memory-revalidation-real-sample.json",
+  "captured_at_utc": "2026-10-10T23:16:06Z",
+  "source": {
+   "host": "117.50.211.93",
+   "container": "collectinfo-postgres",
+   "database": "collectinfo",
+   "access": "readonly (BEGIN READ ONLY + statement_timeout=20s + LIMIT)",
+   "query": "qa_runs/qa_claims/qa_claim_evidence/qa_evidence/qa_conflicts/qa_evidence_seen/qa_stage_runs + memory_*（含 Phase 10 的两张表）各一条 SELECT，带 LIMIT；另加两条只读部署态探针",
+   "snapshot_version": "qa-memory-revalidation-real-sample-v1"
+  }
+ },
+ "live_machine": {
+  "captured_at_utc": "2026-10-10T23:16:06Z",
+  "catalog": {
+   "qa_runs": 15,
+   "qa_claims": 129,
+   "qa_claim_evidence": 57,
+   "qa_evidence": 93,
+   "qa_conflicts": 0,
+   "qa_evidence_seen": 0,
+   "qa_stage_runs": 118,
+   "memory_item": 0,
+   "memory_version": 0,
+   "memory_entity_link": 0,
+   "memory_evidence_link": 0,
+   "memory_relation": 0,
+   "memory_recall_log": 0,
+   "memory_write_decision": 0,
+   "memory_usage_stat": 0
+  },
+  "memory_table_rows": {
+   "memory_entity_link": 0,
+   "memory_evidence_link": 0,
+   "memory_item": 0,
+   "memory_recall_log": 0,
+   "memory_relation": 0,
+   "memory_usage_stat": 0,
+   "memory_version": 0,
+   "memory_write_decision": 0
+  },
+  "memory_rows_total": 0,
+  "phase10_tables_present": [],
+  "deployment": {
+   "schema_version": "QA_SCHEMA_VERSION = \"unified-qa-schema-v8\"",
+   "p09_module": "-rw-rw-rw- 1 root root 101823 Oct 11 06:36 /app/qa_memory.py",
+   "p10_module": "ls: cannot access '/app/qa_memory_revalidation.py': No such file or directory",
+   "containers": "collectinfo-web Up 15 minutes (healthy)\ncollectinfo-intel-worker Up 15 minutes (healthy)\ncollectinfo-qa-worker Up 15 minutes (healthy)\ncollectinfo-worker Up 15 minutes\ncollectinfo-postgres Up 3 days (healthy)\ncollectinfo-redis Up 4 weeks (healthy)"
+  },
+  "runs": 15,
+  "claims": 129,
+  "evidence": 93
+ },
+ "rebuild": {
+  "runs": 15,
+  "candidates": 278,
+  "persisted": 203,
+  "merged": 121,
+  "session_only": 0,
+  "dropped": 75,
+  "decision_counts": {
+   "PERSIST": 121,
+   "PERSIST_WITH_TTL": 82,
+   "DROP": 75
+  },
+  "reason_counts": {
+   "DUPLICATE_MERGED": 121,
+   "TTL_REQUIRED_BY_FRESHNESS": 82,
+   "UTILITY_BELOW_FLOOR": 42,
+   "NO_VERIFIED_EVIDENCE": 33
+  },
+  "by_type": {
+   "VERIFIED_CLAIM": 129,
+   "ENTITY": 149
+  },
+  "by_freshness": {
+   "SHORT": 72,
+   "VERSION_SENSITIVE": 15,
+   "MEDIUM": 182,
+   "VERY_SHORT": 9
+  }
+ },
+ "phases": [
+  {
+   "offset_days": 0,
+   "clock": "2026-10-10T23:16:06+00:00",
+   "memories": 82,
+   "status_before": {
+    "ACTIVE": 81,
+    "EXPIRED": 1
+   },
+   "lifecycle": {
+    "checked": 82,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 81,
+     "ACTIVE->EXPIRED/VALID_UNTIL_PASSED": 1
+    },
+    "status_counts": {
+     "ACTIVE": 82
+    },
+    "decay_bands": {
+     "0-0.05": 1,
+     "0.05-0.25": 0,
+     "0.25-0.5": 0,
+     "0.5-0.8": 21,
+     "0.8-1.0": 60
+    }
+   },
+   "gate": {
+    "decisions": {
+     "ALLOW": 61,
+     "REVALIDATE": 21
+    },
+    "reasons": {
+     "ALLOW/FRESH_AND_VERIFIED": 61,
+     "REVALIDATE/HIGH_STAKES_DEFAULT": 15,
+     "REVALIDATE/FRESHNESS_REQUIRED": 5,
+     "REVALIDATE/VALID_UNTIL_PASSED": 1
+    },
+    "high_stakes": 16
+   },
+   "per_run": [
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "REVALIDATED": 4
+     },
+     "gate_decisions": {
+      "REVALIDATE": 4
+     },
+     "revalidated": 4,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "NO_CANDIDATE_EVIDENCE": 2,
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 4
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "48855683e91d48b6b213e8aa8195df50",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "REFRESHED_NO_CHANGE": 2,
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "ALLOW": 2,
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "REVALIDATED": 2,
+      "NO_CANDIDATE_EVIDENCE": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 3
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "NO_CANDIDATE_EVIDENCE": 3,
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 4
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+     "hits": 1,
+     "checked": 1,
+     "outcomes": {
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 1
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 1,
+       "NO_VERSION_TOKEN": 1,
+       "SOURCE_VERSION_STABLE": 1
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "REVALIDATED": 4
+     },
+     "gate_decisions": {
+      "REVALIDATE": 4
+     },
+     "revalidated": 4,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "c3fd469f115d4002bd2824b397425756",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "REVALIDATED": 2,
+      "REFRESHED_NO_CHANGE": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2,
+      "ALLOW": 1
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    }
+   ],
+   "hits": 35,
+   "hints_recalled": 35,
+   "validations": 35,
+   "outcomes": {
+    "REVALIDATED": 26,
+    "NO_CANDIDATE_EVIDENCE": 6,
+    "REFRESHED_NO_CHANGE": 3
+   },
+   "revalidated": 26,
+   "revalidated_ids": [
+    "MEM04032bb832bfda5f79396346",
+    "MEM08299cfafcd062bfdc8814c8",
+    "MEM0909eb19dc8e67dc7c18741f",
+    "MEM0965e4d2a7eb3881687a81d6",
+    "MEM11cb9ec767686687a78cb5ea",
+    "MEM3a4b4c0785ca9450c8712025",
+    "MEM41ab674d715d7f342c7dbbd0",
+    "MEM432ab21eaf1e952a1f372177",
+    "MEM69381cdb0ff614182129c335",
+    "MEM6f05b4fd9bc26dce5b84fb81",
+    "MEM6f4e879865baaf1690abbfe8",
+    "MEM74a71f297f8cdb0329cfc4ea",
+    "MEM8d0a4615f50c15761e2f1c9c",
+    "MEM947372cd6eab2292bf95a55c",
+    "MEMab536a9eed9738ee4d253d99",
+    "MEMb2e5d8d302af1e99e0c0f5d2",
+    "MEMb61a29ab5525726424dee6f9",
+    "MEMcf5b261e4e86d8b74ce7f451",
+    "MEMd01ffc4519999bd168a7304d",
+    "MEMd41ff2fdd58f1f7067e2679c"
+   ],
+   "revalidation_pass_rate": 0.742857,
+   "status_transitions": {
+    "ACTIVE->STALE": 6
+   },
+   "status_after": {
+    "ACTIVE": 75,
+    "STALE": 6,
+    "EXPIRED": 1
+   },
+   "source_version": {
+    "changed": 0,
+    "reasons": {
+     "NO_CORPUS_VERSION": 35,
+     "NO_VERSION_TOKEN": 35,
+     "SOURCE_VERSION_STABLE": 35
+    }
+   },
+   "high_risk": {
+    "high_stakes": 27,
+    "hooked": 6
+   },
+   "contradictions": {
+    "candidates": 0,
+    "by_kind": {},
+    "by_resolution": {},
+    "by_reason_code": {},
+    "by_status_action": {},
+    "supersessions": 0
+   },
+   "supersession_audit": {
+    "chains": 0,
+    "problems": [],
+    "superseded": 0
+   },
+   "replay": {
+    "new_versions": 0,
+    "new_validations": 0,
+    "new_contradictions": 0
+   },
+   "gate_rows": [
+    {
+     "memory_id": "MEM00060e649ddfa71d604e29fe",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM00b0185a4a3f404c14ac3f00",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0313d34f1a43ed04e4fa614d",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM040289935dc75ec015e2fe92",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM04032bb832bfda5f79396346",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.66005,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0490362adad8b28a7a8307d8",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0792a4a30e5759429f715474",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM08299cfafcd062bfdc8814c8",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERY_SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.628,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0909eb19dc8e67dc7c18741f",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.5854,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0965e4d2a7eb3881687a81d6",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.61925,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0c858db8998510df69cbca90",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM0d4ba9868cfa7e4e213d9457",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM11cb9ec767686687a78cb5ea",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.79025,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM1273ca319c1b491bb5b25684",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM2693b01a79abe886761eab2e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM28e0ccca2003228c38d25030",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM295cc43ae4c7818c3658b93e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM2d355fecd8bfd5616b942a7e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM3427538206390efc501d9f55",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM370d192246a4c2138fa7475c",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM3944c80333c8ffe414f87abf",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM3a4b4c0785ca9450c8712025",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.6154,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM3a68c3478f59911cbc63b635",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM41ab674d715d7f342c7dbbd0",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.62805,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM432ab21eaf1e952a1f372177",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.62535,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM435f7f2e0d8fc01f3a4b8d78",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM44ce2f3dd17304a336321e97",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM44ed0ef553af934c41f3db2e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM4911d79ad1dfab920ed39ef6",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM4a477f4881674f0f29bf5b27",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM5102242881ec277e94e15027",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM53d30ca0fee99a78b047e6fc",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM5aedef1ed7356e40c41af9de",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.6217,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM5d9fbf1388b857423f2de282",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM6630c885b18090d1772ae8e9",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM69381cdb0ff614182129c335",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.62695,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM6a02a8e305c0d8ae33680c17",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM6f0425b8835f861d81275680",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM6f05b4fd9bc26dce5b84fb81",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.84025,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM6f4e879865baaf1690abbfe8",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.63565,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM6fab2cfc1e6cbe05c5d1c088",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM74a71f297f8cdb0329cfc4ea",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.61705,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM79ea8398ad79c5714bc1885a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM7b4e6a5f3312afd751f41f45",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM7d194d0fec260583f45a046a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.61515,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM82796e9bdce520eea1c7e203",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM8315b38e57f04c9ac1545258",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM85d6dbfb5f6ab947c32894e7",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.6147,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM8d0a4615f50c15761e2f1c9c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.6963,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM8e03d16184c7881ad65cf9c8",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM947372cd6eab2292bf95a55c",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.62355,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM9b975f1018f8e2502d9fc80b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM9d279e01e80287367cd4d689",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM9d4ddeb5ff8d37f60fb962ea",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEM9d915cfc55a3188446202ca4",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMa24a8562f4fad3a54219ed65",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMab536a9eed9738ee4d253d99",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.65485,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMb2b45d6ce27ac2b14743c375",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMb2e5d8d302af1e99e0c0f5d2",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.79025,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMb61a29ab5525726424dee6f9",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.6256,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMb728eafac3c19e22ae2942de",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMbaa36d41bb29023b81bdc99a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMbdb903ad97cc2d5a5602d7a8",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMbf9f75a994ee3960188471ab",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMc0a8e040c080ffefd6eb694b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMc5e3ef79c356193b5d01770b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMcf5b261e4e86d8b74ce7f451",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.62145,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMd01ffc4519999bd168a7304d",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.61505,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMd41ff2fdd58f1f7067e2679c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.84025,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMdd801f4447b2e82e59b10e39",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMe43cd4d6f2b548839b31585a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMe48a6cad656287e12a8b2592",
+     "decision": "REVALIDATE",
+     "reason": "VALID_UNTIL_PASSED",
+     "freshness_class": "SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.0,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMe75bb5699a2c9d75e6fb76be",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMee6107977e81b54e5cb4533c",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMf0166c75b8b9db71c69ca582",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMf1e7afaf4781d7a958332fff",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMf5ad31f82ab46b6a473cb670",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMf65dded9c897dfc54a4b9f2f",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMfb48885df54fabd4ece82a1b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMfd7cf3cb01bb45f1493d3e47",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMfed63413c31b64b15e7104eb",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    },
+    {
+     "memory_id": "MEMffaa77074bf5f09ec1ab1025",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.9,
+     "age_days": 0.0
+    }
+   ],
+   "revoke_constructed": {
+    "reason": "SOURCE_CONTAMINATED",
+    "checked": 13,
+    "revoked": [
+     {
+      "memory_id": "MEM2693b01a79abe886761eab2e",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEM3a68c3478f59911cbc63b635",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM41ab674d715d7f342c7dbbd0",
+      "from": "STALE",
+      "to": "REVOKED",
+      "version": 7
+     },
+     {
+      "memory_id": "MEM435f7f2e0d8fc01f3a4b8d78",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 4
+     },
+     {
+      "memory_id": "MEM44ce2f3dd17304a336321e97",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM8e03d16184c7881ad65cf9c8",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM9b975f1018f8e2502d9fc80b",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEM9d915cfc55a3188446202ca4",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMa24a8562f4fad3a54219ed65",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMb728eafac3c19e22ae2942de",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMdd801f4447b2e82e59b10e39",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEMee6107977e81b54e5cb4533c",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEMfed63413c31b64b15e7104eb",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     }
+    ],
+    "skipped": [],
+    "already_revoked": 0,
+    "status_counts": {
+     "ACTIVE": 63,
+     "REVOKED": 13,
+     "STALE": 5,
+     "EXPIRED": 1
+    },
+    "selector": "07a1d56c11410ffd7f5f608a"
+   }
+  },
+  {
+   "offset_days": 90,
+   "clock": "2027-01-08T23:16:06+00:00",
+   "memories": 82,
+   "status_before": {
+    "ACTIVE": 80,
+    "EXPIRED": 2
+   },
+   "lifecycle": {
+    "checked": 82,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 80,
+     "ACTIVE->EXPIRED/DECAY_BELOW_EXPIRE_FLOOR": 1,
+     "ACTIVE->EXPIRED/VALID_UNTIL_PASSED": 1
+    },
+    "status_counts": {
+     "ACTIVE": 82
+    },
+    "decay_bands": {
+     "0-0.05": 2,
+     "0.05-0.25": 0,
+     "0.25-0.5": 11,
+     "0.5-0.8": 69,
+     "0.8-1.0": 0
+    }
+   },
+   "gate": {
+    "decisions": {
+     "ALLOW": 61,
+     "REVALIDATE": 21
+    },
+    "reasons": {
+     "ALLOW/FRESH_AND_VERIFIED": 61,
+     "REVALIDATE/HIGH_STAKES_DEFAULT": 14,
+     "REVALIDATE/FRESHNESS_REQUIRED": 5,
+     "REVALIDATE/STATUS_EXPIRED": 1,
+     "REVALIDATE/VALID_UNTIL_PASSED": 1
+    },
+    "high_stakes": 16
+   },
+   "per_run": [
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "REVALIDATED": 4
+     },
+     "gate_decisions": {
+      "REVALIDATE": 4
+     },
+     "revalidated": 4,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "REVALIDATED": 2,
+      "NO_CANDIDATE_EVIDENCE": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 3
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "48855683e91d48b6b213e8aa8195df50",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "hits": 1,
+     "checked": 1,
+     "outcomes": {
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 1
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 1,
+       "NO_VERSION_TOKEN": 1,
+       "SOURCE_VERSION_STABLE": 1
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "REFRESHED_NO_CHANGE": 2,
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "ALLOW": 2,
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "85a60d2cd15b4d98a5ceaac71dc05d0b",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "REVALIDATED": 2,
+      "NO_CANDIDATE_EVIDENCE": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 3
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "hits": 5,
+     "checked": 5,
+     "outcomes": {
+      "NO_CANDIDATE_EVIDENCE": 4,
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 5
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 5,
+       "NO_VERSION_TOKEN": 5,
+       "SOURCE_VERSION_STABLE": 5
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "a1a9563809084b73b3c49b4e6e9d1940",
+     "hits": 1,
+     "checked": 1,
+     "outcomes": {
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 1
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 1,
+       "NO_VERSION_TOKEN": 1,
+       "SOURCE_VERSION_STABLE": 1
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "hits": 4,
+     "checked": 4,
+     "outcomes": {
+      "REVALIDATED": 4
+     },
+     "gate_decisions": {
+      "REVALIDATE": 4
+     },
+     "revalidated": 4,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 4,
+       "NO_VERSION_TOKEN": 4,
+       "SOURCE_VERSION_STABLE": 4
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "c3fd469f115d4002bd2824b397425756",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "REVALIDATED": 2,
+      "REFRESHED_NO_CHANGE": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2,
+      "ALLOW": 1
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    }
+   ],
+   "hits": 34,
+   "hints_recalled": 34,
+   "validations": 34,
+   "outcomes": {
+    "REVALIDATED": 25,
+    "NO_CANDIDATE_EVIDENCE": 6,
+    "REFRESHED_NO_CHANGE": 3
+   },
+   "revalidated": 25,
+   "revalidated_ids": [
+    "MEM04032bb832bfda5f79396346",
+    "MEM0909eb19dc8e67dc7c18741f",
+    "MEM0965e4d2a7eb3881687a81d6",
+    "MEM11cb9ec767686687a78cb5ea",
+    "MEM3a4b4c0785ca9450c8712025",
+    "MEM41ab674d715d7f342c7dbbd0",
+    "MEM432ab21eaf1e952a1f372177",
+    "MEM69381cdb0ff614182129c335",
+    "MEM6f05b4fd9bc26dce5b84fb81",
+    "MEM6f4e879865baaf1690abbfe8",
+    "MEM74a71f297f8cdb0329cfc4ea",
+    "MEM8d0a4615f50c15761e2f1c9c",
+    "MEM947372cd6eab2292bf95a55c",
+    "MEMab536a9eed9738ee4d253d99",
+    "MEMb2e5d8d302af1e99e0c0f5d2",
+    "MEMb61a29ab5525726424dee6f9",
+    "MEMcf5b261e4e86d8b74ce7f451",
+    "MEMd01ffc4519999bd168a7304d",
+    "MEMd41ff2fdd58f1f7067e2679c"
+   ],
+   "revalidation_pass_rate": 0.735294,
+   "status_transitions": {
+    "ACTIVE->STALE": 6
+   },
+   "status_after": {
+    "ACTIVE": 74,
+    "STALE": 6,
+    "EXPIRED": 2
+   },
+   "source_version": {
+    "changed": 0,
+    "reasons": {
+     "NO_CORPUS_VERSION": 34,
+     "NO_VERSION_TOKEN": 34,
+     "SOURCE_VERSION_STABLE": 34
+    }
+   },
+   "high_risk": {
+    "high_stakes": 26,
+    "hooked": 6
+   },
+   "contradictions": {
+    "candidates": 0,
+    "by_kind": {},
+    "by_resolution": {},
+    "by_reason_code": {},
+    "by_status_action": {},
+    "supersessions": 0
+   },
+   "supersession_audit": {
+    "chains": 0,
+    "problems": [],
+    "superseded": 0
+   },
+   "replay": {
+    "new_versions": 0,
+    "new_validations": 0,
+    "new_contradictions": 0
+   },
+   "gate_rows": [
+    {
+     "memory_id": "MEM00060e649ddfa71d604e29fe",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM00b0185a4a3f404c14ac3f00",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0313d34f1a43ed04e4fa614d",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM040289935dc75ec015e2fe92",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM04032bb832bfda5f79396346",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.330025,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0490362adad8b28a7a8307d8",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0792a4a30e5759429f715474",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM08299cfafcd062bfdc8814c8",
+     "decision": "REVALIDATE",
+     "reason": "STATUS_EXPIRED",
+     "freshness_class": "VERY_SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.00729066,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0909eb19dc8e67dc7c18741f",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.2927,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0965e4d2a7eb3881687a81d6",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.309625,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0c858db8998510df69cbca90",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM0d4ba9868cfa7e4e213d9457",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM11cb9ec767686687a78cb5ea",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.395125,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM1273ca319c1b491bb5b25684",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM2693b01a79abe886761eab2e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM28e0ccca2003228c38d25030",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM295cc43ae4c7818c3658b93e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM2d355fecd8bfd5616b942a7e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM3427538206390efc501d9f55",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM370d192246a4c2138fa7475c",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM3944c80333c8ffe414f87abf",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM3a4b4c0785ca9450c8712025",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.51871752,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM3a68c3478f59911cbc63b635",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM41ab674d715d7f342c7dbbd0",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.314025,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM432ab21eaf1e952a1f372177",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.52710433,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM435f7f2e0d8fc01f3a4b8d78",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM44ce2f3dd17304a336321e97",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM44ed0ef553af934c41f3db2e",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM4911d79ad1dfab920ed39ef6",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM4a477f4881674f0f29bf5b27",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM5102242881ec277e94e15027",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM53d30ca0fee99a78b047e6fc",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM5aedef1ed7356e40c41af9de",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.52402776,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM5d9fbf1388b857423f2de282",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM6630c885b18090d1772ae8e9",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM69381cdb0ff614182129c335",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.52845296,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM6a02a8e305c0d8ae33680c17",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM6f0425b8835f861d81275680",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM6f05b4fd9bc26dce5b84fb81",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.74857765,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM6f4e879865baaf1690abbfe8",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.317825,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM6fab2cfc1e6cbe05c5d1c088",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM74a71f297f8cdb0329cfc4ea",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.54972905,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM79ea8398ad79c5714bc1885a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM7b4e6a5f3312afd751f41f45",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM7d194d0fec260583f45a046a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.5185068,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM82796e9bdce520eea1c7e203",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM8315b38e57f04c9ac1545258",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM85d6dbfb5f6ab947c32894e7",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.51812749,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM8d0a4615f50c15761e2f1c9c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.34815,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM8e03d16184c7881ad65cf9c8",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM947372cd6eab2292bf95a55c",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.5555199,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM9b975f1018f8e2502d9fc80b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM9d279e01e80287367cd4d689",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM9d4ddeb5ff8d37f60fb962ea",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEM9d915cfc55a3188446202ca4",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMa24a8562f4fad3a54219ed65",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMab536a9eed9738ee4d253d99",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.327425,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMb2b45d6ce27ac2b14743c375",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMb2e5d8d302af1e99e0c0f5d2",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.395125,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMb61a29ab5525726424dee6f9",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.3128,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMb728eafac3c19e22ae2942de",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMbaa36d41bb29023b81bdc99a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMbdb903ad97cc2d5a5602d7a8",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMbf9f75a994ee3960188471ab",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMc0a8e040c080ffefd6eb694b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMc5e3ef79c356193b5d01770b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMcf5b261e4e86d8b74ce7f451",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.52381704,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMd01ffc4519999bd168a7304d",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.51842251,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMd41ff2fdd58f1f7067e2679c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "ACTIVE",
+     "decay_score": 0.420125,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMdd801f4447b2e82e59b10e39",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMe43cd4d6f2b548839b31585a",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMe48a6cad656287e12a8b2592",
+     "decision": "REVALIDATE",
+     "reason": "VALID_UNTIL_PASSED",
+     "freshness_class": "SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.0,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMe75bb5699a2c9d75e6fb76be",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMee6107977e81b54e5cb4533c",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMf0166c75b8b9db71c69ca582",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMf1e7afaf4781d7a958332fff",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMf5ad31f82ab46b6a473cb670",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMf65dded9c897dfc54a4b9f2f",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMfb48885df54fabd4ece82a1b",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMfd7cf3cb01bb45f1493d3e47",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMfed63413c31b64b15e7104eb",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    },
+    {
+     "memory_id": "MEMffaa77074bf5f09ec1ab1025",
+     "decision": "ALLOW",
+     "reason": "FRESH_AND_VERIFIED",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.75860541,
+     "age_days": 90.0
+    }
+   ],
+   "revoke_constructed": {
+    "reason": "SOURCE_CONTAMINATED",
+    "checked": 13,
+    "revoked": [
+     {
+      "memory_id": "MEM2693b01a79abe886761eab2e",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEM3a68c3478f59911cbc63b635",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM41ab674d715d7f342c7dbbd0",
+      "from": "STALE",
+      "to": "REVOKED",
+      "version": 7
+     },
+     {
+      "memory_id": "MEM435f7f2e0d8fc01f3a4b8d78",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 4
+     },
+     {
+      "memory_id": "MEM44ce2f3dd17304a336321e97",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM8e03d16184c7881ad65cf9c8",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM9b975f1018f8e2502d9fc80b",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEM9d915cfc55a3188446202ca4",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMa24a8562f4fad3a54219ed65",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMb728eafac3c19e22ae2942de",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMdd801f4447b2e82e59b10e39",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEMee6107977e81b54e5cb4533c",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEMfed63413c31b64b15e7104eb",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     }
+    ],
+    "skipped": [],
+    "already_revoked": 0,
+    "status_counts": {
+     "ACTIVE": 62,
+     "REVOKED": 13,
+     "STALE": 5,
+     "EXPIRED": 2
+    },
+    "selector": "07a1d56c11410ffd7f5f608a"
+   }
+  },
+  {
+   "offset_days": 365,
+   "clock": "2027-10-10T23:16:06+00:00",
+   "memories": 82,
+   "status_before": {
+    "ACTIVE": 69,
+    "STALE": 11,
+    "EXPIRED": 2
+   },
+   "lifecycle": {
+    "checked": 82,
+    "transition_counts": {
+     "ACTIVE->ACTIVE/DECAY_REFRESH": 69,
+     "ACTIVE->STALE/DECAY_BELOW_STALE_FLOOR": 11,
+     "ACTIVE->EXPIRED/DECAY_BELOW_EXPIRE_FLOOR": 1,
+     "ACTIVE->EXPIRED/VALID_UNTIL_PASSED": 1
+    },
+    "status_counts": {
+     "ACTIVE": 82
+    },
+    "decay_bands": {
+     "0-0.05": 12,
+     "0.05-0.25": 1,
+     "0.25-0.5": 68,
+     "0.5-0.8": 1,
+     "0.8-1.0": 0
+    }
+   },
+   "gate": {
+    "decisions": {
+     "REVALIDATE": 82
+    },
+    "reasons": {
+     "REVALIDATE/AGE_OVER_REVALIDATE_THRESHOLD": 61,
+     "REVALIDATE/HIGH_STAKES_DEFAULT": 14,
+     "REVALIDATE/FRESHNESS_REQUIRED": 5,
+     "REVALIDATE/STATUS_EXPIRED": 1,
+     "REVALIDATE/VALID_UNTIL_PASSED": 1
+    },
+    "high_stakes": 16
+   },
+   "per_run": [
+    {
+     "run_id": "162612f141e84ead98c36047f4dfd64b",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "1e10187dc8f0410faf8aaded4cf971f9",
+     "hits": 1,
+     "checked": 1,
+     "outcomes": {
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 1
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 1,
+       "NO_VERSION_TOKEN": 1,
+       "SOURCE_VERSION_STABLE": 1
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "613514876a1e40698cb1e1e636a0c21b",
+     "hits": 1,
+     "checked": 1,
+     "outcomes": {
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 1
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 1,
+       "NO_VERSION_TOKEN": 1,
+       "SOURCE_VERSION_STABLE": 1
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "64f12a4adc7f4f67b589871f4eb5d54d",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "93926d5bff5245728d07cd2362f5d7a0",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "NO_CANDIDATE_EVIDENCE": 3
+     },
+     "gate_decisions": {
+      "REVALIDATE": 3
+     },
+     "revalidated": 0,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "adebd40548d343eda11e765cdbaede3f",
+     "hits": 2,
+     "checked": 2,
+     "outcomes": {
+      "REVALIDATED": 2
+     },
+     "gate_decisions": {
+      "REVALIDATE": 2
+     },
+     "revalidated": 2,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 2,
+       "NO_VERSION_TOKEN": 2,
+       "SOURCE_VERSION_STABLE": 2
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "b76aa77a29c046fa84d55e7db517e810",
+     "hits": 1,
+     "checked": 1,
+     "outcomes": {
+      "REVALIDATED": 1
+     },
+     "gate_decisions": {
+      "REVALIDATE": 1
+     },
+     "revalidated": 1,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 1,
+       "NO_VERSION_TOKEN": 1,
+       "SOURCE_VERSION_STABLE": 1
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    },
+    {
+     "run_id": "e280beda3f7b48a596293c032f6a15e2",
+     "hits": 3,
+     "checked": 3,
+     "outcomes": {
+      "REVALIDATED": 3
+     },
+     "gate_decisions": {
+      "REVALIDATE": 3
+     },
+     "revalidated": 3,
+     "promoted": 0,
+     "source_version": {
+      "changed": 0,
+      "reasons": {
+       "NO_CORPUS_VERSION": 3,
+       "NO_VERSION_TOKEN": 3,
+       "SOURCE_VERSION_STABLE": 3
+      }
+     },
+     "contradictions": {
+      "candidates": 0,
+      "by_kind": {},
+      "by_resolution": {},
+      "by_reason_code": {},
+      "by_status_action": {},
+      "supersessions": 0,
+      "persisted": 0
+     }
+    }
+   ],
+   "hits": 15,
+   "hints_recalled": 15,
+   "validations": 15,
+   "outcomes": {
+    "REVALIDATED": 12,
+    "NO_CANDIDATE_EVIDENCE": 3
+   },
+   "revalidated": 12,
+   "revalidated_ids": [
+    "MEM3a4b4c0785ca9450c8712025",
+    "MEM432ab21eaf1e952a1f372177",
+    "MEM5aedef1ed7356e40c41af9de",
+    "MEM69381cdb0ff614182129c335",
+    "MEM6f05b4fd9bc26dce5b84fb81",
+    "MEM74a71f297f8cdb0329cfc4ea",
+    "MEM7d194d0fec260583f45a046a",
+    "MEM85d6dbfb5f6ab947c32894e7",
+    "MEM947372cd6eab2292bf95a55c",
+    "MEMcf5b261e4e86d8b74ce7f451",
+    "MEMd01ffc4519999bd168a7304d"
+   ],
+   "revalidation_pass_rate": 0.8,
+   "status_transitions": {
+    "ACTIVE->STALE": 3
+   },
+   "status_after": {
+    "ACTIVE": 66,
+    "STALE": 14,
+    "EXPIRED": 2
+   },
+   "source_version": {
+    "changed": 0,
+    "reasons": {
+     "NO_CORPUS_VERSION": 15,
+     "NO_VERSION_TOKEN": 15,
+     "SOURCE_VERSION_STABLE": 15
+    }
+   },
+   "high_risk": {
+    "high_stakes": 12,
+    "hooked": 3
+   },
+   "contradictions": {
+    "candidates": 0,
+    "by_kind": {},
+    "by_resolution": {},
+    "by_reason_code": {},
+    "by_status_action": {},
+    "supersessions": 0
+   },
+   "supersession_audit": {
+    "chains": 0,
+    "problems": [],
+    "superseded": 0
+   },
+   "replay": {
+    "new_versions": 0,
+    "new_validations": 3,
+    "new_contradictions": 0
+   },
+   "gate_rows": [
+    {
+     "memory_id": "MEM00060e649ddfa71d604e29fe",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM00b0185a4a3f404c14ac3f00",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0313d34f1a43ed04e4fa614d",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM040289935dc75ec015e2fe92",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM04032bb832bfda5f79396346",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03969474,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0490362adad8b28a7a8307d8",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0792a4a30e5759429f715474",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM08299cfafcd062bfdc8814c8",
+     "decision": "REVALIDATE",
+     "reason": "STATUS_EXPIRED",
+     "freshness_class": "VERY_SHORT",
+     "status": "EXPIRED",
+     "decay_score": 1e-08,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0909eb19dc8e67dc7c18741f",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03520536,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0965e4d2a7eb3881687a81d6",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03724107,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0c858db8998510df69cbca90",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM0d4ba9868cfa7e4e213d9457",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM11cb9ec767686687a78cb5ea",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.04752484,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM1273ca319c1b491bb5b25684",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM2693b01a79abe886761eab2e",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM28e0ccca2003228c38d25030",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM295cc43ae4c7818c3658b93e",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM2d355fecd8bfd5616b942a7e",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM3427538206390efc501d9f55",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM370d192246a4c2138fa7475c",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM3944c80333c8ffe414f87abf",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM3a4b4c0785ca9450c8712025",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.3077,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM3a68c3478f59911cbc63b635",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM41ab674d715d7f342c7dbbd0",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03777029,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM432ab21eaf1e952a1f372177",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.312675,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM435f7f2e0d8fc01f3a4b8d78",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM44ce2f3dd17304a336321e97",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM44ed0ef553af934c41f3db2e",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM4911d79ad1dfab920ed39ef6",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM4a477f4881674f0f29bf5b27",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM5102242881ec277e94e15027",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM53d30ca0fee99a78b047e6fc",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM5aedef1ed7356e40c41af9de",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.31085,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM5d9fbf1388b857423f2de282",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM6630c885b18090d1772ae8e9",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM69381cdb0ff614182129c335",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.313475,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM6a02a8e305c0d8ae33680c17",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM6f0425b8835f861d81275680",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM6f05b4fd9bc26dce5b84fb81",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.52593799,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM6f4e879865baaf1690abbfe8",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03822735,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM6fab2cfc1e6cbe05c5d1c088",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM74a71f297f8cdb0329cfc4ea",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.38623033,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM79ea8398ad79c5714bc1885a",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM7b4e6a5f3312afd751f41f45",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM7d194d0fec260583f45a046a",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.307575,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM82796e9bdce520eea1c7e203",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM8315b38e57f04c9ac1545258",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM85d6dbfb5f6ab947c32894e7",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.30735,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM8d0a4615f50c15761e2f1c9c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.04187478,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM8e03d16184c7881ad65cf9c8",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM947372cd6eab2292bf95a55c",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "VERSION_SENSITIVE",
+     "status": "ACTIVE",
+     "decay_score": 0.39029888,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM9b975f1018f8e2502d9fc80b",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM9d279e01e80287367cd4d689",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM9d4ddeb5ff8d37f60fb962ea",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEM9d915cfc55a3188446202ca4",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMa24a8562f4fad3a54219ed65",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMab536a9eed9738ee4d253d99",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03938202,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMb2b45d6ce27ac2b14743c375",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMb2e5d8d302af1e99e0c0f5d2",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.04752484,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMb61a29ab5525726424dee6f9",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.03762295,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMb728eafac3c19e22ae2942de",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMbaa36d41bb29023b81bdc99a",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMbdb903ad97cc2d5a5602d7a8",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMbf9f75a994ee3960188471ab",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMc0a8e040c080ffefd6eb694b",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMc5e3ef79c356193b5d01770b",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMcf5b261e4e86d8b74ce7f451",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.310725,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMd01ffc4519999bd168a7304d",
+     "decision": "REVALIDATE",
+     "reason": "HIGH_STAKES_DEFAULT",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.307525,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMd41ff2fdd58f1f7067e2679c",
+     "decision": "REVALIDATE",
+     "reason": "FRESHNESS_REQUIRED",
+     "freshness_class": "SHORT",
+     "status": "STALE",
+     "decay_score": 0.05053179,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMdd801f4447b2e82e59b10e39",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMe43cd4d6f2b548839b31585a",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMe48a6cad656287e12a8b2592",
+     "decision": "REVALIDATE",
+     "reason": "VALID_UNTIL_PASSED",
+     "freshness_class": "SHORT",
+     "status": "EXPIRED",
+     "decay_score": 0.0,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMe75bb5699a2c9d75e6fb76be",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMee6107977e81b54e5cb4533c",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMf0166c75b8b9db71c69ca582",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMf1e7afaf4781d7a958332fff",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMf5ad31f82ab46b6a473cb670",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMf65dded9c897dfc54a4b9f2f",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMfb48885df54fabd4ece82a1b",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMfd7cf3cb01bb45f1493d3e47",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMfed63413c31b64b15e7104eb",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    },
+    {
+     "memory_id": "MEMffaa77074bf5f09ec1ab1025",
+     "decision": "REVALIDATE",
+     "reason": "AGE_OVER_REVALIDATE_THRESHOLD",
+     "freshness_class": "MEDIUM",
+     "status": "ACTIVE",
+     "decay_score": 0.45,
+     "age_days": 365.0
+    }
+   ],
+   "revoke_constructed": {
+    "reason": "SOURCE_CONTAMINATED",
+    "checked": 13,
+    "revoked": [
+     {
+      "memory_id": "MEM2693b01a79abe886761eab2e",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEM3a68c3478f59911cbc63b635",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM41ab674d715d7f342c7dbbd0",
+      "from": "STALE",
+      "to": "REVOKED",
+      "version": 5
+     },
+     {
+      "memory_id": "MEM435f7f2e0d8fc01f3a4b8d78",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 4
+     },
+     {
+      "memory_id": "MEM44ce2f3dd17304a336321e97",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM8e03d16184c7881ad65cf9c8",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEM9b975f1018f8e2502d9fc80b",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEM9d915cfc55a3188446202ca4",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMa24a8562f4fad3a54219ed65",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMb728eafac3c19e22ae2942de",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     },
+     {
+      "memory_id": "MEMdd801f4447b2e82e59b10e39",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEMee6107977e81b54e5cb4533c",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 6
+     },
+     {
+      "memory_id": "MEMfed63413c31b64b15e7104eb",
+      "from": "ACTIVE",
+      "to": "REVOKED",
+      "version": 3
+     }
+    ],
+    "skipped": [],
+    "already_revoked": 0,
+    "status_counts": {
+     "ACTIVE": 54,
+     "REVOKED": 13,
+     "STALE": 13,
+     "EXPIRED": 2
+    },
+    "selector": "07a1d56c11410ffd7f5f608a"
+   }
+  }
+ ],
+ "constructed_conflict": {
+  "candidates": 2,
+  "by_reason_code": {
+   "AUTHORITY_ADVANTAGE": 1,
+   "NEWER_VERSION_PRECEDES": 1
+  },
+  "by_resolution": {
+   "resolved": 2
+  },
+  "status_action": "",
+  "control_candidates": 0,
+  "example": {
+   "text": "电池消费税新规实施导致行业集体涨价，宁德时代等头部企业上调售价，显示其具备成本传导能力。",
+   "negated": "电池消费税新规实施导致行业集体涨价，宁德时代不予等头部企业上调售价，显示其具备成本传导能力。",
+   "older_status": "SUPERSEDED",
+   "superseded_by": "MEM-constructed-new"
+  },
+  "save_errors": [],
+  "by_status_action": {
+   "CONTRADICT": 1,
+   "SUPERSEDE": 1
+  },
+  "supersessions": 1,
+  "control_eligible_types": [
+   "VERIFIED_CLAIM"
+  ]
+ },
+ "determinism": {
+  "deterministic": true,
+  "first": {
+   "decisions": {
+    "ALLOW": 61,
+    "REVALIDATE": 21
+   },
+   "reasons": {
+    "ALLOW/FRESH_AND_VERIFIED": 61,
+    "REVALIDATE/HIGH_STAKES_DEFAULT": 15,
+    "REVALIDATE/FRESHNESS_REQUIRED": 5,
+    "REVALIDATE/VALID_UNTIL_PASSED": 1
+   },
+   "outcomes": {},
+   "gate": {},
+   "contradictions": {}
+  },
+  "second": {
+   "decisions": {
+    "ALLOW": 61,
+    "REVALIDATE": 21
+   },
+   "reasons": {
+    "ALLOW/FRESH_AND_VERIFIED": 61,
+    "REVALIDATE/HIGH_STAKES_DEFAULT": 15,
+    "REVALIDATE/FRESHNESS_REQUIRED": 5,
+    "REVALIDATE/VALID_UNTIL_PASSED": 1
+   },
+   "outcomes": {},
+   "gate": {},
+   "contradictions": {}
+  }
+ },
+ "checks": [
+  {
+   "name": "live_machine_state_recorded",
+   "passed": true,
+   "detail": "线上记忆行 0 条（8 张表）、Phase 10 两张表存在 无、部署 schema QA_SCHEMA_VERSION = \"unified-qa-schema-v8\""
+  },
+  {
+   "name": "memory_graph_rebuilt_offline",
+   "passed": true,
+   "detail": "真实快照上离线重建 82 条记忆（候选 278）"
+  },
+  {
+   "name": "freshness_gate_reaches_every_decision",
+   "passed": true,
+   "detail": "闸门分布：{\"ALLOW\": 61, \"REVALIDATE\": 21}"
+  },
+  {
+   "name": "revalidation_produces_outcomes",
+   "passed": true,
+   "detail": "复验出口分布：{\"REVALIDATED\": 26, \"NO_CANDIDATE_EVIDENCE\": 6, \"REFRESHED_NO_CHANGE\": 3}（受检 35）"
+  },
+  {
+   "name": "revalidation_pass_rate_recorded",
+   "passed": true,
+   "detail": "复验通过率 0.7429（§16 Revalidation Pass Rate，命中 35 次）"
+  },
+  {
+   "name": "aged_clocks_show_status_transitions",
+   "passed": true,
+   "detail": "在 +0/+90/+365 天三个时钟上的状态迁移：[{\"ACTIVE->STALE\": 6}, {\"ACTIVE->STALE\": 6}, {\"ACTIVE->STALE\": 3}]"
+  },
+  {
+   "name": "contradiction_verdicts_use_phase06_codes",
+   "passed": true,
+   "detail": "三个时钟上的裁决理由码：[{}, {}, {}]；**真机素材构造注入**（正例/负例控制）：{\"candidates\": 2, \"by_reason_code\": {\"AUTHORITY_ADVANTAGE\": 1, \"NEWER_VERSION_PRECEDES\": 1}, \"by_resolution\": {\"resolved\": 2}, \"by_status_action\": {\"CONTRADICT\": 1, \"SUPERSEDE\": 1}, \"supersessions\": 1, \"control_candidates\": 0}"
+  },
+  {
+   "name": "supersession_chain_has_no_problems",
+   "passed": true,
+   "detail": "取代链问题：[[], [], []]"
+  },
+  {
+   "name": "revoke_constructed_is_auditable",
+   "passed": true,
+   "detail": "构造的按来源撤销：撤销 13 条 / 跳过 0 条"
+  },
+  {
+   "name": "deterministic_across_runs",
+   "passed": true,
+   "detail": "两独立库的闸门/复验/矛盾分布逐字相同：True"
+  },
+  {
+   "name": "replay_writes_no_memory_state",
+   "passed": true,
+   "detail": "同钟重放的写入：[{\"new_versions\": 0, \"new_validations\": 0, \"new_contradictions\": 0}, {\"new_versions\": 0, \"new_validations\": 0, \"new_contradictions\": 0}, {\"new_versions\": 0, \"new_validations\": 3, \"new_contradictions\": 0}]（`new_validations` 只允许来自\"首遍真的改了状态\"（最多 [6, 6, 3] 行），状态/取代/矛盾本身一律 0 新增）"
+  }
+ ],
+ "summary": {
+  "checks_passed": 11,
+  "checks_total": 11,
+  "memories_rebuilt": 82,
+  "revalidation_hits": 35,
+  "revalidated": 26,
+  "revalidation_pass_rate": 0.742857,
+  "contradictions_detected": 0,
+  "supersessions": 0,
+  "constructed_contradictions": 2,
+  "constructed_control_candidates": 0,
+  "stale_or_expired_before": {
+   "ACTIVE": 81,
+   "EXPIRED": 1
+  },
+  "status_transitions": {
+   "ACTIVE->STALE": 6
+  }
+ },
+ "notes": [
+  "线上（A 机）记忆行数为 0：Phase 09 已发布、表已建，但发布后还没有 QA run 触发写入；",
+  "复验/矛盾/取代在**离线重建的记忆图**上复算（同一份代码 + 同一份真实证据），口径与管线一致（只吃本轮证据图的证据，零新增检索）；",
+  "只允许**断言型**记忆（默认 VERIFIED_CLAIM）参与矛盾判定：实体记忆只是索引，真机上 8 条\"实体 vs 含否定词长句\"的假矛盾由这条前置条件消除（有负例控制组）；",
+  "构造的撤销/矛盾演示不代表线上发生了污染或冲突，只证明链路可跑通且可审计；",
+  "所有判定纯规则/统计：无 LLM、无嵌入端点调用（GPU 机本轮停用）。"
+ ],
+ "contract_ok": true,
+ "status": "PASS"
+}
