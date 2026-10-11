@@ -1,0 +1,30 @@
+{
+ "captured_at_utc": "2026-10-11T08:21:42Z",
+ "source": {
+  "host": "117.50.211.93",
+  "container": "collectinfo-postgres",
+  "database": "collectinfo",
+  "access": "readonly (BEGIN READ ONLY + statement_timeout=25s + LIMIT)",
+  "snapshot_version": "qa-realignment-real-sample-v1",
+  "note": "Phase 14 真机只读探针：问题流 + 缺口环投影；零写操作、零模型调用。"
+ },
+ "probe": {
+  "web_container": "collectinfo-web",
+  "schema_version": "QA_SCHEMA_VERSION = \"unified-qa-schema-v11\"",
+  "phase14_modules": "/app/qa_acquisition.py\n/app/qa_realignment.py",
+  "gap_analyzer_version": "",
+  "counts": "BEGIN\nSET\n1|15|10\nCOMMIT"
+ },
+ "runs": [],
+ "gap_loop": [],
+ "errors": [
+  {
+   "section": "runs",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  },
+  {
+   "section": "gap_loop",
+   "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+  }
+ ]
+}

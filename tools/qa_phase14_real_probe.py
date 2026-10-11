@@ -38,6 +38,10 @@ from qa_phase07_real_snapshot import (  # noqa: E402
 
 SNAPSHOT_VERSION = "qa-realignment-real-sample-v1"
 REMOTE_TIMEOUT_SECONDS = 25
+
+# 文件类检查必须落在**应用容器**上：默认容器是数据库容器（只跑 psql，没有 /app 代码目录），
+# 早期版本把两者用同一个容器名，导致 "ls /app/qa_realignment.py" 恒报 No such file（实测踩到）。
+WEB_CONTAINER = os.environ.get("QA_WEB_CONTAINER", "collectinfo-web")
 MAX_RUNS = 60
 MAX_GAP_ROWS = 120
 
@@ -93,15 +97,21 @@ def _sql(client, sql: str, container: str, database: str) -> str:
 
 
 def probe(client, container: str, database: str) -> dict:
-    """发布态探针：schema 版本 / 新模块 / 新表 / 真机问题流规模。"""
+    """发布态探针：schema 版本 / 新模块 / 新表 / 真机问题流规模。
+
+    注意：`container` 是**数据库容器**（跑 psql），而三个文件类检查必须落在**应用容器**
+    （`WEB_CONTAINER`，代码目录 /app 在它里面）——两者混用会让文件检查恒报不存在。
+    """
+    web = WEB_CONTAINER
     out = {
+        "web_container": web,
         "schema_version": _shell(client, "timeout 20 docker exec %s grep -h 'QA_SCHEMA_VERSION =' "
-                                         "/app/qa_schema.py" % container),
+                                         "/app/qa_schema.py" % web),
         "phase14_modules": _shell(client, "timeout 20 docker exec %s sh -c "
                                           "'ls /app/qa_realignment.py /app/qa_acquisition.py 2>&1'"
-                                          % container),
+                                          % web),
         "gap_analyzer_version": _shell(client, "timeout 20 docker exec %s grep -h 'GAP_ANALYZER_VERSION =' "
-                                               "/app/qa_gap_analyzer.py" % container),
+                                               "/app/qa_gap_analyzer.py" % web),
         "counts": _sql(client, PROBE_SQL, container, database),
     }
     return out
