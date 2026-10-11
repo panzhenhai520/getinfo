@@ -93,6 +93,21 @@ def pool_ttl_seconds() -> float:
     return _env_float("QA_HUNTER_POOL_TTL_SECONDS", 180.0, 0.0, 3600.0)
 
 
+def debug_enabled() -> bool:
+    """fleet 调试日志开关（`QA_HUNTER_FLEET_DEBUG`，**默认关**）。
+
+    只加日志，**不改任何判定与语义**。存在的理由：回执里的 `latency_ms`/`reason_code`
+    只来自**最后一次**尝试，第一次尝试若是超时或抛错会被成功的那次顶掉、不留痕迹——
+    于是"attempts=2"无法反推第一次到底怎么了。这行日志补的就是这个盲区。
+    """
+    return _env_flag("QA_HUNTER_FLEET_DEBUG", False)
+
+
+def _debug_log(message: str) -> None:
+    if debug_enabled():
+        print("[qa-hunter-fleet] %s" % message, flush=True)
+
+
 @dataclass
 class HunterTask:
     """一个待执行的 Hunter + 它的失败策略参数（可逐 Hunter 覆盖）。"""
@@ -213,16 +228,21 @@ class HunterFleet:
         # `starts` 由工作线程写入，主线程只读，用一把小锁保护。
         starts: dict = {}
         starts_lock = threading.Lock()
+        submitted_at: dict = {}          # 仅调试日志用：key → 提交时刻
         sequence = [0]
 
         def _run_task(hunter, hunter_request, key):
             with starts_lock:
-                starts[key] = time.monotonic()
+                starts[key] = began = time.monotonic()
+            _debug_log("start hunter=%s attempt=%d queue_ms=%d"
+                       % (hunter.hunter_id, attempts.get(hunter.hunter_id, 0),
+                          max(0, int((began - submitted_at.get(key, began)) * 1000))))
             return hunter.safe_run(hunter_request)
 
         def _submit(task):
             sequence[0] += 1
             key = "t%d-%s" % (sequence[0], task.hunter_id)
+            submitted_at[key] = time.monotonic()          # 只给调试日志量排队时长
             future = executor.submit(_run_task, task.hunter, request, key)
             pending.add(future)
             meta[future] = {"task": task, "submitted": time.monotonic(), "key": key}
@@ -252,6 +272,11 @@ class HunterFleet:
                             and attempts.get(hunter_id, 1) <= self.retries
                             and (deadline - time.monotonic()) > 0.05):
                         # §28 的 RETRY 1：只读检索天然幂等，失败（超时/抛错）重试一次
+                        _debug_log("retry hunter=%s attempt=%d status=%s reason=%s ran_ms=%d error=%s"
+                                   % (hunter_id, attempts.get(hunter_id, 1),
+                                      outcome.get("status"), outcome.get("reason_code"),
+                                      int(outcome.get("latency_ms") or 0),
+                                      str(outcome.get("error") or "")[:160]))
                         _submit(info["task"])
                         continue
                     outcomes[hunter_id] = outcome
@@ -271,6 +296,9 @@ class HunterFleet:
                     task = info["task"]
                     if (attempts.get(task.hunter_id, 0) <= self.retries
                             and (deadline - time.monotonic()) > 0.05):
+                        _debug_log("retry hunter=%s attempt=%d status=timeout reason=hunter_timeout ran_ms=%d timeout_s=%s"
+                                   % (task.hunter_id, attempts.get(task.hunter_id, 1),
+                                      int(_elapsed(info) * 1000), self.per_hunter_timeout))
                         _submit(task)
                         continue
                     outcomes[task.hunter_id] = hunter_outcome(
