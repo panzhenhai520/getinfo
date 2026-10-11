@@ -84,6 +84,7 @@
 |P14-03|KB/EMR/DB/Web routes|NOT_STARTED|||
 |P14-04|ask-patient route|NOT_STARTED|||
 |P14-05|Context Gap no-repeat|NOT_STARTED|||
+|P14-07|重复提问识别与思路调整确认|NOT_STARTED|||
 |P14-06|clinical/safety weights|NOT_STARTED|||
 |P15-01|scope enforcement|NOT_STARTED|||
 |P15-02|encounter isolation|NOT_STARTED|||
