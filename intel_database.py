@@ -356,11 +356,14 @@ class IntelRepository:
         classifications therefore remain hidden until their article evidence
         is checked against the target pack's *current* project keywords. Only
         still-matching rows are rebound; unrelated legacy rows stay auditable
-        under their previous/empty activation identity. Rebinding updates only
-        the activation projection and its current anchor evidence. It must not
-        overwrite category/topic evidence or claim that an old classification
-        was produced by the target pack version; a version mismatch deliberately
-        leaves the row eligible for normal reclassification.
+        under their previous/empty activation identity. Rebinding writes the
+        activation identity and nothing else — 项目词池只用于判定"这行是否仍属于
+        本包"，它不是分类器口径的锚点池（anchor_keywords/entity_keywords），写进
+        hits.anchor 会造出分类器永远不可能产生的锚点，让门禁
+        （INDUSTRY_KEYWORD_GATE_SQL）与准入（_classification_admitted）把"激活
+        产生的可见性"当成行业证据。可见性只能由分类器自己写入的
+        anchor/core/expanded 证据决定。因此这里不覆盖 anchor、不覆盖评分，也不
+        覆盖 category/topic；版本不一致的行留给正常重分类流程处理。
         """
 
         from project_keyword_gate import matched_project_keywords
@@ -382,7 +385,6 @@ class IntelRepository:
                 rows = cursor.execute(
                     """
                     SELECT c.id, c.activation_id, c.industry_pack_version,
-                           c.score_details_json,
                            a.title, a.content, a.matched_keywords
                     FROM article_intel_classifications c
                     JOIN articles a ON a.id=c.article_id
@@ -404,31 +406,17 @@ class IntelRepository:
                     if not matched:
                         left_hidden += 1
                         continue
-                    score_details = _json_value(row["score_details_json"], {})
-                    if not isinstance(score_details, dict):
-                        score_details = {}
-                    hits = score_details.get("hits")
-                    if not isinstance(hits, dict):
-                        hits = {}
-                    hits["anchor"] = list(matched)
-                    score_details["hits"] = hits
-                    # 锚点被换掉了，按上一轮锚点算出的旧评分必须一起作废：继续留着会让
-                    # 下游 _gate_failure_key 看到「锚点非空 + 陈旧 0 分 < 阈值」，把这些
-                    # 行误判成 below_min_score（纯假归因）。这里只把评分置为"未知"，
-                    # 不重算、也不碰 category/topic —— 该行的分类结论不是本次重绑产生的，
-                    # 重算会伪造出"该结论由目标包版本评分过"的假一致性（见函数 docstring）。
-                    score_details["relevance_score"] = None
-                    score_details["minimum_relevance_score"] = None
+                    # 只换激活身份：证据（anchor/core/expanded/评分/category/topic）
+                    # 一律由分类器写入，激活路径不得改写（见函数 docstring）。
                     cursor.execute(
                         """
                         UPDATE article_intel_classifications
-                        SET activation_id=?, score_details_json=?,
+                        SET activation_id=?,
                             updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
                         WHERE id=?
                         """,
                         (
                             str(activation_id),
-                            _json_text(score_details, {}),
                             int(row["id"]),
                         ),
                     )

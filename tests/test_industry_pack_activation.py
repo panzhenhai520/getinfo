@@ -263,7 +263,10 @@ class IndustryPackActivationTest(unittest.TestCase):
                     "rule_confidence": 1,
                     "rule_reason": "legacy",
                     "score_details": {
-                        "hits": {"anchor": [], "trend": ["政策"]},
+                        # 证据全部来自分类器：anchor 为空 = "从未命中锚点"，core 才是
+                        # 这一行真正的行业依据。激活重绑只换激活身份，可见性必须由这些
+                        # 证据本身决定，不能被激活路径补写出来的 anchor 撑起来。
+                        "hits": {"anchor": [], "core": ["家族办公室"], "trend": ["政策"]},
                     },
                     "matched_keywords": ["旧关键词", "政策"],
                     "topic_tags": ["政策与税务"],
@@ -273,6 +276,11 @@ class IndustryPackActivationTest(unittest.TestCase):
                 }
             )
         self.database.connection.commit()
+
+        evidence_before = self.database.connection.execute(
+            "SELECT score_details_json FROM article_intel_classifications WHERE article_id=?",
+            (article_ids[0],),
+        ).fetchone()[0]
 
         preview = self.service.preview(
             "family_office", target_version_id=self.family_baseline["id"]
@@ -291,8 +299,7 @@ class IndustryPackActivationTest(unittest.TestCase):
         )
         matching = self.database.connection.execute(
             """
-            SELECT activation_id,industry_pack_version,
-                   json_extract(score_details_json,'$.hits.anchor[0]'),
+            SELECT activation_id,industry_pack_version,score_details_json,
                    matched_keywords_json,topic_tags_json
             FROM article_intel_classifications WHERE article_id=?
             """,
@@ -302,7 +309,12 @@ class IndustryPackActivationTest(unittest.TestCase):
         # Projection restoration is not reclassification. Keep the producing
         # version and category metadata so the normal sweep can upgrade it.
         self.assertEqual(matching[1], "1.0.0")
-        self.assertEqual(matching[2], "家族办公室")
+        # 重绑只换激活身份：anchor 仍是分类器写入的空值，证据一字未改。
+        # （若把旧实现塞回来——重绑时写 hits.anchor=项目词池命中——这里必然失败。）
+        self.assertEqual(matching[2], evidence_before)
+        restored_details = json.loads(matching[2])
+        self.assertEqual(restored_details["hits"]["anchor"], [])
+        self.assertEqual(restored_details["hits"]["core"], ["家族办公室"])
         self.assertEqual(json.loads(matching[3]), ["旧关键词", "政策"])
         self.assertEqual(json.loads(matching[4]), ["政策与税务"])
         unrelated = self.database.connection.execute(
@@ -313,6 +325,7 @@ class IndustryPackActivationTest(unittest.TestCase):
         _rows, total, _window = self.repository.list_classified_articles(
             industry_pack_id="family_office", time_range="7d"
         )
+        # 门禁可见性来自这一行自己的 core 证据，而不是激活补写的 anchor。
         self.assertEqual(total, 1)
         pending_ids = {
             int(row["id"])
@@ -344,12 +357,12 @@ class IndustryPackActivationTest(unittest.TestCase):
         self.assertEqual(policy_total, 1)
         self.assertEqual(policy_rows[0]["article_id"], article_ids[0])
 
-    def test_projection_rebind_invalidates_stale_score_without_touching_category(self):
-        """回归：重绑换掉 hits.anchor 却不刷新评分 → _gate_failure_key 误报 below_min_score。
+    def test_projection_rebind_keeps_anchor_and_scores_untouched(self):
+        """回归：重绑不再改写 hits.anchor，也不再作废评分。
 
-        线上真实受损形态：分类时没命中锚点（anchor=[]、relevance_score=0 < 阈值 2），
-        之后行业包激活重绑把项目词池命中塞进 hits.anchor，评分却留在 0 —— 于是
-        「锚点非空 + 陈旧 0 分 < 阈值」被归因成 below_min_score（100% 假象）。
+        历史缺陷：重绑把项目词池命中塞进 hits.anchor，造出分类器永远不可能产生的
+        锚点（既污染门禁可见性，又让 _gate_failure_key 把「锚点非空 + 陈旧 0 分」
+        误报成 below_min_score）。修复后重绑只换激活身份，证据逐字保留。
         """
         from intel_pack_improvement import _gate_failure_key
 
@@ -434,18 +447,26 @@ class IndustryPackActivationTest(unittest.TestCase):
         self.assertEqual(result["classification_rows_evaluated"], 1)
         self.assertEqual(result["classification_rows_restored"], 1)
         self.assertEqual(result["classification_rows_left_hidden"], 0)
+        self.assertEqual(result["classification_rows_reclassification_required"], 1)
 
         after = snapshot()
-        # 重绑确实换掉了锚点证据（否则本用例是空跑）。
+        # ★ 核心断言：命中项目词池（"家族办公室"）也不许被写进 hits.anchor，
+        #   score_details 必须逐字相同。旧实现塞回这里必然失败。
+        self.assertEqual(after["score_details_json"], before["score_details_json"])
         after_details = json.loads(after["score_details_json"])
-        self.assertEqual(after_details["hits"]["anchor"], ["家族办公室"])
-        # 关键断言：修复后不再把「陈旧评分」误报成 below_min_score。
+        self.assertEqual(after_details["hits"]["anchor"], [])
+        # ★ 评分保留分类器原值，不再被置 None（旧实现是 None）。
+        self.assertEqual(after_details["relevance_score"], 0.0)
+        self.assertEqual(after_details["minimum_relevance_score"], 2.0)
+        self.assertEqual(after_details["rule_signal"], "below_threshold")
+        # 旧写法「换 anchor 不刷分」必然把这个夹具报成 below_min_score；
+        # 现在 anchor 没被动过，归因保持诚实的 no_anchor。
         self.assertNotEqual(gate_key(after), "below_min_score")
-        self.assertEqual(gate_key(after), "unknown")
-        # 反证：若沿用"只换 anchor 不刷新评分"的旧写法，这个夹具必然报 below_min_score。
-        stale_pre_fix = dict(after_details)
-        stale_pre_fix["relevance_score"] = 0.0
-        stale_pre_fix["minimum_relevance_score"] = 2.0
+        self.assertEqual(gate_key(after), "no_anchor")
+        # 变异哨兵：把旧实现写进 anchor 的形态喂给同一函数，确实会得到
+        # below_min_score —— 证明上面那条断言是真在守着这个缺陷。
+        stale_pre_fix = json.loads(after["score_details_json"])
+        stale_pre_fix["hits"]["anchor"] = ["家族办公室"]
         self.assertEqual(
             _gate_failure_key(
                 {
@@ -456,18 +477,8 @@ class IndustryPackActivationTest(unittest.TestCase):
             ),
             "below_min_score",
         )
-        # 陈旧评分被置为"未知"，不是被伪造成新分数。
-        self.assertIsNone(after_details["relevance_score"])
-        self.assertIsNone(after_details["minimum_relevance_score"])
-        # 除锚点与两个评分字段外，score_details 其余内容一字未变。
-        before_details = json.loads(before["score_details_json"])
-        for payload in (before_details, after_details):
-            payload.pop("relevance_score", None)
-            payload.pop("minimum_relevance_score", None)
-            (payload.get("hits") or {}).pop("anchor", None)
-        self.assertEqual(after_details, before_details)
 
-        # category / topic 证据一字未变（docstring 明令不得覆盖）。
+        # 激活身份确实被换掉，其它原有语义不变。
         self.assertEqual(after["activation_id"], "new-activation")
         for name in (
             "industry_pack_version",
@@ -484,6 +495,87 @@ class IndustryPackActivationTest(unittest.TestCase):
             self.assertEqual(after[name], before[name], name)
         self.assertEqual(after["final_category"], "other")
         self.assertEqual(json.loads(after["topic_tags_json"]), ["政策与税务"])
+
+    def test_projection_rebind_no_longer_makes_evidence_less_rows_visible(self):
+        """代价口径回归：没有 anchor/core/expanded 证据的旧行不再因激活而进门禁。
+
+        量化结论（invest_mgmt 976 行实测）：删掉写 anchor 后，靠被污染 anchor 才
+        可见、且无 core/expanded 兜底的行 = 33 行（3.4%），全部 final_category
+        ='other'。这里用最小夹具钉住这条语义，避免以后有人"顺手"补回写 anchor。
+        """
+        content = "家族办公室与财富传承信息仍命中当前项目关键词。"
+        article_id = int(
+            self.database.connection.execute(
+                """
+                INSERT INTO articles(
+                    url,title,content,domain,publish_date,status,
+                    content_hash,content_length
+                ) VALUES(?,?,?,?,date('now'),'active',?,?)
+                """,
+                (
+                    "https://projection.example.test/no-evidence",
+                    "家族办公室无证据回归用例",
+                    content,
+                    "projection.example.test",
+                    "projection-no-evidence",
+                    len(content),
+                ),
+            ).lastrowid
+        )
+        self.repository.upsert_classification(
+            {
+                "article_id": article_id,
+                "industry_pack_id": "family_office",
+                "activation_id": "",
+                "industry_pack_version": "1.0.0",
+                "classifier_version": "legacy-fixture",
+                "article_content_hash": "projection-no-evidence",
+                "rule_category": "other",
+                "rule_confidence": 0.45,
+                "rule_reason": "通用行业过滤器：未命中行业核心词或行业包实体，不予准入",
+                "score_details": {
+                    "relevance_score": 0.0,
+                    "minimum_relevance_score": 0.0,
+                    "hits": {"anchor": [], "core": [], "expanded": []},
+                    "admitted": False,
+                },
+                "matched_keywords": [],
+                "topic_tags": [],
+                "final_category": "other",
+                "final_confidence": 0.45,
+                "final_reason": "通用行业过滤器：未命中行业核心词或行业包实体，不予准入",
+                "result_source": "industry_filter",
+            }
+        )
+        self.database.connection.commit()
+
+        result = self.repository.restore_pack_projection_for_activation(
+            industry_pack_id="family_office",
+            activation_id="new-activation",
+            target_pack_version="2.0.0",
+            project_keywords=["家族办公室"],
+        )
+        # 仍然算"重绑成功"（命中项目词池），但可见性不由激活决定。
+        self.assertEqual(result["classification_rows_restored"], 1)
+        details = json.loads(
+            self.database.connection.execute(
+                "SELECT score_details_json FROM article_intel_classifications WHERE article_id=?",
+                (article_id,),
+            ).fetchone()[0]
+        )
+        self.assertEqual(details["hits"]["anchor"], [])
+        _rows, total, _window = self.repository.list_classified_articles(
+            industry_pack_id="family_office", time_range="7d"
+        )
+        self.assertEqual(total, 0)
+        # 该行仍会被正常重分类流程领走，不是被静默丢弃。
+        pending_ids = {
+            int(row["id"])
+            for row in self.repository.list_unclassified_articles(
+                "family_office", limit=1000
+            )
+        }
+        self.assertIn(article_id, pending_ids)
 
     def test_failure_during_apply_rolls_back_settings_sources_and_activation(self):
         first = self._publish()
