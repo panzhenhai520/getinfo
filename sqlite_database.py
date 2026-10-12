@@ -1791,6 +1791,21 @@ class SQLiteDatabase:
                                 f"{str(article_data.get('title') or '无标题')[:50]}..."
                             )
                             return None
+                        # 栏目/首页/列表页 URL 形态（index.html、目录页、/album/、/zt/、
+                        # ?tag=/?keyword=、站点首页、机构公告栏目）：结构上不是单篇文章详情页。
+                        if "url_is_channel_or_index_page" in _hard_issues:
+                            print(
+                                "⏭️ 跳过栏目/首页/列表页（最终入库闸门）: "
+                                f"{str(article_data.get('url') or '')[:70]}..."
+                            )
+                            return None
+                        # 刊头式聚合索引标题（投资界24h | …）：标题是多条快讯的总目录，不是一篇稿件
+                        if "title_is_period_digest" in _hard_issues:
+                            print(
+                                "⏭️ 跳过聚合刊头页（最终入库闸门）: "
+                                f"{str(article_data.get('title') or '无标题')[:50]}..."
+                            )
+                            return None
                     except Exception as quality_exc:
                         print(f"⚠️ 最终链接目录检查失败，继续由上游准入处理: {quality_exc}")
 

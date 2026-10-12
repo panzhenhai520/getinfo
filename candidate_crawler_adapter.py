@@ -20,7 +20,7 @@ import requests
 from intel_candidates import IntelCandidateRepository, quick_score_candidate
 from industry_packs import industry_pack_loader
 from intel_http import SafeHTTPClient, sanitize_external_error, validate_external_url
-from intel_content_quality_gate import assess_article_quality
+from intel_content_quality_gate import assess_article_quality, looks_like_channel_or_index_url
 from intel_admission import assess_admission
 from intel_url_expansion import expand_links
 from sqlite_database import sqlite_db
@@ -55,6 +55,19 @@ def looks_like_listing_url(url: str) -> bool:
         or _LISTING_PAGE_RE.search(path)
         or _LISTING_QUERY_RE.search(parts.query)
     )
+
+
+def is_non_article_url(url: str) -> bool:
+    """候选 URL 是否"结构上不是单篇文章"——派发前统一判据（命中即永久拒绝，不抓取）。
+
+    两条规则取并集：
+      - `looks_like_listing_url`：tag / 栏目 / 作者 / 搜索 / 分页（业界公认聚合页路径）；
+      - `looks_like_channel_or_index_url`：站点首页、目录页、index.* 模板页、
+        /album/ 与 /zt/ 专题页、?keyword=/?tag= 列表页、以及信源配置的机构公告栏目。
+    后者是 A 机 invest_mgmt 976 行实测新增的一层：这批页面正文 69~3815 字，
+    能穿过"最小字数"闸门，但 URL 形态永不是文章详情页。
+    """
+    return bool(looks_like_listing_url(url) or looks_like_channel_or_index_url(url))
 
 
 def _detect_protection(*, status_code=None, headers=None, body="", url="") -> Optional[Dict]:
@@ -1099,12 +1112,15 @@ class CandidateCrawlerAdapter:
         crawler_task_id = self._ensure_task(candidate)
         # 列表页 URL 直接永久拒绝：tag/栏目/作者/搜索/分页页不是单篇文章，
         # 抓取后正文是"标题条目列表"（如 hit180.com/tag/xxx），必须在此层拦下。
+        # is_non_article_url 另含站点首页、目录页、index.* 模板页、/album/ 与 /zt/ 专题页、
+        # ?keyword=/?tag= 列表页与信源配置的机构公告栏目
+        # （URL 形态判据集中在 intel_content_quality_gate）。
         _candidate_url = str(candidate.get("original_url") or "")
-        if looks_like_listing_url(_candidate_url):
+        if is_non_article_url(_candidate_url):
             self.db.update_crawl_task_status(
                 crawler_task_id,
                 "failed",
-                error_message=f"URL 为列表/聚合页（tag/栏目/作者/搜索/分页），非单篇文章: {_candidate_url[:160]}",
+                error_message=f"URL 为列表/聚合页（tag/栏目/作者/搜索/分页/首页/专题），非单篇文章: {_candidate_url[:160]}",
             )
             return {
                 "success": False,

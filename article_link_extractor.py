@@ -383,7 +383,18 @@ class ArticleLinkExtractor:
                 return True
         except Exception:
             pass
-        
+
+        # 3.6 栏目/首页/列表页 URL 形态（信源层过滤）：站点首页、目录页、index.* 模板页、
+        # /album/ 与 /zt/ 专题页、?tag=/?keyword= 列表页、机构公告栏目——
+        # 这些 URL 结构上不是文章详情页，在候选阶段就跳过，不必再发一次请求。
+        try:
+            from intel_content_quality_gate import looks_like_channel_or_index_url
+
+            if looks_like_channel_or_index_url(url):
+                return True
+        except Exception:
+            pass
+
         # 4. 排除明显的导航链接（更严格的关键词）
         obvious_nav_keywords = [
             '登录', '注册', 'login', 'register', 'sign up', 'sign in',

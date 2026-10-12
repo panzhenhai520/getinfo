@@ -772,6 +772,32 @@ CRAWL_DENY_DOMAINS = tuple(
     if domain.strip()
 )
 
+# ==================== 行业包抓取：噪声页面闸门 ====================
+# 两条例外形态结构上永不是文章详情页，但正文长度足以穿过"最小字数/段落"检查，
+# 会被当文章入库（A 机 invest_mgmt 976 行实测占 98 行）。判定在
+# intel_content_quality_gate（纯函数、可复算、不联网），入库终局闸门与候选派发共用。
+#
+# 栏目/首页/列表页 URL 形态：index.* 模板页、目录页、/album/ 与 /zt/ 专题页、
+# ?tag=/?keyword= 列表页、站点首页、机构公告栏目。置 0 回退到旧行为。
+INTEL_REJECT_URL_SHAPE = _env_bool('INTEL_REJECT_URL_SHAPE', True)
+# 刊头式聚合索引标题（投资界24h | …、投资界LP周报 | …）：标题是多条并列快讯的总目录。
+# 置 0 回退到旧行为。
+INTEL_REJECT_PERIOD_DIGEST = _env_bool('INTEL_REJECT_PERIOD_DIGEST', True)
+# 信源栏目路径排除表：逗号分隔的「域名/栏目路径」片段，按 host+path 小写子串匹配。
+# 只用于"机构公告/定期披露"栏目——这类页面正文完整、正文规则区分不了，
+# 而按"公告/公示/遴选"关键词拦会连带压掉真行业事件
+# （如 news.pedaily.cn 的"郑州战新母基金子基金管理机构遴选结果公示"），
+# 所以只在信源栏目这一层按路径排除。留空则不排除任何栏目。
+INTEL_URL_DENY_PATH_PATTERNS = tuple(
+    item.strip().casefold()
+    for item in (_env_str(
+        'INTEL_URL_DENY_PATH_PATTERNS',
+        'amac.org.cn/zlgl/sljg,amac.org.cn/xwfb/tzgg,'
+        'boc.cn/cbservice/bi2,ggzy.gov.cn/information/deal',
+    ) or '').split(',')
+    if item.strip()
+)
+
 # HTTP代理地址，例如 http://127.0.0.1:7890
 PROXY_HTTP = _env_str('PROXY_HTTP')
 
