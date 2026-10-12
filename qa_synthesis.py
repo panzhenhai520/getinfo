@@ -41,6 +41,17 @@ _CITATION_LABEL_RE = re.compile(r"^\[\d+\]$")
 只用来识别**格式误填**（模型把正文标签填进了 `citations` 字段），
 不做任何内容解读、也不拿它放宽"不许引用不存在的证据"这条底线。"""
 _POLICY_QA_RE = re.compile(r"(公告|政策|法规|办法|条例|通知|个税|个人所得税|征管|离岸信托|境外信托)", re.I)
+_NO_EVIDENCE_RE = re.compile(
+    r"(无证据|没有(足够|相关|可用|对应)?的?(证据|依据|资料|信息)|缺乏(足够|相关|可用|对应)?的?(证据|依据|资料|信息)|"
+    r"(证据|依据|资料|信息)(不足|不充分|不完整|有限)|"
+    r"无法(确定|判断|回答|核实|确认|给出)|不能(确定|判断|回答|核实|确认)|"
+    r"不足以(回答|判断|确定|支撑)|未(能)?(找到|检索到)|没有找到)"
+)
+"""答案正文自述"无证据/没法据此作答"的词汇形态（**只判形态，不解读内容**）。
+
+只服务一个判定：答案正文是**如实拒答**还是**给出结论**。命中它并不会放宽任何底
+线（引用完整性、数字可回溯、grounding 闸门全都不看这个谓词）。
+"""
 
 _LOGGER = logging.getLogger(__name__)
 """本模块的日志器。存在意义只有一个：**失败必须留痕**。
@@ -743,6 +754,25 @@ def _answer_has_internal_noise(answer: object) -> bool:
     return bool(re.search(r"claim\s*=|^\s*[\{\[]['\"]?(sections|answer|claims|citations)['\"]?\s*:|已检索到参考资料|已检索到官方原文|未解决冲突：|其内容载明：", str(answer or ""), re.I))
 
 
+def _answer_is_refusal_or_no_evidence(answer: object) -> bool:
+    """答案正文是不是**如实拒答/明说无证据**（而不是给出结论）。
+
+    只看**首句**（按 `。；！？;` 与换行切分）：
+      · 实测形态（B 机 run 0b047cc4e0db49078f24e75e44beb28d）：首句就是
+        `无证据支持，无法回答。` —— 这正是被结构化渲染顶掉的那句"合法拒答"；
+      · **反过来不算**："先给结论、末句才补一句'证据不足'"的正文首句没有拒答形态，
+        照旧按内容判据顶掉（那种正文确实需要程序补引用/补结构，见对照用例）。
+    真需要结构化渲染的两种情形（正文含内部噪声、政策/风险问句缺行内引用）**不受本谓词保护**：
+    噪声优先于它，政策缺引用那条只对"非拒答"的正文生效 —— 见 `_answer_override_trigger`。
+    """
+    text = str(answer or "").strip()
+    if not text:
+        return False
+    head = re.split(r"[。；！？!?;\n]", text, maxsplit=1)[0].strip()
+    probe = head or text
+    return bool(_NO_EVIDENCE_RE.search(probe) or _REFUSAL_RE.search(probe))
+
+
 def _render_structured_answer_value(value: object, parsed: Mapping) -> str:
     if isinstance(value, str):
         text = value.strip()
@@ -807,6 +837,34 @@ def _answer_lacks_line_citations(answer: object) -> bool:
         return True
     missing = [line for line in substantive if not re.search(r"\[\d+\]", line)]
     return bool(missing)
+
+
+_OVERRIDDEN_EXCERPT_CHARS = 200
+"""散文被顶掉时留存的原文长度：够看出形态与长度，又不至于撑爆 `details_json`。"""
+
+
+def _answer_override_trigger(answer: object, question: str) -> str:
+    """模型散文被"结构化渲染"顶掉的**触发条件名**（返回空串 = 不顶掉）。
+
+    三条判据与改动前逐字一致，只把**如实拒答/明说无证据的正文**排除在两条"内容不足"判据之外
+    （`_answer_is_refusal_or_no_evidence`）。为什么必须排除：拒答句里既没有可引用的断言、
+    也没有可结构化的结论，用 `_build_structured_answer` 顶掉它等于"用程序话术掩盖模型的如实回答"
+    —— 实测就是那句 11 字的 `无证据支持，无法回答。` 被换成了"核心结论：<问题本身>"。
+      · `internal_noise`：正文含内部噪声（`claim=`、程序话术、JSON 片段）—— **优先级最高，拒不拒答都照旧顶掉**；
+      · `too_short`：正文不足 20 字且**不是**拒答（拒答常常只有一句话，长度判据对它没有意义）；
+      · `policy_missing_line_citation`：政策/风险问句缺行内引用且**不是**拒答 —— 照旧顶掉。
+    拒答形态**不会**因此绕过任何底线：引用完整性、数字可回溯、grounding 闸门都在本函数之外照跑。
+    """
+    text = str(answer or "")
+    if _answer_has_internal_noise(text):
+        return "internal_noise"
+    if _answer_is_refusal_or_no_evidence(text):
+        return ""
+    if len(text.strip()) < 20:
+        return "too_short"
+    if _policy_or_risk_question(question) and _answer_lacks_line_citations(text):
+        return "policy_missing_line_citation"
+    return ""
 
 
 def _public_evidence_gaps(gaps: list, evidence: list[Mapping]) -> list[str]:
@@ -1011,7 +1069,32 @@ def _claim_labels(claim: Mapping, reverse: Mapping[str, str]) -> list[str]:
     return [label for label in labels if label]
 
 
-def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: list[Mapping], citation_map: Mapping[str, str], models: Mapping | None = None) -> str:
+_STRUCTURED_LEAD = "本回答基于{label}召回的证据，经证据图整理后给出。"
+"""**结构化渲染路径**（模型正文被程序顶掉、按证据重组）的固定首行。
+
+措辞必须与 `_FALLBACK_LEAD` 逐字不同：这两条路过去共用同一句、且与旧版兜底模板句
+逐字相同，导致"模型答过但被顶掉"被误读成"又是兜底模板"。
+"""
+_FALLBACK_LEAD = "已完成{label}和证据图综合。"
+"""**终局兜底路径**（模型两次都没给出可用输出）的固定首行。
+
+沿用历史文案：它就是这条路自己的指纹 —— 看到它 + `sections` 只有 4 个键 +
+`SYNTHESIS_FALLBACK_USED` 码，就是兜底，不必再猜。
+"""
+
+
+def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: list[Mapping], citation_map: Mapping[str, str], models: Mapping | None = None, fallback: bool = False) -> str:
+    """证据约束的结构化正文。**两条路径共用骨架，但固定首行必须不同**：
+
+    · `fallback=False`（结构化渲染）：模型答了、但正文被 `_answer_override_trigger` 判为不能用，
+      于是程序按证据重组。首行 = `_STRUCTURED_LEAD`；
+    · `fallback=True`（终局兜底，`fallback_final_answer` 调用）：模型压根没给出可用的合规输出。
+      首行 = `_FALLBACK_LEAD`（沿用历史文案，它是这条路自己的指纹）。
+
+    历史事故：两条路共用同一句首行，而那句又与"旧版兜底模板句"逐字相同，于是
+    "模型正常作答、正文被程序顶掉"看起来跟"模型没答成、走了兜底"一模一样
+    （B 机 run 0b047cc4e0db49078f24e75e44beb28d 就是这么被误判成"又是模板"的）。
+    """
     reverse = _citation_reverse(evidence, citation_map)
     official_label = _first_official_label(evidence, citation_map)
     evidence_refs_by_official = {
@@ -1023,7 +1106,7 @@ def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: 
     rag_label = _public_text(dict(models or {}).get("research") or "RAG检索")
     if rag_label not in {"RAG检索", "RAG增强检索"}:
         rag_label = "RAG检索"
-    lines.append(f"已完成{rag_label}和证据图综合。")
+    lines.append((_FALLBACK_LEAD if fallback else _STRUCTURED_LEAD).format(label=rag_label))
 
     cleaned = []
     seen = set()
@@ -1705,11 +1788,19 @@ class QaFinalSynthesizer:
         if selected_claims:
             answer = _ensure_inline_citations(answer, selected_claims, {label: ref for ref, label in reverse.items() if label})
         answer = _pin_official_citation(answer, evidence, citation_map)
-        if (
-            _answer_has_internal_noise(answer)
-            or len(answer.strip()) < 20
-            or (_policy_or_risk_question(question) and _answer_lacks_line_citations(answer))
-        ):
+        # 散文被顶掉这件事**必须留下被顶掉的原文**：三条判据过去只能靠推断
+        # （B 机 run 0b047cc4e0db49078f24e75e44beb28d 就是如此，连"哪一条命中"都只能猜）。
+        # 这里先算出命中的是**哪一条**，命中时把被顶掉的原文片段挂进既有载体
+        # `sections.diagnostics`（`sections` 是自由 object：不新增数据库列、不改冻结 schema）。
+        override_trigger = _answer_override_trigger(answer, question)
+        prose_override = None
+        if override_trigger:
+            replaced = str(answer or "").strip()
+            prose_override = {
+                "trigger": override_trigger,
+                "chars": len(replaced),
+                "replaced_excerpt": replaced[:_OVERRIDDEN_EXCERPT_CHARS],
+            }
             answer = _build_structured_answer(
                 question=question, claims=selected_claims, evidence=evidence,
                 citation_map=citation_map, models=models,
@@ -1752,11 +1843,17 @@ class QaFinalSynthesizer:
             "degradation": public_degradation,
         }
         sections["risk_deep_dive"] = _build_risk_deep_dive(question, selected_claims, evidence, citation_map)
-        sections["diagnostics"] = {
+        diagnostics = {
             "degradation_codes": [
                 str(item.get("code") or "") for item in ledger if isinstance(item, Mapping) and item.get("code")
             ],
         }
+        # 只在真的顶掉时留痕：不顶掉的路径上 diagnostics 一个键都不多（"逐字不变"那条对照片照旧过）。
+        # 注意这是**取证信息**，不是降级账：`degraded`/`status`/`degradation_reasons` 的口径一字未动
+        # （顶掉模型散文本身不等于降级，改口径会把整批存量 run 的语义一起改掉）。
+        if prose_override:
+            diagnostics["prose_override"] = prose_override
+        sections["diagnostics"] = diagnostics
         degraded = bool(public_degradation)
         if not selected_claims:
             status = "insufficient_evidence"
@@ -1798,7 +1895,7 @@ def fallback_final_answer(*, graph: Mapping, level1: Mapping, level2: Mapping, d
         rag_label = "RAG检索"
     answer_text = _build_structured_answer(
         question=question, claims=claims, evidence=evidence,
-        citation_map=citation_map, models=models,
+        citation_map=citation_map, models=models, fallback=True,
     )
     unresolved = [
         item

@@ -373,9 +373,16 @@ class ReadableSectionsBehaviourUnchangedTests(_GenerationBase):
     """对照：sections 形状正常 → 行为逐字不变（只调一次、不降级、不带留痕键）。
 
     下面的期望值是**改动前跑出来的原文快照**：形状正常这条路上，本改动一个字都不该改。
-    快照里那句 `已完成RAG检索和证据图综合。…` 是既有 `_build_structured_answer` 的产物
-    （模型那句正文因为只有一行带引用、被既有 `_answer_lacks_line_citations` 判成
-    "政策类问句缺行内引用"而顶掉）—— 这是**改动前就有**的行为，与本改动无关，照抄不改。
+    快照里那句正文是既有 `_build_structured_answer` 的产物（模型那句正文因为只有一行带引用、
+    被既有 `_answer_lacks_line_citations` 判成"政策类问句缺行内引用"而顶掉）—— 这是
+    **改动前就有**的行为，与本改动无关，照旧不改。
+
+    唯一随语义更新的字面量：这条**结构化渲染路径**的固定首行。它原来是
+    `已完成RAG检索和证据图综合。`，与**终局兜底路径**的首行逐字相同（也就是旧版兜底模板句），
+    于是"模型答过、正文被程序顶掉"看起来和"模型没答成、走了兜底"一模一样（阶段 09 修）。
+    现在渲染路径用自己的首行 `本回答基于RAG检索召回的证据，经证据图整理后给出。`，
+    兜底路径保留 `已完成RAG检索和证据图综合。`（详见 tests/test_qa_synthesis_refusal_passthrough.py
+    的 PathDistinguishabilityTests）。除这一句外，本快照一个字符都没动。
     """
 
     def _good_raw(self):
@@ -413,7 +420,7 @@ class ReadableSectionsBehaviourUnchangedTests(_GenerationBase):
             "degradation_reasons": [],
             "degradation_codes": [],
             "answer": (
-                "已完成RAG检索和证据图综合。\n\n核心结论：\n"
+                "本回答基于RAG检索召回的证据，经证据图整理后给出。\n\n核心结论：\n"
                 "- 香港家族办公室税收优惠政策对内地高净值客户有影响 [1]\n\n"
                 "风险拆解与应对：\n"
                 "- 家族办公室服务流程：可能要求家族办公室重做架构体检、客户风险分层、"
