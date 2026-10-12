@@ -33,7 +33,7 @@ from qa_ragflow_client import QaRagflowResearchClient
 from qa_relevance import filter_relevant_evidence, question_terms
 from qa_reasoning import build_claim_evidence_graph
 from qa_research import QaRagflowResearchService, enrich_ragflow_evidence_from_database, insufficient_level2_result
-from qa_synthesis import QaFinalSynthesizer, fallback_final_answer
+from qa_synthesis import QaFinalSynthesizer, RAW_TRACE_KEY, fallback_final_answer
 from qa_retrieval import ArticleRetriever, default_web_search_service
 from qa_storage import QaStore
 from qa_flags import QaFeatureFlags
@@ -3932,13 +3932,21 @@ def build_qa_stage_handlers(
                 streamed_chars += len(text)
                 context["_answer_delta_streamed"] = True
 
+            # 原始模型输出留痕的接收口：`generate()` 的返回值必须保持"能直接过冻结契约"
+            # 的干净形状（`additionalProperties=False`），所以原文不挂在答案载荷上，
+            # 而是由这里收下、挂成本阶段输出的 `RAW_TRACE_KEY`，再由 orchestrator 摘进
+            # `qa_stage_runs.details_json`（零迁移、与 token_usage 同一处）。
+            raw_trace_sink: dict = {}
             result = final_synthesizer.generate(
                 question=_question_for_synthesis(context),
                 graph=graph, level1=level1, level2=level2,
                 degradation=degradation, profile=profile, models=models,
                 token_callback=_token_callback if callable(emit_stage_event) else None,
                 context_pack=context_pack,
+                raw_trace_sink=raw_trace_sink,
             )
+            if raw_trace_sink.get(RAW_TRACE_KEY):
+                result[RAW_TRACE_KEY] = raw_trace_sink[RAW_TRACE_KEY]
             resilience.circuit_success(dependency)
             # 阶段 09（P09-02/P09-03）：§9 主执行流的 Write Gate 位置**在最终答案之后**。
             # 只吃已核验证据图（不吃 result 的正文）——自由生成的内容永远不进记忆库；
@@ -3976,6 +3984,32 @@ def build_qa_stage_handlers(
                         "experience_memory": _exp_receipt,
                     })
             return result
+        except QaCircuitOpen as exc:
+            # 熔断保护：provider:local 处于熔断打开期，本轮**根本没调用模型**。
+            # 与 level1_draft 同口径特判（照抄它的写法）；否则会落进下面通用分支，
+            # 被 classify_qa_error 判成 INTERNAL_ERROR 再改写成 SYNTHESIS_FALLBACK_USED，
+            # 看上去像"模型答得不好"，掩盖了"模型没被调用"这个真原因。
+            if "profile" in locals():
+                # 保留既有副作用口径：熔断打开时再来一轮，同 level1_draft 一样续记一次失败
+                resilience.circuit_failure(f"provider:{profile.provider_id}")
+            public = QaPublicError(
+                "PROVIDER_CIRCUIT_OPEN",
+                "本地模型当前处于熔断保护（%s，约 %s 秒后自动探测恢复），本轮未真正调用模型，"
+                "已改用证据约束重组。" % (exc.dependency, exc.retry_after),
+                True,
+                str(run.get("synthesis_provider_id") or "local"),
+                "synthesis",
+                (QaAction("重试最终综合", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
+            )
+            item = {"stage": "synthesis", **public.to_event_payload(trace_id=run["id"])}
+            store.mark_degraded(run["id"], item)
+            return fallback_final_answer(
+                graph=graph, level1=level1, level2=level2,
+                degradation=degradation + [item], models=models,
+                # 刻意不传 reason：reason 会被 fallback_final_answer 再补一条
+                # SYNTHESIS_FALLBACK_USED，等于把"根本没调用模型"又标回兜底码。
+                reason="", question=_question_for_synthesis(context),
+            )
         except Exception as exc:
             if "profile" in locals():
                 resilience.circuit_failure(f"provider:{profile.provider_id}")
