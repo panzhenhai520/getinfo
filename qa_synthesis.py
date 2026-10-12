@@ -201,6 +201,10 @@ def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int =
     include_usage：请求体是否带 stream_options.include_usage（端点才会在末块回传用量）。
     None → 读 QA_STREAM_INCLUDE_USAGE（默认开）。端点不认该参数时，只要 400 报错点名了它，
     就摘掉参数原样重发一次，仍然走这条流式解析路径（不退化、不改变其它错误的失败路径）。
+
+    timeout：**读超时（秒），本层只认这个入参，不读任何 env**。两个调用方各自解析自己的键：
+      · `qa_level1.QaLevel1Generator` → `QA_LEVEL1_LOCAL_TIMEOUT_SECONDS`；
+      · `QaSynthesis.generate` → `QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS`。
     """
     if profile.provider_id != "local" and not profile.api_key:
         from qa_errors import missing_api_key_error
@@ -254,10 +258,16 @@ def _stream_openai_json_content(profile, messages: list[dict], *, timeout: int =
         # 流式路径就永远采不到用量 → Cost 基线恒为 0。带上后末块回传 usage（4 块 / 1 用量）。
         payload["stream_options"] = {"include_usage": True}
     is_local = str(profile.provider_id or "").casefold() == "local"
-    read_timeout = (
-        _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 8, 4, 300)
-        if is_local else int(timeout or 90)
-    )
+    # 超时键口径（乙案）：socket 层**不读任何 env**，只认调用方传进来的数。
+    # 历史坑（四个后果都是同一条代码造成的）：local 分支曾直接读
+    # `QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS`（默认 8、夹取 [4,300]），于是
+    #   ① 一个"合成"命名的键**越界控制**了 level1 的流式读超时（qa_level1 也走这条函数）；
+    #   ② 不设它 = 本地流式读超时**恒 8 秒**，调用方按端点能力推导出来的值被整条丢弃；
+    #   ③ 夹取区间 [4,300] 与调用侧 [0,600] 不一致（写 600 实际只生效 300）；
+    #   ④ 调 `QA_LEVEL1_LOCAL_TIMEOUT_SECONDS` 对流式路径**完全无效**。
+    # 现在：调用方各自解析自己的键 → 传入值 = 生效值 = 判定值
+    # （任务 ③ 判"是否真超时"用的就是这个数，避免了"按 A 键判超时、实际被 B 键控制"的二次说谎）。
+    read_timeout = max(1, int(timeout or 90))
     request_url = f"{safe_base.rstrip('/')}/chat/completions"
     request_kwargs = {
         "headers": headers,
@@ -661,6 +671,13 @@ def _is_digest_claim(value: object) -> bool:
     return False
 
 
+EVIDENCE_ONLY_NOTE = "本条回答由已核验证据摘录生成，未经模型综合"
+"""任务 ③ 的固定标注文案（**一个字都不许改**；`templates/mapindex.html` 直接渲染它）。
+
+单一事实源放在**本模块**：下面 `_public_degradation_reasons` 要按它做一条过滤规则，
+而 `qa_pipeline` 从本模块 import 它 —— 同一句话只写一遍，不给日后漂移留口子。"""
+
+
 def _public_degradation_reasons(degradation: list, reason: str = "") -> list[str]:
     result, seen = [], set()
     for item in list(degradation or []) + ([{"message": reason}] if reason else []):
@@ -672,6 +689,14 @@ def _public_degradation_reasons(degradation: list, reason: str = "") -> list[str
             continue
         public = _public_text(message)
         if re.search(r"暂时无法连接\s*local|综合模型响应超时|RAG增强检索.*暂不可用|深度知识库暂不可用|已保留.*证据", public):
+            continue
+        # 任务 ③ 的固定文案**只能由"本次运行的答案载荷自己"声明**（`qa_pipeline._mark_evidence_only_payload`
+        # 直接写进载荷，不走这里）。为什么必须在这里挡一道：run 级的降级账本是**跨阶段、跨尝试累积**的，
+        # 一旦把历史条目的这句话抄进新答案的 degradation_reasons，就会出现
+        # "模型明明综合过、回答却自称未经模型综合"的假话 —— 那正是任务明令禁止的二次说谎。
+        # 前缀匹配（凡是以这句固定文案开头的条目一律丢掉）：这句话的唯一产地就是
+        # `qa_pipeline._evidence_only_message`，不会误伤别的文案。
+        if public.startswith(EVIDENCE_ONLY_NOTE):
             continue
         if not public or public in seen:
             continue
@@ -1397,6 +1422,7 @@ class QaFinalSynthesizer:
         token_callback: Callable[[str], None] | None = None,
         context_pack: Mapping | None = None,
         raw_trace_sink: dict | None = None,
+        timeout_sink: dict | None = None,
     ) -> dict:
         """综合最终答案。
 
@@ -1404,6 +1430,11 @@ class QaFinalSynthesizer:
         原始模型输出（截断到 `_RAW_TRACE_CHARS`）放进它的 `RAW_TRACE_KEY` 键，供调用方
         落进 `qa_stage_runs.details_json`。**默认 None 时行为逐字不变**；返回值永远
         不带这个键 —— 合成输出必须保持"能直接过冻结契约"的干净形状。
+
+        `timeout_sink`：可选的外部字典。把本阶段**实际生效的读超时**（= 真正传给 requests 的
+        那个数）连同它的来源写进去，供调用方判"这一次到底是真超时还是别的原因"
+        （超时键口径（乙案）：传入值 = 生效值 = 判定值）。**默认 None 时行为逐字不变**，
+        且返回值永远不带这个键 —— 答案载荷要保持"能直接过冻结契约"的干净形状。
         """
         messages = self._messages(question=question, graph=graph, level1=level1, level2=level2,
                                   degradation=degradation, context_pack=context_pack)
@@ -1414,20 +1445,34 @@ class QaFinalSynthesizer:
             """把本阶段（可能多次调用）的用量挂到阶段输出上；拿不到就不挂 token_usage 键。"""
             return _with_token_usage(payload, _merge_token_usage(*usage_parts))
 
+        def _record_timeout(payload: Mapping) -> None:
+            """把生效超时回传给调用方；sink 不是字典就什么都不做（旁路，绝不影响出答案）。"""
+            if isinstance(timeout_sink, dict):
+                timeout_sink.update(dict(payload))
+
         if token_callback:
             raw_parts = []
             answer_delta = _JsonAnswerDeltaExtractor()
             streamed_buffer = []
             structured_answer_stream = False
-            # 阶段 6-5：流式读超时按端点能力推导（显式 env 优先，其次探测推导，最后兜底）
-            if str(getattr(profile, "provider_id", "") or "").casefold() == "local":
-                stream_timeout = (
-                    _int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 0, 0, 600)
-                    or _synthesis_local_timeouts(profile).get("first_token_seconds")
-                    or 120
-                )
+            is_local = str(getattr(profile, "provider_id", "") or "").casefold() == "local"
+            # 阶段 6-5 + 超时键口径（乙案）：**本阶段的流式读超时由本键独占**。
+            # `QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS` 现在只作用于 synthesis 流式
+            # （不再越界控制 level1）；未设时走端点能力推导，**不再恒 8 秒**。
+            env_first = (_int_env("QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS", 0, 0, 600)
+                         if is_local else 0)
+            derived_first = (_synthesis_local_timeouts(profile).get("first_token_seconds")
+                             if is_local and not env_first else None)
+            if is_local:
+                stream_timeout = env_first or derived_first or 120
+                stream_source = "env" if env_first else ("endpoint" if derived_first else "default")
             else:
                 stream_timeout = 90
+                stream_source = "default"
+            _record_timeout({
+                "stage": "synthesis", "path": "stream", "read_seconds": int(stream_timeout),
+                "source": stream_source, "keys": ["QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS"],
+            })
             stream_usage: dict = {}
             for content in _stream_openai_json_content(
                 profile, messages, timeout=stream_timeout, usage_sink=stream_usage,
@@ -1453,14 +1498,23 @@ class QaFinalSynthesizer:
             raw = "".join(raw_parts)
             usage_parts.append(stream_usage)
         else:
-            if str(getattr(profile, "provider_id", "") or "").casefold() == "local":
-                raw_timeout = (
-                    _int_env("QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS", 0, 0, 600)
-                    or _synthesis_local_timeouts(profile).get("request_seconds")
-                    or 180
-                )
+            is_local = str(getattr(profile, "provider_id", "") or "").casefold() == "local"
+            # 非流式路径的超时键与流式**不是同一个**（流式那条见上）：`QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS`
+            # 只管非流式整体读超时。这里同样把生效值回传，供调用方判"是否真超时"。
+            env_raw = (_int_env("QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS", 0, 0, 600)
+                       if is_local else 0)
+            derived_raw = (_synthesis_local_timeouts(profile).get("request_seconds")
+                           if is_local and not env_raw else None)
+            if is_local:
+                raw_timeout = env_raw or derived_raw or 180
+                raw_source = "env" if env_raw else ("endpoint" if derived_raw else "default")
             else:
                 raw_timeout = 90
+                raw_source = "default"
+            _record_timeout({
+                "stage": "synthesis", "path": "non_stream", "read_seconds": int(raw_timeout),
+                "source": raw_source, "keys": ["QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS"],
+            })
             raw = self.model_client(profile, messages, timeout=raw_timeout)
             usage_parts.append(_client_last_usage(self.model_client))
         if _is_model_refusal(raw):
@@ -1514,6 +1568,14 @@ class QaFinalSynthesizer:
                                 attempt + 1, type(exc).__name__, str(exc)[:300])
                 if attempt:
                     break
+                if str(getattr(profile, "provider_id", "") or "").casefold() == "local":
+                    repair_timeout = _int_env("QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS", 6, 3, 120)
+                else:
+                    repair_timeout = 80
+                # 修复重试的读超时同样回传：它是**另一个键**（`..._REPAIR_...`），
+                # 不记下来的话"这次到底被哪个键的超时卡住"就又说不清了。
+                if isinstance(timeout_sink, dict):
+                    timeout_sink["repair_read_seconds"] = int(repair_timeout)
                 raw = self.model_client(
                     profile,
                     self._messages(
@@ -1521,10 +1583,7 @@ class QaFinalSynthesizer:
                         degradation=degradation, repair_error=str(exc), prior=str(raw),
                         context_pack=context_pack,
                     ),
-                    timeout=(
-                        _int_env("QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS", 6, 3, 120)
-                        if str(getattr(profile, "provider_id", "") or "").casefold() == "local" else 80
-                    ),
+                    timeout=repair_timeout,
                 )
                 usage_parts.append(_client_last_usage(self.model_client))
                 if _is_model_refusal(raw):

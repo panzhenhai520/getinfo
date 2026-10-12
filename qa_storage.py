@@ -137,6 +137,18 @@ _CONFIG_HASH_KEYS = (
     # 政策解析上限与生成侧选择
     "QA_STANDARD_MAX_HOPS", "QA_DEEP_MAX_HOPS", "QA_MAX_QUERIES_PER_HOP", "QA_MAX_EVIDENCE",
     "QA_SYNTHESIS_PROVIDER", "QA_RESEARCH_TIMEOUT_SECONDS", "QA_LLM_SELECTION",
+    # 生成侧超时族（**必须进指纹**）：这几个键直接决定 level1 草稿与最终综合的流式/非流式读超时，
+    # 也就直接决定"这一次调用是真超时还是真答完"。历史事故正是"指纹相同 ≠ 行为相同"：
+    # 调 `QA_LEVEL1_LOCAL_TIMEOUT_SECONDS` 对流式路径曾经**完全无效**（socket 层越界读
+    # `QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS`），于是两台机器 config_hash 一致、
+    # 实际生效的超时却不同 → 拿 config_hash 做复用/回放等价判定会被骗。超时键改了 → 哈希必须变，
+    # 旧的"同配置"结论自然失效。（`QA_LEVEL1_LOCAL_MAX_TOKENS` 同理：它决定模型输出上限，
+    # 而输出被截断与否会改变整条 run 的产出形态。）
+    "QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", "QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS",
+    "QA_LEVEL1_LOCAL_MAX_TOKENS",
+    "QA_SYNTHESIS_LOCAL_TIMEOUT_SECONDS", "QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS",
+    "QA_SYNTHESIS_LOCAL_REPAIR_TIMEOUT_SECONDS",
+    "QA_ENDPOINT_REQUEST_TIMEOUT_SECONDS", "QA_ENDPOINT_FIRST_TOKEN_TIMEOUT_SECONDS",
 )
 """纳入 config_hash 的配置键：全部是"改了就影响问答链路"的静态配置。"""
 

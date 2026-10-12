@@ -33,7 +33,12 @@ from qa_ragflow_client import QaRagflowResearchClient
 from qa_relevance import filter_relevant_evidence, question_terms
 from qa_reasoning import build_claim_evidence_graph
 from qa_research import QaRagflowResearchService, enrich_ragflow_evidence_from_database, insufficient_level2_result
-from qa_synthesis import QaFinalSynthesizer, RAW_TRACE_KEY, fallback_final_answer
+from qa_synthesis import (
+    EVIDENCE_ONLY_NOTE,
+    QaFinalSynthesizer,
+    RAW_TRACE_KEY,
+    fallback_final_answer,
+)
 from qa_retrieval import ArticleRetriever, default_web_search_service
 from qa_storage import QaStore
 from qa_flags import QaFeatureFlags
@@ -358,6 +363,131 @@ def _evidence_anchored_level1_fallback(message: str, evidence: list[dict], queri
     result["gaps"] = ["资料检索已完成，事实主张仍需结合更多可引用依据继续核验。"]
     result["followup_queries"] = list(queries)[:5]
     return validate_level1_result(result)
+
+
+# ── 任务 ③：只在"模型真的失败/超时"之后降级成证据摘录 ─────────────────────────
+# 用户口径（五条，缺一不可）：默认仍然用模型（好答案优先）；只有模型**真的失败或超时之后**
+# 才降级成"证据摘录"式，**不许预防性跳过**；必须如实标注"这条答案是证据摘录、未经模型综合"，
+# 让人一眼看得见；判定放在**一处**，两个阶段（level1_draft / synthesis）口径一致；两个阶段都要记账。
+EVIDENCE_ONLY_NO_MODEL = "EVIDENCE_ONLY_NO_MODEL"
+""""证据摘录（未经模型综合）"的稳定码（stage=level1_draft / synthesis 共用同一套语义）。
+
+占判定矩阵**新的一格**，与"熔断（PROVIDER_CIRCUIT_OPEN）"和"契约失败兜底
+（SYNTHESIS_STRUCTURED_FALLBACK / SYNTHESIS_FALLBACK_USED / LEVEL1_OUTPUT_INVALID）"**互斥**。
+明确**不复用**已被删除的旧码 `SYNTHESIS_FAST_EVIDENCE_MODE`：那个是"预防性跳过"，
+语义完全不同，复用会让统计不可证伪（要在 diagnostics 里比对，见 `_EVIDENCE_ONLY_SUPERSEDES`）。
+触发原因（如 `NETWORK_UNREACHABLE`）只作为 item 的 `detail` 与 message 内容。"""
+
+EVIDENCE_ONLY_NOTE = EVIDENCE_ONLY_NOTE
+"""固定文案（**一个字都不许改**）：`degradation_reasons` 里必须出现它，UI 才看得见这条标注。
+
+来源是 `qa_synthesis.EVIDENCE_ONLY_NOTE`（**单一事实源**：那边还按它做一条过滤规则，
+防止 run 级账本里这句话被抄进"其实被模型综合过"的新答案 —— 见 `_public_degradation_reasons`）。
+
+UI 的唯一渲染点是 `templates/mapindex.html` 读 `result.degradation_reasons`（`slice(0, 6)`），
+所以这条**必须插在 reasons 的第 1 位**（追加到第 7 位以后等于看不见）。"""
+
+EVIDENCE_ONLY_HEADER = "【未经模型综合】"
+"""正文顶部 header 块的前缀（与 `qa_final_verifier.INSUFFICIENT_HEADER` 同手法、同幂等口径）。"""
+
+_EVIDENCE_ONLY_SUPERSEDES = "SYNTHESIS_FAST_EVIDENCE_MODE"
+"""新码"取代"的旧码名（只写进 `sections.diagnostics` 供比对，**绝不参与任何判定**）。"""
+
+_EVIDENCE_ONLY_TRIGGER_CODES = frozenset({
+    "NETWORK_UNREACHABLE",     # 超时 / 连不上（`classify_qa_error` 对 Timeout 与 ConnectionError 都给这个码）
+    "RESEARCH_TIMEOUT",        # level2 阶段超时（本 helper 不用于 level2，留着是为了口径完整）
+    "RAGFLOW_UNAVAILABLE",     # 依赖不可用
+})
+"""第 ③ 格允许触发新码的公开码：**只有这一次调用真的超时/连不上/依赖不可用**。
+
+必须逐个点名，不许写成"非配置类都算"：漏一个的最坏后果是把"没配 Key"这类**配置问题**
+说成"模型失败"，那又是一次说谎。"""
+
+_EVIDENCE_ONLY_CONFIG_CODES = frozenset({
+    "API_KEY_MISSING", "API_KEY_INVALID", "MODEL_NOT_FOUND",
+    "PROVIDER_NOT_CONFIGURED", "SYNTHESIS_OPERATIONS_DISABLED",
+})
+"""第 ② 格：路径/配置禁用类 —— **保持原码**，绝不许被记成"模型失败"。"""
+
+
+def _evidence_only_message(note: str, detail: str, reason: str = "") -> str:
+    """降级 item 的对外文案：**固定文案在前**（一眼能看见"未经模型综合"）+ 阶段原因 + 触发原因。
+
+    这段文案进的是 **run 级账本**（`qa_runs.degradation_json`）与 `degraded` 事件；
+    答案载荷里的固定文案由 `_mark_evidence_only_payload` 直接写（不走 `_public_degradation_reasons`
+    的过滤），两者是两件事：账本记"这一阶段真的没走模型"，载荷记"这条回答是证据摘录"。
+    """
+    text = str(note or "").strip()
+    reason = " ".join(str(reason or "").split())
+    if reason:
+        text += "，" + reason
+    detail = " ".join(str(detail or "").split())
+    if detail:
+        text += "（触发原因：%s）" % detail
+    return text[:500]
+
+
+def _evidence_only_header_block(detail: str) -> str:
+    """正文顶部的显式说明块：写明"这是证据摘录、没经过模型综合"+ 触发原因。"""
+    lines = [EVIDENCE_ONLY_HEADER + EVIDENCE_ONLY_NOTE + "。"]
+    detail = " ".join(str(detail or "").split())
+    if detail:
+        lines.append("触发原因：" + detail[:200])
+    lines.append("以下内容由已核验证据原文摘录拼接而成，未经过模型的跨证据推理；请以引用来源为准。")
+    return "\n".join(lines)
+
+
+def _mark_evidence_only_payload(payload: Mapping, *, stage: str, code: str,
+                                detail: str = "", timeouts: Mapping | None = None) -> dict:
+    """把"证据摘录、未经模型综合"**如实标注**到该阶段的载荷上（幂等：跑两次逐字相同）。
+
+    为什么必须在这里自己补文案：`qa_synthesis._public_degradation_reasons` 会按正则丢掉若干
+    内部文案（"已保留…证据"等），只依赖它就会出现"标注被吃掉、UI 上看不见"——看不见的标注
+    等于没有标注。所以固定文案在**最后一道**直接写进 reasons 的第 1 位（与 2af3546 把回填写在
+    落库前最后一道同一手法）。
+
+    一级结果（`LEVEL1_RESULT_SCHEMA`，additionalProperties=False）**没有**
+    degradation_reasons / sections / status 这三个字段，它"这条答案"就是 `draft_answer`
+    → 一级的标注落在正文顶部；另外三处（reasons / 诊断码 / status）只存在于最终答案载荷上。
+
+    `timeouts`：任务 ② 回传的"**真正传给 requests 的那个读超时**"，顺手记进最终答案的
+    `sections.diagnostics.model_timeouts`（sections 在冻结契约里是自由对象，写它不改任何 schema），
+    于是"这次到底被哪个键、哪个数卡住"在答案载荷里也能查。
+    """
+    result = dict(payload or {})
+    stage = str(stage or "")
+    if stage == "level1_draft":
+        draft = str(result.get("draft_answer") or "")
+        if EVIDENCE_ONLY_HEADER not in draft:
+            result["draft_answer"] = (_evidence_only_header_block(detail) + "\n\n" + draft)[:30000]
+        return result
+    text = str(result.get("answer") or "")
+    if EVIDENCE_ONLY_HEADER not in text:
+        result["answer"] = (_evidence_only_header_block(detail) + "\n\n" + text.lstrip())[:79000]
+    # 固定文案插到**第 1 位**：UI 只渲染前 6 条，追加到后面等于看不见。
+    reasons = [EVIDENCE_ONLY_NOTE] + [
+        str(item).strip() for item in (result.get("degradation_reasons") or [])
+        if str(item or "").strip() and str(item).strip() != EVIDENCE_ONLY_NOTE
+    ]
+    result["degradation_reasons"] = reasons[:20]
+    sections = dict(result.get("sections") or {}) if isinstance(result.get("sections"), Mapping) else {}
+    diagnostics = (dict(sections.get("diagnostics") or {})
+                   if isinstance(sections.get("diagnostics"), Mapping) else {})
+    codes = [str(item).strip() for item in (diagnostics.get("degradation_codes") or [])
+             if str(item or "").strip()]
+    if code and code not in codes:
+        codes.append(code)
+    diagnostics["degradation_codes"] = codes
+    diagnostics["supersedes"] = _EVIDENCE_ONLY_SUPERSEDES
+    if isinstance(timeouts, Mapping) and timeouts:
+        diagnostics["model_timeouts"] = dict(timeouts)
+    sections["diagnostics"] = diagnostics
+    result["sections"] = sections
+    result["degraded"] = True
+    # status 只**降**不升：ready → partial；已经是 insufficient_evidence 的保持更低档。
+    if str(result.get("status") or "") == "ready":
+        result["status"] = "partial"
+    return result
 
 
 def _env_int(name: str, default: int, low: int, high: int) -> int:
@@ -2662,6 +2792,15 @@ def _local_retrieval(article_retriever, fleet, plan: Mapping, *, industry_pack_i
             plan, industry_pack_id=industry_pack_id, page_context=page_context, limit=limit), receipt
 
 
+def _payload_degradation_codes(result: Mapping) -> list[str]:
+    """答案载荷里的公开诊断码（`sections.diagnostics.degradation_codes`，契约内既有字段）。"""
+    sections = result.get("sections") if isinstance(result, Mapping) else None
+    diagnostics = sections.get("diagnostics") if isinstance(sections, Mapping) else None
+    raw_codes = diagnostics.get("degradation_codes") if isinstance(diagnostics, Mapping) else None
+    return [str(item).strip() for item in (raw_codes if isinstance(raw_codes, (list, tuple)) else [])
+            if str(item or "").strip()]
+
+
 def _synthesis_degradation_item(result: Mapping) -> dict:
     """综合阶段"正常返回但答案被标注降级"时的 run 级记账项（方案①）。
 
@@ -2669,11 +2808,7 @@ def _synthesis_degradation_item(result: Mapping) -> dict:
     取不到就退回稳定的 `SYNTHESIS_DEGRADED`。`message` 取公开的第 1 条降级原因，
     过滤后为空时用诊断码拼串兜底 —— **降级不许静默**：记账里必须看得出为什么降级。
     """
-    sections = result.get("sections")
-    diagnostics = sections.get("diagnostics") if isinstance(sections, Mapping) else None
-    raw_codes = diagnostics.get("degradation_codes") if isinstance(diagnostics, Mapping) else None
-    codes = [str(item).strip() for item in (raw_codes if isinstance(raw_codes, (list, tuple)) else [])
-             if str(item or "").strip()]
+    codes = _payload_degradation_codes(result)
     raw_reasons = result.get("degradation_reasons")
     reasons = [str(item).strip() for item in (raw_reasons if isinstance(raw_reasons, (list, tuple)) else [])
                if str(item or "").strip()]
@@ -2735,6 +2870,83 @@ def build_qa_stage_handlers(
                 retries=1,
                 proxies=config.get_ragflow_proxies() if hasattr(config, "get_ragflow_proxies") else None,
             )
+
+    def _evidence_only_fallback(context, *, stage: str, public, evidence_source: str = "",
+                                build_payload, code: str = EVIDENCE_ONLY_NO_MODEL) -> dict:
+        """任务 ③ 的**判定与记账只在这里**（level1_draft / synthesis 共用同一个 helper）。
+
+        它同时做四件事（顺序固定，缺一不可）：
+          ① 产出降级载荷 —— 由 `build_payload(item, note)` 复用各阶段**既有**的降级实现
+             （level1 = `_evidence_anchored_level1_fallback`；synthesis = `fallback_final_answer`），
+             不改它们任何一个字的口径；
+          ② 写 run 级 `store.mark_degraded` —— **无条件**（含以前故意跳过的
+             `LEVEL1_OUTPUT_INVALID`：那正是判定矩阵里"A/C/D/E 四处全空"的空档 ⑧）；
+          ③ `emit_stage_event("degraded", item)`（事件类型是契约 `QA_EVENT_TYPES` 里既有的，不新增）；
+          ④ 在 context 上留 `_stage_degraded[stage]`，供终局落库前判定"这一段是不是证据摘录"。
+
+        触发条件的优先级由**调用点**钉死、互斥（顺序不许调换）：
+          ① 熔断 `QaCircuitOpen` 走**独立分支**，码固定 `PROVIDER_CIRCUIT_OPEN`，**绝不进这里**
+             —— 历史坑：有个被撤掉的实现把"跳过模型"的门控放在熔断检查**之前**，把熔断也吃成了
+             "快速模式"，于是"模型没被调用"被伪装成"模型答得不好"；
+          ② 路径/配置禁用（运维关掉 synthesis、provider 未配置/无 Key）→ **保持原码**；
+          ③ 这一次调用真的异常/超时（`public.code` 命中 `_EVIDENCE_ONLY_TRIGGER_CODES`）→ 新码；
+          ④ 契约失败**且该阶段自带修复重试已用尽**（level1 两次 / synthesis 两次）→ 沿用既有码；
+          ⑤ 模型明确拒答 → 新码。
+
+        **明令禁止**：任何基于"耗时/预算/上一次运行慢"的**预防性跳过**；也不许拿"本 run 早先
+        阶段出现过 NETWORK_UNREACHABLE"当后续阶段跳模型的理由 —— 每个阶段只判**自己这一次**
+        调用的结果（`evidence_source` 就是这一次的原始触发原因）。
+        """
+        run = context.get("run") if isinstance(context.get("run"), Mapping) else {}
+        run_id = str(run.get("id") or "")
+        detail = " ".join(str(evidence_source or getattr(public, "code", "") or "").split())[:200]
+        # 任务 ②→③ 的接口：判"是否真超时"必须用**真正传给 requests 的那个数**
+        # （乙案保证"传入值 = 生效值 = 判定值"），所以把它一起记进 item / 事件 / 阶段输出。
+        timeouts = {}
+        recorded = context.get("_stage_model_timeouts")
+        if isinstance(recorded, Mapping) and isinstance(recorded.get(str(stage or "")), Mapping):
+            timeouts = dict(recorded[str(stage or "")])
+        item = {
+            "stage": str(stage or ""),
+            "code": str(code or EVIDENCE_ONLY_NO_MODEL),
+            "message": _evidence_only_message(
+                EVIDENCE_ONLY_NOTE, detail, str(getattr(public, "message", "") or "")),
+            "detail": detail,
+        }
+        if timeouts:
+            item["model_timeouts"] = timeouts
+        payload = build_payload(item, EVIDENCE_ONLY_NOTE)
+        annotated = _mark_evidence_only_payload(payload, stage=stage, code=item["code"],
+                                                detail=detail, timeouts=timeouts)
+        # ② run 级记账：run 级写点 = 本 helper（主）+ `qa_storage.update_run` 的派生段（结构兜底）
+        #    → 新路径**不可能**再出现"run 级说没降级、答案级说降级"。
+        if run_id:
+            store.mark_degraded(run_id, item)
+        # ③ 事件（契约里既有的事件类型）
+        emit = context.get("_emit_stage_event")
+        if callable(emit):
+            emit("degraded", dict(item))
+        # ④ 阶段标记
+        degraded_stages = context.get("_stage_degraded")
+        if not isinstance(degraded_stages, dict):
+            degraded_stages = {}
+            context["_stage_degraded"] = degraded_stages
+        degraded_stages[str(stage or "")] = dict(item)
+        return annotated
+
+    def _record_stage_timeouts(context, stage: str, sink) -> None:
+        """任务 ② → ③ 的接口：把"**真正传给 requests 的那个数**"留在这条 run 的 context 上。
+
+        任务 ② 的乙案保证"传入值 = 生效值 = 判定值"，所以判"这一次是否真超时"必须用这个数，
+        而不是"按 A 键判、实际被 B 键控制"。
+        """
+        if not isinstance(sink, dict) or not sink:
+            return
+        timeouts = context.get("_stage_model_timeouts")
+        if not isinstance(timeouts, dict):
+            timeouts = {}
+            context["_stage_model_timeouts"] = timeouts
+        timeouts[str(stage or "")] = dict(sink)
 
     def _prewarm_synthesis_provider(context, *, reason: str = "plan") -> None:
         run = context.get("run") or {}
@@ -3360,15 +3572,22 @@ def build_qa_stage_handlers(
             return result
         profile = None
 
-        def degrade_to_evidence_draft(public: QaPublicError, *, dependency_id: str = "") -> dict:
-            item = {"stage": "level1_draft", **public.to_event_payload(trace_id=run["id"])}
-            if public.code not in {"LEVEL1_OUTPUT_INVALID"}:
-                store.mark_degraded(run["id"], item)
+        def degrade_to_evidence_draft(public: QaPublicError, *, dependency_id: str = "",
+                                      trigger: str = "", code: str = EVIDENCE_ONLY_NO_MODEL) -> dict:
+            """一级草稿降级成证据摘录（任务 ③：判定/记账/标注统一交给 `_evidence_only_fallback`）。
+
+            `trigger`：**这一次调用**的原始触发原因（如 `NETWORK_UNREACHABLE`），只进 detail 与文案；
+            `code`：② 路径/配置禁用与 ④ 契约失败用既有码，③ 真异常/超时与 ⑤ 拒答用新码。
+            """
+            result = _evidence_only_fallback(
+                context, stage="level1_draft", public=public,
+                evidence_source=trigger or public.code, code=code,
+                build_payload=lambda item, note: _evidence_anchored_level1_fallback(
+                    public.message, evidence, list(retrieval_plan.get("queries") or [])),
+            )
             if dependency_id:
                 resilience.circuit_failure(dependency_id)
-            return _evidence_anchored_level1_fallback(
-                public.message, evidence, list(retrieval_plan.get("queries") or []),
-            )
+            return result
 
         try:
             profile = provider_registry.resolve(
@@ -3379,20 +3598,29 @@ def build_qa_stage_handlers(
             )
             dependency = f"provider:{profile.provider_id}"
             resilience.circuit_before(dependency)
-            result = level1_generator.generate(
-                question=_question_for_synthesis(context),
-                plan=retrieval_plan,
-                evidence=evidence,
-                profile=profile,
-                # 阶段 6-6：首 token 到达就回报，别让用户干等（草稿阶段没有可见输出）
-                first_token_callback=(
-                    (lambda seconds: emit_stage_event("stage_progress", {
-                        "message": "模型已开始生成初步结论（首字 %.1f 秒），完整草稿仍在生成中。" % seconds,
-                        "first_token_seconds": seconds,
-                        "stats": {"first_token_seconds": seconds},
-                    })) if callable(emit_stage_event) else None
-                ),
-            )
+            level1_timeouts: dict = {}
+            try:
+                result = level1_generator.generate(
+                    question=_question_for_synthesis(context),
+                    plan=retrieval_plan,
+                    evidence=evidence,
+                    profile=profile,
+                    # 阶段 6-6：首 token 到达就回报，别让用户干等（草稿阶段没有可见输出）
+                    first_token_callback=(
+                        (lambda seconds: emit_stage_event("stage_progress", {
+                            "message": "模型已开始生成初步结论（首字 %.1f 秒），完整草稿仍在生成中。" % seconds,
+                            "first_token_seconds": seconds,
+                            "stats": {"first_token_seconds": seconds},
+                        })) if callable(emit_stage_event) else None
+                    ),
+                    # 任务 ②/③ 接口：把"真正传给 requests 的那个读超时"带出来
+                    # （传入值 = 生效值 = 判定值）
+                    timeout_sink=level1_timeouts,
+                )
+            finally:
+                # 必须放 finally：**超时/异常这条路上更要把生效超时留下**（判定要用它），
+                # 而它恰恰不会走到下面那行。
+                _record_stage_timeouts(context, "level1_draft", level1_timeouts)
             resilience.circuit_success(dependency)
         except QaContractError as exc:
             # The model has already had one bounded repair attempt.  A bad
@@ -3415,6 +3643,9 @@ def build_qa_stage_handlers(
             result = degrade_to_evidence_draft(
                 public,
                 dependency_id=f"provider:{profile.provider_id}" if profile is not None else "",
+                # ④ 契约失败且**该阶段自带修复重试已用尽**（level1 两次）→ 沿用既有码；
+                #    但记账/标注照旧走同一个 helper（顺手补上原先被故意跳过 mark_degraded 的空档 ⑧）。
+                code="LEVEL1_OUTPUT_INVALID",
             )
         except QaStageFailure as exc:
             public = exc.public_error
@@ -3426,11 +3657,17 @@ def build_qa_stage_handlers(
                 public.stage,
                 tuple(public.actions),
             )
+            # ② 配置类（未配 Key 等）保持原码；③ 其余 `QaStageFailure` 是"这次调用真的失败" → 新码。
+            config_disabled = public.code in _EVIDENCE_ONLY_CONFIG_CODES
             result = degrade_to_evidence_draft(
                 public,
                 dependency_id=f"provider:{profile.provider_id}" if profile is not None else "",
+                trigger="" if config_disabled else public.code,
+                code=public.code if config_disabled else EVIDENCE_ONLY_NO_MODEL,
             )
         except QaCircuitOpen as exc:
+            # ① 熔断最高优先，**独立分支**：码固定 PROVIDER_CIRCUIT_OPEN，绝不进证据摘录判定
+            # （历史上那个被撤掉的实现把"跳过模型"的门控放在熔断检查之前，把熔断吃成了"快速模式"）。
             public = QaPublicError(
                 "PROVIDER_CIRCUIT_OPEN",
                 "本地模型当前响应过慢，系统已先用检索证据整理初步结论并继续后续核验。",
@@ -3438,9 +3675,12 @@ def build_qa_stage_handlers(
                 str(getattr(profile, "provider_id", "model")), "level1_draft",
                 (QaAction("稍后重试当前阶段", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
             )
-            result = degrade_to_evidence_draft(
-                public,
-                dependency_id=f"provider:{profile.provider_id}" if profile is not None else "",
+            item = {"stage": "level1_draft", **public.to_event_payload(trace_id=run["id"])}
+            store.mark_degraded(run["id"], item)
+            if profile is not None:
+                resilience.circuit_failure(f"provider:{profile.provider_id}")
+            result = _evidence_anchored_level1_fallback(
+                public.message, evidence, list(retrieval_plan.get("queries") or []),
             )
         except Exception as exc:
             if profile is not None:
@@ -3453,6 +3693,7 @@ def build_qa_stage_handlers(
                 use_proxy=use_proxy,
                 proxy_configured=use_proxy,
             )
+            raw_code = public.code
             public = QaPublicError(
                 public.code,
                 f"{public.message} 已保留本地检索证据并继续后续核验。",
@@ -3461,9 +3702,16 @@ def build_qa_stage_handlers(
                 public.stage,
                 tuple(public.actions),
             )
+            # ③ 真异常/超时（Timeout → NETWORK_UNREACHABLE、ConnectionError、依赖不可用）→ 新码；
+            # 其余（配置类、未知内部错）保持原码，绝不把"配置问题"说成"模型失败"。
+            # 关键：这里只判 **exc 这一次调用**的结果，不看本 run 早先阶段的降级记录 ——
+            # 那是被明令禁止的"用历史失败当后续阶段跳模型的理由"。
+            triggered = raw_code in _EVIDENCE_ONLY_TRIGGER_CODES
             result = degrade_to_evidence_draft(
                 public,
                 dependency_id=f"provider:{profile.provider_id}" if profile is not None else "",
+                trigger=raw_code if triggered else "",
+                code=EVIDENCE_ONLY_NO_MODEL if triggered else raw_code,
             )
         store.persist_level1_result(run["id"], result)
         return result
@@ -3963,14 +4211,21 @@ def build_qa_stage_handlers(
             # 而是由这里收下、挂成本阶段输出的 `RAW_TRACE_KEY`，再由 orchestrator 摘进
             # `qa_stage_runs.details_json`（零迁移、与 token_usage 同一处）。
             raw_trace_sink: dict = {}
-            result = final_synthesizer.generate(
-                question=_question_for_synthesis(context),
-                graph=graph, level1=level1, level2=level2,
-                degradation=degradation, profile=profile, models=models,
-                token_callback=_token_callback if callable(emit_stage_event) else None,
-                context_pack=context_pack,
-                raw_trace_sink=raw_trace_sink,
-            )
+            synth_timeouts: dict = {}
+            try:
+                result = final_synthesizer.generate(
+                    question=_question_for_synthesis(context),
+                    graph=graph, level1=level1, level2=level2,
+                    degradation=degradation, profile=profile, models=models,
+                    token_callback=_token_callback if callable(emit_stage_event) else None,
+                    context_pack=context_pack,
+                    raw_trace_sink=raw_trace_sink,
+                    # 任务 ②/③ 接口：真正传给 requests 的那个读超时（传入值 = 生效值 = 判定值）
+                    timeout_sink=synth_timeouts,
+                )
+            finally:
+                # 必须放 finally：超时/异常这条路上更要把生效超时留下（③ 判"是否真超时"要用它）
+                _record_stage_timeouts(context, "synthesis", synth_timeouts)
             if raw_trace_sink.get(RAW_TRACE_KEY):
                 result[RAW_TRACE_KEY] = raw_trace_sink[RAW_TRACE_KEY]
             # 方案①（一次补齐 ①内部兜底 / ④grounding 闸门不可用 / ⑤grounding 阻断违规 /
@@ -3979,7 +4234,46 @@ def build_qa_stage_handlers(
             # d980edf5/db1fc148 两条 run：答案 degraded=true、run 级 degraded=0 且
             # degradation_json=[]，而 synthesis/citation_validation 阶段还是 completed）。
             # 这里集中记一次：答案级说降级，run 级就必须有对应记账，两本账不许打脸。
-            if result.get("degraded"):
+            #
+            # 任务 ③ 只把"**答案真的是证据摘录（没有模型综合）**"的两种情况接进
+            # `_evidence_only_fallback`（复用 `qa_synthesis.fallback_final_answer` 的产物，原地标注）：
+            #   · ⑤ 模型明确拒答 → 新码；
+            #   · ④ 契约失败、自带修复重试两次都用尽（终局兜底，`raw_trace_sink` 只在通这条路时
+            #     才填）→ **沿用既有码** SYNTHESIS_FALLBACK_USED。
+            # 其余"正常返回但被标注降级"的形态（citations 标签归一化、grounding 不可用/阻断违规）
+            # 是**模型答出来的**答案，一个字都不许标成"未经模型综合"。
+            codes = _payload_degradation_codes(result)
+            if "SYNTHESIS_MODEL_REFUSED" in codes:
+                result = _evidence_only_fallback(
+                    context, stage="synthesis",
+                    public=QaPublicError(
+                        "SYNTHESIS_MODEL_REFUSED",
+                        "最终综合模型拒绝处理，已改用证据约束的结构化重组。",
+                        True, str(run.get("synthesis_provider_id") or "local"), "synthesis", (),
+                    ),
+                    evidence_source="SYNTHESIS_MODEL_REFUSED",
+                    # 重出一份载荷（与 generate() 内部那条 refusal 分支同一个函数、同一份入参口径），
+                    # 并刻意不传 reason：否则 `fallback_final_answer` 又会补一条
+                    # SYNTHESIS_FALLBACK_USED，把"模型明确拒答"混进"契约兜底"那一格
+                    # —— 判定矩阵的两格必须互斥。
+                    build_payload=lambda payload_item, note: fallback_final_answer(
+                        graph=graph, level1=level1, level2=level2,
+                        degradation=degradation + [payload_item], models=models,
+                        reason="", question=_question_for_synthesis(context)),
+                )
+            elif raw_trace_sink.get(RAW_TRACE_KEY):
+                result = _evidence_only_fallback(
+                    context, stage="synthesis",
+                    public=QaPublicError(
+                        "SYNTHESIS_FALLBACK_USED",
+                        "最终综合模型两次尝试都未通过契约校验，已改用证据约束重组。",
+                        True, str(run.get("synthesis_provider_id") or "local"), "synthesis", (),
+                    ),
+                    evidence_source="CONTRACT_ATTEMPTS_EXHAUSTED",
+                    code="SYNTHESIS_FALLBACK_USED",
+                    build_payload=lambda item, note: dict(result),
+                )
+            elif result.get("degraded"):
                 store.mark_degraded(run["id"], _synthesis_degradation_item(result))
             resilience.circuit_success(dependency)
             # 阶段 09（P09-02/P09-03）：§9 主执行流的 Write Gate 位置**在最终答案之后**。
@@ -4048,7 +4342,9 @@ def build_qa_stage_handlers(
             if "profile" in locals():
                 resilience.circuit_failure(f"provider:{profile.provider_id}")
             provider_id = str(run.get("synthesis_provider_id") or "local")
+            trigger = ""
             if isinstance(exc, QaContractError):
+                # ④ 契约失败且自带修复重试已用尽 → 沿用既有码
                 public = QaPublicError(
                     "SYNTHESIS_STRUCTURED_FALLBACK",
                     "最终综合已按证据图完成结构化整理。",
@@ -4060,6 +4356,7 @@ def build_qa_stage_handlers(
             else:
                 public = classify_qa_error(exc, provider_id=provider_id, stage="synthesis")
                 if public.code == "INTERNAL_ERROR":
+                    # 契约失败兜底（既有码）
                     public = QaPublicError(
                         "SYNTHESIS_FALLBACK_USED",
                         "最终综合模型未稳定返回，已改用证据约束重组。",
@@ -4068,12 +4365,24 @@ def build_qa_stage_handlers(
                         "synthesis",
                         (QaAction("重试最终综合", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
                     )
+                elif public.code in _EVIDENCE_ONLY_TRIGGER_CODES:
+                    # ③ 这一次调用**真的**超时/连不上/依赖不可用 → 新码。
+                    # 只判 exc 这一次的结果；绝不用"本 run 早先阶段失败过"当跳模型的理由。
+                    trigger = public.code
             item = {"stage": "synthesis", **public.to_event_payload(trace_id=run["id"])}
-            store.mark_degraded(run["id"], item)
-            return fallback_final_answer(
-                graph=graph, level1=level1, level2=level2,
-                degradation=degradation + [item], models=models, reason=public.message,
-                question=_question_for_synthesis(context),
+            return _evidence_only_fallback(
+                context, stage="synthesis", public=public,
+                evidence_source=trigger or public.code,
+                code=EVIDENCE_ONLY_NO_MODEL if trigger else public.code,
+                build_payload=lambda payload_item, note: fallback_final_answer(
+                    graph=graph, level1=level1, level2=level2,
+                    degradation=degradation + [payload_item], models=models,
+                    # ③ 时刻意不传 reason：reason 会被 fallback_final_answer 再补一条
+                    # SYNTHESIS_FALLBACK_USED，等于把"真超时"又标回兜底码（与熔断分支同一理由）。
+                    # 其余既有分支口径逐字不变（继续传 public.message）。
+                    reason="" if trigger else public.message,
+                    question=_question_for_synthesis(context),
+                ),
             )
 
     def citation_validation(context):
@@ -4108,6 +4417,18 @@ def build_qa_stage_handlers(
                 result = dict(result)
                 result["degradation_reasons"] = list(result.get("degradation_reasons") or []) + [
                     "%s（%s）" % (FINAL_VERIFY_FAILED_NOTE, type(exc).__name__)][:20]
+        # 任务 ③ 的最后一道（落库前最后一次写答案形状）：synthesis 已被判定为"证据摘录、
+        # 未经模型综合"时，确保那四处标注真的出现在**交出去的这份载荷**里（终验层可能重建过
+        # answer / sections / reasons）。这里只**重放**标注，不重新判定 —— 判定只在
+        # `_evidence_only_fallback` 一处（否则又会出现"两处判定、口径漂移"）。
+        degraded_stage = context.get("_stage_degraded")
+        degraded_stage = (degraded_stage.get("synthesis")
+                          if isinstance(degraded_stage, Mapping) else None)
+        if isinstance(degraded_stage, Mapping):
+            result = _mark_evidence_only_payload(
+                result, stage="synthesis",
+                code=str(degraded_stage.get("code") or EVIDENCE_ONLY_NO_MODEL),
+                detail=str(degraded_stage.get("detail") or ""))
         from qa_contracts import validate_final_answer
 
         return validate_final_answer(result)

@@ -447,6 +447,8 @@ class QaLevel1Generator:
 
         usage_sink：传一个可变字典就顺带收集流式返回里的 token 用量（拿不到时保持空）。
         请求体是否带 stream_options（让端点回传用量块）由 QA_STREAM_INCLUDE_USAGE 控制，默认开。
+        timeout：**已经解析好的读超时秒数**（调用方负责读自己的键；socket 层不读任何 env），
+        所以这个值就是真正生效的值。
         """
         import time as _time
 
@@ -473,22 +475,51 @@ class QaLevel1Generator:
             return None
 
     def generate(self, *, question: str, plan: Mapping, evidence: list[dict], profile,
-                 first_token_callback=None) -> dict:
+                 first_token_callback=None, timeout_sink: dict | None = None) -> dict:
+        """跑一级草稿。
+
+        `timeout_sink`：可选的外部字典，写进本阶段**实际生效的读超时**（= 真正传给 requests 的
+        那个数）与它的来源，供调用方判"这一次到底是真超时还是别的原因"。默认 None 时行为逐字
+        不变；返回值永远不带这个键 —— 一级结果要能直接过冻结契约（additionalProperties=False）。
+        """
         is_local = str(getattr(profile, "provider_id", "") or "").casefold() == "local"
-        # 阶段 6-5：本地端点不再写死 8 秒（那会让整条 run 必然降级，B 机事故即此）。
-        # 显式 QA_LEVEL1_LOCAL_TIMEOUT_SECONDS 仍然优先；没配才用端点能力推导出来的值。
+        # 阶段 6-5 + 超时键口径（乙案）：本地端点的读超时**由本键独占**，不再写死 8 秒
+        # （那会让整条 run 必然降级，B 机事故即此），也不再看 synthesis 的键。
+        # 历史坑：`_stream_openai_json_content` 的 local 分支以前自己去读
+        # `QA_SYNTHESIS_LOCAL_FIRST_TOKEN_TIMEOUT_SECONDS`（默认 8 秒）→ **这里的流式路径
+        # 传下去的值被整条丢弃**，调 `QA_LEVEL1_LOCAL_TIMEOUT_SECONDS` 对流式完全无效。
+        # 现在 socket 层不读任何 env：这里解析出来的数 = 真正生效的数 = 判定用的数。
+        # 显式 `QA_LEVEL1_LOCAL_TIMEOUT_SECONDS` 仍然优先；没配才用端点能力推导出来的值。
         endpoint_timeouts = _local_timeouts(profile) if is_local else {}
-        first_timeout = (_int_env("QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", 0, 0, 600)
-                         or endpoint_timeouts.get("request_seconds") or 180) if is_local else 90
-        repair_timeout = (_int_env("QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS", 0, 0, 600)
-                          or endpoint_timeouts.get("repair_seconds") or 90) if is_local else 60
+        env_first = _int_env("QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", 0, 0, 600) if is_local else 0
+        env_repair = _int_env("QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS", 0, 0, 600) if is_local else 0
+        if is_local:
+            first_timeout = env_first or endpoint_timeouts.get("request_seconds") or 180
+            repair_timeout = env_repair or endpoint_timeouts.get("repair_seconds") or 90
+            timeout_source = "env" if env_first else (
+                "endpoint" if endpoint_timeouts.get("request_seconds") else "default")
+        else:
+            first_timeout, repair_timeout, timeout_source = 90, 60, "default"
+        # 流式首字节优先（阶段 6-6）：本地端点先流式拿，首个 chunk 到达即回报。这里把"走不走流式"
+        # 与下面的调用点共用同一个判断，避免超时记录与实际路径不一致。
+        use_stream = bool(first_token_callback is not None and is_local
+                          and _env_flag("QA_LEVEL1_STREAM_FIRST_BYTE", True))
+        if isinstance(timeout_sink, dict):
+            timeout_sink.update({
+                "stage": "level1_draft",
+                "path": "stream" if use_stream else "non_stream",
+                "stream_read_seconds": int(first_timeout),
+                "repair_read_seconds": int(repair_timeout),
+                "source": timeout_source,
+                "keys": ["QA_LEVEL1_LOCAL_TIMEOUT_SECONDS", "QA_LEVEL1_LOCAL_REPAIR_TIMEOUT_SECONDS"],
+            })
         messages = self._messages(question, plan, evidence)
         # 本阶段的模型用量：首答 + 修复重试逐次收集，最后累加（拿不到就不挂该键）
         usage_parts: list[dict] = []
         # 阶段 6-6：流式首字节优先 —— 本地端点先流式拿，首个 chunk 到达即回报（用户能看到
         # "模型已在生成"而不是干等 30 秒）；流式不可用/失败则原样退回非流式，行为不变。
         raw = None
-        if first_token_callback is not None and is_local and _env_flag("QA_LEVEL1_STREAM_FIRST_BYTE", True):
+        if use_stream:
             stream_usage: dict = {}
             raw = self._stream_raw(profile, messages, first_timeout, first_token_callback, stream_usage)
             if raw is not None:
