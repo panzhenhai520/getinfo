@@ -1,0 +1,64 @@
+{
+  "captured_at_utc": "2026-10-11T11:52:58+00:00",
+  "cleanup": {
+    "long_transactions": {
+      "long_transactions": 0
+    }
+  },
+  "conclusion": {
+    "production_e2e_data_available": false,
+    "reason_code": "B-003_PRODUCTION_BEHAVIOR_DATA_MISSING（qa_reasoning_traces 为 0 行）",
+    "token_rows_online": 0,
+    "tokens_null_justified": true
+  },
+  "cost": {
+    "rows_with_tokens": 0,
+    "runs_with_corpus": 0,
+    "stage_rows": 118
+  },
+  "counts": {
+    "claim_edges": 57,
+    "claims": 129,
+    "conflicts": 0,
+    "evidence": 93,
+    "memories": 0,
+    "realignment_rows": 0,
+    "runs": 15,
+    "seen_rows": 0,
+    "stage_runs": 118,
+    "traces": 0
+  },
+  "deployment": {
+    "note": "本包**未部署**（不部署是硬约束）：Phase 17 的四个模块不在应用镜像里，这里如实记录，不用它推断「没数据」",
+    "phase16_still_present": true,
+    "phase17_files": {
+      "/app/qa_ablation.py": false,
+      "/app/qa_e2e.py": false,
+      "/app/qa_metrics_report.py": false,
+      "/app/qa_release.py": false
+    },
+    "phase17_files_present": false,
+    "schema_version_is_v11": true,
+    "schema_version_line": "QA_SCHEMA_VERSION = \"unified-qa-schema-v11\""
+  },
+  "host": "117.50.211.93",
+  "probe_version": "qa-phase17-real-probe-v1",
+  "processes": {
+    "head": [
+      "PID ELAPSED COMMAND         COMMAND",
+      "    1     587 docker-init     /sbin/docker-init -- /app/docker-entrypoint.sh gunicorn -w 2 --threads 4 --bind 0.0.0.0:8003 --timeout 300 firecrawl_app:app",
+      "    7     587 gunicorn        /usr/bin/python /usr/local/bin/gunicorn -w 2 --threads 4 --bind 0.0.0.0:8003 --timeout 300 firecrawl_app:app",
+      "   11     586 gunicorn        /usr/bin/python /usr/local/bin/gunicorn -w 2 --threads 4 --bind 0.0.0.0:8003 --timeout 300 firecrawl_app:app",
+      "   12     586 gunicorn        /usr/bin/python /usr/local/bin/gunicorn -w 2 --threads 4 --bind 0.0.0.0:8003 --timeout 300 firecrawl_app:app",
+      "  118     319 bash            bash -lc cd /app && nohup python tools/backfill_article_events.py --apply --workers 0 --max-minutes 240 > /app/data/backfill_events.log 2>&1 < /dev/null &",
+      "  119     319 python          python tools/backfill_article_events.py --apply --workers 0 --max-minutes 240",
+      "  318       0 sh              sh -c ps -eo pid,etimes,comm,args --sort=-etimes | head -12",
+      "  325       0 ps              ps -eo pid,etimes,comm,args --sort=-etimes",
+      "  326       0 head            head -12"
+    ],
+    "note": "只读：只列进程，不 kill、不重启",
+    "probe_leftovers": 1,
+    "process_lines": 10
+  },
+  "read_only": true
+}
