@@ -898,71 +898,6 @@ def _extract_question_plan(question: str) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def _relation_public_label(value: str) -> str:
-    labels = {
-        "single": "单一问题",
-        "parallel": "并列问题",
-        "progressive": "递进问题",
-        "causal": "因果问题",
-        "comparison": "比较问题",
-        "parent_child": "总分问题",
-        "overlap": "交集问题",
-        "conflict": "冲突核验问题",
-    }
-    return labels.get(str(value or ""), str(value or "相关问题"))
-
-
-def _question_plan_intro(question: str) -> str:
-    plan = _extract_question_plan(question)
-    if not plan:
-        return ""
-    try:
-        count = int(plan.get("问题数量") or 1)
-    except (TypeError, ValueError):
-        count = 1
-    relation = str(plan.get("问题关系") or "single")
-    subquestions = [item for item in plan.get("子问题") or [] if isinstance(item, Mapping)]
-    categories = [item for item in plan.get("主题聚类") or [] if isinstance(item, Mapping)]
-    outline = [str(item) for item in (plan.get("动态回答模板") or plan.get("回答大纲") or []) if str(item).strip()]
-    strategy = _public_text(plan.get("回答策略") or "")
-    lines = ["【问题分析思路】"]
-    if count <= 1:
-        first = str(subquestions[0].get("text") or "").strip() if subquestions else ""
-        lines.append(f"- 已识别为 1 个单一问题{f'：{first}' if first else ''}。")
-    else:
-        lines.append(f"- 已识别为 {count} 个{_relation_public_label(relation)}。")
-        for item in subquestions[:4]:
-            qid = str(item.get("id") or "").replace("q", "")
-            text = str(item.get("text") or "").strip()
-            if text:
-                lines.append(f"- 问题 {qid or len(lines)}：{text}")
-        if count > 4:
-            lines.append("- 其余问题会先合并同类项，再按主题分组回答。")
-    labels = [str(item.get("label") or "") for item in categories if item.get("label")]
-    if labels:
-        unique_labels = list(dict.fromkeys(labels))
-        lines.append(f"- 问题拆分为{len(unique_labels)}个类型：" + "、".join(unique_labels))
-    if outline:
-        cleaned = [item.lstrip("先再然后最后，,：: ") for item in outline[:5]]
-        prefixes = ["我会先", "再", "然后", "最后"]
-        steps = []
-        for index, item in enumerate(cleaned):
-            prefix = prefixes[index] if index < len(prefixes) else "然后"
-            steps.append(prefix + item)
-        lines.append("- " + " → ".join(steps) + "。")
-    elif strategy:
-        lines.append("- 我会按这个策略继续：" + strategy)
-    return "\n".join(lines)
-
-
-def _prepend_question_plan_intro(answer: str, question: str) -> str:
-    intro = _question_plan_intro(question)
-    text = str(answer or "").strip()
-    if not intro or text.startswith("【问题分析思路】") or text.startswith("【问题分析思路：】") or text.startswith("问题拆解与回答计划："):
-        return text
-    return intro + "\n\n" + text
-
-
 def _short_question_title(text: str) -> str:
     value = str(text or "").strip().strip("？?。.")
     if not value:
@@ -1082,19 +1017,62 @@ _FALLBACK_LEAD = "已完成{label}和证据图综合。"
 `SYNTHESIS_FALLBACK_USED` 码，就是兜底，不必再猜。
 """
 
+ANSWER_PATH_RENDER = "structured_render"
+"""路径标识：**结构化渲染**（模型答了，但正文被 `_answer_override_trigger` 判为不能用）。"""
+ANSWER_PATH_FALLBACK = "final_fallback"
+"""路径标识：**终局兜底**（模型压根没给出可用的合规输出）。"""
 
-def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: list[Mapping], citation_map: Mapping[str, str], models: Mapping | None = None, fallback: bool = False) -> str:
-    """证据约束的结构化正文。**两条路径共用骨架，但固定首行必须不同**：
+_ANSWER_LEADS = {
+    ANSWER_PATH_RENDER: _STRUCTURED_LEAD,
+    ANSWER_PATH_FALLBACK: _FALLBACK_LEAD,
+}
+"""`路径 → 固定首行` 的**唯一**映射：两条路共用 `_build_structured_answer` 一条实现，
+差别只剩这里的取值（过去是散成两处的两条并列代码）。"""
 
-    · `fallback=False`（结构化渲染）：模型答了、但正文被 `_answer_override_trigger` 判为不能用，
-      于是程序按证据重组。首行 = `_STRUCTURED_LEAD`；
-    · `fallback=True`（终局兜底，`fallback_final_answer` 调用）：模型压根没给出可用的合规输出。
-      首行 = `_FALLBACK_LEAD`（沿用历史文案，它是这条路自己的指纹）。
+_ANSWER_PATH_LABELS = ("RAG检索", "RAG增强检索")
+"""首行里 `{label}` 的全部可能取值（`_build_structured_answer` 只允许这两个，见那里的归一化）。"""
+
+
+def answer_path_of(answer: object) -> str:
+    """**一眼区分两条路径**：返回 `ANSWER_PATH_RENDER` / `ANSWER_PATH_FALLBACK`，认不出返回空串。
+
+    判据是"**整篇正文里出现的是哪一句**"，**不是首行** —— 这条约束有实测来源：
+    `EVIDENCE_ONLY_NO_MODEL`（证据摘录、未经模型综合）那条路上，
+    `qa_pipeline._mark_evidence_only_payload` 会把 `【未经模型综合】…` 横幅块插到正文**最前面**
+    （见 `qa_pipeline._evidence_only_header_block`），首行于是变成横幅、不再是路径指纹，
+    "按首行判断走的是哪条路"的做法在那条路上**整个失效**（这正是本函数按整篇匹配的原因）。
+    两句首行在正文里都不会误伤：label 被 `_build_structured_answer` 归一化到 `_ANSWER_PATH_LABELS`，
+    而句子的其余部分（`召回的证据，经证据图整理后给出。` / `和证据图综合。`）按设计逐字不同。
+
+    一次调用只会写入一句首行，所以两句不会同时出现；返回空串 = 两条路都不是
+    （模型正文被原样保留、程序一个字都没动）。
+    """
+    text = str(answer or "")
+    for path, template in _ANSWER_LEADS.items():
+        if any(template.format(label=label) in text for label in _ANSWER_PATH_LABELS):
+            return path
+    return ""
+
+
+def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: list[Mapping], citation_map: Mapping[str, str], models: Mapping | None = None, path: str = ANSWER_PATH_RENDER) -> str:
+    """证据约束的结构化正文。**两条路径共用这一条实现**，差别只是参数 `path`：
+
+    · `path=ANSWER_PATH_RENDER`（结构化渲染，`_lock_to_graph` 在 `_answer_override_trigger`
+      命中时调用）：模型答了、但正文被判为不能用，于是程序按证据重组。首行 = `_STRUCTURED_LEAD`；
+    · `path=ANSWER_PATH_FALLBACK`（终局兜底，`fallback_final_answer` 调用）：模型压根没给出可用的
+      合规输出。首行 = `_FALLBACK_LEAD`（沿用历史文案，它是这条路自己的指纹）。
+
+    固定首行必须分岔：它是两条路的指纹，`answer_path_of` 就是按它判的
+    （**注意**：那是"整篇里有没有这一句"，不是"首行是不是这一句" —— 横幅会顶掉首行）。
 
     历史事故：两条路共用同一句首行，而那句又与"旧版兜底模板句"逐字相同，于是
     "模型正常作答、正文被程序顶掉"看起来跟"模型没答成、走了兜底"一模一样
     （B 机 run 0b047cc4e0db49078f24e75e44beb28d 就是这么被误判成"又是模板"的）。
     """
+    lead = _ANSWER_LEADS.get(str(path or ""))
+    if lead is None:
+        raise ValueError("未知的答案路径：%r（只允许 %s）"
+                         % (path, " / ".join(sorted(_ANSWER_LEADS))))
     reverse = _citation_reverse(evidence, citation_map)
     official_label = _first_official_label(evidence, citation_map)
     evidence_refs_by_official = {
@@ -1106,7 +1084,7 @@ def _build_structured_answer(*, question: str, claims: list[Mapping], evidence: 
     rag_label = _public_text(dict(models or {}).get("research") or "RAG检索")
     if rag_label not in {"RAG检索", "RAG增强检索"}:
         rag_label = "RAG检索"
-    lines.append((_FALLBACK_LEAD if fallback else _STRUCTURED_LEAD).format(label=rag_label))
+    lines.append(lead.format(label=rag_label))
 
     cleaned = []
     seen = set()
@@ -1606,6 +1584,9 @@ class QaFinalSynthesizer:
                 "code": "SYNTHESIS_MODEL_REFUSED",
                 "message": "最终综合模型拒绝处理，已改用证据约束的结构化重组。",
             }
+            # 模型**整段拒答**也是"最需要看原文"的一条路：判定口径一个字不改，只多留一份原文。
+            # `_publish_raw_trace` 在 sink 为空/None 时 no-op；原文为空就写空串并在 error 里说明。
+            _publish_raw_trace(raw_trace_sink, [{"attempt": 1, "raw_excerpt": str(raw or "")[:_RAW_TRACE_CHARS], "error": "SYNTHESIS_MODEL_REFUSED: 模型明确拒答" + ("" if raw else "（原文为空）")}])
             return _finalize(fallback_final_answer(
                 graph=graph, level1=level1, level2=level2,
                 degradation=list(degradation or []) + [item], models=models,
@@ -1675,6 +1656,10 @@ class QaFinalSynthesizer:
                         "code": "SYNTHESIS_MODEL_REFUSED",
                         "message": "最终综合模型拒绝处理，已改用证据约束的结构化重组。",
                     }
+                    # 修复重试这一次也拒答 → 同样留痕；`raw` 已被重试结果覆盖，只有它没进
+                    # `raw_traces`，所以补上这一条（同时带上第 1 次尝试的原文，绝不丢）。
+                    # `attempt` 这时还是 0（重试发生在同一次循环里），编号按"第几次模型调用"取。
+                    _publish_raw_trace(raw_trace_sink, raw_traces + [{"attempt": len(raw_traces) + 1, "raw_excerpt": str(raw or "")[:_RAW_TRACE_CHARS], "error": "SYNTHESIS_MODEL_REFUSED: 模型明确拒答" + ("" if raw else "（原文为空）")}])
                     return _finalize(fallback_final_answer(
                         graph=graph, level1=level1, level2=level2,
                         degradation=list(degradation or []) + [item], models=models,
@@ -1803,7 +1788,7 @@ class QaFinalSynthesizer:
             }
             answer = _build_structured_answer(
                 question=question, claims=selected_claims, evidence=evidence,
-                citation_map=citation_map, models=models,
+                citation_map=citation_map, models=models, path=ANSWER_PATH_RENDER,
             )
         else:
             answer = str(answer or "").strip()
@@ -1890,12 +1875,12 @@ def fallback_final_answer(*, graph: Mapping, level1: Mapping, level2: Mapping, d
     citation_map = _citation_map(evidence)
     reverse = _citation_reverse(evidence, citation_map)
     visible_degradation = list(degradation or [])
-    rag_label = _public_text(dict(models or {}).get("research") or "RAG检索")
-    if rag_label not in {"RAG检索", "RAG增强检索"}:
-        rag_label = "RAG检索"
+    # label 归一化（`research` → `RAG检索` / `RAG增强检索`）只在 `_build_structured_answer` 里做一次：
+    # 这里过去抄了一份逐字相同的 `rag_label` 计算，但**一个字符都没用上**（首行由被调方自己拼），
+    # 属于"两条路各留一套代码"的残留，已随本次收敛删除。
     answer_text = _build_structured_answer(
         question=question, claims=claims, evidence=evidence,
-        citation_map=citation_map, models=models, fallback=True,
+        citation_map=citation_map, models=models, path=ANSWER_PATH_FALLBACK,
     )
     unresolved = [
         item
@@ -1951,4 +1936,4 @@ def fallback_final_answer(*, graph: Mapping, level1: Mapping, level2: Mapping, d
     return validate_final_answer(result)
 
 
-__all__ = ["QaFinalSynthesizer", "fallback_final_answer"]
+__all__ = ["QaFinalSynthesizer", "answer_path_of", "fallback_final_answer"]

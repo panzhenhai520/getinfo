@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""graph-rag-v2 通用包 Phase 04 · 管线接线回归（level1_retrieval 上的舰队开关）。
+"""graph-rag-v2 通用包 Phase 04 · 管线接线回归（level1_retrieval 上的并行舰队）。
 
 要点（全部在隔离临时 sqlite 上真跑，不连真库、不调 LLM/嵌入端点）：
-  1. **默认关**：`QA_HUNTER_FLEET` 不设 → 走既有 `ArticleRetriever.retrieve()`，
-     阶段返回键集与 stats 键集必须与"没有舰队"逐字一致（零行为变化的硬证据）；
-  2. **打开**：走并行舰队，`stats["hunter_fleet"]` 出现（兄弟键，Phase 02 冻结的
-     `stats["evidence_layer"]` 键集一个字不动），证据包仍然过既有闸门/去重/证据层；
-  3. **失败回落**：舰队抛错 → 自动回落到既有检索，证据包不受影响，回执里写明原因；
+  1. **舰队是首跳检索的唯一实现**：`QA_HUNTER_FLEET` 设成什么（不设 / "0" / "1"）都走舰队
+     —— 用户拍板"一个完成的功能不许并列多条路径"，旧的"开关关掉就切到逐字旧单路检索"已删除，
+     `ArticleRetriever.retrieve()` 只剩**兜底**（舰队抛错 / 舰队装配失败）；
+  2. `stats["hunter_fleet"]` 是兄弟键，Phase 02 冻结的 `stats["evidence_layer"]` 键集一个字不动；
+  3. **失败回落**：舰队抛错 / 装配失败 → 自动回落到既有检索，证据包不受影响，回执里写明原因；
   4. **多跳不受影响**：`_run_multi_hop` 仍然拿既有 retriever（舰队只覆盖首跳）。
 """
 import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 os.environ.setdefault("DATABASE_TYPE", "sqlite")
 
@@ -109,13 +110,43 @@ class FleetWiringTests(unittest.TestCase):
             }},
         }
 
-    def test_default_off_keeps_the_old_path_byte_for_byte(self):
-        result = self._handlers()["level1_retrieval"](self._context())
-        self.assertEqual(set(result.keys()), LEVEL1_RECEIPT_KEYS)
-        self.assertNotIn("hunter_fleet", result["stats"],
-                         "开关没开就不该出现舰队回执（回滚口径）")
-        self.assertEqual(set(result["stats"]["evidence_layer"].keys()), EVIDENCE_RECEIPT_KEYS)
-        self.assertTrue(result["evidence"], "旧路径本身要能取到证据，比较才有意义")
+    def test_no_switch_can_reroute_the_first_hop_away_from_the_fleet(self):
+        """用户拍板：首跳检索**只留舰队一条路**，开关不是"换实现"的选择器。
+
+        `QA_HUNTER_FLEET` 不设 / 显式设 "0"，都必须走舰队（回执 `stats["hunter_fleet"]`
+        就是"这一轮真的走了舰队"的硬证据），阶段返回键集与证据层回执键集一个字不动。
+
+        变异守卫：把装配点的 `if _hunter_fleet_enabled():` 那一支加回去 → 回执整份消失
+        （`_local_retrieval` 的 `fleet is None` 兜底会写一条带 `fallback` 的回执）→ 本用例红。
+        """
+        for value in (None, "0", "1"):
+            with self.subTest(fleet_env=value):
+                if value is None:
+                    os.environ.pop("QA_HUNTER_FLEET", None)
+                else:
+                    os.environ["QA_HUNTER_FLEET"] = value
+                # 不注入舰队 → 装配点是唯一入口（这里验的就是"管线自己会不会建舰队"）
+                result = self._handlers()["level1_retrieval"](self._context())
+                self.assertEqual(set(result.keys()), LEVEL1_RECEIPT_KEYS,
+                                 "阶段返回键集被改动了（Phase 02 冻结）")
+                receipt = result["stats"]["hunter_fleet"]
+                self.assertNotIn("fallback", receipt,
+                                 "开关不该把检索打回兜底：%s" % (receipt,))
+                self.assertEqual(receipt["hunters_total"], 5,
+                                 "开关 %r 下没有走舰队（并列的第二条路径不许回来）" % (value,))
+                self.assertEqual(set(result["stats"]["evidence_layer"].keys()), EVIDENCE_RECEIPT_KEYS)
+                self.assertTrue(result["evidence"], "舰队路径本身要能取到证据，比较才有意义")
+
+    def test_fleet_assembly_failure_falls_back_and_says_so(self):
+        """舰队**装配**失败 → 回落既有检索（兜底），回执如实写明原因与回落目标。"""
+        with mock.patch.object(qa_pipeline, "_build_hunter_fleet",
+                               side_effect=RuntimeError("装不起来")):
+            result = self._handlers()["level1_retrieval"](self._context())
+
+        receipt = result["stats"]["hunter_fleet"]
+        self.assertEqual(receipt["fallback"], "ArticleRetriever.retrieve")
+        self.assertIn("fleet_unavailable", receipt["error"])
+        self.assertTrue(result["evidence"], "兜底路径必须照常给出证据")
 
     def test_flag_on_runs_the_fleet_and_adds_a_sibling_receipt(self):
         os.environ["QA_HUNTER_FLEET"] = "1"

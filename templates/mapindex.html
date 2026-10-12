@@ -7154,64 +7154,31 @@
             if (drawer) drawer.classList.remove('history-open');
         }
 
-        function cleanChatUiText(text) {
-            return String(text || '')
-                .replace(/RAGFlow\s*二级召回/g, 'RAG增强召回')
-                .replace(/RAGFlow\s*深度检索/g, 'RAG增强检索')
-                .replace(/RAGFlow/gi, 'RAG增强检索')
-                .replace(/RAG检索增强/g, 'RAG增强检索')
-                .replace(/RAG增强检索\s*(news\s*)?知识库/gi, 'RAG增强检索知识库')
-                .replace(/RAG增强检索\s*二级研究/g, 'RAG增强检索')
-                .replace(/降级摘要/g, '证据锚定摘要')
-                .replace(/一级模型返回格式异常[^。；]*[。；]?/g, '资料已按证据锚定方式整理。')
-                .replace(/一级分析未稳定返回结构化结果[^。；]*[。；]?/g, '资料已按证据锚定方式整理。')
-                .replace(/[^。；]*研究模型格式未完全通过校验[^。；]*[。；]?/g, '已完成证据召回，并按证据锚定方式整理。')
-                .replace(/证据锚定摘要。?\s*现返回严格引用证据的证据锚定摘要。?/g, '证据锚定摘要。')
-                .replace(/连接\s*local\s*超时，请检查网络后重试。?/g, '综合模型响应超时，已改用证据约束重组。');
-        }
-
-        function structuredAnswerJsonToMarkdown(value) {
-            const raw = String(value || '').trim();
-            if (!raw || !/^[\[{]/.test(raw) || !/"(sections|claims|citations|conflicts)"\s*:/.test(raw)) return '';
-            let parsed = null;
-            try { parsed = JSON.parse(raw); } catch (error) { return ''; }
-            const lines = [];
-            if (typeof parsed.summary === 'string' && parsed.summary.trim()) {
-                lines.push('**核心结论**', '', parsed.summary.trim());
-            }
-            const sections = Array.isArray(parsed.sections) ? parsed.sections : [];
-            sections.forEach(section => {
-                if (!section || typeof section !== 'object') return;
-                const title = cleanChatUiText(section.title || '').trim();
-                const content = cleanChatUiText(section.content || '').trim();
-                if (!content) return;
-                if (lines.length) lines.push('');
-                lines.push(`**${title || '分析'}**`, '', content);
-            });
-            const conflicts = Array.isArray(parsed.conflicts) ? parsed.conflicts : [];
-            const meaningfulConflicts = conflicts
-                .map(item => cleanChatUiText(item?.rationale || item?.subject || ''))
-                .filter(Boolean)
-                .slice(0, 3);
-            if (meaningfulConflicts.length) {
-                lines.push('', '**需核验事项**', '', ...meaningfulConflicts.map(item => `- ${item}`));
-            }
-            return lines.join('\n');
-        }
-
-        function normalizeAssistantAnswerText(text) {
-            const cleaned = cleanChatUiText(text || '');
-            return structuredAnswerJsonToMarkdown(cleaned) || cleaned;
+        // 文案清洗与"结构化 JSON → markdown"这两件事**都只由后端做**，前端不再各留一份：
+        //   · 文案替换规则的**唯一真源**是后端 `qa_synthesis._public_text`
+        //     （RAGFlow→RAG增强检索、降级摘要→证据锚定摘要、一级模型返回格式异常/
+        //      一级分析未稳定返回结构化结果/研究模型格式未完全通过校验→证据锚定整理、
+        //      连接 local 超时→综合模型响应超时）。UI 显示的正文/状态/降级原因都是后端清洗过的
+        //      文本，直接显示即可；这里过去那份逐字重复的替换规则表已整表删除，
+        //      不再出现"流式正文与落库正文各按一套规则替换"的两条路径。
+        //   · 结构化 JSON 的正文重组由后端 `_render_structured_answer_value` 负责
+        //     （交出来的 `answer` 已经是干净 markdown）；而且后端 `generate()` 一见模型输出
+        //      首字符是 `{`/`[` 就**停发** `answer_delta`，前端根本收不到 JSON 正文。
+        //      这里过去那份 `structuredAnswerJsonToMarkdown`（把 JSON 再拼一次 markdown）已删除；
+        //      JSON 万一真的显示出来，也按原文显示，**绝不再重组**（重组会和后端正文措辞不一致）。
+        // 本函数只剩"把任意值变成字符串"这一层兜底（`null`/`undefined` → `''`）。
+        function chatUiText(value) {
+            return String(value || '');
         }
 
         function isQuestionPlanOnlyText(text) {
-            const value = cleanChatUiText(text || '').trim();
+            const value = chatUiText(text || '').trim();
             if (!/^【问题分析思路】/.test(value)) return false;
             return !/(已完成|核心结论|分问题回答|风险拆解|依据、分析与核验|最终回答|一、|二、)/.test(value);
         }
 
         function setStatus(text) {
-            document.getElementById('chatStatus').textContent = cleanChatUiText(text || '');
+            document.getElementById('chatStatus').textContent = chatUiText(text || '');
         }
 
         function classifyChatProgress(message, fallback = 'thinking') {
@@ -7225,24 +7192,24 @@
         }
 
         function compactProgressTitle(value, max = 22) {
-            const text = cleanChatUiText(value || '').replace(/\s+/g, ' ').trim();
+            const text = chatUiText(value || '').replace(/\s+/g, ' ').trim();
             if (!text) return '';
             return text.length > max ? `${text.slice(0, max)}...` : text;
         }
 
         function mergeAssistantChunk(current, chunk) {
             const existing = String(current || '');
-            const incoming = cleanChatUiText(chunk || '');
+            const incoming = chatUiText(chunk || '');
             if (!incoming) return existing;
-            if (!existing) return normalizeAssistantAnswerText(incoming);
-            if (incoming.startsWith(existing)) return normalizeAssistantAnswerText(incoming);
+            if (!existing) return chatUiText(incoming);
+            if (incoming.startsWith(existing)) return chatUiText(incoming);
             if (existing.endsWith(incoming)) return existing;
             const existingTrimmed = existing.trimEnd();
             const incomingTrimmed = incoming.trimStart();
             if (existingTrimmed && incomingTrimmed && incomingTrimmed.startsWith(existingTrimmed)) {
-                return normalizeAssistantAnswerText(incomingTrimmed);
+                return chatUiText(incomingTrimmed);
             }
-            return normalizeAssistantAnswerText(existing + incoming);
+            return chatUiText(existing + incoming);
         }
 
         function boundedChatMessages(messages, maxMessages = 16, maxChars = 16000) {
@@ -7253,7 +7220,7 @@
                 const item = source[index] || {};
                 const role = String(item.role || '');
                 if (!['user', 'assistant'].includes(role)) continue;
-                let content = cleanChatUiText(item.content || '');
+                let content = chatUiText(item.content || '');
                 if (!content) continue;
                 if (content.length > remaining) content = content.slice(-remaining);
                 selected.push({ role, content });
@@ -7361,7 +7328,7 @@
             node.dataset.adjustmentPaused = 'false';
             clearChatProgress(node);
             stopInlineAnswerProgress(node);
-            const text = cleanChatUiText(adjustmentText || '').trim();
+            const text = chatUiText(adjustmentText || '').trim();
             node.innerHTML = `<div class="chat-plan-actions"><span>${escapeHtml(text ? `原计划已暂停，正在按调整思路重新生成：${text}` : '原计划已暂停，正在按新思路重新生成。')}</span></div>`;
             node.closest('.message')?.classList.add('message-superseded');
         }
@@ -7402,7 +7369,7 @@
         function beginPlanAdjustment(node, question, planText, bar, placeholderText) {
             resolvePlanContinueGate(node, { silent: true });
             const pausedRunId = state.currentQaRunId || '';
-            state.pendingPlanAdjustment = { question, planText: cleanChatUiText(planText || ''), runId: pausedRunId, node };
+            state.pendingPlanAdjustment = { question, planText: chatUiText(planText || ''), runId: pausedRunId, node };
             state.chatStreamSerial += 1;
             if (state.chatStreamController) {
                 try { state.chatStreamController.abort(); } catch (error) {}
@@ -7513,7 +7480,7 @@
         function chatProgressVariants(event, message, phase) {
             const stage = event?.stage || event?.data?.stage || event?.data?.current_stage || '';
             const hint = chatEvidenceHint(event);
-            const base = cleanChatUiText(message || '').trim();
+            const base = chatUiText(message || '').trim();
             const variantsByStage = {
                 plan: [
                     '拆解问题：识别公告号、主题词、时间和回答边界',
@@ -7589,7 +7556,7 @@
 
         function setChatProgressLine(panel, text) {
             if (!panel) return;
-            const clean = cleanChatUiText(text || '').trim();
+            const clean = chatUiText(text || '').trim();
             panel.querySelector('.chat-progress-text').textContent = clean;
             const live = panel.querySelector('.chat-progress-live span');
             if (live) live.textContent = clean;
@@ -7648,7 +7615,7 @@
 
         function updateChatProgress(node, message, phase = '', event = null) {
             if (!node) return;
-            const text = cleanChatUiText(message || '').trim() || '正在思考...';
+            const text = chatUiText(message || '').trim() || '正在思考...';
             const resolvedPhase = phase || classifyChatProgress(text);
             const stageKey = `${event?.stage || event?.data?.stage || event?.data?.current_stage || resolvedPhase}:${text}`;
             const nowMs = Date.now();
@@ -7719,7 +7686,7 @@
         }
 
         function splitAnswerForStreaming(text) {
-            const source = normalizeAssistantAnswerText(text || '');
+            const source = chatUiText(text || '');
             if (!source) return [];
             const parts = [];
             const blocks = source.split(/(\n{2,})/);
@@ -7743,15 +7710,15 @@
         }
 
         function streamAssistantAnswer(node, fullText, options = {}) {
-            const text = normalizeAssistantAnswerText(fullText || '');
+            const text = chatUiText(fullText || '');
             const onUpdate = typeof options.onUpdate === 'function' ? options.onUpdate : null;
             if (!node || !text) return Promise.resolve('');
             if (node.dataset.streamFrozen === 'true') {
-                const existing = normalizeAssistantAnswerText(node._fullAssistantContent || node.textContent || '');
+                const existing = chatUiText(node._fullAssistantContent || node.textContent || '');
                 if (onUpdate) onUpdate(existing);
                 return Promise.resolve(existing);
             }
-            const existing = normalizeAssistantAnswerText(node._fullAssistantContent || '');
+            const existing = chatUiText(node._fullAssistantContent || '');
             let current = '';
             let streamTarget = text;
             if (existing && text === existing) {
@@ -7793,12 +7760,12 @@
             const piece = String(delta || '');
             const onUpdate = typeof options.onUpdate === 'function' ? options.onUpdate : null;
             if (!node || !piece) {
-                const existing = normalizeAssistantAnswerText(node?._fullAssistantContent || '');
+                const existing = chatUiText(node?._fullAssistantContent || '');
                 if (onUpdate) onUpdate(existing);
                 return Promise.resolve(existing);
             }
             if (node.dataset.streamFrozen === 'true') {
-                const existing = normalizeAssistantAnswerText(node._fullAssistantContent || node.textContent || '');
+                const existing = chatUiText(node._fullAssistantContent || node.textContent || '');
                 if (onUpdate) onUpdate(existing);
                 return Promise.resolve(existing);
             }
@@ -7929,8 +7896,8 @@
 
         function messageCopyText(body, role) {
             if (!body) return '';
-            if (role === 'assistant') return cleanChatUiText(body._fullAssistantContent || body.textContent || '').trim();
-            return cleanChatUiText(body.dataset.rawContent || body.textContent || '').trim();
+            if (role === 'assistant') return chatUiText(body._fullAssistantContent || body.textContent || '').trim();
+            return chatUiText(body.dataset.rawContent || body.textContent || '').trim();
         }
 
         async function copyTextToClipboard(text) {
@@ -8033,7 +8000,7 @@
         }
 
         function renderAssistantContent(node, content) {
-            const uiContent = normalizeAssistantAnswerText(content || '');
+            const uiContent = chatUiText(content || '');
             node._fullAssistantContent = uiContent;
             const preservedPlanActions = node.querySelector('[data-plan-actions="true"]');
             if (preservedPlanActions) preservedPlanActions.remove();
@@ -8522,7 +8489,7 @@
             const stage = event.stage || event.data?.stage || event.data?.current_stage || '';
             const label = chatStageLabel(stage);
             const rawMessage = event.message || event.data?.message || '';
-            if (rawMessage) return cleanChatUiText(rawMessage);
+            if (rawMessage) return chatUiText(rawMessage);
             if (event.type === 'search_done') return '资料检索完成，正在整理可引用证据';
             if (event.type === 'retrieval') return `${label}：正在筛选证据片段`;
             if (event.type === 'research_status') return `${label}：正在进行交叉核验`;
@@ -8561,7 +8528,7 @@
             if (/interpretation/.test(type)) return '官方解读';
             if (/commentary|article/.test(type)) return '解读材料';
             if (/ragflow|chunk|kb|knowledge/i.test(type)) return 'RAG增强检索片段';
-            return cleanChatUiText(type || '证据');
+            return chatUiText(type || '证据');
         }
 
         function qaEvidenceIndex(evidence) {
@@ -8575,7 +8542,7 @@
 
         function qaEvidenceTitle(item, fallback = '依据') {
             const meta = item?.metadata || {};
-            return cleanChatUiText(
+            return chatUiText(
                 item?.title || meta.title || item?.doc_no || meta.doc_no ||
                 item?.source_url || meta.source_url || item?.evidence_ref || fallback
             );
@@ -9408,7 +9375,7 @@
 
         function qaMeaningfulConflict(conflict) {
             const text = conflict?.summary || conflict?.reason || conflict?.rationale || conflict?.subject || conflict?.claim || conflict?.verdict || '';
-            let clean = cleanChatUiText(text).trim();
+            let clean = chatUiText(text).trim();
             clean = clean.replace(/（?裁决规则\s*qa-adjudication-v\d+）?/gi, '').trim();
             if (!clean || clean === '发现待核验事项') return '';
             if (/来源权威等级差异明确|优先采用主张\s*[A-Za-z0-9_.:-]+|受限解释保留/.test(clean)) {
@@ -9517,7 +9484,7 @@
             const units = Array.isArray(data?.units) ? data.units : [];
             if (!units.length) {
                 const message = data?.message || '这条回答暂时没有可解析的证据（可能未启用检索，或还没有最终答案）。';
-                panel.innerHTML = `<div class="qa-attribution-empty">${escapeHtml(cleanChatUiText(message))}</div>`;
+                panel.innerHTML = `<div class="qa-attribution-empty">${escapeHtml(chatUiText(message))}</div>`;
                 return;
             }
             const stats = data.stats || {};
@@ -9541,18 +9508,18 @@
                     return `<li class="qa-attribution-link">
                         <span class="qa-attribution-rel is-${escapeHtml(String(link.relation || 'unknown'))}">${escapeHtml(qaAttributionRelationLabel(link.relation))}</span>
                         <span class="qa-attribution-conf">${Number(link.confidence || 0).toFixed(2)}</span>
-                        <span class="qa-attribution-sentence">${escapeHtml(cleanChatUiText(link.sentence || ''))}</span>
+                        <span class="qa-attribution-sentence">${escapeHtml(chatUiText(link.sentence || ''))}</span>
                         <span class="qa-attribution-ref">${escapeHtml(String(link.evidence_ref || ''))}</span>
                         ${influence}${tokens}${openButton}
                     </li>`;
                 }).join('');
-                const claimed = unit.claim_type ? `<span class="qa-attribution-type">${escapeHtml(cleanChatUiText(unit.claim_type))}</span>` : '';
+                const claimed = unit.claim_type ? `<span class="qa-attribution-type">${escapeHtml(chatUiText(unit.claim_type))}</span>` : '';
                 return `<li class="qa-attribution-unit">
-                    <div class="qa-attribution-unit-text">${escapeHtml(cleanChatUiText(unit.text || ''))}${claimed}</div>
+                    <div class="qa-attribution-unit-text">${escapeHtml(chatUiText(unit.text || ''))}${claimed}</div>
                     ${linkHtml ? `<ol class="qa-attribution-links">${linkHtml}</ol>` : '<div class="qa-attribution-empty">未找到对应证据句（该结论可能来自模型推断或背景知识）。</div>'}
                 </li>`;
             }).join('');
-            panel.innerHTML = `<div class="qa-attribution-summary">${escapeHtml(cleanChatUiText(summary))}${data.scorer_note ? `<span class="qa-attribution-note">${escapeHtml(cleanChatUiText(data.scorer_note))}</span>` : ''}</div><ol class="qa-attribution-list">${items}</ol>`;
+            panel.innerHTML = `<div class="qa-attribution-summary">${escapeHtml(chatUiText(summary))}${data.scorer_note ? `<span class="qa-attribution-note">${escapeHtml(chatUiText(data.scorer_note))}</span>` : ''}</div><ol class="qa-attribution-list">${items}</ol>`;
             panel.querySelectorAll('.qa-citation-link[data-article-id]').forEach(button => {
                 button.addEventListener('click', event => {
                     event.preventDefault();
@@ -9650,13 +9617,13 @@
                     ? `<a class="qa-spider-step-target" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(title)}</a>`
                     : `<span class="qa-spider-step-target">${escapeHtml(title)}</span>`;
                 const actions = qaEvidenceActionsHtml(qaEvidenceArticleId(item), url);
-                return `<li class="qa-insight-card" data-ref="${escapeHtml(ref)}"><span class="qa-insight-card-title">${titleHtml}</span><span class="qa-insight-card-meta">${escapeHtml(cleanChatUiText(meta))}</span>${actions}</li>`;
+                return `<li class="qa-insight-card" data-ref="${escapeHtml(ref)}"><span class="qa-insight-card-title">${titleHtml}</span><span class="qa-insight-card-meta">${escapeHtml(chatUiText(meta))}</span>${actions}</li>`;
             }).join('');
             const riskItems = risks.slice(0, 5).map(risk => {
                 const labels = Array.isArray(risk.citation_labels) ? risk.citation_labels.join(' ') : '';
-                return `<li class="qa-insight-card"><span class="qa-insight-card-title">${escapeHtml(cleanChatUiText(risk.area || '风险点'))}</span><span>${escapeHtml(cleanChatUiText(risk.impact || ''))}</span><span>应对：${escapeHtml(cleanChatUiText(risk.response || ''))} ${escapeHtml(labels)}</span></li>`;
+                return `<li class="qa-insight-card"><span class="qa-insight-card-title">${escapeHtml(chatUiText(risk.area || '风险点'))}</span><span>${escapeHtml(chatUiText(risk.impact || ''))}</span><span>应对：${escapeHtml(chatUiText(risk.response || ''))} ${escapeHtml(labels)}</span></li>`;
             }).join('');
-            const reasonItems = reasons.slice(0, 6).map(reason => `<li>${escapeHtml(cleanChatUiText(reason))}</li>`).join('');
+            const reasonItems = reasons.slice(0, 6).map(reason => `<li>${escapeHtml(chatUiText(reason))}</li>`).join('');
             const conflictItems = qaUniqueMeaningfulConflicts(conflicts).slice(0, 5).map(text => `<li>${escapeHtml(text)}</li>`).join('');
             const drawer = document.createElement('details');
             drawer.className = 'qa-insight-drawer';
@@ -10647,9 +10614,9 @@
                         intervalMs: 12,
                         onUpdate: value => { answer = value; },
                     });
-                } else if (qaFinalResult?.answer && cleanChatUiText(answer) !== cleanChatUiText(qaFinalResult.answer)) {
-                    const finalAnswerText = cleanChatUiText(qaFinalResult.answer);
-                    const currentAnswerText = cleanChatUiText(answer);
+                } else if (qaFinalResult?.answer && chatUiText(answer) !== chatUiText(qaFinalResult.answer)) {
+                    const finalAnswerText = chatUiText(qaFinalResult.answer);
+                    const currentAnswerText = chatUiText(answer);
                     if (finalAnswerText.startsWith(currentAnswerText)) {
                         const tail = finalAnswerText.slice(currentAnswerText.length);
                         if (tail) {
@@ -10681,7 +10648,7 @@
                 }
                 appendFinancialReportLinks(answerNode, reportRefs);
                 appendQaInsightDrawer(answerNode, qaFinalResult);
-                const uiAnswer = cleanChatUiText(answer);
+                const uiAnswer = chatUiText(answer);
                 state.chatMessages.push({ role: 'assistant', content: uiAnswer });
                 state.modelChatMessages.push({ role: 'assistant', content: uiAnswer });
                 await fetch('/api/chat/history/save', {
@@ -10716,7 +10683,7 @@
                 }
                 clearChatProgress(answerNode);
                 stopInlineAnswerProgress(answerNode);
-                const errorText = cleanChatUiText(error.message || '聊天生成失败');
+                const errorText = chatUiText(error.message || '聊天生成失败');
                 // 异常结束同样折叠来源面板
                 collapseSourcePanels();
                 answerNode.classList.remove('waiting');

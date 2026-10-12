@@ -30,7 +30,12 @@ from qa_policy_evidence import filter_and_rank_policy_evidence, normalize_policy
 from qa_provider_registry import QaProviderRegistry
 from qa_question_templates import render_question_plan_status
 from qa_ragflow_client import QaRagflowResearchClient
-from qa_relevance import filter_relevant_evidence, question_terms
+from qa_relevance import (
+    filter_offtopic_evidence,
+    filter_relevant_evidence,
+    offtopic_reason_text,
+    question_terms,
+)
 from qa_reasoning import build_claim_evidence_graph
 from qa_research import QaRagflowResearchService, enrich_ragflow_evidence_from_database, insufficient_level2_result
 from qa_synthesis import (
@@ -408,6 +413,29 @@ _EVIDENCE_ONLY_CONFIG_CODES = frozenset({
     "PROVIDER_NOT_CONFIGURED", "SYNTHESIS_OPERATIONS_DISABLED",
 })
 """第 ② 格：路径/配置禁用类 —— **保持原码**，绝不许被记成"模型失败"。"""
+
+
+def _record_failed_raw_trace(sink, exc: BaseException) -> None:
+    """模型调用**本身**抛异常时的留痕：只记错误摘要，**不伪造原文**。
+
+    为什么必须有：`qa_synthesis.QaFinalSynthesizer.generate()` 只在"两次契约都不过"
+    那条路的**函数末尾**发布原文（`_publish_raw_trace`），调用抛异常时直接穿出去，
+    于是"模型真的挂了"这条最需要留痕的路一条记录都没有 —— B 机 run
+    13038dbc1700412faf3ea51e2058dcee（流式读超时 → `EVIDENCE_ONLY_NO_MODEL`）
+    的 `qa_stage_runs.details_json` 实测就是零留痕。
+
+    `attempt=0` 是刻意的：它表示"第 0 次调用根本没回来"，没有形成可判定的 attempt，
+    与正常路径上 `attempt=1/2`（模型答了、但没过契约）在语义上分开，绝不混为一谈。
+    sink 不是字典、或已经有留痕（正常发布过）时什么都不做。
+    """
+    if not isinstance(sink, dict) or sink.get(RAW_TRACE_KEY):
+        return
+    sink[RAW_TRACE_KEY] = [{
+        "attempt": 0,
+        "raw_excerpt": "",
+        "error": "%s: %s" % (type(exc).__name__, str(exc)[:300]),
+        "note": "模型调用本身失败（超时/连不上/端点异常），原文不可得",
+    }]
 
 
 def _evidence_only_message(note: str, detail: str, reason: str = "") -> str:
@@ -822,6 +850,12 @@ def _apply_evidence_layer(evidence: list, *, rejected, question: str, plan: Mapp
                 return [], audit
             # 去重把证据清空了：宁可退回原证据（只加了标注），也不给用户一个空证据包。
             # 退回的这批**照样要过核验**——不然"退回"就成了绕过核验的后门。
+            #
+            # ⚠ 例外（用户拍板，2026-10）：**一级离题闸门**（`filter_offtopic_evidence`，
+            # 在 level1_retrieval 里、本函数**之前**）允许返回空证据包。它砍掉的是
+            # "BM25 最近似也离题"的材料，退回它们等于把用户明令不要的东西塞回答案里。
+            # 这里的退回**不会**触犯那条口径：`reviewed` 只由入参 `evidence` 生成，
+            # 而入参就是闸门放行的结果——入参为空时这里退回的也是空。
             audit["reason"] = "seen_dedupe_emptied_evidence_fallback"
             fallback, fallback_audit = _verify(reviewed)
             if verifier_enabled() and fallback_audit.get("verifier"):
@@ -2636,7 +2670,16 @@ def _build_hunter_fleet(database, article_retriever):
 
 
 def _hunter_fleet_enabled() -> bool:
-    """`QA_HUNTER_FLEET` 开关（默认关）。每次都重新读环境变量，便于测试与灰度切换。"""
+    """`QA_HUNTER_FLEET` 开关的**读出口**（默认关）。每次重新读环境变量。
+
+    ⚠ 它**不再**用来选检索实现（用户拍板：一个完成的功能不许并列多条路径）：首跳检索只有
+    舰队一条路（见 `_local_retrieval`），这里返回什么都不会切到第二条实现。保留它的原因：
+      ① 消融/验收框架按 `"qa_pipeline:_hunter_fleet_enabled"` 这个 accessor **动态取用**它
+         （`qa_e2e.LAYER_SPECS` → `qa_release` 的开关默认值表），删掉会让那一层的
+         `accessor_available` 变 false（既有验收用例直接红）；
+      ② 执行图的展开仍按它决定（`qa_execution_graph.build_execution_graph`，`hunters=None` 时）。
+    这两条都是"读开关"，不是"第二套检索实现"。
+    """
     try:
         from qa_hunter_fleet import fleet_enabled
 
@@ -2770,16 +2813,26 @@ def _ledger_record_hops(ledger, graph, receipts) -> None:
 
 def _local_retrieval(article_retriever, fleet, plan: Mapping, *, industry_pack_id: str,
                      page_context, limit: int) -> tuple:
-    """level1 首跳检索：默认走既有 `ArticleRetriever.retrieve()`；舰队打开时走并行风扇。
+    """level1 首跳检索：**舰队是唯一实现**（`ArticleRetriever.retrieve()` 只剩兜底）。
 
-    返回 `(结果, 舰队回执)`。舰队是**并列的新入口**，不是替换：
-      · `QA_HUNTER_FLEET` 默认关 → 逐字回到旧路径（零行为变化）；
-      · 打开时舰队任何异常都**回落**到既有检索，并把原因写进回执——
-        一个通道挂了不许把整条检索拖成失败（§2.7 Failure Isolation）。
+    返回 `(结果, 舰队回执)`。这里只有**一条**检索路径：
+      · 正常：并行舰队（`qa_hunter_fleet`，扇出 → 扇入）；
+      · 舰队**抛异常**：回落到既有 `ArticleRetriever.retrieve()`，并把原因写进回执 ——
+        一个通道挂了不许把整条检索拖成失败（§2.7 Failure Isolation）；
+      · `fleet is None`（舰队在**装配**那一步就没建成）：同样回落，回执如实写明。
+
+    历史（用户拍板删除）：本函数曾经由 `QA_HUNTER_FLEET` 在"并行舰队"与"逐字的旧单路检索"
+    之间**二选一** —— 那是同一个功能的**两套实现**并列存在。开关的"关"从此不再换实现，
+    只剩"装配/运行失败兜底"这一条回落（兜底是**异常路径**，不是并列路径，且它如实记账）。
     """
     if fleet is None:
+        # 装配失败（`_build_hunter_fleet` 抛错）→ 兜底，不是"开关关掉换一条路"
         return article_retriever.retrieve(
-            plan, industry_pack_id=industry_pack_id, page_context=page_context, limit=limit), {}
+            plan, industry_pack_id=industry_pack_id, page_context=page_context, limit=limit), {
+            "error": "fleet_unavailable: 舰队未装配成功",
+            "fallback": "ArticleRetriever.retrieve",
+            "note": "舰队装配失败已回落到既有检索路径（证据包不受影响）",
+        }
     try:
         result = fleet.retrieve(plan, industry_pack_id=industry_pack_id,
                                 page_context=page_context, limit=limit)
@@ -2821,6 +2874,30 @@ def _synthesis_degradation_item(result: Mapping) -> dict:
         "code": codes[0] if codes else "SYNTHESIS_DEGRADED",
         "message": message[:500],
     }
+
+
+def _record_run_degradation(store, context: Mapping, item: Mapping) -> dict:
+    """run 级降级记账的**唯一写点**（同一件事只有这一处实现）。
+
+    谁调用它：
+      · `_evidence_only_fallback` —— 证据摘录判定（level1_draft / synthesis 两个阶段共用）；
+      · 两条**熔断**分支（level1_draft / synthesis，码固定 `PROVIDER_CIRCUIT_OPEN`）——
+        它们过去各自 inline 调一次 `store.mark_degraded`，与上面那个统一记账点
+        **同语义两处实现**，现改为共用本函数（只合并"写账"这一件事）。
+
+    **只做记账**：`emit_stage_event("degraded", …)` 与 `context["_stage_degraded"][stage]`
+    仍由 `_evidence_only_fallback` 自己发 —— 熔断走**独立分支**、此前刻意不发这两样，
+    合并写点不许把它们顺带出来（`tests/test_qa_evidence_only_fallback.py::PriorityTests`
+    钉死了"熔断不进 `_stage_degraded`"）。
+
+    取不到 `run_id`（直调阶段函数的夹具、context 里没有 run）时静默跳过，与既有行为一致。
+    """
+    recorded = dict(item)
+    run = context.get("run") if isinstance(context, Mapping) else None
+    run_id = str(run.get("id") or "") if isinstance(run, Mapping) else ""
+    if run_id:
+        store.mark_degraded(run_id, recorded)
+    return recorded
 
 
 def build_qa_stage_handlers(
@@ -2879,8 +2956,9 @@ def build_qa_stage_handlers(
           ① 产出降级载荷 —— 由 `build_payload(item, note)` 复用各阶段**既有**的降级实现
              （level1 = `_evidence_anchored_level1_fallback`；synthesis = `fallback_final_answer`），
              不改它们任何一个字的口径；
-          ② 写 run 级 `store.mark_degraded` —— **无条件**（含以前故意跳过的
-             `LEVEL1_OUTPUT_INVALID`：那正是判定矩阵里"A/C/D/E 四处全空"的空档 ⑧）；
+          ② 写 run 级降级账 —— 走 `_record_run_degradation`（**全阶段唯一的写点**，熔断分支同用），
+             且**无条件**（含以前故意跳过的 `LEVEL1_OUTPUT_INVALID`：那正是判定矩阵里
+             "A/C/D/E 四处全空"的空档 ⑧）；
           ③ `emit_stage_event("degraded", item)`（事件类型是契约 `QA_EVENT_TYPES` 里既有的，不新增）；
           ④ 在 context 上留 `_stage_degraded[stage]`，供终局落库前判定"这一段是不是证据摘录"。
 
@@ -2897,8 +2975,6 @@ def build_qa_stage_handlers(
         阶段出现过 NETWORK_UNREACHABLE"当后续阶段跳模型的理由 —— 每个阶段只判**自己这一次**
         调用的结果（`evidence_source` 就是这一次的原始触发原因）。
         """
-        run = context.get("run") if isinstance(context.get("run"), Mapping) else {}
-        run_id = str(run.get("id") or "")
         detail = " ".join(str(evidence_source or getattr(public, "code", "") or "").split())[:200]
         # 任务 ②→③ 的接口：判"是否真超时"必须用**真正传给 requests 的那个数**
         # （乙案保证"传入值 = 生效值 = 判定值"），所以把它一起记进 item / 事件 / 阶段输出。
@@ -2918,10 +2994,9 @@ def build_qa_stage_handlers(
         payload = build_payload(item, EVIDENCE_ONLY_NOTE)
         annotated = _mark_evidence_only_payload(payload, stage=stage, code=item["code"],
                                                 detail=detail, timeouts=timeouts)
-        # ② run 级记账：run 级写点 = 本 helper（主）+ `qa_storage.update_run` 的派生段（结构兜底）
-        #    → 新路径**不可能**再出现"run 级说没降级、答案级说降级"。
-        if run_id:
-            store.mark_degraded(run_id, item)
+        # ② run 级记账：写点只有 `_record_run_degradation` 一处（+ `qa_storage.update_run` 的派生段
+        #    作结构兜底）→ 新路径**不可能**再出现"run 级说没降级、答案级说降级"。
+        _record_run_degradation(store, context, item)
         # ③ 事件（契约里既有的事件类型）
         emit = context.get("_emit_stage_event")
         if callable(emit):
@@ -3175,19 +3250,20 @@ def build_qa_stage_handlers(
                     "stats": dict(cached.get("stats") or {}),
                 })
             return cached
-        # ── 阶段 04（P04-06）：首跳检索 = 既有 retriever 或并行舰队（默认关，见 _local_retrieval）──
+        # ── 阶段 04（P04-06）：首跳检索 = 并行舰队（**唯一实现**，见 _local_retrieval）──
+        # 这里不再问 `QA_HUNTER_FLEET`：开关的"关"过去会切到另一套逐字旧检索实现（并列路径，
+        # 用户拍板删除）。装配失败仍然只是**兜底**（`_fleet=None` → `_local_retrieval` 如实记账）。
         _fleet = _fleet_state["fleet"]
         if not _fleet_state["ready"]:
             _fleet_state["ready"] = True
-            if _hunter_fleet_enabled():
-                try:
-                    _fleet = _fleet_state["fleet"] = _build_hunter_fleet(database, article_retriever)
-                except Exception as exc:  # 舰队装配失败也不能影响检索
-                    _fleet = _fleet_state["fleet"] = None
-                    if callable(emit_stage_event):
-                        emit_stage_event("stage_progress", {
-                            "message": "并行检索舰队不可用，已使用常规检索：%s"
-                                       % str(exc)[:120]})
+            try:
+                _fleet = _fleet_state["fleet"] = _build_hunter_fleet(database, article_retriever)
+            except Exception as exc:  # 舰队装配失败也不能影响检索
+                _fleet = _fleet_state["fleet"] = None
+                if callable(emit_stage_event):
+                    emit_stage_event("stage_progress", {
+                        "message": "并行检索舰队不可用，已使用常规检索：%s"
+                                   % str(exc)[:120]})
         # ── 阶段 05（P05-01…P05-05）：执行图 + 运行账本（`QA_EXECUTION_GRAPH` 默认关）──
         # 关掉时这一段是空操作：既不建图、也不改任何返回键（零行为变化）。
         execution_graph = None
@@ -3318,9 +3394,31 @@ def build_qa_stage_handlers(
         raw_evidence = _dedupe_evidence(
             list(local.get("evidence") or []) + list(external.get("evidence") or []), cap
         )
+        # ── 一级（本地文章库 / BM25）离题闸门：**这一层允许返回空证据包** ──────────────
+        # 用户拍板："如果 BM25 查到的最近似的也离题，那就不要召回，不认为是答案。"
+        # 位置是刻意的：在**所有** empty-fallback 之前（证据层 `_apply_evidence_layer`、
+        # 核验 `qa_verifier` 的 `gate_emptied_evidence_fallback`、上下文包/synthesis 的
+        # "包为空就用整图"都在这之后），且是"首跳+多跳+舰队"三条路的**唯一汇合处**
+        # （`local` 已含 `_run_multi_hop` 的补充跳，`external` 是联网结果）。
+        # 为什么三处"绝不空手"不会把离题材料还回来：那几个 fallback 退回的 `reviewed`
+        # 都是**从本层放行的证据**生成的（入参就是这里返回的列表），入参为空 → 退回也是空。
+        # 为什么判据放在这里而不是检索器里：检索器逐通道返回（keyword/semantic/graph/
+        # policy_exact/page_context），只有这里能看到"这一轮真正要交给综合模型的全集"。
+        evidence_candidates, relevance_audit = filter_offtopic_evidence(
+            _planned_question(context), raw_evidence, plan=retrieval_plan, limit=cap,
+        )
+        if callable(emit_stage_event) and (relevance_audit.get("dropped") or relevance_audit.get("weak")):
+            emit_stage_event("stage_progress", {
+                "message": ("证据相关性闸门：保留 %s 条、剔除 %s 条离题证据%s。"
+                            % (relevance_audit.get("kept"), relevance_audit.get("dropped"),
+                               ("（另有 %s 条只算弱相关，已标注）" % relevance_audit.get("weak"))
+                               if relevance_audit.get("weak") else "")),
+                "evidence_relevance": dict(relevance_audit),
+                "stats": {"evidence_relevance": dict(relevance_audit)},
+            })
         evidence, policy_audit = filter_and_rank_policy_evidence(
             _planned_question(context),
-            raw_evidence,
+            evidence_candidates,
             plan=retrieval_plan,
             limit=cap,
         )
@@ -3347,6 +3445,39 @@ def build_qa_stage_handlers(
             _graph_ledger_record_verification(graph_ledger, execution_graph, evidence_audit)
         stats = dict(local.get("stats") or {})
         stats.update({"web_adopted": len(external.get("evidence") or []), "adopted": len(evidence)})
+        # 一级离题闸门的**生效值回执**（kept / dropped / floor / keep_floor /
+        # coverage_of_top1 / term_source / reason_counts …）：没有这份回执就无法证伪
+        # "闸门到底有没有生效"（今天已经踩过阈值 no-op 的坑）。放兄弟键，不动既有键集。
+        stats["evidence_relevance"] = dict(relevance_audit)
+        # 弱相关档与"全离题"必须出现在用户可见的降级说明里（degradation_reasons），
+        # 否则"证据被砍"这件事只活在 stats 里，用户看到的答案没有任何提示。
+        _weak_n = int(relevance_audit.get("weak") or 0)
+        if _weak_n and isinstance(run_meta, Mapping) and run_meta.get("id"):
+            try:
+                store.mark_degraded(run_meta["id"], {
+                    "stage": "level1_retrieval", "code": "EVIDENCE_WEAK_RELEVANCE",
+                    "message": ("一级检索有 %d 条材料与问题核心词的重合度偏低"
+                                "（覆盖率 %.2f–%.2f），支撑力偏弱，请谨慎采信。"
+                                % (_weak_n, float(relevance_audit.get("floor") or 0.0),
+                                   float(relevance_audit.get("keep_floor") or 0.0))),
+                })
+            except Exception:  # noqa: BLE001 —— 记账失败不许拖垮检索
+                pass
+        if relevance_audit.get("reason") == "level1_all_offtopic" \
+                and isinstance(run_meta, Mapping) and run_meta.get("id"):
+            try:
+                store.mark_degraded(run_meta["id"], {
+                    "stage": "level1_retrieval", "code": "EVIDENCE_ALL_OFFTOPIC",
+                    "message": ("本轮找回的 %s 条材料都不足以作为答案依据（%s；本轮最高核心词"
+                                "覆盖率 %.2f），已按“离题即不召回”处理：证据包为空，"
+                                "不提供证据依据。"
+                                % (relevance_audit.get("dropped"),
+                                   offtopic_reason_text(relevance_audit.get("reason_counts"))
+                                   or "核心词覆盖率低于下限",
+                                   float(relevance_audit.get("coverage_max") or 0.0))),
+                })
+            except Exception:  # noqa: BLE001
+                pass
         if fleet_receipt:
             # 阶段 04（P04-06）：舰队回执放**兄弟键**（Phase 02 的 evidence_layer 键集是冻结的）
             stats["hunter_fleet"] = dict(fleet_receipt)
@@ -3676,7 +3807,9 @@ def build_qa_stage_handlers(
                 (QaAction("稍后重试当前阶段", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
             )
             item = {"stage": "level1_draft", **public.to_event_payload(trace_id=run["id"])}
-            store.mark_degraded(run["id"], item)
+            # 记账走全阶段唯一的写点（与 `_evidence_only_fallback` 同一处实现）；**不发**
+            # `degraded` 事件、**不**打 `_stage_degraded` 标记 —— 熔断是独立一格，行为不变。
+            _record_run_degradation(store, context, item)
             if profile is not None:
                 resilience.circuit_failure(f"provider:{profile.provider_id}")
             result = _evidence_anchored_level1_fallback(
@@ -4176,11 +4309,16 @@ def build_qa_stage_handlers(
                 "stage": "synthesis", "code": "SYNTHESIS_OPERATIONS_DISABLED",
                 "message": "最终综合模型已由运维临时关闭，现返回已核验证据摘要。",
             }
-            store.mark_degraded(run["id"], item)
+            _record_run_degradation(store, context, item)
             return fallback_final_answer(
                 graph=graph, level1=level1, level2=level2,
                 degradation=degradation + [item], models=models,
-                reason=item["message"], question=_question_for_synthesis(context),
+                # 刻意不传 reason：`fallback_final_answer` 见 reason 非空就再补一条
+                # `SYNTHESIS_FALLBACK_USED` —— 那会让"运维关掉综合模型"这**一件事**落两个码
+                # （本处已经用更具体的 `SYNTHESIS_OPERATIONS_DISABLED` 记了账）。今天之所以
+                # 只看得到一个码，靠的是它按 message 文本去重这个巧合（reason 与
+                # item["message"] 逐字相同）；不传 reason 才把这第二码**从结构上**去掉。
+                reason="", question=_question_for_synthesis(context),
             )
         try:
             profile = provider_registry.resolve(
@@ -4223,6 +4361,13 @@ def build_qa_stage_handlers(
                     # 任务 ②/③ 接口：真正传给 requests 的那个读超时（传入值 = 生效值 = 判定值）
                     timeout_sink=synth_timeouts,
                 )
+            except Exception as exc:  # noqa: BLE001 —— 只补留痕，异常原样抛出，判定口径一个字不改
+                # 模型调用**本身**失败（流式读超时 / 连不上 / 端点抛错）这条路：`generate()` 里
+                # 发布原文的 `_publish_raw_trace` 在函数**末尾**，异常直接穿出去 → 库里什么都不留。
+                # B 机 run 13038dbc1700412faf3ea51e2058dcee（流式读超时 → EVIDENCE_ONLY_NO_MODEL）
+                # 的 `details_json` 里就是一条留痕都没有，只能靠 run 级账本猜。
+                _record_failed_raw_trace(raw_trace_sink, exc)
+                raise
             finally:
                 # 必须放 finally：超时/异常这条路上更要把生效超时留下（③ 判"是否真超时"要用它）
                 _record_stage_timeouts(context, "synthesis", synth_timeouts)
@@ -4261,6 +4406,11 @@ def build_qa_stage_handlers(
                         degradation=degradation + [payload_item], models=models,
                         reason="", question=_question_for_synthesis(context)),
                 )
+                # 拒答这条路的载荷是**新字典**（上一行的 `result = ...` 把原字典整个换掉了），
+                # 所以 `generate()` 刚发布的拒答原文必须在这里重新挂一次，否则会在返回前被丢掉
+                # （与下面异常路径挂留痕的手法逐字相同）。空 sink 时这两行是 no-op。
+                if raw_trace_sink.get(RAW_TRACE_KEY):
+                    result[RAW_TRACE_KEY] = raw_trace_sink[RAW_TRACE_KEY]
             elif raw_trace_sink.get(RAW_TRACE_KEY):
                 result = _evidence_only_fallback(
                     context, stage="synthesis",
@@ -4330,7 +4480,9 @@ def build_qa_stage_handlers(
                 (QaAction("重试最终综合", action="retry_stage"), QaAction("切换模型", action="open_model_picker")),
             )
             item = {"stage": "synthesis", **public.to_event_payload(trace_id=run["id"])}
-            store.mark_degraded(run["id"], item)
+            # 记账走全阶段唯一的写点（同 level1_draft 的熔断分支）；事件与 `_stage_degraded`
+            # 标记照旧不发 —— `PriorityTests` 钉死"熔断不进证据摘录的判定"。
+            _record_run_degradation(store, context, item)
             return fallback_final_answer(
                 graph=graph, level1=level1, level2=level2,
                 degradation=degradation + [item], models=models,
@@ -4370,7 +4522,7 @@ def build_qa_stage_handlers(
                     # 只判 exc 这一次的结果；绝不用"本 run 早先阶段失败过"当跳模型的理由。
                     trigger = public.code
             item = {"stage": "synthesis", **public.to_event_payload(trace_id=run["id"])}
-            return _evidence_only_fallback(
+            payload = _evidence_only_fallback(
                 context, stage="synthesis", public=public,
                 evidence_source=trigger or public.code,
                 code=EVIDENCE_ONLY_NO_MODEL if trigger else public.code,
@@ -4384,9 +4536,20 @@ def build_qa_stage_handlers(
                     question=_question_for_synthesis(context),
                 ),
             )
+            # 异常路径的留痕必须跟着这份载荷回去，否则"模型调用真的挂了"这条最需要留痕的路
+            # 照样一条记录都没有（与上面正常返回那条路的挂法逐字相同）。空 sink 时逐字不变。
+            if raw_trace_sink.get(RAW_TRACE_KEY):
+                payload[RAW_TRACE_KEY] = raw_trace_sink[RAW_TRACE_KEY]
+            return payload
 
     def citation_validation(context):
         result = dict(context["outputs"]["synthesis"])
+        # 留痕是**阶段输出的旁路键**（`RAW_TRACE_KEY` 只走 `qa_stage_runs.details_json`）：
+        # 正常链路上 orchestrator 已在本阶段之前把它摘走，这里再兜一次底 —— 直调阶段处理器的
+        # 夹具（绕开 orchestrator）会把同一个阶段输出对象直接喂进来，而答案载荷要过
+        # `additionalProperties=False` 的冻结契约，多一个键就是整条 run 判失败。
+        # 生产链路上这一行是 no-op（键早就不在了）；摘掉≠丢弃：它已经落在 details_json 里。
+        result.pop(RAW_TRACE_KEY, None)
         citations = list(result.get("citations") or [])
         citations.extend(
             str(ref)

@@ -3,24 +3,35 @@
 """回归：**合法的模型拒答**被结构化渲染顶掉，以及"结构化渲染"与"终局兜底"首行同名。
 
 背景（B 机 run 0b047cc4e0db49078f24e75e44beb28d，128.7 秒，模型真被调用：`synthesis` 66.3 秒 /
-21786 tokens、`level1_draft` 43.2 秒 / 14599 tokens；检索回来的 8 条证据全部离题，模型如实拒答）：
+21786 tokens、`level1_draft` 43.2 秒 / 14599 tokens；检索回来的 8 条证据全部离题，模型如实拒答）。
+该 run 的**两个字段**必须分清楚（本文件过去把第二个当成了第一个，是事实错误）：
 
-  1. `sections.summary` = `无证据支持，无法回答。`（**模型写的**，不是模板句）；
-  2. 但用户看到的正文第一行是 `已完成RAG检索和证据图综合。` —— `_lock_to_graph` 用
-     `_build_structured_answer` 把模型散文**顶掉**了，还把**问题本身**当成"核心结论"第一条列出；
-  3. 那句话与**终局兜底路径**的固定首行逐字相同（也就是旧版兜底模板句），于是
-     "模型答过、正文被程序顶掉"看起来和"模型没答成、走了兜底"一模一样。
+  1. 模型的**正文**（`answer` 字段）= `MODEL_ANSWER_PROSE`，**86 字**的如实说明：
+     只读 SELECT `qa_events`（run=0b047cc4、`type=answer_delta`、`stage=synthesis`、
+     event_id 34 起）把 `payload.delta` 按 event_id 逐字拼接得到 —— **被顶掉的就是这一句**；
+  2. `sections.summary` = `MODEL_REFUSAL`，**另一个字段**，模型写的一句 11 字拒答
+     （只读 SELECT `qa_runs.final_answer_json.sections.summary` 逐字复核）；
+  3. 顶掉的动作：`_lock_to_graph` 命中判据后用 `_build_structured_answer` 把上面那句 86 字正文
+     换成了 `已完成RAG检索和证据图综合。`（旧文案），还把**问题本身**当成"核心结论"第一条列出
+     —— 落库的 `qa_runs.final_answer_json.answer` 至今是那个形态；
+  4. 那句首行与**终局兜底路径**的固定首行逐字相同，于是"模型答过、正文被程序顶掉"看起来和
+     "模型没答成、走了兜底"一模一样（两条路现已分岔，见 `PathFingerprintTests`）。
 
-本文件钉住三件事：
+本文件钉住四件事：
   · 拒答/无证据形态的正文**不再**被两条"内容不足"判据顶掉（极短、政策/风险问句缺行内引用）；
   · **该顶掉的照旧顶掉**（对照）：内部噪声（优先于拒答）、非拒答的极短正文、
     政策问句里"先给结论、末句才补一句证据不足"的正文；
   · 顶掉这件事**留下被顶掉的原文**（`sections.diagnostics.prose_override`：哪一条判据命中 +
-    原文片段 + 原长度），不再只能靠推断；不新增数据库列、不改冻结 schema、不改降级口径。
+    原文片段 + 原长度），不再只能靠推断；不新增数据库列、不改冻结 schema、不改降级口径；
+  · 两条路**怎么一眼区分**：按**正文里出现哪一句**（不是首行 —— 证据摘录那条路上
+    `【未经模型综合】` 横幅会占掉首行）。
 
-夹具取自该 run 的落库数据（只读 SELECT：`qa_runs.question_text`、plan 阶段 `question_plan`、
-synthesis 阶段 `details_json.result`）：2 条 claim（`c1` 无 refs、`policy-impact-family-office`
-带 4 个 refs）、8 条证据的 `citation_map`、模型的 6 个 sections 键（除 summary 外都是空串）。
+夹具取自该 run 的落库数据（全部只读 SELECT）：`qa_runs.question_text`、
+`qa_runs.final_answer_json`（claims / citation_map / evidence / sections.summary）、
+`qa_events.answer_delta`（被顶掉的正文逐字拼接）、plan 阶段 `question_plan`：
+2 条 claim（`c1` 无 refs、`policy-impact-family-office` 带 4 个 refs）、8 条证据的 `citation_map`
+（`[1]→article:1765 … [8]→article:2355`，与库中逐字一致）、模型的 6 个 sections 键
+（除 summary 外都是空串）。
 `_question_for_synthesis` 会把「问题拆解与回答计划」拼进 question，而该计划含"法规"
 → `_policy_or_risk_question` 为 True：这正是本 run 命中"政策/风险问句缺行内引用"的前提。
 
@@ -37,6 +48,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import qa_synthesis  # noqa: E402
+import qa_pipeline  # noqa: E402  —— 证据摘录横幅（`_mark_evidence_only_payload`）与生产同一段代码
 from qa_contracts import validate_final_answer  # noqa: E402
 
 QUESTION = "最近融资近3亿元的公司是哪个公司"
@@ -55,8 +67,27 @@ QUESTION_WITH_PLAN = QUESTION + "\n\n问题拆解与回答计划：" + json.dump
 }, ensure_ascii=False)
 """该 run 真正交给综合模型的 question（`_question_for_synthesis` 把计划摘要拼在后面）。"""
 
+MODEL_ANSWER_PROSE = (
+    "根据提供的证据，没有找到任何关于“最近融资近3亿元的公司”的信息。"
+    "所有证据均涉及信托行业、财富管理、房地产交易或离岸信托税务政策，与融资事件无关。"
+    "因此，无法确定该公司名称。"
+)
+"""该 run 模型写的**正文**（`answer` 字段，86 字）—— **被程序顶掉的就是这一句**。
+
+取值来源（只读 SELECT，B 机）：`qa_events` 里 run=0b047cc4e0db49078f24e75e44beb28d、
+`type=answer_delta`、`stage=synthesis` 的 `payload.delta`，按 `event_id`（34 起）逐字拼接；
+event_id 6 那条 `source=question_plan` 是计划文本，不属于模型正文，已排除。
+
+**它不等同于** `sections.summary`（那句是 `MODEL_REFUSAL`）—— 两个字段是两句话，
+过去本夹具把 summary 当成了被顶掉的正文，那是事实错误；两条断言现在各自独立。
+"""
+
 MODEL_REFUSAL = "无证据支持，无法回答。"
-"""模型写的 11 字拒答：该 run 的 `sections.summary`，也正是被顶掉的那句正文。"""
+"""模型写的 11 字拒答：该 run 的 **`sections.summary`**（`qa_runs.final_answer_json` 逐字复核）。
+
+**它不是被顶掉的正文**（那句见 `MODEL_ANSWER_PROSE`）：`sections.summary` 走的是模型自写字段，
+`_model_sections()` 用它；被顶掉的是 `answer` 字段里的 86 字。
+"""
 
 REAL_CITATION_MAP = {
     "[1]": "article:1765", "[2]": "article:1794", "[3]": "article:2610",
@@ -180,13 +211,29 @@ class FixtureFidelityTests(unittest.TestCase):
         这条钉住一个**排查结论**：该 run 命中的不可能是"极短"那条判据，
         只可能是"政策/风险问句缺行内引用"（内部噪声则取决于模型原文里有没有内部标记）。
         """
-        pre_override = qa_synthesis._ensure_inline_citations(MODEL_REFUSAL, _claims(), REAL_CITATION_MAP)
+        pre_override = qa_synthesis._ensure_inline_citations(
+            MODEL_ANSWER_PROSE, _claims(), REAL_CITATION_MAP)
 
         self.assertIn("关键依据：", pre_override)
         self.assertIn("[8]", pre_override)
         self.assertGreaterEqual(len(pre_override.strip()), 20, pre_override)
         self.assertFalse(qa_synthesis._answer_has_internal_noise(pre_override))
         self.assertTrue(qa_synthesis._answer_is_refusal_or_no_evidence(pre_override))
+
+    def test_answer_field_and_summary_field_are_two_different_sentences(self):
+        """夹具保真的**底线**：正文（`answer`）与 `sections.summary` 不是同一句话。
+
+        该 run 的正文是 86 字的如实说明、summary 是 11 字的短拒答；被顶掉的是前者。
+        过去夹具拿 summary 当正文，于是"被顶掉的正文"这句话在证据上是错的 ——
+        本用例把这个区分钉死（改回去 → 变红）。
+        """
+        self.assertEqual(86, len(MODEL_ANSWER_PROSE), MODEL_ANSWER_PROSE)
+        self.assertNotEqual(MODEL_ANSWER_PROSE, MODEL_REFUSAL)
+        self.assertNotIn(MODEL_REFUSAL, MODEL_ANSWER_PROSE)
+        # 两句都必须是"拒答/无证据"形态：放行判据对**正文**成立（summary 只作字段断言）
+        self.assertTrue(qa_synthesis._answer_is_refusal_or_no_evidence(MODEL_ANSWER_PROSE))
+        self.assertTrue(qa_synthesis._answer_is_refusal_or_no_evidence(MODEL_REFUSAL))
+        self.assertEqual(MODEL_REFUSAL, _model_sections()["summary"])
 
 
 # ── 1. 判定谓词：只认首句里的拒答/无证据形态 ────────────────────────────────────
@@ -220,21 +267,24 @@ class RefusalPredicateTests(unittest.TestCase):
 
 class RefusalProseSurvivesTests(unittest.TestCase):
     def test_real_run_refusal_is_not_replaced_by_structured_render(self):
-        """同一份真 run 夹具：模型那句 11 字拒答必须留在用户看到的正文里。
+        """同一份真 run 夹具：模型写的那句 86 字正文必须留在用户看到的正文里。
 
         （判据维度见后两条：极短判据那一条由 `test_short_refusal_survives_the_length_condition`
         钉住，本 run 真正命中的"政策/风险问句缺行内引用"由
-        `test_real_run_trigger_shape_refusal_is_not_replaced` 钉住。本用例另外守住一件事：
-        程序补的"关键依据"块在场时也**不许**凭空多出一次顶掉。）
+        `test_real_run_trigger_shape_refusal_is_not_replaced` 钉住。本用例另外守住两件事：
+        程序补的"关键依据"块在场时也**不许**凭空多出一次顶掉；
+        `answer` 与 `sections.summary` 两个字段各按各的断言，不许互相顶替。）
         """
-        result = validate_final_answer(_lock(MODEL_REFUSAL, question=QUESTION_WITH_PLAN))
+        result = validate_final_answer(_lock(MODEL_ANSWER_PROSE, question=QUESTION_WITH_PLAN))
 
-        self.assertTrue(result["answer"].startswith(MODEL_REFUSAL), result["answer"])
+        self.assertTrue(result["answer"].startswith(MODEL_ANSWER_PROSE), result["answer"])
         self.assertNotIn(qa_synthesis._STRUCTURED_LEAD.format(label="RAG检索"), result["answer"])
         self.assertNotIn(qa_synthesis._FALLBACK_LEAD.format(label="RAG检索"), result["answer"])
         self.assertNotIn("- " + QUESTION + "\n", result["answer"], "问题本身不许再被当成核心结论列出")
-        # 模型自己的 summary 照旧保留（它本来就是模型写的）
+        # **另一个字段**（`sections.summary`）照旧保留它自己那句 11 字（模型写的，谁也没动过）
         self.assertEqual(MODEL_REFUSAL, result["sections"]["summary"])
+        self.assertNotIn(MODEL_REFUSAL, result["answer"],
+                         "summary 那句不是正文：不许被当成'正文在'的替身")
         # 没有顶掉 → 不留顶掉痕迹
         self.assertNotIn("prose_override", result["sections"]["diagnostics"])
         # 正常路径的形状不变：模型的 6 个键 + 程序 3 个键
@@ -259,12 +309,18 @@ class RefusalProseSurvivesTests(unittest.TestCase):
         self.assertNotIn("prose_override", result["sections"]["diagnostics"])
 
     def test_short_refusal_survives_the_length_condition(self):
-        """极短判据这一条：正文停在 11 字（无 refs 可补）时，拒答同样不被顶掉。"""
+        """极短判据这一条：正文停在 20 字以内（无 refs 可补）时，拒答同样不被顶掉。
+
+        这里用的是**该 run 的 `sections.summary` 那句 11 字**当正文（它是真话，只是字段不同）
+        加一张空图 —— 目的是把"极短"这条判据单独隔离出来。
+        真 run 的**正文**（86 字）走的不是这条判据，见 `test_real_run_refusal_is_not_replaced_by_structured_render`。
+        """
         result = validate_final_answer(
             _lock(MODEL_REFUSAL, question=QUESTION, graph=_refusal_only_graph(),
                   sections={"summary": MODEL_REFUSAL}, citations=[]))
 
         self.assertEqual(MODEL_REFUSAL, result["answer"])
+        self.assertLess(len(MODEL_REFUSAL.strip()), 20, "本用例的前提就是'极短'")
         self.assertNotIn("prose_override", result["sections"]["diagnostics"])
 
     def test_no_evidence_lead_is_not_replaced_either(self):
@@ -351,9 +407,10 @@ class ProseOverrideObservabilityTests(unittest.TestCase):
 
     def test_excerpt_records_program_appended_block_too(self):
         """留痕记录的是**判据当时看到的全文**：程序补的"关键依据"块也在里面（这正是判据依据）。"""
-        result = _lock(MODEL_REFUSAL, question=QUESTION_WITH_PLAN, graph=_graph(claims=[], evidence=[]))
+        result = _lock(MODEL_ANSWER_PROSE, question=QUESTION_WITH_PLAN, graph=_graph(claims=[], evidence=[]))
         # 没有 claim → 不会补块，这里用真夹具那条有 refs 的 claim 单独验证一次
         self.assertTrue(result["answer"])  # 空图：答案保持拒答（不被顶掉）
+        self.assertIn(MODEL_ANSWER_PROSE, result["answer"])
         record_graph = _graph(claims=[_claims()[1]], evidence=_evidence())
         overridden = _lock("离岸信托税务政策会影响家族办公室的架构复核与申报安排。",
                          question=QUESTION_WITH_PLAN, graph=record_graph)
@@ -374,7 +431,7 @@ class ProseOverrideObservabilityTests(unittest.TestCase):
 
     def test_no_override_means_diagnostics_gets_no_extra_key(self):
         """不顶掉的路径上 diagnostics 只多一个键都不行（"逐字不变"那类对照片的护栏）。"""
-        result = _lock(MODEL_REFUSAL, question=QUESTION_WITH_PLAN)
+        result = _lock(MODEL_ANSWER_PROSE, question=QUESTION_WITH_PLAN)
         self.assertEqual(["degradation_codes"], sorted(result["sections"]["diagnostics"]))
 
 
@@ -421,8 +478,113 @@ class PathDistinguishabilityTests(unittest.TestCase):
         self.assertEqual(qa_synthesis._STRUCTURED_LEAD.format(label="RAG检索"), first_line)
         self.assertNotEqual("已完成RAG检索和证据图综合。", first_line)
         self.assertNotEqual(self._fallback()["answer"].splitlines()[0], first_line)
+        # 首行仍是"路径指纹"的载体，但**判别**它的是 `answer_path_of`（按整篇里的那一句，
+        # 不按行位置）—— 证据摘录那条路上横幅会顶掉首行，见 PathFingerprintTests
+        self.assertEqual(qa_synthesis.ANSWER_PATH_RENDER,
+                         qa_synthesis.answer_path_of(result["answer"]))
         # 渲染路径保留模型自己的 summary（模型答过），这条与兜底路径天然不同
         self.assertEqual(MODEL_REFUSAL, result["sections"]["summary"])
+
+
+# ── 6. 路径判别：看**正文里出现哪一句**，不看首行 ─────────────────────────────
+
+
+def _render_payload():
+    """渲染路径的真产物：非拒答的极短正文被 `_answer_override_trigger` 判为 `too_short` 后重组。"""
+    return validate_final_answer(_lock("是的，需要申报。", question=QUESTION, graph=_refusal_only_graph()))
+
+
+def _fallback_payload():
+    """兜底路径的真产物：`fallback_final_answer`（模型两次都没给出可用输出）。"""
+    return validate_final_answer(qa_synthesis.fallback_final_answer(
+        graph=_graph(), level1={"gaps": []}, level2={"evidence_gaps": []}, degradation=[],
+        models={"research": "RAG检索"},
+        reason="最终综合模型两次尝试都未通过契约校验，已改用证据约束的结构化重组。",
+        question=QUESTION,
+    ))
+
+
+class PathFingerprintTests(unittest.TestCase):
+    """**两条路怎么一眼区分**：`answer_path_of` 按"正文里出现的是哪一句"判，不按首行。
+
+    为什么不能用首行：证据摘录那条路（`EVIDENCE_ONLY_NO_MODEL`）上，
+    `qa_pipeline._mark_evidence_only_payload` 会把 `【未经模型综合】…` 横幅块插到正文最前面，
+    首行于是变成横幅 —— "首行就是路径指纹"这条前提在那条路上整个失效
+    （`test_evidence_only_banner_does_not_hide_the_path` 就是这根的钉子）。
+    """
+
+    def test_each_path_is_recognised_by_its_own_sentence(self):
+        self.assertEqual(qa_synthesis.ANSWER_PATH_RENDER,
+                         qa_synthesis.answer_path_of(_render_payload()["answer"]))
+        self.assertEqual(qa_synthesis.ANSWER_PATH_FALLBACK,
+                         qa_synthesis.answer_path_of(_fallback_payload()["answer"]))
+
+    def test_passthrough_body_belongs_to_neither_path(self):
+        """模型正文被原样保留的正文：两条路都不是（返回空串），不许硬认成其中一条。"""
+        result = _lock(MODEL_ANSWER_PROSE, question=QUESTION_WITH_PLAN)
+
+        self.assertEqual("", qa_synthesis.answer_path_of(result["answer"]))
+
+    def test_evidence_only_banner_does_not_hide_the_path(self):
+        """**证据摘录那条路上的钉子**：横幅占掉首行时，判别照样成立（改回"只看首行" → 变红）。
+
+        直接调生产同一段代码（`qa_pipeline._mark_evidence_only_payload`）来加横幅，
+        而不是手写一个像横幅的字符串：这样"横幅长什么样、插在哪"永远与生产一致。
+        """
+        marked = qa_pipeline._mark_evidence_only_payload(
+            _fallback_payload(), stage="synthesis",
+            code=qa_pipeline.EVIDENCE_ONLY_NO_MODEL, detail="HTTPConnectionPool: 连接被拒绝")
+        answer = marked["answer"]
+        fallback_lead = qa_synthesis._FALLBACK_LEAD.format(label="RAG检索")
+
+        self.assertTrue(answer.startswith(qa_pipeline.EVIDENCE_ONLY_HEADER), answer[:80])
+        self.assertNotEqual(fallback_lead, answer.splitlines()[0],
+                            "前提：横幅已经占掉首行 —— 所以'看首行判路'这条路本身失效了")
+        self.assertEqual(qa_synthesis.ANSWER_PATH_FALLBACK, qa_synthesis.answer_path_of(answer))
+        self.assertIn(fallback_lead, answer)
+        # 横幅与固定文案都如实落到载荷上（判别不许依赖它们的位置）
+        self.assertIn(qa_pipeline.EVIDENCE_ONLY_NOTE, answer)
+        self.assertEqual(qa_pipeline.EVIDENCE_ONLY_NOTE, marked["degradation_reasons"][0])
+
+    def test_judgement_does_not_depend_on_the_line_the_sentence_sits_on(self):
+        """判别只看"整篇里有没有这一句"：挪到中间、挪到末尾、前面垫多少行都照样认得出。"""
+        render_lead = qa_synthesis._STRUCTURED_LEAD.format(label="RAG增强检索")
+        fallback_lead = qa_synthesis._FALLBACK_LEAD.format(label="RAG增强检索")
+
+        bodies = (
+            ("【未经模型综合】本条回答由已核验证据摘录生成，未经模型综合。\n\n前缀说明\n\n"
+             + render_lead + "\n核心结论：…"),
+            "a\nb\nc\n" + render_lead,
+            "【未经模型综合】…\n" + fallback_lead + "\n核心结论：…",
+        )
+        self.assertEqual(qa_synthesis.ANSWER_PATH_RENDER, qa_synthesis.answer_path_of(bodies[0]))
+        self.assertEqual(qa_synthesis.ANSWER_PATH_RENDER, qa_synthesis.answer_path_of(bodies[1]))
+        self.assertEqual(qa_synthesis.ANSWER_PATH_FALLBACK, qa_synthesis.answer_path_of(bodies[2]))
+
+    def test_one_implementation_two_paths_as_a_parameter(self):
+        """**一条实现、一个入口**：渲染 / 兜底是同一个 `_build_structured_answer` 的 `path` 取值。
+
+        同一份输入下两条路的正文**除首行外逐字相同** —— 这正是"把两条并列路径收敛成
+        同一路径的参数"的可断言形态；未知 `path` 直接报错，不给第三条路留门。
+        """
+        common = dict(question=QUESTION, claims=_claims(), evidence=_evidence(),
+                      citation_map=REAL_CITATION_MAP, models={"research": "RAG检索"})
+
+        self.assertEqual({qa_synthesis.ANSWER_PATH_RENDER, qa_synthesis.ANSWER_PATH_FALLBACK},
+                         set(qa_synthesis._ANSWER_LEADS))
+        render = qa_synthesis._build_structured_answer(
+            path=qa_synthesis.ANSWER_PATH_RENDER, **common)
+        fallback = qa_synthesis._build_structured_answer(
+            path=qa_synthesis.ANSWER_PATH_FALLBACK, **common)
+
+        self.assertEqual(render.split("\n", 1)[1], fallback.split("\n", 1)[1],
+                         "两条路只许差首行（其余逐字相同）")
+        self.assertEqual([qa_synthesis._STRUCTURED_LEAD.format(label="RAG检索")],
+                         render.splitlines()[:1])
+        self.assertEqual([qa_synthesis._FALLBACK_LEAD.format(label="RAG检索")],
+                         fallback.splitlines()[:1])
+        with self.assertRaises(ValueError):
+            qa_synthesis._build_structured_answer(path="third_path", **common)
 
 
 if __name__ == "__main__":

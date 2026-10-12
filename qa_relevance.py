@@ -14,6 +14,7 @@ App 的片段当成具身智能的证据引用出来）。这类无关证据一�
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 from typing import Iterable, Mapping
@@ -263,7 +264,417 @@ def filter_relevant_evidence(
     return kept, audit
 
 
+# ── 一级（本地文章库 / BM25）检索的"离题闸门" ──────────────────────────────────
+#
+# 用户拍板（原话）："如果 BM25 查到的最近似的也离题，那就不要召回，不认为是答案。"
+# 所以**这一层允许返回空证据包**：全离题 → 0 条 → 生成端如实说"无证据支持"，而不是把
+# 离题材料包装成核心结论。（这是对"绝不返回空证据包"口径的**明确例外**，理由见下。）
+#
+# 为什么不能照抄二级闸门 `filter_relevant_evidence` 的口径：
+#   · 二级是召回优先（命中 1 个实词就算相关），因为知识库片段短、词表窄；
+#   · 一级是本地文章库全文，`融资/亿元/公司` 这类词到处都是，词面命中极其廉价。
+#     实测（B 机两轮真实问答 run 0b047cc4e0db49078f24e75e44beb28d /
+#     16d1eeb0425345c5882b0e9cca16e715，plan 逐字为 entities=[]、policy_anchors 全空、
+#     queries=["最近融资近3亿元的公司是哪个公司"]）8 条一级证据的核心词覆盖率是
+#     1.000 / 0.076 / 0.076 / 1.000 / 0.076 / 1.000 / 0.076 / 1.000：
+#     **单靠覆盖率会留下 4 条离题的**（信托业三分类、财富管理降佣降费、美国家族信托、
+#     商厦租赁成交）——闸门等于没开。决定性的是问题自带的**金额硬约束**：
+#     只有"應天獲買家3億掃兩伙"那条的金额对得上（近3亿元），但它的窗口里没有"融资"，
+#     所以按 `qa_retrieval._amount_constraint_hits` 的口径（金额必须与上下文词同窗）也判离题。
+#     加金额硬约束以后 8 条全灭（实测 kept=0 / dropped=8）。
+#
+# 判据（三道，任一不满足即离题）：
+#   ① 核心词 idf 覆盖率：coverage = Σ idf(t)·[t ∈ 证据] / Σ idf(t)，t 复用
+#      `question_terms`（不另造词表）；idf 用**本证据包内**的 df（BM25 同款公式）。
+#      阈值：≥ keep_floor(0.20) 保留；floor(0.12)–keep_floor 保留但标 weak_relevance；
+#      < floor 丢弃。**阈值需实测校准**：默认值取自 B 机两轮真实问答的分布
+#      （离题的落在 0.076，相关的落在 0.92–1.00），语料/词表变化后必须重新量。
+#   ② 硬否决：只命中金额/数字字面（"亿元""3亿"），或整包一个核心词都没命中。
+#   ③ 金额硬约束：问题带金额时（"近3亿元"），证据必须命中该金额且与核心词同窗
+#      （沿用 `qa_retrieval._amount_constraint_hits` 口径）——数值问题的答案不可能
+#      出现在对不上数字的材料里。可用 `QA_LEVEL1_AMOUNT_GATE=0` 单独关掉。
+#   次级判据（主判据不可用时=只有 n-gram 兜底词，词本身不可信）：不同核心词命中
+#      ≥ QA_LEVEL1_MIN_DISTINCT_HITS(2)，或语义分 ≥ QA_LEVEL1_SEMANTIC_STRONG(0.60)。
+#      **语义分是独立量纲**：BM25 分（几十到上百）与余弦相似度（0–1）绝不共用一个阈值，
+#      所以这里只对真带语义分的证据生效（`retrieval_method=semantic` 或 match_reason 里
+#      的"语义相似度 x"），BM25 证据永远走词面判据。
+#
+# 豁免（绝不砍）：用户显式引用的页面上下文（page_context）、图谱事实（graph）、
+#   联网结果（web）、政策元数据精确命中（policy_metadata_exact）——这些通道的"相关"
+#   不靠词面重合，砍掉它们就是回归。
+_LEVEL1_EXEMPT_SOURCE_TYPES = frozenset({"page_context", "graph", "web"})
+_LEVEL1_EXEMPT_METHODS = frozenset({"page_context", "policy_metadata_exact", "policy_exact"})
+_LEVEL1_EXEMPT_METHOD_PREFIXES = ("graph_",)
+# 只是金额/数字字面、说明不了"问的是什么"的词
+_AMOUNT_LITERALS = ("亿元", "亿", "万元", "万", "千元", "千", "元", "人民币", "美元",
+                    "港元", "美金", "日元", "億", "萬")
+_DIGITS_RE = re.compile(r"[0-9０-９.,%％]+")
+# 长词/整句（计划里的 queries 常常就是整句）要先拆开：整句当词会让覆盖率恒为 0，
+# 好证据也会被一起砍掉（实测 plan.queries 就是 15 字的整句问题）。
+_LONG_TERM_CHARS = 8
+_SENTENCE_CHARS_RE = re.compile(r"[。！？，、；：,.!?;:…\s]")
+_SEMANTIC_IN_REASON = re.compile(r"语义相似度\s*([0-9]*\.?[0-9]+)")
+_SEMANTIC_METHODS = frozenset({"semantic", "vector", "embedding"})
+# 离题原因 → 人话（降级说明与运维报表共用同一份文案，避免两处不一致）
+_OFFTOPIC_REASON_TEXT = {
+    "no_core_term_hit": "与问题核心词零重合",
+    "only_amount_literals": "只命中金额/数字字面",
+    "amount_constraint_miss": "金额与问题对不上",
+    "coverage_below_floor": "核心词覆盖率低于下限",
+    "ngram_insufficient_hits": "命中核心词太少",
+}
+
+
+def offtopic_reason_text(reason_counts: Mapping | None) -> str:
+    """把离题原因计数翻成人话（`"金额与问题对不上 3 条；…"`）。"""
+    counts = dict(reason_counts or {})
+    parts = []
+    for code, value in sorted(counts.items(), key=lambda row: -row[1]):
+        parts.append("%s %s 条" % (_OFFTOPIC_REASON_TEXT.get(str(code), str(code)), value))
+    return "；".join(parts)
+
+
+def level1_relevance_enabled() -> bool:
+    """一级离题闸门总开关（QA_LEVEL1_RELEVANCE_GATE，默认开）。"""
+    return _env_int("QA_LEVEL1_RELEVANCE_GATE", 1) != 0
+
+
+def level1_coverage_floor() -> float:
+    """丢弃线（QA_LEVEL1_RELEVANCE_FLOOR，默认 0.12）。**需实测校准**：见本节注释。"""
+    return max(0.0, _env_float("QA_LEVEL1_RELEVANCE_FLOOR", 0.12))
+
+
+def level1_coverage_keep() -> float:
+    """保留线（QA_LEVEL1_RELEVANCE_KEEP，默认 0.20）。**需实测校准**：见本节注释。"""
+    return max(0.0, _env_float("QA_LEVEL1_RELEVANCE_KEEP", 0.20))
+
+
+def level1_semantic_strong() -> float:
+    """次级判据里的语义强阈值（QA_LEVEL1_SEMANTIC_STRONG，默认 0.60）。
+
+    **只作用于真带语义分的证据**（另一条量纲），BM25 分绝不拿它比。
+    """
+    return max(0.0, _env_float("QA_LEVEL1_SEMANTIC_STRONG", 0.60))
+
+
+def level1_min_distinct_hits() -> int:
+    """次级判据：n-gram 兜底词表下至少要命中几个不同核心词（默认 2）。"""
+    return max(1, _env_int("QA_LEVEL1_MIN_DISTINCT_HITS", 2))
+
+
+def level1_amount_gate() -> bool:
+    """问题带金额时是否启用金额硬约束（QA_LEVEL1_AMOUNT_GATE，默认开）。"""
+    return _env_int("QA_LEVEL1_AMOUNT_GATE", 1) != 0
+
+
+def _term_is_amount_literal(term: str) -> bool:
+    """词本身只是金额/数字字面（"亿元""3亿"）→ 不能当"相关"的证据。"""
+    clean = normalize_intel_text(term)
+    if not clean:
+        return True
+    stripped = clean
+    for literal in _AMOUNT_LITERALS:
+        stripped = stripped.replace(normalize_intel_text(literal), "")
+    stripped = _DIGITS_RE.sub("", stripped)
+    return not stripped.strip()
+
+
+def _split_long_terms(term: str) -> list:
+    """把长词/整句拆成核心词：复用检索器既有的 jieba + 停用词/目标词表。
+
+    刻意**不新增词表**：分词与过滤都走 `qa_retrieval._tokenize_query`，与 BM25 通道
+    用同一套口径。分词器不可用时退回既有 `_cjk_ngrams`（二级闸门同款兜底），
+    这样闸门不会因为依赖缺失而静默消失。
+    """
+    tokens: list = []
+    try:
+        from qa_retrieval import _tokenize_query  # 局部导入：qa_retrieval 很重
+
+        tokens = list(_tokenize_query(str(term or "")))
+    except Exception:  # noqa: BLE001 —— 任何异常都走下面的字面兜底
+        tokens = []
+    if not tokens:
+        tokens = sorted(_cjk_ngrams(str(term or ""), sizes=(2,)))
+    cleaned = []
+    for token in tokens:
+        value = normalize_intel_text(token)
+        if len(value) >= 2 and value not in cleaned:
+            cleaned.append(value)
+    return cleaned
+
+
+def _core_terms(question: str, plan: Mapping | None) -> tuple[set, str, list]:
+    """核心词 + 词表来源 + 被拆开的长词。
+
+    词表**只来自** `question_terms`（计划实体/政策锚词/检索式/问题本身），长词用既有
+    分词器拆开。返回 `(terms, term_source, split_from)`，term_source ∈
+    {"plan", "question", "ngram_fallback"}，与二级闸门的审计口径保持一致。
+    """
+    strict = question_terms(question, plan, allow_ngram_fallback=False)
+    if strict:
+        plan_only = question_terms("", plan, allow_ngram_fallback=False) if isinstance(plan, Mapping) else set()
+        source = "plan" if plan_only else "question"
+        raw = strict
+    else:
+        # 计划里一个实词都抽不到 → n-gram 兜底词（可信度低，走次级判据）
+        raw = question_terms(question, plan)
+        source = "ngram_fallback"
+    terms: set = set()
+    split_from: list = []
+    for term in raw:
+        if len(term) > _LONG_TERM_CHARS or _SENTENCE_CHARS_RE.search(term):
+            split_from.append(term)
+            for token in _split_long_terms(term):
+                terms.add(token)
+            continue
+        terms.add(term)
+    return terms, source, sorted(split_from)[:5]
+
+
+def _evidence_text(item: Mapping) -> str:
+    """判据只看证据自身的标题 + 正文摘要（与二级闸门口径一致：绝不含 match_reason）。"""
+    return normalize_intel_text("%s %s" % (item.get("title") or "", item.get("content_excerpt") or ""))
+
+
+def _pack_idf(texts: list, terms: Iterable[str]) -> tuple[dict, dict]:
+    """证据包内的 idf（BM25 同款公式，k1/b 无关）。
+
+    为什么用包内 df：本层拿不到检索器的全库 df（那是候选池内部的量），而包内 df 在
+    同一次检索里**可复算**。df=0 的词（整包一条都没命中）不进权重：它对包内没有任何
+    区分度，留在分母里只会把所有覆盖率整体压低——好证据也会被一起砍掉。
+    """
+    total = max(1, len(texts))
+    df = {term: 0 for term in terms}
+    for text in texts:
+        for term in df:
+            if term and term in text:
+                df[term] += 1
+    weights = {}
+    for term, count in df.items():
+        if count <= 0:
+            continue
+        weights[term] = math.log(1.0 + (total - count + 0.5) / (count + 0.5))
+    return weights, df
+
+
+def _semantic_score(item: Mapping) -> float:
+    """证据自带的语义分（0–1）；没有就返回 0（**绝不用 BM25 分顶替**）。"""
+    method = str(item.get("retrieval_method") or "").casefold()
+    try:
+        score = float(item.get("score") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+    if method in _SEMANTIC_METHODS:
+        # 语义 Hunter 的证据分就是余弦×100（见 qa_hunters 的 method="semantic"）
+        return max(0.0, min(1.0, score / 100.0))
+    match = _SEMANTIC_IN_REASON.search(str(item.get("match_reason") or ""))
+    if match:
+        try:
+            return max(0.0, min(1.0, float(match.group(1))))
+        except (TypeError, ValueError):
+            return 0.0
+    return 0.0
+
+
+def _exempt_reason(item: Mapping) -> str:
+    """这些通道的"相关"不靠词面重合，本层一律放行。"""
+    source_type = str(item.get("source_type") or "")
+    method = str(item.get("retrieval_method") or "")
+    if source_type in _LEVEL1_EXEMPT_SOURCE_TYPES:
+        return source_type
+    if method in _LEVEL1_EXEMPT_METHODS:
+        return method
+    for prefix in _LEVEL1_EXEMPT_METHOD_PREFIXES:
+        if method.startswith(prefix):
+            return prefix.rstrip("_")
+    return ""
+
+
+def _amount_tools() -> tuple:
+    """懒加载 `qa_retrieval` 的金额判据（沿用既有口径，不重写一套）。"""
+    try:
+        from qa_retrieval import _amount_constraint_hits, _amount_constraints, _amount_context_terms
+
+        return _amount_constraints, _amount_context_terms, _amount_constraint_hits
+    except Exception:  # noqa: BLE001 —— 取不到就不启用金额硬约束（不误砍）
+        return None, None, None
+
+
+def filter_offtopic_evidence(
+    question: str,
+    evidence: list,
+    *,
+    plan: Mapping | None = None,
+    limit: int | None = None,
+) -> tuple:
+    """一级证据离题闸门：**允许返回空证据包**，返回 (保留的证据, 审计)。
+
+    审计里 `kept` / `dropped` / `floor` / `keep_floor` / `coverage_of_top1` /
+    `term_source` 是生效值回执（调用方必须落进阶段 stats，否则无法证伪）。
+    证据条目本身**不加顶层键**（冻结的 `EVIDENCE_SCHEMA.additionalProperties=False`）：
+    weak 标记与覆盖率写进 `metadata.evidence_relevance`。
+    """
+    items = [dict(item) for item in (evidence or []) if isinstance(item, Mapping)]
+    floor = level1_coverage_floor()
+    keep_floor = level1_coverage_keep()
+    audit = {
+        "gate": "applied", "reason": "", "kept": 0, "dropped": 0, "weak": 0, "exempt": 0,
+        "floor": floor, "keep_floor": keep_floor,
+        "term_source": "", "terms": [], "terms_split_from": [],
+        "coverage_of_top1": 0.0, "top1_ref": "", "coverage_max": 0.0,
+        "amount_gate": "off", "amount_constraints": [],
+        "excluded": [], "weak_evidence": [], "reason_counts": {},
+    }
+
+    def _cap(kept: list) -> list:
+        if limit is None:
+            return kept
+        try:
+            return kept[: max(0, int(limit))]
+        except (TypeError, ValueError):
+            return kept
+
+    if not items:
+        audit["reason"] = "no_evidence"
+        return [], audit
+    if not level1_relevance_enabled():
+        # 关掉闸门 = 逐字回到改动前的行为（回滚口径），统计里如实写明
+        audit.update({"gate": "disabled", "reason": "QA_LEVEL1_RELEVANCE_GATE=0", "kept": len(items)})
+        return _cap(items), audit
+
+    terms, term_source, split_from = _core_terms(question, plan)
+    audit["term_source"] = term_source
+    audit["terms"] = sorted(terms)[:20]
+    audit["terms_split_from"] = split_from
+    if not terms:
+        # 问句与计划都为空：没有任何判据可用。注意与二级闸门 `not_applicable` 的区别——
+        # 这里**不会**因为"抽不出实词"就放行：抽不出实词时会走 n-gram 兜底（上面的
+        # term_source=ngram_fallback），那时走的是次级判据，闸门照旧生效。
+        audit.update({"gate": "not_applicable", "reason": "no_core_terms", "kept": len(items)})
+        return _cap(items), audit
+
+    texts = [_evidence_text(item) for item in items]
+    weights, _df = _pack_idf(texts, terms)
+    coverage_total = sum(weights.values())
+    audit["idf_terms"] = {term: round(value, 4) for term, value in sorted(weights.items())[:20]}
+
+    # 金额硬约束（问题里出现金额时）：口径与检索器完全一致
+    _constraints_fn, _context_fn, _hits_fn = _amount_tools()
+    queries = [str(item) for item in (plan or {}).get("queries") or [] if str(item).strip()] \
+        if isinstance(plan, Mapping) else []
+    if not queries:
+        queries = [str(question or "")]
+    constraints: list = []
+    context_terms: list = []
+    if _constraints_fn and _context_fn and _hits_fn:
+        context_terms = list(_context_fn(queries))
+        for query in queries:
+            for item in _constraints_fn(query):
+                key = (round(float(item.get("value_yi") or 0), 6), bool(item.get("approximate")))
+                if not any((round(float(existing.get("value_yi") or 0), 6),
+                            bool(existing.get("approximate"))) == key for existing in constraints):
+                    constraints.append(item)
+        constraints = constraints[:8]
+    amount_active = bool(constraints) and level1_amount_gate()
+    audit["amount_constraints"] = [dict(item) for item in constraints]
+    audit["amount_context_terms"] = context_terms[:12]
+    audit["amount_gate"] = "applied" if amount_active else ("disabled" if constraints else "off")
+
+    need_hits = level1_min_distinct_hits()
+    strong = level1_semantic_strong()
+    kept: list = []
+    weak_evidence: list = []
+    dropped: list = []
+    reason_counts: dict = {}
+    # `coverage_of_top1` = **分数最高的那条非豁免证据**（"BM25 查到的最近似的"）的覆盖率；
+    # `coverage_max` = 包内最高覆盖率。两个都报，避免"第一"这个词的歧义。
+    top1 = (-1.0, 0.0, "")
+    coverage_max = 0.0
+
+    def _drop(item: Mapping, reason: str, coverage: float, hits: list) -> None:
+        reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        dropped.append({
+            "evidence_ref": item.get("evidence_ref"), "title": str(item.get("title") or "")[:120],
+            "reason": reason, "coverage": round(coverage, 6), "term_hits": hits[:10],
+        })
+
+    def _mark(entry: dict, record: dict) -> None:
+        """标注写进 `metadata.evidence_relevance`：顶层键集冻结（additionalProperties=False），
+        且这里刻意换一个新的 metadata 字典，绝不改动调用方传进来的证据对象。"""
+        metadata = entry.get("metadata")
+        metadata = dict(metadata) if isinstance(metadata, Mapping) else {}
+        metadata["evidence_relevance"] = record
+        entry["metadata"] = metadata
+
+    for item, text in zip(items, texts):
+        exempt = _exempt_reason(item)
+        hits = sorted(term for term, weight in weights.items() if weight and term in text)
+        coverage = (sum(weights[term] for term in hits) / coverage_total) if coverage_total else 0.0
+        content_hits = [term for term in hits if not _term_is_amount_literal(term)]
+        coverage_max = max(coverage_max, coverage)
+        try:
+            _score = float(item.get("score") or 0.0)
+        except (TypeError, ValueError):
+            _score = 0.0
+        if not exempt and _score > top1[0]:
+            top1 = (_score, coverage, str(item.get("evidence_ref") or ""))
+        amount_hits: list = []
+        if amount_active and _hits_fn:
+            amount_hits = list(_hits_fn(constraints, text, context_terms=context_terms))
+        record = {
+            "coverage": round(coverage, 6), "term_hits": hits[:10],
+            "amount_hits": amount_hits[:4], "gate": "level1-offtopic-v1",
+        }
+        reason = ""
+        if exempt:
+            # 豁免通道：不判、不砍（用户显式引用 / 图谱事实 / 联网 / 政策元数据精确命中）
+            record["exempt"] = exempt
+            audit["exempt"] += 1
+        elif not hits:
+            reason = "no_core_term_hit"
+        elif not content_hits:
+            # 判据②：只命中金额/数字字面（"應天獲買家3億掃兩伙"就是这种）
+            reason = "only_amount_literals"
+        elif amount_active and not amount_hits:
+            # 判据③：数值问题里"数字对不上"就不可能承载答案
+            reason = "amount_constraint_miss"
+        elif term_source == "ngram_fallback":
+            # 次级判据（主判据不可用：词表是 n-gram 兜底，词本身不可信）
+            semantic = _semantic_score(item)
+            record["semantic"] = round(semantic, 4)
+            if not (len(content_hits) >= need_hits or (semantic and semantic >= strong)):
+                reason = "ngram_insufficient_hits"
+        elif coverage >= keep_floor:
+            record["weak"] = False
+        elif coverage >= floor:
+            # 弱相关档：**保留**并标注（不许当成丢弃），由上层转成 degradation 说明
+            record["weak"] = True
+        else:
+            reason = "coverage_below_floor"
+        if reason:
+            record["reason"] = reason
+            _drop(item, reason, coverage, hits)
+        else:
+            if record.get("weak"):
+                weak_evidence.append({"evidence_ref": item.get("evidence_ref"),
+                                      "coverage": round(coverage, 6)})
+            kept.append(item)
+        _mark(item, record)
+
+    audit.update({
+        "kept": len(kept), "dropped": len(dropped), "weak": len(weak_evidence),
+        "coverage_of_top1": round(float(top1[1]), 6), "top1_ref": top1[2],
+        "coverage_max": round(float(coverage_max), 6),
+        "weak_evidence": weak_evidence[:20], "excluded": dropped[:50],
+        "reason_counts": dict(sorted(reason_counts.items(), key=lambda row: -row[1])),
+        "reason": "level1_all_offtopic" if not kept else "",
+    })
+    return _cap(kept), audit
+
+
 __all__ = [
     "question_terms", "evidence_hits", "filter_relevant_evidence",
     "min_term_hits", "min_similarity",
+    "filter_offtopic_evidence", "level1_coverage_floor", "level1_coverage_keep",
+    "offtopic_reason_text",
 ]
