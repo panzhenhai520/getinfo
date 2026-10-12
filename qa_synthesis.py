@@ -35,6 +35,11 @@ from qa_level1 import (
 _REFUSAL_RE = re.compile(r"(抱歉|无法|不能|拒绝|sorry|cannot|can't|unable).{0,20}(处理|回答|协助|comply|process|answer)", re.I)
 _RISK_RE = re.compile(r"(风险|冲击|影响|应对|调整|合规|家族办公室|家族信托|离岸信托|规避|反避税|申报|税务)", re.I)
 _RAG_PROVIDER_RE = re.compile(r"RAGFlow", re.I)
+_CITATION_LABEL_RE = re.compile(r"^\[\d+\]$")
+"""正文引用标签的形状（`citation_map` 的 key，如 `[1]`）。
+
+只用来识别**格式误填**（模型把正文标签填进了 `citations` 字段），
+不做任何内容解读、也不拿它放宽"不许引用不存在的证据"这条底线。"""
 _POLICY_QA_RE = re.compile(r"(公告|政策|法规|办法|条例|通知|个税|个人所得税|征管|离岸信托|境外信托)", re.I)
 
 _LOGGER = logging.getLogger(__name__)
@@ -521,6 +526,46 @@ def _citation_reverse(evidence: list[Mapping], citation_map: Mapping[str, str]) 
         identity = _citation_identity(item)
         reverse[ref] = primary_by_identity.get(identity) or direct.get(ref, "")
     return reverse
+
+
+def _normalize_citation_labels(citations: list, citation_map: Mapping[str, str]) -> tuple[list, list[str]]:
+    """把模型误填进 `citations` 的正文标签 `[n]` 翻译成 evidence_ref（**纯格式归一化**）。
+
+    为什么需要（B 机真实 run d980edf5c1b44949acccbf212daeb3f5）：模型的原始输出是
+        {"answer": "…", "citations": ["[1]"], "claims": ["l1-c1"]}
+    —— `citations` 填的是 `citation_map` 的 **key**（正文引用标签 `[1]`），而字段要的是
+    **evidence_ref**（`article:1765`）。于是"引用不存在的证据"的判定把两次尝试全废掉，
+    真实答案被丢掉、退化成模板（`sections.summary = 已完成RAG检索和证据图综合。`）。
+
+    这条归一化**一个字都没放松底线**：
+      · 只有形状严格等于 `[n]` 的项才走逆映射，`citation_map` 里查不到就**原样保留**，
+        后面照旧落进 `unknown_refs` 判失败；
+      · 翻译结果仍然逐个落在本轮真实证据集合里复核（调用点紧跟着判 `unknown_refs`）。
+
+    返回值第二项是本轮真正被翻译的标签，供调用点**如实记账**（绝不静默改写模型输出）；
+    没有可翻译的项时返回空列表，调用点行为逐字不变。
+    """
+    refs: list = []
+    translated: list[str] = []
+    for item in citations or []:
+        label = str(item).strip()
+        if _CITATION_LABEL_RE.match(label):
+            ref = str(dict(citation_map or {}).get(label) or "")
+            if ref:
+                translated.append(label)
+                refs.append(ref)
+                continue
+        refs.append(item)
+    return refs, translated
+
+
+def _citation_label_note(labels: list, citation_map: Mapping[str, str]) -> str:
+    """把"翻译了几个标签、翻成了什么"写成一句可落库的公开说明（≤500 字）。"""
+    pairs = "、".join("%s→%s" % (label, citation_map.get(label, "")) for label in list(labels)[:5])
+    return (
+        "最终综合的 citations 填的是正文引用标签，已按本轮 citation_map 逆映射为 evidence_ref"
+        "（共 %d 个：%s）；映射结果逐个复核过，未放行任何不存在的引用。" % (len(list(labels)), pairs)
+    )
 
 
 def _cutoff(evidence: list[Mapping]) -> str:
@@ -1225,6 +1270,12 @@ class QaFinalSynthesizer:
                 claims = _packed_claims(claims, pack_refs)
                 conflicts = _filter_conflicts_to_refs(conflicts, pack_refs)
         citation_map = _citation_map(evidence)
+        # 形状示例里的"字面量"必须取自本轮真实数据：没有证据时不许凭空给一个 article:NNNN，
+        # 否则模型照抄这个示例反而会撞上"引用了不存在的 evidence_ref"（等于提示自己制造违规）。
+        _labels = list(dict(citation_map or {}).items())
+        sample_label = _labels[0][0] if _labels else ""
+        sample_ref = _labels[0][1] if _labels else ""
+        sample_claim = str((claims[0].get("claim_id") if claims else "") or "")
         compact_evidence = [{
             "evidence_ref": item.get("evidence_ref"), "title": item.get("title"),
             "source_url": item.get("source_url"), "published_at": item.get("published_at"),
@@ -1236,9 +1287,18 @@ class QaFinalSynthesizer:
             "只能使用 allowed_claims 和 evidence；不得添加新主张、数字或引用；"
             "未解决冲突、例外、证据缺口和降级状态必须明确展示。"
             "只输出一个 JSON 对象；禁止 Markdown、代码围栏、解释性文字和思维过程；"
-            "必须包含 required_shape 的全部顶层字段，字段名和类型必须一致；没有内容时用空数组、空字符串或 null。"
-            "正文引用使用 citation_map 的 [n]，"
-            "citations 字段填写对应 evidence_ref。answer不超过600字；每个sections文本不超过160字。"
+            "必须包含 required_shape 的全部顶层字段，字段名和类型必须一致；"
+            "required_shape 的任意一个顶层字段都**不许省略**，缺任意一个即视为不合格；没有内容时用空数组、空字符串或 null。"
+            "required_shape 是**形状示例**：字段名、类型、层级必须逐字一致，"
+            "但里面的示例文字必须替换成你自己的真实结论，禁止原样照抄示例文字或占位说明。"
+            "sections 必须是对象，且 sections.summary 必须填你自己写的正文小结，不许留空。"
+            "status 只能填 ready / partial / insufficient_evidence 三者之一。"
+            "正文引用使用 citation_map 的 [n] 标签；"
+            "citations 字段只能逐字填 evidence / citation_map 里出现过的 evidence_ref"
+            + ("（本轮形如 %s）" % sample_ref if sample_ref else "（本轮 citation_map 为空：citations 必须填 []）")
+            + "，**绝对不要填 [n] 标签**"
+            "——[n] 只是写进正文 answer 的引用标签，把它填进 citations 会被判成引用了不存在的证据。"
+            "answer不超过600字；每个sections文本不超过160字。"
             "claims 字段只填写 claim_id 字符串数组，不要回填完整 claim 对象；不要复述证据全文。"
             "如果 question 中包含“问题拆解与回答计划”，必须按其中的问题关系、主题聚类、检索策略和回答大纲组织答案；"
             "如果包含“动态回答模板”，最终 answer 的段落结构必须优先服从动态回答模板；"
@@ -1261,18 +1321,33 @@ class QaFinalSynthesizer:
                 "包内没有证据支持的句子必须显式写上【无证据】；"
                 "context_pack.反证 与 上下文缺口 必须展示，不得只讲支持性结论。"
             )
+        # ── 提示消歧（B 机真实 run d980edf5c1b44949acccbf212daeb3f5 的生成端真根因）──────
+        # 旧 required_shape 是"空骨架 + 抽象占位"：answer 的示例只有"综合回答，正文引用如 [1]"，
+        # sections 全是空字符串，status 给的是 "ready|partial|insufficient_evidence" 这种非字面量。
+        # 模型的原始输出（见 `model_raw_trace`，两次 attempt 逐字相同）恰好只给了三个
+        # "看起来能填"的字段：answer / claims / citations；sections、status、conflicts、
+        # contract_version 一个都没给；而 citations 被填成了正文标签 `["[1]"]`（citation_map 的
+        # key，不是 evidence_ref），于是被判"引用了不存在的证据"、真实答案被丢掉换成模板。
+        # 现在的口径：**每个顶层字段都给一个合法字面量示例**（取自本轮真实数据），
+        # 且 `citations` 的示例里只出现 evidence_ref、不再出现 `[n]`（方向 1：消歧）。
         required = {
             "contract_version": QA_CONTRACT_VERSION,
-            "status": "ready|partial|insufficient_evidence",
-            "answer": "综合回答，正文引用如 [1]",
+            "status": "ready",
+            "answer": ("把最终回答写在这里；正文引用写成 %s 这样的 citation_map 标签。" % sample_label
+                       if sample_label else "把最终回答写在这里。"),
             "sections": {
-                "summary": "", "key_evidence": "", "timeline": "", "comparison": "",
-                "conflicts_and_uncertainty": "", "business_impact": "", "retrieval_scope": "",
-                "risk_deep_dive": {"methodology": "", "risks": [], "law_search_queries": []},
+                "summary": "一句话核心结论（必填：写你自己对结论的概括，不许留空、不许照抄本示例）",
+                "key_evidence": "支撑结论的关键证据；没有就写空字符串",
+                "timeline": "时间线；没有就写空字符串",
+                "comparison": "对比；没有就写空字符串",
+                "business_impact": "业务影响；没有就写空字符串",
+                "retrieval_scope": "检索范围；没有就写空字符串",
+                "conflicts_and_uncertainty": "程序会重写这个键，写空字符串即可",
+                "risk_deep_dive": {"methodology": "程序会重写这个键，写空对象即可"},
             },
-            "claims": ["claim_id"],
+            "claims": [sample_claim] if sample_claim else [],
             "conflicts": conflicts,
-            "citations": list(citation_map.values()),
+            "citations": [sample_ref] if sample_ref else [],
         }
         body = {
             "question": str(question)[:4000],
@@ -1292,7 +1367,21 @@ class QaFinalSynthesizer:
             body["context_pack"] = pack_blocks
         user = json.dumps(body, ensure_ascii=False)
         if repair_error:
-            user += "\n只修复 JSON，不增加任何事实：" + repair_error[:1000] + "\n原输出：" + prior[:20000]
+            # 方向 5：修复重试必须"真能修"。B 机真实 run 里两次输出**逐字相同**（只多了一层 ```json
+            # 围栏）—— 旧提示只说"只修复 JSON，不增加任何事实：<error>"，模型既拿不到**合法取值清单**
+            # （citations 里到底能填哪些 ref），也不知道**少了哪些顶层字段**（模型输出根本没有 sections、
+            # 没有 status），除了把原样再吐一遍无事可做，白白多花一次模型调用与 27.5 秒。
+            # 现在把三件事直接铺进提示：① 出问题的原文；② 必须返回的顶层字段清单；
+            # ③ citations 的合法 evidence_ref 全列表。**不改任何校验口径**，只是让模型有修的依据。
+            legal_refs = list(dict.fromkeys(str(ref) for ref in dict(citation_map or {}).values() if str(ref)))
+            user += (
+                "\n只修复 JSON，不增加任何事实：" + repair_error[:1000]
+                + "\n必须返回的顶层字段（缺任意一个即不通过，字段名逐字一致）：" + "、".join(str(key) for key in required)
+                + "\n上一次输出若缺少顶层字段必须补齐：sections 必须是对象，且 sections.summary 必须填你自己写的正文小结。"
+                + "\ncitations 只能从这份合法 evidence_ref 清单里逐字取值，禁止填 [n] 标签："
+                + json.dumps(legal_refs[:40], ensure_ascii=False)
+                + "\n原输出：" + prior[:20000]
+            )
         return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
     def generate(
@@ -1523,7 +1612,25 @@ class QaFinalSynthesizer:
                     evidence = packed
                     selected_claims = packed_claims
         evidence_refs = {str(item.get("evidence_ref")) for item in evidence}
+        # 引用编号提前算（原来在下面 unknown_refs 之后）：下面的 [n] 逆映射、未知引用判定、
+        # 正文引用补全都用同一份编号，口径一字不变。
+        citation_map = _citation_map(evidence)
         citations = list(dict.fromkeys(str(item) for item in parsed.get("citations") or []))
+        # 方向 2（本 run 的真根因）：模型把 citations 填成了正文标签 `[n]`（citation_map 的 key）。
+        # 这里做**纯格式归一化**：用 citation_map 逆映射成 evidence_ref。**底线没动** ——
+        # 翻译结果仍要逐个落在本轮真实证据里（紧跟着的 unknown_refs 判定），
+        # 映射不动的标签原样保留、照旧判失败。
+        citations, translated_labels = _normalize_citation_labels(citations, citation_map)
+        citations = list(dict.fromkeys(citations))
+        # 归一化的事实必须**如实记账**（绝不静默改写模型输出）：落进与 grounding 不可用
+        # 同一本账（degradation_reasons + sections.diagnostics.degradation_codes + degraded/status）。
+        ledger = list(degradation or [])
+        if translated_labels:
+            ledger.append({
+                "stage": "synthesis",
+                "code": "SYNTHESIS_CITATION_LABEL_NORMALIZED",
+                "message": _citation_label_note(translated_labels, citation_map),
+            })
         if official_only:
             citations = [ref for ref in citations if ref in evidence_refs]
         unknown_refs = sorted(set(citations) - evidence_refs)
@@ -1533,7 +1640,6 @@ class QaFinalSynthesizer:
             citations = list(dict.fromkeys(
                 str(ref) for claim in selected_claims for ref in claim.get("evidence_refs") or []
             ))
-        citation_map = _citation_map(evidence)
         reverse = _citation_reverse(evidence, citation_map)
         answer = _render_structured_answer_value(parsed.get("answer"), parsed)
         answer = re.sub(r"\[\d+\]", "", answer).strip()
@@ -1572,12 +1678,15 @@ class QaFinalSynthesizer:
         # （既有语义一个字没改：契约不合格仍然降级，坏输出不会被当好消息接受）。
         sections_value = parsed.get("sections")
         if not isinstance(sections_value, Mapping):
+            # 缺键与坏形状分开表达：本 run 的原始输出（`model_raw_trace`）是**连 sections 键都没有**，
+            # 旧文案只说"实际是 null"，读不出"字段整个缺失"。只加文案，判罚口径一字未动。
+            missing = "（顶层字段缺失：模型没有返回这个字段）" if "sections" not in parsed else ""
             raise QaContractError(
-                "最终综合的 sections 必须是对象，实际是 %s；sections 原文片段：%s"
-                % (_shape_of(sections_value), _value_excerpt(sections_value))
+                "最终综合的 sections 必须是对象，实际是 %s%s；sections 原文片段：%s"
+                % (_shape_of(sections_value), missing, _value_excerpt(sections_value))
             )
         sections = dict(sections_value)
-        public_degradation = _public_degradation_reasons(degradation)
+        public_degradation = _public_degradation_reasons(ledger)
         sections["conflicts_and_uncertainty"] = {
             "unresolved_conflicts": _public_conflict_summaries(unresolved),
             "evidence_gaps": _public_evidence_gaps(l1_gaps + l2_gaps, evidence),
@@ -1586,7 +1695,7 @@ class QaFinalSynthesizer:
         sections["risk_deep_dive"] = _build_risk_deep_dive(question, selected_claims, evidence, citation_map)
         sections["diagnostics"] = {
             "degradation_codes": [
-                str(item.get("code") or "") for item in degradation or [] if isinstance(item, Mapping) and item.get("code")
+                str(item.get("code") or "") for item in ledger if isinstance(item, Mapping) and item.get("code")
             ],
         }
         degraded = bool(public_degradation)
