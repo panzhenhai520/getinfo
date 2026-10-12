@@ -396,6 +396,11 @@ class IntelRepository:
                 restored = 0
                 left_hidden = 0
                 reclassification_required = 0
+                # 本次重绑的写入时刻：与分类/聚类作业同口径（Python 侧 utc_text()）。
+                # 不能再用 SQL 的 strftime(...,'now')（旧写法，见下方注释）——PG 主库上
+                # postgres_shims.py 把它实现成 now() AT TIME ZONE 'Asia/Shanghai'。
+                # 一次重绑共用一个时刻，与原 now() 的事务内稳定性一致。
+                rebind_at = utc_text()
                 for row in rows:
                     matched = matched_project_keywords(
                         normalized_keywords,
@@ -408,15 +413,23 @@ class IntelRepository:
                         continue
                     # 只换激活身份：证据（anchor/core/expanded/评分/category/topic）
                     # 一律由分类器写入，激活路径不得改写（见函数 docstring）。
+                    # updated_at 也必须写 UTC：这一列在 PG 主库上曾被
+                    # `updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')` 写成
+                    # 「东八区本地时间 + 误导性的 Z 后缀」（shim 把 'now' 换成
+                    # now() AT TIME ZONE 'Asia/Shanghai'，还把 %f 映射成 US 导致秒位丢失），
+                    # 与分类作业写的 utc_text() 混在同一列 → 按 updated_at 判新鲜度时会
+                    # 误判"未来时间"（实测 4 行重绑值大于当前 UTC）。
+                    # shim 本身可能被别处依赖（例如展示北京时间），不改；只改这里的取值方式。
                     cursor.execute(
                         """
                         UPDATE article_intel_classifications
                         SET activation_id=?,
-                            updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                            updated_at=?
                         WHERE id=?
                         """,
                         (
                             str(activation_id),
+                            rebind_at,
                             int(row["id"]),
                         ),
                     )

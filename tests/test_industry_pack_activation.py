@@ -3,6 +3,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -576,6 +577,116 @@ class IndustryPackActivationTest(unittest.TestCase):
             )
         }
         self.assertIn(article_id, pending_ids)
+
+    def test_projection_rebind_timestamp_is_utc_not_local_time(self):
+        """回归：重绑写的 updated_at 必须是 UTC，不能是东八区本地时间。
+
+        历史缺陷（A 机 PostgreSQL 主库实证）：重绑用 SQL 侧
+        `updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`，而 postgres_shims.py:476-477
+        把 'now' 实现成 `now() AT TIME ZONE 'Asia/Shanghai'` → 落库的是「东八区本地时间
+        + 误导性的 Z 后缀」（%f 还被映射成 US，连秒位都丢了）。分类/聚类作业写的是
+        Python 侧 utc_text()，两种口径混在同一列：全表 13395 行里有 4 行重绑值的
+        updated_at 大于当前 UTC 时刻，按 updated_at 判新鲜度的逻辑会把它们当成未来时间。
+
+        为什么要把 shim 语义搬进隔离 sqlite：sqlite 自己的 strftime(...,'now') 本来就是
+        UTC，旧写法在 sqlite 上照样"通过"——缺陷只在 PG 主库显形。这里用 create_function
+        覆盖内置 strftime 复刻 shim 的「'now' → 东八区」，旧写法在这个环境里必然写出本地时间，
+        本用例因此真的能挡住它回来（已用"改回旧写法则用例失败"验证过）。
+        """
+        content = "家族办公室与财富传承信息仍命中当前项目关键词。"
+        article_id = int(
+            self.database.connection.execute(
+                """
+                INSERT INTO articles(
+                    url,title,content,domain,publish_date,status,
+                    content_hash,content_length
+                ) VALUES(?,?,?,?,date('now'),'active',?,?)
+                """,
+                (
+                    "https://projection.example.test/utc-stamp",
+                    "重绑时间戳时区回归用例",
+                    content,
+                    "projection.example.test",
+                    "projection-utc-stamp",
+                    len(content),
+                ),
+            ).lastrowid
+        )
+        self.repository.upsert_classification(
+            {
+                "article_id": article_id,
+                "industry_pack_id": "family_office",
+                "activation_id": "",
+                "industry_pack_version": "1.0.0",
+                "classifier_version": "legacy-fixture",
+                "article_content_hash": "projection-utc-stamp",
+                "rule_category": "event",
+                "rule_confidence": 1,
+                "rule_reason": "legacy",
+                "score_details": {"hits": {"anchor": [], "core": ["家族办公室"]}},
+                "matched_keywords": ["政策"],
+                "topic_tags": ["政策与税务"],
+                "final_category": "event",
+                "final_confidence": 1,
+                "final_reason": "legacy",
+            }
+        )
+        self.database.connection.commit()
+
+        # 固定时刻只用来区分「值来自 Python 侧 UTC 时钟源」还是「来自 SQL 侧 now / 真实时钟」。
+        # 取一个古早时刻：东八区本地时间恒大于它，断言与跑用例的机器时间无关。
+        pinned_utc = "2020-01-02T03:04:05Z"
+
+        def shim_strftime(fmt, value):
+            """复刻 postgres_shims.py 的 strftime：'now' → 东八区本地时间（带 Z 后缀）。"""
+            if str(value or "").strip().lower() != "now":
+                return str(value)
+            local = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8)))
+            return local.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+        # 注意：sqlite 会缓存已编译的语句，所以这个覆盖对「此后新出现的 SQL 文本」生效
+        # （本用例要验证的两条语句都是新的）。py3.11 的 create_function(..., None) 无法干净
+        # 还原内置实现，这里不做还原——每个用例都是独立的新连接（setUp 建新库）。
+        self.database.connection.create_function("strftime", 2, shim_strftime)
+
+        # 变异哨兵：把旧写法（旧实现的原文）在同一环境里跑一遍，确认它写出的确实是东八区
+        # 本地时间。旧实现一旦回来，下面的核心断言必然失败。
+        self.database.connection.execute(
+            """
+            UPDATE article_intel_classifications
+            SET updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+            WHERE article_id=?
+            """,
+            (article_id,),
+        )
+        legacy_value = self.database.connection.execute(
+            "SELECT updated_at FROM article_intel_classifications WHERE article_id=?",
+            (article_id,),
+        ).fetchone()[0]
+        self.assertNotEqual(legacy_value, pinned_utc)
+        self.assertGreater(legacy_value, pinned_utc)
+
+        with patch("intel_database.utc_text", lambda *args, **kwargs: pinned_utc):
+            result = self.repository.restore_pack_projection_for_activation(
+                industry_pack_id="family_office",
+                activation_id="new-activation",
+                target_pack_version="2.0.0",
+                project_keywords=["家族办公室"],
+            )
+        self.assertEqual(result["classification_rows_restored"], 1)
+
+        stored = self.database.connection.execute(
+            "SELECT activation_id, updated_at FROM article_intel_classifications WHERE article_id=?",
+            (article_id,),
+        ).fetchone()
+        self.assertEqual(stored[0], "new-activation")
+        # ★ 核心断言：重绑写的是 Python 侧 UTC 时钟源的时刻，不是 shim 的东八区本地时间。
+        self.assertEqual(stored[1], pinned_utc)
+        # 顺带钉住"可解析"：PG 上被 shim 写坏的 24 字符值（无秒位）连 fromisoformat 都过不去。
+        self.assertEqual(
+            datetime.fromisoformat(stored[1].replace("Z", "+00:00")),
+            datetime(2020, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
+        )
 
     def test_failure_during_apply_rolls_back_settings_sources_and_activation(self):
         first = self._publish()

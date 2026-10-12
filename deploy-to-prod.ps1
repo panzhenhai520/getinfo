@@ -364,6 +364,41 @@ for p in missing[:8]: print("   - " + p)
 } catch {
   Write-Host ("    核对未完成：{0}" -f $_.Exception.Message) -ForegroundColor Yellow
 }
+# ── 7) 版本记录：把「这次到底发的什么」自动落到生产机 ──────────────
+# 为什么要有这一步：$RemoteDir/DEPLOYED_COMMIT 以前是手工写的，发布脚本不写，
+# 所以下次发布之后它必然过时（与实际在跑的镜像对不上）。这里在部署成功后自动写。
+# 用「本地写文件 + Send-FileResumable 上传」而不是 ssh 命令行内联 echo：
+# 脚本注释里写过「ssh 命令行多层引号转义是把 python -c 拆坏的根源」，同样适用于多行内容。
+# 容错：版本记录只是运维标注，写不进去绝不能让一次已经成功的部署判失败（打黄字告警）。
+try {
+  $headRaw = (& git -C $RepoRoot rev-parse HEAD 2>$null | Select-Object -Last 1)
+  $head = if ($headRaw) { $headRaw.Trim() } else { '' }
+  if (-not $head) { throw 'git rev-parse HEAD 无输出' }
+  $branchRaw = (& git -C $RepoRoot rev-parse --abbrev-ref HEAD 2>$null | Select-Object -Last 1)
+  $branch = if ($branchRaw) { $branchRaw.Trim() } else { '' }
+  # 本脚本打包的是**工作区整目录**（见 [1/5] 的 tar），不是 HEAD 快照：有未提交改动时
+  # 镜像内容会领先 commit。dirty 行如实记下这个差异，避免把 commit 当成「镜像==该提交」的保证。
+  $dirty = @(& git -C $RepoRoot status --porcelain 2>$null).Count
+  # 远端镜像 id：只认 sha256: 开头的行；镜像不存在时不要让 Invoke-Ssh 走 4 次重试（用 || true 直接收口）
+  $imgRaw = Invoke-Ssh ("docker image inspect " + $Image + " --format '{{.Id}}' 2>/dev/null || true")
+  $imgId = ($imgRaw | Where-Object { $_ -match '^sha256:[0-9a-f]{12,}$' } | Select-Object -Last 1)
+  if (-not $imgId) { throw '未能从远端 docker image inspect 读到镜像 id' }
+  $deployedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss') + 'Z'
+  $record = @(
+    ("commit=" + $head),
+    ("branch=" + $branch),
+    ("deployed_at=" + $deployedAt),
+    ("image=" + $imgId.Substring(0, 19)),
+    ("worktree_dirty=" + $dirty)
+  ) -join "`n"
+  $recordPath = Join-Path $Staging 'DEPLOYED_COMMIT'
+  [System.IO.File]::WriteAllText($recordPath, $record + "`n", (New-Object System.Text.UTF8Encoding($false)))
+  Send-FileResumable $recordPath (($RemoteDir.TrimEnd('/')) + '/DEPLOYED_COMMIT')
+  Write-Host ("    版本记录已写入 {0}/DEPLOYED_COMMIT：commit={1} image={2}" -f $RemoteDir, $head.Substring(0, 12), $imgId.Substring(0, 19)) -ForegroundColor Green
+} catch {
+  Write-Host ("    ⚠️ 版本记录写入失败（不影响本次部署结果）：{0}" -f $_.Exception.Message) -ForegroundColor Yellow
+}
+
 Write-Host '=== 部署完成 ✅ ===' -ForegroundColor Green
 Write-Host '  回滚: docker tag collectinfo-web:rollback collectinfo-web:latest && cd /www/CollectInfo_latest_new && docker compose -f docker-compose.prod.yml up -d'
 Remove-Item $Staging -Recurse -Force -ErrorAction SilentlyContinue
