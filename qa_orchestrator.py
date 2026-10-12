@@ -233,6 +233,13 @@ class QaOrchestrator:
                 # 判失败；而 details["result"] 还要作为"已完成阶段输出"回放（见上面 completed_outputs），
                 # 留着同样会把回放的 run 判失败。拿到的用量只进 details，不影响既有结果结构。
                 token_usage = output.pop("token_usage", None)
+                # 同类：合成阶段"两次契约校验都不过"时挂上的原始模型输出留痕
+                # （`qa_synthesis.RAW_TRACE_KEY`）。**必须同样从 output 里摘掉**再进
+                # `details["result"]`，理由与上面 token_usage 逐字相同：答案输出要走
+                # `additionalProperties=False` 的冻结契约，多带一个键就判失败；
+                # 而 `details["result"]` 还要作为"已完成阶段输出"回放。
+                # 摘下来的原文只进 details（`qa_stage_runs.details_json`，零迁移、不新增列）。
+                model_raw_trace = output.pop("model_raw_trace", None)
                 context["outputs"][stage] = output
                 details = {
                     "result": output,
@@ -252,6 +259,10 @@ class QaOrchestrator:
                     }
                     if clean_usage:
                         details["token_usage"] = clean_usage
+                # 原始模型输出留痕：与 token_usage 同级进 details（不碰 result、不碰任何 schema）。
+                # 只在阶段真的挂了这条留痕时才写，成功路径逐字不变。
+                if model_raw_trace:
+                    details["model_raw_trace"] = model_raw_trace
                 self.store.record_stage(
                     run_id,
                     stage,

@@ -46,6 +46,50 @@ _LOGGER = logging.getLogger(__name__)
 "生成端 grounding 闸门零产出"看起来像"零违规"，实际是**闸门根本没跑到**。
 """
 
+RAW_TRACE_KEY = "model_raw_trace"
+"""原始模型输出留痕的阶段输出键名，由 `qa_orchestrator` 摘出来写进
+
+`qa_stage_runs.details_json`（与 `token_usage` 同一处、同一理由：冻结契约
+`additionalProperties=False`，多带一个键就会把整条 run 判失败；`details["result"]`
+还要当"已完成阶段输出"回放）。**不新增数据库列、不改任何冻结 schema。**
+
+传递路径：`QaFinalSynthesizer.generate(raw_trace_sink=...)` → `qa_pipeline.synthesis`
+挂成阶段输出的这个键 → `qa_orchestrator` 摘进 `details`。答案载荷本身始终干净。
+"""
+
+_RAW_TRACE_CHARS = 2000
+"""每次尝试的原始模型输出入库前截断到这个长度（够看出形状，又不至于撑爆 details_json）。"""
+
+
+def _shape_of(value: object) -> str:
+    """模型给的字段值是什么形状。只用于报错文案，**不做任何类型转换**。"""
+    if value is None:
+        return "null"
+    if isinstance(value, Mapping):
+        return "对象"
+    if isinstance(value, (list, tuple)):
+        return "数组"
+    if isinstance(value, str):
+        return "字符串"
+    if isinstance(value, bool):
+        return "布尔"
+    if isinstance(value, (int, float)):
+        return "数字"
+    return type(value).__name__
+
+
+def _value_excerpt(value: object, limit: int = 120) -> str:
+    """把模型给的坏值截成一行短摘要，供报错文案 / 降级原因带出**原文片段**。
+
+    为什么不做 try/except 兜住调用方：这里是"把坏值转成可读文本"，转不动就退回 repr，
+    坏形状本身仍由调用方判成契约错误 —— 绝不因为这里能转就当成"模型答得没问题"。
+    """
+    try:
+        text = json.dumps(value, ensure_ascii=False)
+    except Exception:  # noqa: BLE001 —— 只为出一行摘要，失败不影响判错
+        text = repr(value)
+    return re.sub(r"\s+", " ", str(text)).strip()[:limit]
+
 
 def _int_env(name: str, default: int, low: int, high: int) -> int:
     try:
@@ -1139,6 +1183,21 @@ def _fallback_reason(last_error) -> str:
     return "%s（%s: %s）" % (_FALLBACK_FAILED_NOTE, type(last_error).__name__, str(last_error)[:200])
 
 
+def _publish_raw_trace(sink: dict | None, traces: list) -> None:
+    """把本轮各次尝试的**原始模型输出**交给调用方（`generate(raw_trace_sink=...)`）。
+
+    为什么不直接挂在 `generate()` 的返回值上：合成输出要原样过 `validate_final_answer`
+    （`additionalProperties=False`），多带一个键就会把整条 run 判失败
+    （既有用例 `test_two_failed_attempts_are_recorded_not_erased` 正是钉这一条）。
+    所以走"调用方收留痕"这条路：`qa_pipeline.synthesis` 把它挂成阶段输出的
+    `RAW_TRACE_KEY`，`qa_orchestrator` 再在 `context["outputs"][stage] = output` **之前**
+    摘掉并写进 `qa_stage_runs.details_json`（与 `token_usage` 同一处、同一理由）。
+    """
+    if sink is None or not traces:
+        return
+    sink[RAW_TRACE_KEY] = [dict(item) for item in traces]
+
+
 class QaFinalSynthesizer:
     def __init__(self, model_client: Callable | None = None):
         self.model_client = model_client or OpenAIJsonModelClient()
@@ -1248,7 +1307,15 @@ class QaFinalSynthesizer:
         models: Mapping,
         token_callback: Callable[[str], None] | None = None,
         context_pack: Mapping | None = None,
+        raw_trace_sink: dict | None = None,
     ) -> dict:
+        """综合最终答案。
+
+        `raw_trace_sink`：可选的外部字典。两次尝试都没过契约时，这里把各次尝试的
+        原始模型输出（截断到 `_RAW_TRACE_CHARS`）放进它的 `RAW_TRACE_KEY` 键，供调用方
+        落进 `qa_stage_runs.details_json`。**默认 None 时行为逐字不变**；返回值永远
+        不带这个键 —— 合成输出必须保持"能直接过冻结契约"的干净形状。
+        """
         messages = self._messages(question=question, graph=graph, level1=level1, level2=level2,
                                   degradation=degradation, context_pack=context_pack)
         # 本阶段的模型用量：首答 + 引用修复重试逐次收集，最后累加（拿不到就不挂该键）
@@ -1319,7 +1386,13 @@ class QaFinalSynthesizer:
                 reason=item["message"], question=question,
             ))
         last_error = None
+        # 每次尝试的**原始模型输出**留痕。为什么必须留：这次排查（B 机 run
+        # db1fc148152e47178ce348f256dcad0b）最大的障碍就是原文没落库 —— `finish=stop`、
+        # 零错误、却退化成模板，只能靠猜模型到底返回了什么形状。
+        raw_traces: list[dict] = []
         for attempt in range(2):
+            trace = {"attempt": attempt + 1, "raw_excerpt": str(raw or "")[:_RAW_TRACE_CHARS]}
+            raw_traces.append(trace)
             try:
                 parsed = extract_json_object(raw)
                 result = self._lock_to_graph(parsed, graph, level1, level2, degradation, models,
@@ -1347,6 +1420,7 @@ class QaFinalSynthesizer:
                 last_error = exc
                 # 吞异常必须留痕：旧实现只把它塞进 last_error（再没被读过），
                 # 于是一条"两次都没过"的 run 在库和日志里都看着像"一次就过了"。
+                trace["error"] = "%s: %s" % (type(exc).__name__, str(exc)[:300])
                 _LOGGER.warning("最终综合第 %d 次尝试未通过契约校验：%s: %s",
                                 attempt + 1, type(exc).__name__, str(exc)[:300])
                 if attempt:
@@ -1377,6 +1451,7 @@ class QaFinalSynthesizer:
                     ))
         _LOGGER.warning("最终综合两次尝试都未通过契约校验，改用证据约束结构化重组；最后一次异常：%s",
                         "%s: %s" % (type(last_error).__name__, str(last_error)[:200]) if last_error else "-")
+        _publish_raw_trace(raw_trace_sink, raw_traces)
         return _finalize(fallback_final_answer(
             graph=graph,
             level1=level1,
@@ -1486,7 +1561,22 @@ class QaFinalSynthesizer:
         ]
         l1_gaps = list(level1.get("gaps") or [])
         l2_gaps = list(level2.get("evidence_gaps") or []) if isinstance(level2, Mapping) else []
-        sections = dict(parsed.get("sections") or {})
+        # 模型返回的 sections 必须是对象（冻结契约 FINAL_ANSWER_SCHEMA: sections 是必填 object）。
+        # 旧实现直接 dict(parsed.get("sections") or {})：模型把 sections 返成数组时，只要首元素
+        # 是 3 元组 / 3 键对象，dict() 就抛
+        #   ValueError: dictionary update sequence element #0 has length 3; 2 is required
+        # —— 这条错被上层当成"契约校验未通过"，文案里却看不出**是哪个字段形状错了**，
+        # 于是一条真问答只能靠猜（B 机 run db1fc148152e47178ce348f256dcad0b）。
+        # 这里用**类型守卫**把坏形状显式判成契约错误：不 try/except 兜住、也不静默当空对象收下。
+        # 于是第一次尝试会把"实际形状 + 原文片段"写进修复提示，两次都不过才走证据约束重组
+        # （既有语义一个字没改：契约不合格仍然降级，坏输出不会被当好消息接受）。
+        sections_value = parsed.get("sections")
+        if not isinstance(sections_value, Mapping):
+            raise QaContractError(
+                "最终综合的 sections 必须是对象，实际是 %s；sections 原文片段：%s"
+                % (_shape_of(sections_value), _value_excerpt(sections_value))
+            )
+        sections = dict(sections_value)
         public_degradation = _public_degradation_reasons(degradation)
         sections["conflicts_and_uncertainty"] = {
             "unresolved_conflicts": _public_conflict_summaries(unresolved),
