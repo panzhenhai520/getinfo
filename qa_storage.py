@@ -65,6 +65,63 @@ def _decode_run(row) -> dict | None:
     return value
 
 
+# ── 降级记账的单一真源：run 级派生自答案级（方案①）────────────────────────────
+# 口径：run 级 = **答案级结构派生** + 阶段级显式记账。
+# 派生为什么写在这里：所有"正常返回但答案被标注降级"的路径（生成端内部兜底、
+# grounding 闸门不可用 / 阻断违规、citations 标签归一化、终验证据不足…）最后都必须经过
+# `update_run(final_answer=...)` —— 它是全仓**唯一**带 final_answer 的终局写口
+# （`qa_orchestrator` 的 run_completed）。写在这里，作者就**不需要"记得调 mark_degraded"**，
+# 于是"答案级说降级、run 级说没降级"这种互相打脸在结构上不可能再出现。
+_ANSWER_DEGRADED_CODE = "ANSWER_DEGRADED_NOT_RECORDED"
+"""答案级降级而 run 级缺账时补写的稳定码（可被日志/巡检直接抓）。"""
+
+
+def _answer_degradation_reasons(final_answer: Mapping) -> list[str]:
+    """答案载荷里**过滤后**的公开降级原因（空串一律丢弃）。"""
+    raw = final_answer.get("degradation_reasons")
+    return [str(item).strip() for item in (raw if isinstance(raw, (list, tuple)) else [])
+            if str(item or "").strip()]
+
+
+def _answer_degradation_codes(final_answer: Mapping) -> list[str]:
+    """答案载荷里的公开诊断码（`sections.diagnostics.degradation_codes`，契约内既有字段）。"""
+    sections = final_answer.get("sections")
+    diagnostics = sections.get("diagnostics") if isinstance(sections, Mapping) else None
+    codes = diagnostics.get("degradation_codes") if isinstance(diagnostics, Mapping) else None
+    return [str(item).strip() for item in (codes if isinstance(codes, (list, tuple)) else [])
+            if str(item or "").strip()]
+
+
+def _degradation_note_from_codes(codes: list) -> str:
+    """`degraded=true` 却一条 reason 都没有时的**回填文案**：把公开诊断码带出来。
+
+    硬线：降级不许静默 —— 宁可只报诊断码，也不许留一个空 reasons 让人猜为什么。
+    """
+    if codes:
+        return "降级原因见诊断码：%s" % "、".join(codes)
+    return "最终答案被标注为降级，但本次未给出可公开的降级原因。"
+
+
+def _derive_answer_degradation(final_answer: Mapping) -> tuple[dict, dict | None]:
+    """答案级 → run 级的结构派生。返回 `(载荷, 待补写的 run 级记账或 None)`。
+
+    1) 答案降级但**过滤后 reasons 为空** → 回填一条能说明原因的消息（带上诊断码），
+       消除"`degraded=true` 而 `degradation_reasons=[]`"这种自相矛盾；
+    2) 记账项固定带 stage/code/message，`message` 用回填后的第 1 条 reason ——
+       于是**任何**一条降级都让人看得出为什么降级；
+    3) 答案**没**降级时原样返回、`None` 记账 —— 反向守卫，正常答案一个字都不许改。
+    """
+    payload = dict(final_answer)
+    if not bool(payload.get("degraded")):
+        return payload, None
+    reasons = _answer_degradation_reasons(payload)
+    if not reasons:
+        reasons = [_degradation_note_from_codes(_answer_degradation_codes(payload))]
+        payload["degradation_reasons"] = reasons
+    item = {"stage": "final_answer", "code": _ANSWER_DEGRADED_CODE, "message": reasons[0][:500]}
+    return payload, item
+
+
 # ── graph-rag-v2 通用包 Phase 01 · F-5：版本四元组 ────────────────────────────
 # 四元组（corpus_version / model_version / prompt_version / config_hash）用于回放判定：
 # 任一版本变化就说明"同样的问句不该按旧结论复用"。四个值都允许为空串（老数据、取不到），
@@ -344,13 +401,34 @@ class QaStore:
                     (status, stage, now, completed, str(run_id)),
                 )
             else:
-                self.database.connection.execute(
-                    """
-                    UPDATE qa_runs SET status=?, current_stage=?, final_answer_json=?,
-                        updated_at=?, completed_at=COALESCE(?, completed_at) WHERE id=?
-                    """,
-                    (status, stage, _json(final_answer), now, completed, str(run_id)),
-                )
+                # 方案①：终局写口**结构派生** run 级降级 —— 答案级说降级而 run 级为假
+                # （或记了却一条原因都没有）时，在**同一条 UPDATE** 里补 `degraded=1`
+                # 与一条 {stage:final_answer, code:ANSWER_DEGRADED_NOT_RECORDED, message:…}。
+                payload, derived = _derive_answer_degradation(final_answer)
+                row = self.database.connection.execute(
+                    "SELECT degraded, degradation_json FROM qa_runs WHERE id=?", (str(run_id),)
+                ).fetchone()
+                recorded = _decode_json(row["degradation_json"] if row is not None else None, [])
+                recorded = list(recorded) if isinstance(recorded, list) else []
+                run_marked = bool(row["degraded"]) if row is not None else False
+                if derived is not None and (not run_marked or not recorded):
+                    self.database.connection.execute(
+                        """
+                        UPDATE qa_runs SET status=?, current_stage=?, final_answer_json=?,
+                            degraded=1, degradation_json=?, updated_at=?,
+                            completed_at=COALESCE(?, completed_at) WHERE id=?
+                        """,
+                        (status, stage, _json(payload), _json(recorded + [derived]),
+                         now, completed, str(run_id)),
+                    )
+                else:
+                    self.database.connection.execute(
+                        """
+                        UPDATE qa_runs SET status=?, current_stage=?, final_answer_json=?,
+                            updated_at=?, completed_at=COALESCE(?, completed_at) WHERE id=?
+                        """,
+                        (status, stage, _json(payload), now, completed, str(run_id)),
+                    )
             self.database.connection.commit()
 
     def mark_degraded(self, run_id: str, item: Mapping) -> None:

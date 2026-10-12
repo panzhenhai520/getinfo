@@ -2662,6 +2662,32 @@ def _local_retrieval(article_retriever, fleet, plan: Mapping, *, industry_pack_i
             plan, industry_pack_id=industry_pack_id, page_context=page_context, limit=limit), receipt
 
 
+def _synthesis_degradation_item(result: Mapping) -> dict:
+    """综合阶段"正常返回但答案被标注降级"时的 run 级记账项（方案①）。
+
+    `code` 取答案的诊断码首条（`sections.diagnostics.degradation_codes`，契约内既有字段）；
+    取不到就退回稳定的 `SYNTHESIS_DEGRADED`。`message` 取公开的第 1 条降级原因，
+    过滤后为空时用诊断码拼串兜底 —— **降级不许静默**：记账里必须看得出为什么降级。
+    """
+    sections = result.get("sections")
+    diagnostics = sections.get("diagnostics") if isinstance(sections, Mapping) else None
+    raw_codes = diagnostics.get("degradation_codes") if isinstance(diagnostics, Mapping) else None
+    codes = [str(item).strip() for item in (raw_codes if isinstance(raw_codes, (list, tuple)) else [])
+             if str(item or "").strip()]
+    raw_reasons = result.get("degradation_reasons")
+    reasons = [str(item).strip() for item in (raw_reasons if isinstance(raw_reasons, (list, tuple)) else [])
+               if str(item or "").strip()]
+    if reasons:
+        message = reasons[0]
+    else:
+        message = ("降级原因见诊断码：%s" % "、".join(codes)) if codes else "最终综合被标注为降级。"
+    return {
+        "stage": "synthesis",
+        "code": codes[0] if codes else "SYNTHESIS_DEGRADED",
+        "message": message[:500],
+    }
+
+
 def build_qa_stage_handlers(
     *,
     database=None,
@@ -3947,6 +3973,14 @@ def build_qa_stage_handlers(
             )
             if raw_trace_sink.get(RAW_TRACE_KEY):
                 result[RAW_TRACE_KEY] = raw_trace_sink[RAW_TRACE_KEY]
+            # 方案①（一次补齐 ①内部兜底 / ④grounding 闸门不可用 / ⑤grounding 阻断违规 /
+            # ⑦citations 标签归一化 这四处空档）：`generate()` 的这些降级**只改答案载荷、
+            # 不抛异常**，于是"正常返回"这条路上 run 级与阶段级一个字都没记（B 机实测
+            # d980edf5/db1fc148 两条 run：答案 degraded=true、run 级 degraded=0 且
+            # degradation_json=[]，而 synthesis/citation_validation 阶段还是 completed）。
+            # 这里集中记一次：答案级说降级，run 级就必须有对应记账，两本账不许打脸。
+            if result.get("degraded"):
+                store.mark_degraded(run["id"], _synthesis_degradation_item(result))
             resilience.circuit_success(dependency)
             # 阶段 09（P09-02/P09-03）：§9 主执行流的 Write Gate 位置**在最终答案之后**。
             # 只吃已核验证据图（不吃 result 的正文）——自由生成的内容永远不进记忆库；

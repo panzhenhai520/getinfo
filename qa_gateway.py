@@ -324,6 +324,11 @@ def _public_run(run: Mapping) -> dict:
         "created_at", "updated_at", "completed_at",
     }
     value = {key: run.get(key) for key in allowed}
+    # 方案① 读侧口径：run 级漏记（B 机实测 174 行里有 3 条答案降级而 run 级说没降级）时，
+    # 答案级降级照样要在界面上看得见。只改**读出来的值**，不回写历史行。
+    final_answer = value.get("final_answer")
+    value["degraded"] = bool(value.get("degraded")) or bool(
+        final_answer.get("degraded") if isinstance(final_answer, Mapping) else False)
     value["question"] = str((run.get("request") or {}).get("question") or run.get("question_text") or "")
     return value
 

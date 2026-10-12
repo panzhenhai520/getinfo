@@ -228,8 +228,12 @@ class RealFallbackStillWorksTests(_Base):
         self.assertTrue(answer["degradation_reasons"])
         # 熔断状态机没被这一轮碰开
         self.assertEqual(self._circuit_state(), "closed")
-        # 真兜底路径不产生 synthesis 熔断记录
-        self.assertEqual(self._synthesis_degradation(), [])
+        # 真兜底必须被**如实记账为 `SYNTHESIS_FALLBACK_USED`**（run 级），且**不得被记成熔断码**。
+        # 旧断言 `assertEqual(self._synthesis_degradation(), [])` 的注释写的是"不产生熔断记录"，
+        # 但断言本身钉的是"run 级一个字都不记"——那正是方案①要修的缺陷（答案级 degraded=true
+        # 而 run 级为空 = B 机 d980edf5 的形态），等于把缺陷写成了期望值。这里同时钉住两头。
+        self.assertEqual(["SYNTHESIS_FALLBACK_USED"],
+                         [item.get("code") for item in self._synthesis_degradation()])
 
 
 if __name__ == "__main__":

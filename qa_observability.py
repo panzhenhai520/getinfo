@@ -61,6 +61,22 @@ class QaAuditLogger:
             cursor.close()
 
 
+def _run_degraded(row: Mapping) -> bool:
+    """方案① 读侧口径：run 级为假但**答案级**为真也算降级（与 `qa_gateway._public_run` 同口径）。
+
+    历史 174 行不许回写，这里让"答案降级而 run 级漏记"的 run 在指标里同样被数到。
+    """
+    if bool(row.get("degraded")):
+        return True
+    answer = row.get("final_answer")
+    if not isinstance(answer, Mapping):
+        try:
+            answer = json.loads(row.get("final_answer_json") or "{}")
+        except (TypeError, ValueError):
+            answer = {}
+    return bool(answer.get("degraded")) if isinstance(answer, Mapping) else False
+
+
 class QaMetricsService:
     def __init__(self, database):
         self.database = database
@@ -74,7 +90,7 @@ class QaMetricsService:
             if industry_pack_id:
                 conditions.append("industry_pack_id=?")
                 params.append(str(industry_pack_id))
-            sql = "SELECT id,origin,status,degraded,created_at,completed_at FROM qa_runs"
+            sql = "SELECT id,origin,status,degraded,created_at,completed_at,final_answer_json FROM qa_runs"
             if conditions:
                 sql += " WHERE " + " AND ".join(conditions)
             sql += " ORDER BY created_at DESC LIMIT ?"
@@ -120,7 +136,7 @@ class QaMetricsService:
         )
         return {
             "runs": len(runs), "by_origin": by_origin, "by_status": by_status,
-            "degraded": sum(1 for row in runs if bool(row.get("degraded"))),
+            "degraded": sum(1 for row in runs if _run_degraded(row)),
             "stages": normalized, "error_codes": error_codes,
             "retrieval_evidence_adopted": evidence_count,
         }

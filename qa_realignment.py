@@ -422,6 +422,25 @@ def question_history(store, run_meta: Mapping, *, limit: int = DEFAULT_QUESTION_
     return history
 
 
+def _degradation_reasons(answer: Mapping, run: Mapping) -> list[str]:
+    """降级原因：答案级优先，缺了就用 **run 级** `degradation` 兜底。
+
+    修一个真 bug：`_decode_run` 把 `degradation_json` 解成 `run["degradation"]`，
+    旧写法读的 `run["degradation_reasons"]` **这个键根本不存在** → 想兜 reasons 时永远兜不到。
+    run 级条目是 `{stage,code,message}` 结构，这里渲染成可读文案（不把 dict repr 塞进回执）。
+    """
+    reasons = [str(item).strip() for item in (answer.get("degradation_reasons") or [])
+               if str(item or "").strip()]
+    if reasons:
+        return reasons
+    for item in (run.get("degradation") or []):
+        message = (str(item.get("message") or item.get("code") or "").strip()
+                   if isinstance(item, Mapping) else str(item or "").strip())
+        if message:
+            reasons.append(message)
+    return reasons
+
+
 def run_signals(store, run_id: str) -> dict:
     """一次历史运行的**既有信号**：答案降档 / 停止原因 / 增益 / 缺口未解决率。
 
@@ -474,8 +493,7 @@ def run_signals(store, run_id: str) -> dict:
     answer = _mapping(run.get("final_answer"))
     signals["final_answer"] = answer
     signals["degraded"] = bool(run.get("degraded")) or bool(answer.get("degraded"))
-    signals["degradation_reasons"] = [str(item) for item in
-                                      (answer.get("degradation_reasons") or run.get("degradation_reasons") or [])]
+    signals["degradation_reasons"] = _degradation_reasons(answer, run)
     signals["answer_status"] = str(answer.get("status") or "")
     return signals
 
